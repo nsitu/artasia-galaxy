@@ -51,10 +51,9 @@ jobs:
           script: |
             set -euo pipefail
             cd /opt/artasia-galaxy
-            export ARTASIA_IMAGE=${{ env.IMAGE_NAME }}:latest
-            docker compose pull
-            docker compose up -d --remove-orphans
-            docker image prune -f
+            sudo ARTASIA_IMAGE=${{ env.IMAGE_NAME }}:latest docker compose pull
+            sudo ARTASIA_IMAGE=${{ env.IMAGE_NAME }}:latest docker compose up -d --remove-orphans
+            sudo docker image prune -f
 
       - name: Delete old GHCR image versions
         uses: actions/delete-package-versions@v5
