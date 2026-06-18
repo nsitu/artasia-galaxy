@@ -43,7 +43,7 @@ const publicDir = path.resolve(__dirname, "../../public");
 if (existsSync(publicDir)) {
   app.use(express.static(publicDir));
 
-  app.get("*", (req, res) => {
+  app.get(/.*/, (req, res) => {
     if (req.path.startsWith("/api")) return;
     res.sendFile(path.join(publicDir, "index.html"));
   });
