@@ -1,0 +1,16 @@
+.git
+.github
+node_modules
+dist
+apps/*/dist
+apps/*/*.tsbuildinfo
+.env
+.env.*
+!.env.example
+*.log
+Dockerfile
+docker-compose.yml
+README.md
+PLAN.md
+.opencode
+opencode.json

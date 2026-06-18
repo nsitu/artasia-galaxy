@@ -1,0 +1,17 @@
+services:
+  artasia:
+    image: ${ARTASIA_IMAGE:-ghcr.io/your-github-owner/artasia-galaxy:latest}
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      IMMICH_URL: ${IMMICH_URL:-http://127.0.0.1:2283}
+      IMMICH_API_KEY: ${IMMICH_API_KEY}
+      PORT: 3000
+      DATA_DIR: /data
+      WORDPRESS_URL: ${WORDPRESS_URL:-http://127.0.0.1}
+    volumes:
+      - artasia-data:/data
+    restart: unless-stopped
+
+volumes:
+  artasia-data:
