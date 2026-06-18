@@ -1,0 +1,11 @@
+{
+  "name": "artasia-galaxy",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "dependencies": {
+    "puppeteer-core": "^25.1.0"
+  }
+}

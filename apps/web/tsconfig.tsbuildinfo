@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/api/client.ts","./src/components/scenes/artscene.tsx","./src/components/scenes/camerarig.tsx","./src/components/scenes/gallerywall.tsx","./src/components/scenes/imageplane.tsx","./src/stores/gallerystore.ts"],"version":"5.9.3"}
