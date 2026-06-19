@@ -1,4 +1,6 @@
 import { openAsBlob } from "node:fs";
+import { createHash } from "node:crypto";
+import { createReadStream } from "node:fs";
 
 const IMMICH_URL = process.env.IMMICH_URL ?? "https://photos.artsforall.co";
 const IMMICH_API_KEY = process.env.IMMICH_API_KEY ?? "";
@@ -286,18 +288,33 @@ export async function uploadAsset(params: {
   const modifiedAt = params.modifiedAt ?? createdAt;
   const form = new FormData();
   const blob = await openAsBlob(params.filePath, { type: params.mimeType });
+  const checksum = await sha1File(params.filePath);
+  const deviceAssetId = `artasia-galaxy:${checksum}`;
 
   form.append("assetData", blob, params.filename);
+  form.append("deviceAssetId", deviceAssetId);
+  form.append("deviceId", "artasia-galaxy");
   form.append("filename", params.filename);
   form.append("fileCreatedAt", createdAt.toISOString());
   form.append("fileModifiedAt", modifiedAt.toISOString());
 
   const res = await immichRequest("/assets", {
     method: "POST",
+    headers: { "x-immich-checksum": checksum },
     body: form,
   });
 
   return res.json();
+}
+
+async function sha1File(path: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const hash = createHash("sha1");
+    const stream = createReadStream(path);
+    stream.on("data", (chunk) => hash.update(chunk));
+    stream.on("error", reject);
+    stream.on("end", () => resolve(hash.digest("hex")));
+  });
 }
 
 export async function randomAssets(params: {
