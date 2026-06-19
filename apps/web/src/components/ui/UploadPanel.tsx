@@ -47,8 +47,6 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
     return options.locations.find((location) => keyForLocation(location) === locationKey) ?? null;
   }, [locationKey, options]);
 
-  if (!visible) return null;
-
   function addFiles(fileList: FileList | File[]) {
     const files = Array.from(fileList);
     setError(null);
@@ -154,6 +152,8 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
       uploadInProgressRef.current = false;
     }
   }
+
+  if (!visible) return null;
 
   return (
     <div style={backdropStyle}>
