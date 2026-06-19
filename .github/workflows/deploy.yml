@@ -42,14 +42,27 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Copy Docker Compose file to VM
+      - name: Copy Docker Compose file to VM temp
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_KEY }}
           source: docker-compose.yml
-          target: /opt/artasia-galaxy
+          target: /tmp/artasia-galaxy-deploy
+          overwrite: true
+
+      - name: Install Docker Compose file on VM
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            sudo mkdir -p /opt/artasia-galaxy
+            sudo mv /tmp/artasia-galaxy-deploy/docker-compose.yml /opt/artasia-galaxy/docker-compose.yml
+            sudo rm -rf /tmp/artasia-galaxy-deploy
 
       - name: Deploy to VM
         uses: appleboy/ssh-action@v1
