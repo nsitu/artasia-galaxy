@@ -1,5 +1,8 @@
+import { openAsBlob } from "node:fs";
+
 const IMMICH_URL = process.env.IMMICH_URL ?? "https://photos.artsforall.co";
 const IMMICH_API_KEY = process.env.IMMICH_API_KEY ?? "";
+const PUBLISHED_ALBUM_NAME = "Published";
 
 export interface ImmichAsset {
   id: string;
@@ -158,8 +161,142 @@ export interface ImmichAlbum {
   shared: boolean;
 }
 
+export interface ImmichTag {
+  id: string;
+  name: string;
+  value: string;
+}
+
+interface ImmichUploadResponse {
+  id: string;
+  status: string;
+}
+
+interface ImmichServerStats {
+  usage: number;
+  photos: number;
+  videos: number;
+  usagePhotos: number;
+  usageVideos: number;
+}
+
 export async function listAlbums(): Promise<ImmichAlbum[]> {
   const res = await immichRequest("/albums");
+  return res.json();
+}
+
+export async function findAlbumByName(name: string): Promise<ImmichAlbum | null> {
+  const normalized = name.trim().toLowerCase();
+  const albums = await listAlbums();
+  return albums.find((album) => album.albumName.trim().toLowerCase() === normalized) ?? null;
+}
+
+export async function ensureAlbum(name: string): Promise<ImmichAlbum> {
+  const existing = await findAlbumByName(name);
+  if (existing) return existing;
+
+  const res = await immichRequest("/albums", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ albumName: name }),
+  });
+  return res.json();
+}
+
+export async function ensureConfiguredAlbums(names: string[]) {
+  for (const name of names) {
+    try {
+      await ensureAlbum(name);
+    } catch (err) {
+      console.warn(`[Immich] failed to ensure album "${name}": ${(err as Error).message}`);
+    }
+  }
+}
+
+export async function getPublishedAlbum(): Promise<ImmichAlbum> {
+  return ensureAlbum(PUBLISHED_ALBUM_NAME);
+}
+
+export async function addAssetsToAlbum(albumId: string, assetIds: string[]) {
+  if (assetIds.length === 0) return;
+  await immichRequest(`/albums/${albumId}/assets`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids: assetIds }),
+  });
+}
+
+export async function listTags(): Promise<ImmichTag[]> {
+  const res = await immichRequest("/tags");
+  return res.json();
+}
+
+export async function ensureTag(name: string): Promise<ImmichTag> {
+  const normalized = name.trim().toLowerCase();
+  const tags = await listTags();
+  const existing = tags.find(
+    (tag) =>
+      tag.name.trim().toLowerCase() === normalized ||
+      tag.value.trim().toLowerCase() === normalized
+  );
+  if (existing) return existing;
+
+  const res = await immichRequest("/tags", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  return res.json();
+}
+
+export async function tagAsset(assetId: string, tagNames: string[]) {
+  const uniqueNames = Array.from(
+    new Set(tagNames.map((tag) => tag.trim()).filter(Boolean))
+  );
+  if (uniqueNames.length === 0) return;
+
+  const tags = [];
+  for (const name of uniqueNames) {
+    tags.push(await ensureTag(name));
+  }
+
+  await immichRequest("/tags/assets", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      assetIds: [assetId],
+      tagIds: tags.map((tag) => tag.id),
+    }),
+  });
+}
+
+export async function getServerStatistics(): Promise<ImmichServerStats> {
+  const res = await immichRequest("/server/statistics");
+  return res.json();
+}
+
+export async function uploadAsset(params: {
+  filePath: string;
+  filename: string;
+  mimeType: string;
+  createdAt?: Date;
+  modifiedAt?: Date;
+}): Promise<ImmichUploadResponse> {
+  const createdAt = params.createdAt ?? new Date();
+  const modifiedAt = params.modifiedAt ?? createdAt;
+  const form = new FormData();
+  const blob = await openAsBlob(params.filePath, { type: params.mimeType });
+
+  form.append("assetData", blob, params.filename);
+  form.append("filename", params.filename);
+  form.append("fileCreatedAt", createdAt.toISOString());
+  form.append("fileModifiedAt", modifiedAt.toISOString());
+
+  const res = await immichRequest("/assets", {
+    method: "POST",
+    body: form,
+  });
+
   return res.json();
 }
 

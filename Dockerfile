@@ -30,6 +30,7 @@ COPY apps/server/package.json apps/server/package.json
 COPY --from=build /app/node_modules node_modules
 COPY --from=build /app/apps/server/dist dist
 COPY --from=build /app/apps/web/dist /public
+COPY data /data
 
 RUN mkdir -p /data
 

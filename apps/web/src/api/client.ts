@@ -60,3 +60,78 @@ export async function fetchAlbums(): Promise<Album[]> {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
+
+export interface UploadLocation {
+  partner: string;
+  site: string;
+}
+
+export interface UploadOptions {
+  locations: UploadLocation[];
+  tags: string[];
+  uploaders: string[];
+  limits: {
+    maxFiles: number;
+    maxFileBytes: number;
+    maxBatchBytes: number;
+  };
+}
+
+export interface UploadResult {
+  fileName: string;
+  status: "completed" | "failed";
+  assetId?: string;
+  error?: string;
+}
+
+export async function fetchUploadOptions(): Promise<UploadOptions> {
+  const res = await fetch("/api/v1/uploads/options");
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export function uploadFiles(params: {
+  files: File[];
+  uploader: string;
+  location: UploadLocation;
+  tags: string[];
+  onProgress?: (percent: number) => void;
+}): Promise<UploadResult[]> {
+  return new Promise((resolve, reject) => {
+    const form = new FormData();
+    for (const file of params.files) form.append("files", file);
+    form.append("uploader", params.uploader);
+    form.append("partner", params.location.partner);
+    form.append("site", params.location.site);
+    form.append("tags", JSON.stringify(params.tags));
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/v1/uploads");
+
+    xhr.upload.onprogress = (event) => {
+      if (!event.lengthComputable) return;
+      params.onProgress?.(Math.round((event.loaded / event.total) * 100));
+    };
+
+    xhr.onload = () => {
+      let body: unknown = null;
+      try {
+        body = JSON.parse(xhr.responseText);
+      } catch {
+        body = null;
+      }
+
+      if (xhr.status >= 200 && xhr.status < 300) {
+        const results = (body as { results?: UploadResult[] } | null)?.results ?? [];
+        resolve(results);
+      } else {
+        const message =
+          (body as { error?: string } | null)?.error ?? `Upload failed with HTTP ${xhr.status}`;
+        reject(new Error(message));
+      }
+    };
+
+    xhr.onerror = () => reject(new Error("Upload network error"));
+    xhr.send(form);
+  });
+}

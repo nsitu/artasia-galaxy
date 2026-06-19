@@ -1,4 +1,4 @@
-import { searchAssets, ImmichAsset } from "../infra/ImmichClient.js";
+import { getPublishedAlbum, searchAssets, ImmichAsset } from "../infra/ImmichClient.js";
 
 export interface Photo {
   id: string;
@@ -113,9 +113,10 @@ export async function querySlideshow(
   );
 
   const limit = Math.min(query.limit ?? 100, 500);
+  const publishedAlbum = await getPublishedAlbum();
 
   const result = await searchAssets({
-    albumIds: query.albumIds,
+    albumIds: [publishedAlbum.id],
     personIds: query.personIds,
     type: "IMAGE",
     size: limit,

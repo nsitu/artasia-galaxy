@@ -1,12 +1,12 @@
 import { Router } from "express";
-import { listAlbums } from "../infra/ImmichClient.js";
+import { getPublishedAlbum } from "../infra/ImmichClient.js";
 
 const router = Router();
 
 router.get("/", async (_req, res) => {
   try {
-    const albums = await listAlbums();
-    const normalized = albums.map((a) => ({
+    const album = await getPublishedAlbum();
+    const normalized = [album].map((a) => ({
       id: a.id,
       name: a.albumName,
       description: a.description,

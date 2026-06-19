@@ -1,6 +1,8 @@
 services:
   artasia:
     image: ${ARTASIA_IMAGE:-ghcr.io/your-github-owner/artasia-galaxy:latest}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "127.0.0.1:3000:3000"
     environment:
@@ -10,8 +12,5 @@ services:
       DATA_DIR: /data
       WORDPRESS_URL: ${WORDPRESS_URL:-http://127.0.0.1}
     volumes:
-      - artasia-data:/data
+      - ./data:/data
     restart: unless-stopped
-
-volumes:
-  artasia-data:

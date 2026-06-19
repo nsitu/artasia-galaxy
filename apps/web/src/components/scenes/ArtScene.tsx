@@ -6,6 +6,7 @@ import { useSettingsStore } from "../../stores/settingsStore";
 import GalleryWall from "./GalleryWall";
 import CameraRig from "./CameraRig";
 import SettingsPanel from "../ui/SettingsPanel";
+import UploadPanel from "../ui/UploadPanel";
 
 export default function ArtScene() {
   const fetchPhotos = useGalleryStore((s) => s.fetchPhotos);
@@ -28,6 +29,7 @@ export default function ArtScene() {
 
   const [showAlbums, setShowAlbums] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showUpload, setShowUpload] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const autoAdvance = useCallback(() => {
@@ -116,6 +118,12 @@ export default function ArtScene() {
             style={btnStyle}
           >
             ⚙
+          </button>
+          <button
+            onClick={() => setShowUpload(true)}
+            style={btnStyle}
+          >
+            Upload
           </button>
         </div>
 
@@ -226,6 +234,11 @@ export default function ArtScene() {
       <SettingsPanel
         visible={showSettings}
         onClose={() => setShowSettings(false)}
+      />
+
+      <UploadPanel
+        visible={showUpload}
+        onClose={() => setShowUpload(false)}
       />
 
       <Canvas
