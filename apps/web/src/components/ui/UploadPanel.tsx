@@ -28,6 +28,7 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
   const [items, setItems] = useState<UploadItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const uploadInProgressRef = useRef(false);
 
   useEffect(() => {
     if (!visible || options) return;
@@ -68,7 +69,15 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
     );
   }
 
+  useEffect(() => {
+    if (!visible) return;
+    const hasQueued = items.some((item) => item.status === "queued");
+    if (!hasQueued || uploadInProgressRef.current) return;
+    void uploadQueued();
+  }, [items, visible, uploader, selectedLocation, selectedTags]);
+
   async function uploadQueued() {
+    if (uploadInProgressRef.current) return;
     if (!selectedLocation) {
       setError("Select a location.");
       return;
@@ -78,66 +87,71 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
       return;
     }
 
+    uploadInProgressRef.current = true;
     const queued = items.filter((item) => item.status === "queued" || item.status === "failed");
-    for (const item of queued) {
-      setItems((current) =>
-        current.map((entry) =>
-          entry.id === item.id
-            ? {
-                ...entry,
-                status: entry.status === "failed" ? "retrying" : "uploading",
-                progress: 0,
-                error: undefined,
-              }
-            : entry
-        )
-      );
+    try {
+      for (const item of queued) {
+        setItems((current) =>
+          current.map((entry) =>
+            entry.id === item.id
+              ? {
+                  ...entry,
+                  status: entry.status === "failed" ? "retrying" : "uploading",
+                  progress: 0,
+                  error: undefined,
+                }
+              : entry
+          )
+        );
 
-      try {
-        const results = await uploadFiles({
-          files: [item.file],
-          uploader,
-          location: selectedLocation,
-          tags: selectedTags,
-          onProgress: (progress) => {
-            setItems((current) =>
-              current.map((entry) =>
-                entry.id === item.id
-                  ? {
+        try {
+          const results = await uploadFiles({
+            files: [item.file],
+            uploader,
+            location: selectedLocation,
+            tags: selectedTags,
+            onProgress: (progress) => {
+              setItems((current) =>
+                current.map((entry) =>
+                  entry.id === item.id
+                    ? {
+                        ...entry,
+                        status: progress >= 100 ? "processing" : "uploading",
+                        progress,
+                      }
+                    : entry
+                )
+              );
+            },
+          });
+
+          const result = results[0];
+          setItems((current) =>
+            current.map((entry) =>
+              entry.id === item.id
+                ? result?.status === "completed"
+                  ? { ...entry, status: "completed", progress: 100, assetId: result.assetId }
+                  : {
                       ...entry,
-                      status: progress >= 100 ? "processing" : "uploading",
-                      progress,
+                      status: "failed",
+                      progress: 100,
+                      error: result?.error ?? "Upload failed",
                     }
-                  : entry
-              )
-            );
-          },
-        });
-
-        const result = results[0];
-        setItems((current) =>
-          current.map((entry) =>
-            entry.id === item.id
-              ? result?.status === "completed"
-                ? { ...entry, status: "completed", progress: 100, assetId: result.assetId }
-                : {
-                    ...entry,
-                    status: "failed",
-                    progress: 100,
-                    error: result?.error ?? "Upload failed",
-                  }
-              : entry
-          )
-        );
-      } catch (err) {
-        setItems((current) =>
-          current.map((entry) =>
-            entry.id === item.id
-              ? { ...entry, status: "failed", error: (err as Error).message }
-              : entry
-          )
-        );
+                : entry
+            )
+          );
+        } catch (err) {
+          setItems((current) =>
+            current.map((entry) =>
+              entry.id === item.id
+                ? { ...entry, status: "failed", error: (err as Error).message }
+                : entry
+            )
+          );
+        }
       }
+    } finally {
+      uploadInProgressRef.current = false;
     }
   }
 
@@ -217,7 +231,7 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
 
         <div style={actionsStyle}>
           <button onClick={uploadQueued} style={primaryButtonStyle}>
-            Upload queued
+            Retry failed
           </button>
           <button onClick={() => setItems([])} style={secondaryButtonStyle}>
             Clear
@@ -227,6 +241,19 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
         <div style={listStyle}>
           {items.map((item) => (
             <div key={item.id} style={itemStyle}>
+              <div style={thumbStyle}>
+                {item.assetId ? (
+                  <img
+                    src={`/api/v1/assets/${item.assetId}/thumbnail`}
+                    alt=""
+                    style={thumbImageStyle}
+                  />
+                ) : (
+                  <span style={{ color: "#666", fontSize: 11 }}>
+                    {item.status === "failed" ? "failed" : "uploading"}
+                  </span>
+                )}
+              </div>
               <div>
                 <div style={{ color: "#eee" }}>{item.file.name}</div>
                 <div style={{ color: item.status === "failed" ? "#f88" : "#888", fontSize: 12 }}>
@@ -378,7 +405,7 @@ const listStyle: React.CSSProperties = {
 
 const itemStyle: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1fr 140px",
+  gridTemplateColumns: "54px 1fr 140px",
   gap: 12,
   alignItems: "center",
   background: "#171a22",
@@ -396,6 +423,24 @@ const progressTrackStyle: React.CSSProperties = {
 const progressBarStyle: React.CSSProperties = {
   height: "100%",
   background: "#d8e7ff",
+};
+
+const thumbStyle: React.CSSProperties = {
+  width: 54,
+  height: 44,
+  background: "#0c0e13",
+  border: "1px solid rgba(255,255,255,0.1)",
+  borderRadius: 4,
+  overflow: "hidden",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
+
+const thumbImageStyle: React.CSSProperties = {
+  width: "100%",
+  height: "100%",
+  objectFit: "cover",
 };
 
 const errorStyle: React.CSSProperties = {
