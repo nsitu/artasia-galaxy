@@ -111,7 +111,7 @@ mkdir -p data
 
 ## VM Setup Assumptions
 
-The GitHub Actions deploy workflow assumes the VM has already been prepared. The workflow pulls the latest Docker image and restarts Compose, but it does not currently copy `docker-compose.yml`, `.env`, or `data/*.json` to the VM.
+The GitHub Actions deploy workflow assumes the VM has already been prepared. The workflow copies `docker-compose.yml` from the repo, pulls the latest Docker image, and restarts Compose. It does not copy `.env` or `data/*.json`; those remain VM-managed.
 
 Expected VM layout:
 
@@ -132,7 +132,7 @@ sudo mkdir -p /opt/artasia-galaxy/data
 cd /opt/artasia-galaxy
 ```
 
-Copy the repo's `docker-compose.yml` to:
+GitHub Actions keeps the repo's `docker-compose.yml` synced to:
 
 ```text
 /opt/artasia-galaxy/docker-compose.yml
@@ -147,13 +147,13 @@ IMMICH_API_KEY=...
 WORDPRESS_URL=http://127.0.0.1
 ```
 
-Copy production JSON config files into:
+Copy production JSON config files manually into:
 
 ```text
 /opt/artasia-galaxy/data/
 ```
 
-After this one-time setup, deployments can be handled by GitHub Actions.
+After this one-time setup, deployments can be handled by GitHub Actions. Future changes to `docker-compose.yml` will be copied by the workflow, while `.env` and `data/` remain untouched.
 
 ## Immich API Key Permissions
 

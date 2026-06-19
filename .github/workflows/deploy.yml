@@ -42,6 +42,15 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Copy Docker Compose file to VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          source: docker-compose.yml
+          target: /opt/artasia-galaxy
+
       - name: Deploy to VM
         uses: appleboy/ssh-action@v1
         with:
