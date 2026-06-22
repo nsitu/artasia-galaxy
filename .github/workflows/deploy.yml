@@ -96,11 +96,12 @@ jobs:
           key: ${{ secrets.VM_SSH_KEY }}
           script: |
             set -euo pipefail
-            sudo rm -rf /opt/bitnami/wordpress/plugins/wp-artasia-locations
-            sudo cp -r /tmp/wp-artasia-locations-deploy /opt/bitnami/wordpress/plugins/wp-artasia-locations
-            sudo chown -R daemon:daemon /opt/bitnami/wordpress/plugins/wp-artasia-locations
+            PLUGINS_DIR=/opt/bitnami/wordpress/wp-content/plugins
+            sudo rm -rf "$PLUGINS_DIR/wp-artasia-locations"
+            sudo cp -r /tmp/wp-artasia-locations-deploy "$PLUGINS_DIR/wp-artasia-locations"
+            sudo chown -R daemon:daemon "$PLUGINS_DIR/wp-artasia-locations"
             WP_BIN=$(command -v wp || echo /opt/bitnami/wp-cli/bin/wp)
-            sudo "$WP_BIN" plugin activate wp-artasia-locations --path=/opt/bitnami/wordpress
+            sudo "$WP_BIN" plugin activate wp-artasia-locations --path=/opt/bitnami/wordpress --allow-root
             sudo rm -rf /tmp/wp-artasia-locations-deploy
 
       - name: Delete old GHCR image versions
