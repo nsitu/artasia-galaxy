@@ -62,8 +62,12 @@ export async function fetchAlbums(): Promise<Album[]> {
 }
 
 export interface UploadLocation {
-  partner: string;
-  site: string;
+  site_id: number;
+  site_name: string;
+  context_name: string;
+  address?: string;
+  lat?: number;
+  lng?: number;
 }
 
 export interface UploadOptions {
@@ -101,8 +105,7 @@ export function uploadFiles(params: {
     const form = new FormData();
     for (const file of params.files) form.append("files", file);
     form.append("uploader", params.uploader);
-    form.append("partner", params.location.partner);
-    form.append("site", params.location.site);
+    form.append("site_id", String(params.location.site_id));
     form.append("tags", JSON.stringify(params.tags));
 
     const xhr = new XMLHttpRequest();

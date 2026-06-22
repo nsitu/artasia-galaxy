@@ -10,9 +10,10 @@ It is used for non-secret JSON configuration and runtime JSON state.
 
 The committed JSON files are examples only:
 
-- `locations.json`: example partner/site options.
 - `upload-tags.json`: example upload tags.
 - `uploaders.json`: example uploader dropdown options.
+
+Location data is no longer stored here — it is managed in WordPress via the `wp-artasia-locations` plugin and fetched at runtime through the REST API.
 
 Production values should be copied manually to `/opt/artasia-galaxy/data/` on the VM. The production data directory is bind-mounted into the container as `/data`.
 

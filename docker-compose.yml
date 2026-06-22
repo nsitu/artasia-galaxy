@@ -10,7 +10,7 @@ services:
       IMMICH_API_KEY: ${IMMICH_API_KEY}
       PORT: 3000
       DATA_DIR: /data
-      WORDPRESS_URL: ${WORDPRESS_URL:-http://127.0.0.1}
+      WORDPRESS_URL: ${WORDPRESS_URL:-https://artsforall.co}
     volumes:
       - ./data:/data
     restart: unless-stopped

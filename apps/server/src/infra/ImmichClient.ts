@@ -118,6 +118,17 @@ export async function getAsset(assetId: string): Promise<ImmichAsset> {
   return res.json();
 }
 
+export async function updateAssetLocation(assetId: string, params: {
+  latitude: number;
+  longitude: number;
+}) {
+  await immichRequest(`/assets/${assetId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+}
+
 export async function searchAssets(params: {
   albumId?: string;
   albumIds?: string[];

@@ -77,6 +77,32 @@ jobs:
             sudo ARTASIA_IMAGE=${{ env.IMAGE_NAME }}:latest docker compose up -d --remove-orphans
             sudo docker image prune -f
 
+      - name: Copy WordPress plugin to VM temp
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          source: apps/wp-artasia-locations/*
+          target: /tmp/wp-artasia-locations-deploy
+          strip_components: 2
+          overwrite: true
+
+      - name: Install and activate WordPress plugin
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            sudo rm -rf /opt/bitnami/wordpress/plugins/wp-artasia-locations
+            sudo cp -r /tmp/wp-artasia-locations-deploy /opt/bitnami/wordpress/plugins/wp-artasia-locations
+            sudo chown -R daemon:daemon /opt/bitnami/wordpress/plugins/wp-artasia-locations
+            WP_BIN=$(command -v wp || echo /opt/bitnami/wp-cli/bin/wp)
+            sudo "$WP_BIN" plugin activate wp-artasia-locations --path=/opt/bitnami/wordpress
+            sudo rm -rf /tmp/wp-artasia-locations-deploy
+
       - name: Delete old GHCR image versions
         uses: actions/delete-package-versions@v5
         with:

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   fetchUploadOptions,
   uploadFiles,
-  type UploadLocation,
   type UploadOptions,
 } from "../../api/client";
 
@@ -24,7 +23,7 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
   const [options, setOptions] = useState<UploadOptions | null>(null);
   const [uploader, setUploader] = useState("");
   const [locationKey, setLocationKey] = useState("");
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [selectedTag, setSelectedTag] = useState("");
   const [items, setItems] = useState<UploadItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -36,15 +35,16 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
       .then((data) => {
         setOptions(data);
         setUploader(data.uploaders[0] ?? "");
+        setSelectedTag(data.tags[0] ?? "");
         const firstLocation = data.locations[0];
-        if (firstLocation) setLocationKey(keyForLocation(firstLocation));
+        if (firstLocation) setLocationKey(String(firstLocation.site_id));
       })
       .catch((err) => setError((err as Error).message));
   }, [visible, options]);
 
   const selectedLocation = useMemo(() => {
     if (!options) return null;
-    return options.locations.find((location) => keyForLocation(location) === locationKey) ?? null;
+    return options.locations.find((location) => String(location.site_id) === locationKey) ?? null;
   }, [locationKey, options]);
 
   function addFiles(fileList: FileList | File[]) {
@@ -61,18 +61,12 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
     ]);
   }
 
-  function toggleTag(tag: string) {
-    setSelectedTags((current) =>
-      current.includes(tag) ? current.filter((item) => item !== tag) : [...current, tag]
-    );
-  }
-
   useEffect(() => {
     if (!visible) return;
     const hasQueued = items.some((item) => item.status === "queued");
     if (!hasQueued || uploadInProgressRef.current) return;
     void uploadQueued();
-  }, [items, visible, uploader, selectedLocation, selectedTags]);
+  }, [items, visible, uploader, selectedLocation, selectedTag]);
 
   async function uploadQueued() {
     if (uploadInProgressRef.current) return;
@@ -107,7 +101,7 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
             files: [item.file],
             uploader,
             location: selectedLocation,
-            tags: selectedTags,
+            tags: selectedTag ? [selectedTag] : [],
             onProgress: (progress) => {
               setItems((current) =>
                 current.map((entry) =>
@@ -187,8 +181,8 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
               style={inputStyle}
             >
               {(options?.locations ?? []).map((location) => (
-                <option key={keyForLocation(location)} value={keyForLocation(location)}>
-                  {location.partner} - {location.site}
+                <option key={location.site_id} value={String(location.site_id)}>
+                  {location.context_name} - {location.site_name}
                 </option>
               ))}
             </select>
@@ -199,9 +193,10 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
           {(options?.tags ?? []).map((tag) => (
             <label key={tag} style={tagStyle}>
               <input
-                type="checkbox"
-                checked={selectedTags.includes(tag)}
-                onChange={() => toggleTag(tag)}
+                type="radio"
+                name="upload-tag"
+                checked={selectedTag === tag}
+                onChange={() => setSelectedTag(tag)}
               />
               {tag}
             </label>
@@ -229,15 +224,6 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
           />
         </div>
 
-        <div style={actionsStyle}>
-          <button onClick={uploadQueued} style={primaryButtonStyle}>
-            Retry failed
-          </button>
-          <button onClick={() => setItems([])} style={secondaryButtonStyle}>
-            Clear
-          </button>
-        </div>
-
         <div style={listStyle}>
           {items.map((item) => (
             <div key={item.id} style={itemStyle}>
@@ -261,19 +247,32 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
                   {item.error ? ` - ${item.error}` : ""}
                 </div>
               </div>
-              <div style={progressTrackStyle}>
-                <div style={{ ...progressBarStyle, width: `${item.progress}%` }} />
-              </div>
+              {item.status === "failed" ? (
+                <button
+                  onClick={() => {
+                    setItems((current) =>
+                      current.map((entry) =>
+                        entry.id === item.id
+                          ? { ...entry, status: "queued", progress: 0, error: undefined }
+                          : entry
+                      )
+                    );
+                  }}
+                  style={retryButtonStyle}
+                >
+                  Retry
+                </button>
+              ) : (
+                <div style={progressTrackStyle}>
+                  <div style={{ ...progressBarStyle, width: `${item.progress}%` }} />
+                </div>
+              )}
             </div>
           ))}
         </div>
       </div>
     </div>
   );
-}
-
-function keyForLocation(location: UploadLocation) {
-  return `${location.partner}||${location.site}`;
 }
 
 const backdropStyle: React.CSSProperties = {
@@ -373,30 +372,6 @@ const dropzoneStyle: React.CSSProperties = {
   cursor: "pointer",
 };
 
-const actionsStyle: React.CSSProperties = {
-  display: "flex",
-  gap: 10,
-  marginTop: 14,
-};
-
-const primaryButtonStyle: React.CSSProperties = {
-  background: "#f0f0f0",
-  color: "#111",
-  border: 0,
-  borderRadius: 4,
-  padding: "9px 14px",
-  cursor: "pointer",
-};
-
-const secondaryButtonStyle: React.CSSProperties = {
-  background: "transparent",
-  color: "#ddd",
-  border: "1px solid rgba(255,255,255,0.22)",
-  borderRadius: 4,
-  padding: "9px 14px",
-  cursor: "pointer",
-};
-
 const listStyle: React.CSSProperties = {
   display: "grid",
   gap: 8,
@@ -423,6 +398,15 @@ const progressTrackStyle: React.CSSProperties = {
 const progressBarStyle: React.CSSProperties = {
   height: "100%",
   background: "#d8e7ff",
+};
+
+const retryButtonStyle: React.CSSProperties = {
+  background: "transparent",
+  color: "#ddd",
+  border: "1px solid rgba(255,255,255,0.22)",
+  borderRadius: 4,
+  padding: "7px 10px",
+  cursor: "pointer",
 };
 
 const thumbStyle: React.CSSProperties = {

@@ -165,6 +165,7 @@ The Artasia server-side Immich API key must have these Immich permissions:
 | `album.create` | Create the `Published` album and uploader albums when missing. |
 | `albumAsset.create` | Add uploaded assets to uploader albums. |
 | `asset.upload` | Upload images and videos to Immich. |
+| `asset.update` | Attach default GPS coordinates when uploaded media lacks GPS metadata. |
 | `asset.read` | Query assets from the `Published` album for the public gallery. |
 | `asset.view` | Proxy thumbnails and previews. |
 | `asset.download` | Proxy original assets if needed. |

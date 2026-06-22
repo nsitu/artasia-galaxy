@@ -84,18 +84,25 @@ Each upload should include:
 - Upload status.
 - Immich asset ID after successful upload.
 
-Location metadata should be loaded from `/data/locations.json`. Each location includes a partner name and site name.
+Location metadata should be loaded from `/data/locations.json`. Each location includes a partner name, site name, address, and optional default GPS coordinates.
 
 Example shape:
 
 ```json
 [
-  { partner: "BGC", site: "Kiwanis Club" },
-  { partner: "BGC", site: "Prince of Wales" }
+  {
+    "partner": "BGC",
+    "site": "Kiwanis Club",
+    "address": "Street address",
+    "lat": 43.2557,
+    "lng": -79.8711
+  }
 ]
 ```
 
 Uploads should be tagged with both the selected location's partner name and site name. For example, selecting `{ partner: "BGC", site: "Kiwanis Club" }` should attach both `BGC` and `Kiwanis Club` as tags.
+
+If the uploaded asset does not already have GPS metadata, the backend should attach the selected location's default `lat` and `lng` to the Immich asset after upload. Existing GPS metadata should not be overwritten.
 
 The initial predefined upload tags are:
 
@@ -230,6 +237,7 @@ Required Immich permissions:
 | `album.create` | Create the `Published` album and uploader albums when missing. |
 | `albumAsset.create` | Add uploaded assets to uploader albums. |
 | `asset.upload` | Upload images and videos to Immich. |
+| `asset.update` | Attach default GPS coordinates when uploaded media lacks GPS metadata. |
 | `asset.read` | Query assets from the `Published` album for the public gallery. |
 | `asset.view` | Proxy thumbnails and previews. |
 | `asset.download` | Proxy original assets if needed. |

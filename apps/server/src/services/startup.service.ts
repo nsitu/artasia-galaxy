@@ -2,7 +2,7 @@ import { ensureConfiguredAlbums, getPublishedAlbum } from "../infra/ImmichClient
 import { getUploadConfig } from "./uploadConfig.service.js";
 
 export async function initializeImmichStructure() {
-  const config = getUploadConfig();
+  const config = await getUploadConfig();
   await getPublishedAlbum();
   await ensureConfiguredAlbums(config.uploaders);
 }

@@ -5,8 +5,10 @@ import multer from "multer";
 import {
   addAssetsToAlbum,
   ensureAlbum,
+  getAsset,
   getServerStatistics,
   tagAsset,
+  updateAssetLocation,
   uploadAsset,
 } from "../infra/ImmichClient.js";
 import { uploadRateLimit } from "../middleware/uploadRateLimit.js";
@@ -76,6 +78,23 @@ function validateFile(file: Express.Multer.File) {
   return null;
 }
 
+function hasGps(asset: Awaited<ReturnType<typeof getAsset>>) {
+  return asset.exifInfo?.latitude != null && asset.exifInfo?.longitude != null;
+}
+
+async function applyDefaultLocationIfMissing(assetId: string, location: {
+  lat?: number;
+  lng?: number;
+}) {
+  if (location.lat == null || location.lng == null || (location.lat === 0 && location.lng === 0)) return;
+  const asset = await getAsset(assetId);
+  if (hasGps(asset)) return;
+  await updateAssetLocation(assetId, {
+    latitude: location.lat,
+    longitude: location.lng,
+  });
+}
+
 async function processWithConcurrency<T, R>(
   items: T[],
   limit: number,
@@ -96,16 +115,20 @@ async function processWithConcurrency<T, R>(
   return results;
 }
 
-router.get("/options", (_req, res) => {
-  const config = getUploadConfig();
-  res.json({
-    ...config,
-    limits: {
-      maxFiles: UPLOAD_LIMITS.maxFiles,
-      maxFileBytes: UPLOAD_LIMITS.maxFileBytes,
-      maxBatchBytes: UPLOAD_LIMITS.maxBatchBytes,
-    },
-  });
+router.get("/options", async (_req, res) => {
+  try {
+    const config = await getUploadConfig();
+    res.json({
+      ...config,
+      limits: {
+        maxFiles: UPLOAD_LIMITS.maxFiles,
+        maxFileBytes: UPLOAD_LIMITS.maxFileBytes,
+        maxBatchBytes: UPLOAD_LIMITS.maxBatchBytes,
+      },
+    });
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
 });
 
 router.post(
@@ -117,12 +140,11 @@ router.post(
 
     try {
       const uploader = typeof req.body.uploader === "string" ? req.body.uploader.trim() : "";
-      const partner = typeof req.body.partner === "string" ? req.body.partner.trim() : "";
-      const site = typeof req.body.site === "string" ? req.body.site.trim() : "";
-      const location = findConfiguredLocation(partner, site);
-      const selectedTags = getAllowedTagNames(parseTags(req.body.tags));
+      const site_id = parseInt(typeof req.body.site_id === "string" ? req.body.site_id.trim() : "", 10);
+      const location = await findConfiguredLocation(site_id);
+      const selectedTags = await getAllowedTagNames(parseTags(req.body.tags));
 
-      if (!uploader || !isConfiguredUploader(uploader)) {
+      if (!uploader || !await isConfiguredUploader(uploader)) {
         res.status(400).json({ error: "Select a valid uploader." });
         return;
       }
@@ -152,7 +174,7 @@ router.post(
       }
 
       const album = await ensureAlbum(uploader);
-      const tagNames = [...selectedTags, location.partner, location.site];
+      const tagNames = [...selectedTags, location.context.name, location.site_name];
 
       const results = await processWithConcurrency(files, 2, async (file) => {
         const validationError = validateFile(file);
@@ -172,6 +194,10 @@ router.post(
             mimeType: file.mimetype,
           });
 
+          await applyDefaultLocationIfMissing(uploaded.id, {
+            lat: location.venue?.lat,
+            lng: location.venue?.lng,
+          });
           await tagAsset(uploaded.id, tagNames);
           await addAssetsToAlbum(album.id, [uploaded.id]);
 
@@ -193,7 +219,7 @@ router.post(
 
       res.json({
         uploader,
-        location,
+        site_id,
         tags: tagNames,
         results,
       });
