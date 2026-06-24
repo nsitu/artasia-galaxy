@@ -36,12 +36,8 @@ function artasia_site_meta_box_html(WP_Post $post): void
     ?>
     <table class="form-table">
         <tr>
-            <th><label for="artasia_program_year">Program Year</label></th>
+            <th><label for="artasia_program_year">Artasia Year</label></th>
             <td><input type="number" id="artasia_program_year" name="artasia_program_year" value="<?php echo esc_attr($program_year); ?>" /></td>
-        </tr>
-        <tr>
-            <th><label for="artasia_program_context">Program / Context</label></th>
-            <td><input type="text" id="artasia_program_context" name="artasia_program_context" value="<?php echo esc_attr($program_context); ?>" class="widefat" /></td>
         </tr>
         <tr>
             <th><label for="artasia_venue_id">Venue</label></th>
@@ -50,7 +46,14 @@ function artasia_site_meta_box_html(WP_Post $post): void
                     <option value="0">— Select Venue —</option>
                     <?php foreach ($venues as $venue) : ?>
                         <option value="<?php echo esc_attr($venue->ID); ?>" <?php selected($venue_id, $venue->ID); ?>>
-                            <?php echo esc_html($venue->post_title); ?>
+                            <?php
+                            $venue_label = $venue->post_title;
+                            $venue_address = get_post_meta($venue->ID, 'artasia_address', true);
+                            if ($venue_address) {
+                                $venue_label .= ' (' . $venue_address . ')';
+                            }
+                            echo esc_html($venue_label);
+                            ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
@@ -70,8 +73,8 @@ function artasia_site_meta_box_html(WP_Post $post): void
             </td>
         </tr>
         <tr>
-            <th><label for="artasia_section">Section</label></th>
-            <td><input type="text" id="artasia_section" name="artasia_section" value="<?php echo esc_attr($section); ?>" /></td>
+            <th><label for="artasia_program_context">Program / Context</label></th>
+            <td><input type="text" id="artasia_program_context" name="artasia_program_context" value="<?php echo esc_attr($program_context); ?>" placeholder="e.g. Beyond the Bell" class="widefat" /></td>
         </tr>
         <tr>
             <th><label for="artasia_is_earlyon">EarlyON</label></th>
@@ -81,6 +84,10 @@ function artasia_site_meta_box_html(WP_Post $post): void
                     Mark as an EarlyON site
                 </label>
             </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_section">Section</label></th>
+            <td><input type="text" id="artasia_section" name="artasia_section" value="<?php echo esc_attr($section); ?>" /></td>
         </tr>
         <tr>
             <th><label for="artasia_participant_count">Participants</label></th>
