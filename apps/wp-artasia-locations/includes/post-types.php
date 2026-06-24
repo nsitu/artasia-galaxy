@@ -46,14 +46,14 @@ function artasia_register_post_types(): void
 
     register_post_type('artasia_context', [
         'labels' => [
-            'name'          => 'Contexts',
-            'singular_name' => 'Context',
-            'add_new_item'  => 'Add New Context',
-            'edit_item'     => 'Edit Context',
-            'new_item'      => 'New Context',
-            'view_item'     => 'View Context',
-            'search_items'   => 'Search Contexts',
-            'not_found'      => 'No contexts found',
+            'name'          => 'Artasia Partners',
+            'singular_name' => 'Artasia Partner',
+            'add_new_item'  => 'Add New Artasia Partner',
+            'edit_item'     => 'Edit Artasia Partner',
+            'new_item'      => 'New Artasia Partner',
+            'view_item'     => 'View Artasia Partner',
+            'search_items'   => 'Search Artasia Partners',
+            'not_found'      => 'No Artasia partners found',
         ],
         'public'       => true,
         'has_archive'  => false,

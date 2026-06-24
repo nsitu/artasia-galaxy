@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: Artasia Locations
- * Description: Custom post types for Artasia venues, sites, and contexts with a REST API endpoint for the Node.js backend.
+ * Description: Custom post types for Artasia venues, sites, and partners with a REST API endpoint for the Node.js backend.
  * Version:     1.0.0
  * License:     GPL-2.0-or-later
  */

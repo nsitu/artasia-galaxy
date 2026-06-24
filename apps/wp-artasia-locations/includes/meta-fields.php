@@ -108,7 +108,7 @@ function artasia_register_meta_fields(): void
         'sanitize_callback' => 'sanitize_text_field',
     ]);
 
-    // --- Context meta ---
+    // --- Artasia Partner meta ---
     register_post_meta('artasia_context', 'artasia_context_type', [
         'type'         => 'string',
         'single'       => true,

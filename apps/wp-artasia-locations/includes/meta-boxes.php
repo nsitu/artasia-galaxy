@@ -51,10 +51,10 @@ function artasia_site_meta_box_html(WP_Post $post): void
             </td>
         </tr>
         <tr>
-            <th><label for="artasia_context_id">Context</label></th>
+            <th><label for="artasia_context_id">Artasia Partner</label></th>
             <td>
                 <select id="artasia_context_id" name="artasia_context_id">
-                    <option value="0">— Select Context —</option>
+                    <option value="0">— Select Artasia Partner —</option>
                     <?php foreach ($contexts as $context) : ?>
                         <option value="<?php echo esc_attr($context->ID); ?>" <?php selected($context_id, $context->ID); ?>>
                             <?php echo esc_html($context->post_title); ?>
@@ -138,16 +138,8 @@ function artasia_venue_meta_box_html(WP_Post $post): void
     ?>
     <table class="form-table">
         <tr>
-            <th><label for="artasia_address">Address</label></th>
+            <th><label for="artasia_address">Street Address</label></th>
             <td><input type="text" id="artasia_address" name="artasia_address" value="<?php echo esc_attr($address); ?>" class="widefat" /></td>
-        </tr>
-        <tr>
-            <th><label for="artasia_lat">Latitude</label></th>
-            <td><input type="number" step="any" id="artasia_lat" name="artasia_lat" value="<?php echo esc_attr($lat); ?>" /></td>
-        </tr>
-        <tr>
-            <th><label for="artasia_lng">Longitude</label></th>
-            <td><input type="number" step="any" id="artasia_lng" name="artasia_lng" value="<?php echo esc_attr($lng); ?>" /></td>
         </tr>
         <tr>
             <th><label for="artasia_city">City</label></th>
@@ -158,7 +150,15 @@ function artasia_venue_meta_box_html(WP_Post $post): void
             <td><input type="text" id="artasia_postal_code" name="artasia_postal_code" value="<?php echo esc_attr($postal); ?>" /></td>
         </tr>
         <tr>
-            <th><label for="artasia_accessibility_notes">Accessibility Notes</label></th>
+            <th><label for="artasia_lat">Latitude</label></th>
+            <td><input type="number" step="any" id="artasia_lat" name="artasia_lat" value="<?php echo esc_attr($lat); ?>" /></td>
+        </tr>
+        <tr>
+            <th><label for="artasia_lng">Longitude</label></th>
+            <td><input type="number" step="any" id="artasia_lng" name="artasia_lng" value="<?php echo esc_attr($lng); ?>" /></td>
+        </tr>
+        <tr>
+            <th><label for="artasia_accessibility_notes">Notes</label></th>
             <td><textarea id="artasia_accessibility_notes" name="artasia_accessibility_notes" rows="4" class="widefat"><?php echo esc_textarea($access); ?></textarea></td>
         </tr>
     </table>
@@ -199,7 +199,7 @@ function artasia_save_venue_meta(int $post_id): void
 }
 add_action('save_post_artasia_venue', 'artasia_save_venue_meta');
 
-// --- Context Details meta box ---
+// --- Artasia Partner Details meta box ---
 
 function artasia_context_meta_box_html(WP_Post $post): void
 {
@@ -241,7 +241,7 @@ function artasia_register_context_meta_box(): void
 {
     add_meta_box(
         'artasia_context_details',
-        'Context Details',
+        'Artasia Partner Details',
         'artasia_context_meta_box_html',
         'artasia_context',
         'normal',

@@ -13,7 +13,7 @@ function artasia_site_columns(array $columns): array
         $new[$key] = $label;
         if ($key === 'title') {
             $new['artasia_venue']    = 'Venue';
-            $new['artasia_context']  = 'Context';
+            $new['artasia_context']  = 'Artasia Partner';
             $new['artasia_year']     = 'Year';
             $new['artasia_section']  = 'Section';
             $new['artasia_participants'] = 'Participants';
@@ -76,7 +76,7 @@ function artasia_venue_column(string $column, int $post_id): void
 }
 add_action('manage_artasia_venue_posts_custom_column', 'artasia_venue_column', 10, 2);
 
-// --- Context columns ---
+// --- Artasia Partner columns ---
 
 function artasia_context_columns(array $columns): array
 {
