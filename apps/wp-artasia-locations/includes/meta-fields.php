@@ -19,14 +19,14 @@ function artasia_register_meta_fields(): void
         'single'       => true,
         'default'      => 0,
         'show_in_rest' => true,
-        'sanitize_callback' => 'floatval',
+        'sanitize_callback' => 'artasia_sanitize_float_meta',
     ]);
     register_post_meta('artasia_venue', 'artasia_lng', [
         'type'         => 'number',
         'single'       => true,
         'default'      => 0,
         'show_in_rest' => true,
-        'sanitize_callback' => 'floatval',
+        'sanitize_callback' => 'artasia_sanitize_float_meta',
     ]);
     register_post_meta('artasia_venue', 'artasia_city', [
         'type'         => 'string',
@@ -56,21 +56,21 @@ function artasia_register_meta_fields(): void
         'single'       => true,
         'default'      => 0,
         'show_in_rest' => true,
-        'sanitize_callback' => 'intval',
+        'sanitize_callback' => 'artasia_sanitize_integer_meta',
     ]);
     register_post_meta('artasia_site', 'artasia_context_id', [
         'type'         => 'integer',
         'single'       => true,
         'default'      => 0,
         'show_in_rest' => true,
-        'sanitize_callback' => 'intval',
+        'sanitize_callback' => 'artasia_sanitize_integer_meta',
     ]);
     register_post_meta('artasia_site', 'artasia_program_year', [
         'type'         => 'integer',
         'single'       => true,
         'default'      => 0,
         'show_in_rest' => true,
-        'sanitize_callback' => 'intval',
+        'sanitize_callback' => 'artasia_sanitize_integer_meta',
     ]);
     register_post_meta('artasia_site', 'artasia_section', [
         'type'         => 'string',
@@ -84,7 +84,7 @@ function artasia_register_meta_fields(): void
         'single'       => true,
         'default'      => 0,
         'show_in_rest' => true,
-        'sanitize_callback' => 'intval',
+        'sanitize_callback' => 'artasia_sanitize_integer_meta',
     ]);
     register_post_meta('artasia_site', 'artasia_participant_age', [
         'type'         => 'string',
@@ -130,6 +130,16 @@ function artasia_register_meta_fields(): void
         'show_in_rest' => true,
         'sanitize_callback' => 'sanitize_textarea_field',
     ]);
+}
+
+function artasia_sanitize_integer_meta($value, string $meta_key = '', string $object_type = '', string $object_subtype = ''): int
+{
+    return intval($value);
+}
+
+function artasia_sanitize_float_meta($value, string $meta_key = '', string $object_type = '', string $object_subtype = ''): float
+{
+    return floatval($value);
 }
 
 add_action('init', 'artasia_register_meta_fields');
