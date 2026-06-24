@@ -267,3 +267,16 @@ function artasia_save_context_meta(int $post_id): void
     update_post_meta($post_id, 'artasia_contact_notes', sanitize_textarea_field($_POST['artasia_contact_notes'] ?? ''));
 }
 add_action('save_post_artasia_context', 'artasia_save_context_meta');
+
+function artasia_remove_unnecessary_meta_boxes(): void
+{
+    $post_types = ['artasia_venue', 'artasia_site', 'artasia_context'];
+    $contexts   = ['side', 'normal', 'advanced'];
+
+    foreach ($post_types as $post_type) {
+        foreach ($contexts as $context) {
+            remove_meta_box('passster', $post_type, $context);
+        }
+    }
+}
+add_action('add_meta_boxes', 'artasia_remove_unnecessary_meta_boxes', 99);
