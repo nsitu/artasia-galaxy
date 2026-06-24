@@ -107,20 +107,6 @@ function artasia_register_meta_fields(): void
         'show_in_rest' => true,
         'sanitize_callback' => 'sanitize_text_field',
     ]);
-    register_post_meta('artasia_site', 'artasia_start_date', [
-        'type'         => 'string',
-        'single'       => true,
-        'default'      => '',
-        'show_in_rest' => true,
-        'sanitize_callback' => 'sanitize_text_field',
-    ]);
-    register_post_meta('artasia_site', 'artasia_end_date', [
-        'type'         => 'string',
-        'single'       => true,
-        'default'      => '',
-        'show_in_rest' => true,
-        'sanitize_callback' => 'sanitize_text_field',
-    ]);
 
     // --- Artasia Partner meta ---
     register_post_meta('artasia_partner', 'artasia_partner_type', [

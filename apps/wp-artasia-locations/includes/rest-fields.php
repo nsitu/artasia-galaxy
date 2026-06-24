@@ -88,8 +88,6 @@ function artasia_get_expanded_locations(): WP_REST_Response
             'section'            => get_post_meta($site->ID, 'artasia_section', true) ?: '',
             'participant_count'  => intval(get_post_meta($site->ID, 'artasia_participant_count', true)),
             'participant_age'    => get_post_meta($site->ID, 'artasia_participant_age', true) ?: '',
-            'start_date'         => get_post_meta($site->ID, 'artasia_start_date', true) ?: '',
-            'end_date'           => get_post_meta($site->ID, 'artasia_end_date', true) ?: '',
             'venue'              => $venue_lookup[$vid] ?? null,
             'partner'            => $partner_lookup[$partner_id] ?? null,
         ];

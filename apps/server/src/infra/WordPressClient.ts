@@ -24,8 +24,6 @@ export interface WpArtasiaLocation {
   section?: string;
   participant_count?: number;
   participant_age?: string;
-  start_date?: string;
-  end_date?: string;
   venue: WpVenue;
   partner: WpPartner;
 }

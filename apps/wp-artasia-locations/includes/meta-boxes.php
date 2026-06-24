@@ -32,8 +32,6 @@ function artasia_site_meta_box_html(WP_Post $post): void
     $section        = get_post_meta($post->ID, 'artasia_section', true);
     $participant_count = get_post_meta($post->ID, 'artasia_participant_count', true);
     $participant_age = get_post_meta($post->ID, 'artasia_participant_age', true);
-    $start_date     = get_post_meta($post->ID, 'artasia_start_date', true);
-    $end_date       = get_post_meta($post->ID, 'artasia_end_date', true);
 
     wp_nonce_field('artasia_site_meta', 'artasia_site_meta_nonce');
 ?>
@@ -97,23 +95,24 @@ function artasia_site_meta_box_html(WP_Post $post): void
         </tr>
         <tr>
             <th><label for="artasia_section">Section</label></th>
-            <td><input type="text" id="artasia_section" name="artasia_section" value="<?php echo esc_attr($section); ?>" /></td>
+            <td>
+                <input type="text" id="artasia_section" name="artasia_section" value="<?php echo esc_attr($section); ?>" placeholder="e.g. Room 3" />
+                <p class="description">Sometimes the same program is delivered multiple times at the same location, e.g. in different rooms or at different times</p>
+            </td>
         </tr>
         <tr>
             <th><label for="artasia_participant_count">Participants</label></th>
-            <td><input type="number" id="artasia_participant_count" name="artasia_participant_count" value="<?php echo esc_attr($participant_count); ?>" /></td>
+            <td>
+                <input type="number" id="artasia_participant_count" name="artasia_participant_count" value="<?php echo esc_attr($participant_count); ?>" />
+                <p class="description">How many children are attending the program at this site?</p>
+            </td>
         </tr>
         <tr>
-            <th><label for="artasia_participant_age">Ages</label></th>
-            <td><input type="text" id="artasia_participant_age" name="artasia_participant_age" value="<?php echo esc_attr($participant_age); ?>" /></td>
-        </tr>
-        <tr>
-            <th><label for="artasia_start_date">Start Date</label></th>
-            <td><input type="text" id="artasia_start_date" name="artasia_start_date" value="<?php echo esc_attr($start_date); ?>" /></td>
-        </tr>
-        <tr>
-            <th><label for="artasia_end_date">End Date</label></th>
-            <td><input type="text" id="artasia_end_date" name="artasia_end_date" value="<?php echo esc_attr($end_date); ?>" /></td>
+            <th><label for="artasia_participant_age">Age Range</label></th>
+            <td>
+                <input type="text" id="artasia_participant_age" name="artasia_participant_age" value="<?php echo esc_attr($participant_age); ?>" placeholder="e.g. 6-10" />
+                <p class="description">Provide the age range of the attending children. Use number or words (e.g. 'School age')</p>
+            </td>
         </tr>
     </table>
 <?php
@@ -152,8 +151,6 @@ function artasia_save_site_meta(int $post_id): void
     update_post_meta($post_id, 'artasia_section', sanitize_text_field($_POST['artasia_section'] ?? ''));
     update_post_meta($post_id, 'artasia_participant_count', intval($_POST['artasia_participant_count'] ?? 0));
     update_post_meta($post_id, 'artasia_participant_age', sanitize_text_field($_POST['artasia_participant_age'] ?? ''));
-    update_post_meta($post_id, 'artasia_start_date', sanitize_text_field($_POST['artasia_start_date'] ?? ''));
-    update_post_meta($post_id, 'artasia_end_date', sanitize_text_field($_POST['artasia_end_date'] ?? ''));
 }
 add_action('save_post_artasia_site', 'artasia_save_site_meta');
 
