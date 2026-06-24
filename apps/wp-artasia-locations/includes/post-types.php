@@ -44,7 +44,7 @@ function artasia_register_post_types(): void
         'supports'     => ['title'],
     ]);
 
-    register_post_type('artasia_context', [
+    register_post_type('artasia_partner', [
         'labels' => [
             'name'          => 'Artasia Partners',
             'singular_name' => 'Artasia Partner',
@@ -58,7 +58,7 @@ function artasia_register_post_types(): void
         'public'       => true,
         'has_archive'  => false,
         'show_in_rest' => true,
-        'rest_base'    => 'artasia_context',
+        'rest_base'    => 'artasia_partner',
         'menu_icon'    => 'dashicons-groups',
         'supports'     => ['title'],
     ]);

@@ -27,7 +27,7 @@ function artasia_admin_enqueue_assets(string $hook_suffix): void
     }
 
     $screen = get_current_screen();
-    if (!$screen || $screen->post_type !== 'artasia_context') {
+    if (!$screen || $screen->post_type !== 'artasia_partner') {
         return;
     }
 

@@ -174,7 +174,7 @@ router.post(
       }
 
       const album = await ensureAlbum(uploader);
-      const tagNames = [...selectedTags, location.context.name, location.site_name];
+      const tagNames = [...selectedTags, location.partner.name, location.site_name];
 
       const results = await processWithConcurrency(files, 2, async (file) => {
         const validationError = validateFile(file);

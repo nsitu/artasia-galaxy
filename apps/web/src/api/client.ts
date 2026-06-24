@@ -64,7 +64,7 @@ export async function fetchAlbums(): Promise<Album[]> {
 export interface UploadLocation {
   site_id: number;
   site_name: string;
-  context_name: string;
+  partner_name: string;
   address?: string;
   lat?: number;
   lng?: number;

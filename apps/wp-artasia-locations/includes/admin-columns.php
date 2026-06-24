@@ -13,7 +13,7 @@ function artasia_site_columns(array $columns): array
         $new[$key] = $label;
         if ($key === 'title') {
             $new['artasia_venue']    = 'Venue';
-            $new['artasia_context']  = 'Artasia Partner';
+            $new['artasia_partner']  = 'Artasia Partner';
             $new['artasia_year']     = 'Year';
             $new['artasia_section']  = 'Section';
             $new['artasia_participants'] = 'Participants';
@@ -30,9 +30,9 @@ function artasia_site_column(string $column, int $post_id): void
             $vid = intval(get_post_meta($post_id, 'artasia_venue_id', true));
             echo $vid ? esc_html(get_the_title($vid)) : '—';
             break;
-        case 'artasia_context':
-            $cid = intval(get_post_meta($post_id, 'artasia_context_id', true));
-            echo $cid ? esc_html(get_the_title($cid)) : '—';
+        case 'artasia_partner':
+            $partner_id = intval(get_post_meta($post_id, 'artasia_partner_id', true));
+            echo $partner_id ? esc_html(get_the_title($partner_id)) : '—';
             break;
         case 'artasia_year':
             echo esc_html(get_post_meta($post_id, 'artasia_program_year', true) ?: '—');
@@ -78,25 +78,25 @@ add_action('manage_artasia_venue_posts_custom_column', 'artasia_venue_column', 1
 
 // --- Artasia Partner columns ---
 
-function artasia_context_columns(array $columns): array
+function artasia_partner_columns(array $columns): array
 {
     $new = [];
     foreach ($columns as $key => $label) {
         $new[$key] = $label;
         if ($key === 'title') {
-            $new['artasia_context_type'] = 'Type';
+            $new['artasia_partner_type'] = 'Type';
             $new['artasia_website']       = 'Website';
         }
     }
     return $new;
 }
-add_filter('manage_artasia_context_posts_columns', 'artasia_context_columns');
+add_filter('manage_artasia_partner_posts_columns', 'artasia_partner_columns');
 
-function artasia_context_column(string $column, int $post_id): void
+function artasia_partner_column(string $column, int $post_id): void
 {
     switch ($column) {
-        case 'artasia_context_type':
-            echo esc_html(get_post_meta($post_id, 'artasia_context_type', true) ?: '—');
+        case 'artasia_partner_type':
+            echo esc_html(get_post_meta($post_id, 'artasia_partner_type', true) ?: '—');
             break;
         case 'artasia_website':
             $url = get_post_meta($post_id, 'artasia_website', true);
@@ -104,4 +104,4 @@ function artasia_context_column(string $column, int $post_id): void
             break;
     }
 }
-add_action('manage_artasia_context_posts_custom_column', 'artasia_context_column', 10, 2);
+add_action('manage_artasia_partner_posts_custom_column', 'artasia_partner_column', 10, 2);

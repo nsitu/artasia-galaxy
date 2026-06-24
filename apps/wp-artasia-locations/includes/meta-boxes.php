@@ -14,15 +14,15 @@ function artasia_site_meta_box_html(WP_Post $post): void
         'orderby'     => 'title',
         'order'       => 'ASC',
     ]);
-    $contexts = get_posts([
-        'post_type'   => 'artasia_context',
+    $partners = get_posts([
+        'post_type'   => 'artasia_partner',
         'numberposts' => -1,
         'orderby'     => 'title',
         'order'       => 'ASC',
     ]);
 
     $venue_id       = get_post_meta($post->ID, 'artasia_venue_id', true);
-    $context_id     = get_post_meta($post->ID, 'artasia_context_id', true);
+    $partner_id     = get_post_meta($post->ID, 'artasia_partner_id', true);
     $program_year   = get_post_meta($post->ID, 'artasia_program_year', true);
     $section        = get_post_meta($post->ID, 'artasia_section', true);
     $participant_count = get_post_meta($post->ID, 'artasia_participant_count', true);
@@ -51,13 +51,13 @@ function artasia_site_meta_box_html(WP_Post $post): void
             </td>
         </tr>
         <tr>
-            <th><label for="artasia_context_id">Artasia Partner</label></th>
+            <th><label for="artasia_partner_id">Artasia Partner</label></th>
             <td>
-                <select id="artasia_context_id" name="artasia_context_id">
+                <select id="artasia_partner_id" name="artasia_partner_id">
                     <option value="0">— Select Artasia Partner —</option>
-                    <?php foreach ($contexts as $context) : ?>
-                        <option value="<?php echo esc_attr($context->ID); ?>" <?php selected($context_id, $context->ID); ?>>
-                            <?php echo esc_html($context->post_title); ?>
+                    <?php foreach ($partners as $partner) : ?>
+                        <option value="<?php echo esc_attr($partner->ID); ?>" <?php selected($partner_id, $partner->ID); ?>>
+                            <?php echo esc_html($partner->post_title); ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
@@ -114,7 +114,7 @@ function artasia_save_site_meta(int $post_id): void
 
     update_post_meta($post_id, 'artasia_program_year', intval($_POST['artasia_program_year'] ?? 0));
     update_post_meta($post_id, 'artasia_venue_id', intval($_POST['artasia_venue_id'] ?? 0));
-    update_post_meta($post_id, 'artasia_context_id', intval($_POST['artasia_context_id'] ?? 0));
+    update_post_meta($post_id, 'artasia_partner_id', intval($_POST['artasia_partner_id'] ?? 0));
     update_post_meta($post_id, 'artasia_section', sanitize_text_field($_POST['artasia_section'] ?? ''));
     update_post_meta($post_id, 'artasia_participant_count', intval($_POST['artasia_participant_count'] ?? 0));
     update_post_meta($post_id, 'artasia_participant_age', sanitize_text_field($_POST['artasia_participant_age'] ?? ''));
@@ -216,23 +216,23 @@ add_action('save_post_artasia_venue', 'artasia_save_venue_meta');
 
 // --- Artasia Partner Details meta box ---
 
-function artasia_context_meta_box_html(WP_Post $post): void
+function artasia_partner_meta_box_html(WP_Post $post): void
 {
-    $type    = get_post_meta($post->ID, 'artasia_context_type', true);
+    $type    = get_post_meta($post->ID, 'artasia_partner_type', true);
     $website = get_post_meta($post->ID, 'artasia_website', true);
     $logo_id = intval(get_post_meta($post->ID, 'artasia_logo_id', true));
     $logo_url = $logo_id ? wp_get_attachment_url($logo_id) : '';
-    $notes   = get_post_meta($post->ID, 'artasia_contact_notes', true);
+    $notes   = get_post_meta($post->ID, 'artasia_notes', true);
 
     $type_options = ['Partner Organization', 'Program', 'Community Group', 'School Board', 'Other'];
 
-    wp_nonce_field('artasia_context_meta', 'artasia_context_meta_nonce');
+    wp_nonce_field('artasia_partner_meta', 'artasia_partner_meta_nonce');
     ?>
     <table class="form-table">
         <tr>
-            <th><label for="artasia_context_type">Type</label></th>
+            <th><label for="artasia_partner_type">Type</label></th>
             <td>
-                <select id="artasia_context_type" name="artasia_context_type">
+                <select id="artasia_partner_type" name="artasia_partner_type">
                     <option value="">— Select Type —</option>
                     <?php foreach ($type_options as $option) : ?>
                         <option value="<?php echo esc_attr($option); ?>" <?php selected($type, $option); ?>>
@@ -260,29 +260,29 @@ function artasia_context_meta_box_html(WP_Post $post): void
             </td>
         </tr>
         <tr>
-            <th><label for="artasia_contact_notes">Notes</label></th>
-            <td><textarea id="artasia_contact_notes" name="artasia_contact_notes" rows="4" class="widefat"><?php echo esc_textarea($notes); ?></textarea></td>
+            <th><label for="artasia_notes">Notes</label></th>
+            <td><textarea id="artasia_notes" name="artasia_notes" rows="4" class="widefat"><?php echo esc_textarea($notes); ?></textarea></td>
         </tr>
     </table>
     <?php
 }
 
-function artasia_register_context_meta_box(): void
+function artasia_register_partner_meta_box(): void
 {
     add_meta_box(
-        'artasia_context_details',
+        'artasia_partner_details',
         'Artasia Partner Details',
-        'artasia_context_meta_box_html',
-        'artasia_context',
+        'artasia_partner_meta_box_html',
+        'artasia_partner',
         'normal',
         'default'
     );
 }
-add_action('add_meta_boxes', 'artasia_register_context_meta_box');
+add_action('add_meta_boxes', 'artasia_register_partner_meta_box');
 
-function artasia_save_context_meta(int $post_id): void
+function artasia_save_partner_meta(int $post_id): void
 {
-    if (!isset($_POST['artasia_context_meta_nonce']) || !wp_verify_nonce($_POST['artasia_context_meta_nonce'], 'artasia_context_meta')) {
+    if (!isset($_POST['artasia_partner_meta_nonce']) || !wp_verify_nonce($_POST['artasia_partner_meta_nonce'], 'artasia_partner_meta')) {
         return;
     }
     if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
@@ -292,12 +292,12 @@ function artasia_save_context_meta(int $post_id): void
         return;
     }
 
-    update_post_meta($post_id, 'artasia_context_type', sanitize_text_field($_POST['artasia_context_type'] ?? ''));
+    update_post_meta($post_id, 'artasia_partner_type', sanitize_text_field($_POST['artasia_partner_type'] ?? ''));
     update_post_meta($post_id, 'artasia_website', esc_url_raw($_POST['artasia_website'] ?? ''));
     update_post_meta($post_id, 'artasia_logo_id', artasia_validate_partner_logo_id(intval($_POST['artasia_logo_id'] ?? 0)));
-    update_post_meta($post_id, 'artasia_contact_notes', sanitize_textarea_field($_POST['artasia_contact_notes'] ?? ''));
+    update_post_meta($post_id, 'artasia_notes', sanitize_textarea_field($_POST['artasia_notes'] ?? ''));
 }
-add_action('save_post_artasia_context', 'artasia_save_context_meta');
+add_action('save_post_artasia_partner', 'artasia_save_partner_meta');
 
 function artasia_validate_partner_logo_id(int $attachment_id): int
 {
@@ -313,12 +313,12 @@ function artasia_validate_partner_logo_id(int $attachment_id): int
 
 function artasia_remove_unnecessary_meta_boxes(): void
 {
-    $post_types = ['artasia_venue', 'artasia_site', 'artasia_context'];
-    $contexts   = ['side', 'normal', 'advanced'];
+    $post_types = ['artasia_venue', 'artasia_site', 'artasia_partner'];
+    $meta_box_contexts = ['side', 'normal', 'advanced'];
 
     foreach ($post_types as $post_type) {
-        foreach ($contexts as $context) {
-            remove_meta_box('passster', $post_type, $context);
+        foreach ($meta_box_contexts as $meta_box_context) {
+            remove_meta_box('passster', $post_type, $meta_box_context);
         }
     }
 }

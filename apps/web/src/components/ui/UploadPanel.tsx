@@ -182,7 +182,7 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
             >
               {(options?.locations ?? []).map((location) => (
                 <option key={location.site_id} value={String(location.site_id)}>
-                  {location.context_name} - {location.site_name}
+                  {location.partner_name} - {location.site_name}
                 </option>
               ))}
             </select>

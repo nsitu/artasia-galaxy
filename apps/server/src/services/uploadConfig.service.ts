@@ -8,7 +8,7 @@ import {
 export interface ArtasiaLocation {
   site_id: number;
   site_name: string;
-  context_name: string;
+  partner_name: string;
   address?: string;
   lat?: number;
   lng?: number;
@@ -78,7 +78,7 @@ function mapWpLocation(wp: WpArtasiaLocation): ArtasiaLocation {
   return {
     site_id: wp.site_id,
     site_name: wp.site_name,
-    context_name: wp.context?.name ?? "",
+    partner_name: wp.partner?.name ?? "",
     ...(wp.venue?.address ? { address: wp.venue.address } : {}),
     ...(lat != null && lat !== 0 ? { lat } : {}),
     ...(lng != null && lng !== 0 ? { lng } : {}),

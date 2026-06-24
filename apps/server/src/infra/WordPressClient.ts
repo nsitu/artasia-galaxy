@@ -8,7 +8,7 @@ export interface WpVenue {
   postal_code?: string;
 }
 
-export interface WpContext {
+export interface WpPartner {
   id: number;
   name: string;
   type: string;
@@ -25,7 +25,7 @@ export interface WpArtasiaLocation {
   start_date?: string;
   end_date?: string;
   venue: WpVenue;
-  context: WpContext;
+  partner: WpPartner;
 }
 
 const WORDPRESS_URL = process.env.WORDPRESS_URL ?? "https://artsforall.co";

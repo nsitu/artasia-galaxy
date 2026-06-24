@@ -23,14 +23,14 @@ function artasia_get_expanded_locations(): WP_REST_Response
     ]);
 
     $venue_ids    = [];
-    $context_ids  = [];
+    $partner_ids  = [];
     $site_posts   = $sites_query->posts;
 
     foreach ($site_posts as $site) {
         $vid = intval(get_post_meta($site->ID, 'artasia_venue_id', true));
-        $cid = intval(get_post_meta($site->ID, 'artasia_context_id', true));
+        $partner_id = intval(get_post_meta($site->ID, 'artasia_partner_id', true));
         if ($vid) $venue_ids[$vid] = $vid;
-        if ($cid) $context_ids[$cid] = $cid;
+        if ($partner_id) $partner_ids[$partner_id] = $partner_id;
     }
 
     $venue_lookup = [];
@@ -54,20 +54,20 @@ function artasia_get_expanded_locations(): WP_REST_Response
         }
     }
 
-    $context_lookup = [];
-    if (!empty($context_ids)) {
-        $context_query = new WP_Query([
-            'post_type'      => 'artasia_context',
+    $partner_lookup = [];
+    if (!empty($partner_ids)) {
+        $partner_query = new WP_Query([
+            'post_type'      => 'artasia_partner',
             'posts_per_page' => -1,
-            'post__in'       => array_values($context_ids),
+            'post__in'       => array_values($partner_ids),
         ]);
-        foreach ($context_query->posts as $context) {
-            $logo_id = intval(get_post_meta($context->ID, 'artasia_logo_id', true));
-            $context_lookup[$context->ID] = [
-                'id'      => $context->ID,
-                'name'    => $context->post_title,
-                'type'    => get_post_meta($context->ID, 'artasia_context_type', true) ?: '',
-                'website' => get_post_meta($context->ID, 'artasia_website', true) ?: '',
+        foreach ($partner_query->posts as $partner) {
+            $logo_id = intval(get_post_meta($partner->ID, 'artasia_logo_id', true));
+            $partner_lookup[$partner->ID] = [
+                'id'      => $partner->ID,
+                'name'    => $partner->post_title,
+                'type'    => get_post_meta($partner->ID, 'artasia_partner_type', true) ?: '',
+                'website' => get_post_meta($partner->ID, 'artasia_website', true) ?: '',
                 'logo'    => artasia_get_partner_logo_response($logo_id),
             ];
         }
@@ -77,7 +77,7 @@ function artasia_get_expanded_locations(): WP_REST_Response
 
     foreach ($site_posts as $site) {
         $vid = intval(get_post_meta($site->ID, 'artasia_venue_id', true));
-        $cid = intval(get_post_meta($site->ID, 'artasia_context_id', true));
+        $partner_id = intval(get_post_meta($site->ID, 'artasia_partner_id', true));
 
         $results[] = [
             'site_id'            => $site->ID,
@@ -89,7 +89,7 @@ function artasia_get_expanded_locations(): WP_REST_Response
             'start_date'         => get_post_meta($site->ID, 'artasia_start_date', true) ?: '',
             'end_date'           => get_post_meta($site->ID, 'artasia_end_date', true) ?: '',
             'venue'              => $venue_lookup[$vid] ?? null,
-            'context'            => $context_lookup[$cid] ?? null,
+            'partner'            => $partner_lookup[$partner_id] ?? null,
         ];
     }
 
