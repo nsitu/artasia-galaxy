@@ -123,6 +123,21 @@ function artasia_save_site_meta(int $post_id): void
 }
 add_action('save_post_artasia_site', 'artasia_save_site_meta');
 
+function artasia_site_edit_page_description(WP_Post $post): void
+{
+    if ($post->post_type !== 'artasia_site') {
+        return;
+    }
+
+    ?>
+    <div class="notice notice-info inline">
+        <p><strong>Description</strong></p>
+        <p><?php echo esc_html("Note that an Artasia 'site' refers to an activation of a particular venue by a particular partner in a particular year."); ?></p>
+    </div>
+    <?php
+}
+add_action('edit_form_top', 'artasia_site_edit_page_description');
+
 // --- Venue Details meta box ---
 
 function artasia_venue_meta_box_html(WP_Post $post): void
@@ -205,6 +220,8 @@ function artasia_context_meta_box_html(WP_Post $post): void
 {
     $type    = get_post_meta($post->ID, 'artasia_context_type', true);
     $website = get_post_meta($post->ID, 'artasia_website', true);
+    $logo_id = intval(get_post_meta($post->ID, 'artasia_logo_id', true));
+    $logo_url = $logo_id ? wp_get_attachment_url($logo_id) : '';
     $notes   = get_post_meta($post->ID, 'artasia_contact_notes', true);
 
     $type_options = ['Partner Organization', 'Program', 'Community Group', 'School Board', 'Other'];
@@ -230,7 +247,20 @@ function artasia_context_meta_box_html(WP_Post $post): void
             <td><input type="url" id="artasia_website" name="artasia_website" value="<?php echo esc_attr($website); ?>" class="widefat" /></td>
         </tr>
         <tr>
-            <th><label for="artasia_contact_notes">Contact Notes</label></th>
+            <th><label for="artasia_partner_logo_id">Logo</label></th>
+            <td>
+                <input type="hidden" id="artasia_partner_logo_id" name="artasia_logo_id" value="<?php echo esc_attr($logo_id); ?>" />
+                <div id="artasia_partner_logo_preview" class="artasia-logo-preview">
+                    <?php if ($logo_url) : ?>
+                        <img src="<?php echo esc_url($logo_url); ?>" alt="" />
+                    <?php endif; ?>
+                </div>
+                <button type="button" class="button" id="artasia_partner_logo_select">Select Logo</button>
+                <button type="button" class="button" id="artasia_partner_logo_remove" <?php disabled(!$logo_id); ?>>Remove Logo</button>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_contact_notes">Notes</label></th>
             <td><textarea id="artasia_contact_notes" name="artasia_contact_notes" rows="4" class="widefat"><?php echo esc_textarea($notes); ?></textarea></td>
         </tr>
     </table>
@@ -264,9 +294,22 @@ function artasia_save_context_meta(int $post_id): void
 
     update_post_meta($post_id, 'artasia_context_type', sanitize_text_field($_POST['artasia_context_type'] ?? ''));
     update_post_meta($post_id, 'artasia_website', esc_url_raw($_POST['artasia_website'] ?? ''));
+    update_post_meta($post_id, 'artasia_logo_id', artasia_validate_partner_logo_id(intval($_POST['artasia_logo_id'] ?? 0)));
     update_post_meta($post_id, 'artasia_contact_notes', sanitize_textarea_field($_POST['artasia_contact_notes'] ?? ''));
 }
 add_action('save_post_artasia_context', 'artasia_save_context_meta');
+
+function artasia_validate_partner_logo_id(int $attachment_id): int
+{
+    if (!$attachment_id) {
+        return 0;
+    }
+
+    $mime_type = get_post_mime_type($attachment_id);
+    $allowed_mime_types = ['image/png', 'image/svg+xml'];
+
+    return in_array($mime_type, $allowed_mime_types, true) ? $attachment_id : 0;
+}
 
 function artasia_remove_unnecessary_meta_boxes(): void
 {

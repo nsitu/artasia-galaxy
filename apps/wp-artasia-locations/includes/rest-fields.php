@@ -62,11 +62,13 @@ function artasia_get_expanded_locations(): WP_REST_Response
             'post__in'       => array_values($context_ids),
         ]);
         foreach ($context_query->posts as $context) {
+            $logo_id = intval(get_post_meta($context->ID, 'artasia_logo_id', true));
             $context_lookup[$context->ID] = [
                 'id'      => $context->ID,
                 'name'    => $context->post_title,
                 'type'    => get_post_meta($context->ID, 'artasia_context_type', true) ?: '',
                 'website' => get_post_meta($context->ID, 'artasia_website', true) ?: '',
+                'logo'    => artasia_get_partner_logo_response($logo_id),
             ];
         }
     }
@@ -92,4 +94,23 @@ function artasia_get_expanded_locations(): WP_REST_Response
     }
 
     return rest_ensure_response($results);
+}
+
+function artasia_get_partner_logo_response(int $attachment_id): ?array
+{
+    if (!$attachment_id) {
+        return null;
+    }
+
+    $url = wp_get_attachment_url($attachment_id);
+    if (!$url) {
+        return null;
+    }
+
+    return [
+        'id'        => $attachment_id,
+        'url'       => $url,
+        'mime_type' => get_post_mime_type($attachment_id) ?: '',
+        'alt'       => get_post_meta($attachment_id, '_wp_attachment_image_alt', true) ?: '',
+    ];
 }

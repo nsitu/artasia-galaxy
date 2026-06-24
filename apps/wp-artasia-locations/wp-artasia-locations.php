@@ -20,6 +20,64 @@ require_once ARTASIA_LOCATIONS_PATH . 'includes/meta-boxes.php';
 require_once ARTASIA_LOCATIONS_PATH . 'includes/rest-fields.php';
 require_once ARTASIA_LOCATIONS_PATH . 'includes/admin-columns.php';
 
+function artasia_admin_enqueue_assets(string $hook_suffix): void
+{
+    if (!in_array($hook_suffix, ['post.php', 'post-new.php'], true)) {
+        return;
+    }
+
+    $screen = get_current_screen();
+    if (!$screen || $screen->post_type !== 'artasia_context') {
+        return;
+    }
+
+    wp_enqueue_media();
+    wp_enqueue_script(
+        'artasia-locations-admin',
+        ARTASIA_LOCATIONS_URL . 'assets/admin.js',
+        ['jquery'],
+        ARTASIA_LOCATIONS_VERSION,
+        true
+    );
+    wp_enqueue_style(
+        'artasia-locations-admin',
+        ARTASIA_LOCATIONS_URL . 'assets/admin.css',
+        [],
+        ARTASIA_LOCATIONS_VERSION
+    );
+}
+add_action('admin_enqueue_scripts', 'artasia_admin_enqueue_assets');
+
+function artasia_allow_partner_logo_mime_types(array $mime_types): array
+{
+    if (current_user_can('upload_files')) {
+        $mime_types['svg'] = 'image/svg+xml';
+        $mime_types['png'] = 'image/png';
+    }
+
+    return $mime_types;
+}
+add_filter('upload_mimes', 'artasia_allow_partner_logo_mime_types');
+
+function artasia_check_svg_filetype(array $data, string $file, string $filename, array $mimes): array
+{
+    $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+    if ($extension !== 'svg') {
+        return $data;
+    }
+
+    if (!current_user_can('upload_files')) {
+        return $data;
+    }
+
+    return [
+        'ext'             => 'svg',
+        'type'            => 'image/svg+xml',
+        'proper_filename' => $data['proper_filename'] ?? false,
+    ];
+}
+add_filter('wp_check_filetype_and_ext', 'artasia_check_svg_filetype', 10, 4);
+
 register_activation_hook(__FILE__, function () {
     artasia_register_post_types();
     flush_rewrite_rules();

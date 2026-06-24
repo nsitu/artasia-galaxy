@@ -1,1 +1,15 @@
-/* Placeholder for admin CSS enhancements */
+.artasia-logo-preview {
+  margin: 0 0 10px;
+  min-height: 0;
+}
+
+.artasia-logo-preview img {
+  display: block;
+  max-width: 220px;
+  max-height: 120px;
+  width: auto;
+  height: auto;
+  padding: 8px;
+  border: 1px solid #c3c4c7;
+  background: #fff;
+}
