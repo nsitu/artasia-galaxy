@@ -33,7 +33,7 @@ function artasia_site_meta_box_html(WP_Post $post): void
     $end_date       = get_post_meta($post->ID, 'artasia_end_date', true);
 
     wp_nonce_field('artasia_site_meta', 'artasia_site_meta_nonce');
-    ?>
+?>
     <table class="form-table">
         <tr>
             <th><label for="artasia_program_year">Artasia Year</label></th>
@@ -49,14 +49,17 @@ function artasia_site_meta_box_html(WP_Post $post): void
                             <?php
                             $venue_label = $venue->post_title;
                             $venue_address = get_post_meta($venue->ID, 'artasia_address', true);
-                            if ($venue_address) {
-                                $venue_label .= ' (' . $venue_address . ')';
+                            $venue_city = get_post_meta($venue->ID, 'artasia_city', true);
+                            $venue_details = array_filter([$venue_address, $venue_city]);
+                            if (!empty($venue_details)) {
+                                $venue_label .= ' - ' . implode(', ', $venue_details);
                             }
                             echo esc_html($venue_label);
                             ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
+                <p class="description">A Venue is a location such as a Park, School, or Community Centre.</p>
             </td>
         </tr>
         <tr>
@@ -106,7 +109,7 @@ function artasia_site_meta_box_html(WP_Post $post): void
             <td><input type="text" id="artasia_end_date" name="artasia_end_date" value="<?php echo esc_attr($end_date); ?>" /></td>
         </tr>
     </table>
-    <?php
+<?php
 }
 
 function artasia_register_site_meta_box(): void
@@ -153,12 +156,12 @@ function artasia_site_edit_page_description(WP_Post $post): void
         return;
     }
 
-    ?>
+?>
     <div class="notice notice-info inline">
         <p><strong>Description</strong></p>
         <p><?php echo esc_html("Note that an Artasia 'site' refers to an activation of a particular venue by a particular partner in a particular year."); ?></p>
     </div>
-    <?php
+<?php
 }
 add_action('edit_form_top', 'artasia_site_edit_page_description');
 
@@ -174,7 +177,7 @@ function artasia_venue_meta_box_html(WP_Post $post): void
     $access   = get_post_meta($post->ID, 'artasia_accessibility_notes', true);
 
     wp_nonce_field('artasia_venue_meta', 'artasia_venue_meta_nonce');
-    ?>
+?>
     <table class="form-table">
         <tr>
             <th><label for="artasia_address">Street Address</label></th>
@@ -201,7 +204,7 @@ function artasia_venue_meta_box_html(WP_Post $post): void
             <td><textarea id="artasia_accessibility_notes" name="artasia_accessibility_notes" rows="4" class="widefat"><?php echo esc_textarea($access); ?></textarea></td>
         </tr>
     </table>
-    <?php
+<?php
 }
 
 function artasia_register_venue_meta_box(): void
@@ -251,7 +254,7 @@ function artasia_partner_meta_box_html(WP_Post $post): void
     $type_options = ['Partner Organization', 'Program', 'Community Group', 'School Board', 'Other'];
 
     wp_nonce_field('artasia_partner_meta', 'artasia_partner_meta_nonce');
-    ?>
+?>
     <table class="form-table">
         <tr>
             <th><label for="artasia_partner_type">Type</label></th>
@@ -288,7 +291,7 @@ function artasia_partner_meta_box_html(WP_Post $post): void
             <td><textarea id="artasia_notes" name="artasia_notes" rows="4" class="widefat"><?php echo esc_textarea($notes); ?></textarea></td>
         </tr>
     </table>
-    <?php
+<?php
 }
 
 function artasia_register_partner_meta_box(): void
