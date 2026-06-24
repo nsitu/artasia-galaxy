@@ -68,7 +68,7 @@ function artasia_register_meta_fields(): void
     register_post_meta('artasia_site', 'artasia_program_year', [
         'type'         => 'integer',
         'single'       => true,
-        'default'      => 0,
+        'default'      => intval(date('Y')),
         'show_in_rest' => true,
         'sanitize_callback' => 'artasia_sanitize_integer_meta',
     ]);

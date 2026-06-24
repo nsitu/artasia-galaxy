@@ -215,16 +215,14 @@ The config follows the same pattern as the existing Immich HTTPS server block, i
 
 GitHub Actions deploys on pushes to `main`.
 
-The workflow:
+The workflow detects which deployable areas changed before doing expensive work:
 
-1. Builds the Docker image.
-2. Pushes `latest` and commit-SHA tags to GHCR.
-3. SSHes into the Azure VM.
-4. Runs Docker Compose in `/opt/artasia-galaxy`.
-5. Pulls the new image.
-6. Restarts the container.
-7. Prunes old local Docker images.
-8. Deletes old GHCR package versions, keeping only the newest version for now.
+1. App image changes under `apps/server/`, `apps/web/`, the Docker build inputs, or root package files build and push a new Docker image.
+2. `docker-compose.yml` changes copy the Compose file to `/opt/artasia-galaxy`.
+3. App image or Compose changes restart Docker Compose in `/opt/artasia-galaxy`.
+4. WordPress plugin changes under `apps/wp-artasia-locations/` copy and activate only that plugin.
+5. Plugin-only changes skip the Docker image build, GHCR push, Compose pull, and container restart.
+6. Old GHCR package versions are deleted only after a new image build, keeping only the newest version for now.
 
 The deploy command effectively runs:
 

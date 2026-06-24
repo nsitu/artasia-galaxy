@@ -24,6 +24,9 @@ function artasia_site_meta_box_html(WP_Post $post): void
     $venue_id       = get_post_meta($post->ID, 'artasia_venue_id', true);
     $partner_id     = get_post_meta($post->ID, 'artasia_partner_id', true);
     $program_year   = get_post_meta($post->ID, 'artasia_program_year', true);
+    if (!$program_year) {
+        $program_year = date('Y');
+    }
     $program_context = get_post_meta($post->ID, 'artasia_program_context', true);
     $is_earlyon     = (bool) get_post_meta($post->ID, 'artasia_is_earlyon', true);
     $section        = get_post_meta($post->ID, 'artasia_section', true);
