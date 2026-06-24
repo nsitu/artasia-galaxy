@@ -15,6 +15,8 @@ function artasia_site_columns(array $columns): array
             $new['artasia_venue']    = 'Venue';
             $new['artasia_partner']  = 'Artasia Partner';
             $new['artasia_year']     = 'Year';
+            $new['artasia_program_context'] = 'Program / Context';
+            $new['artasia_is_earlyon'] = 'EarlyON';
             $new['artasia_section']  = 'Section';
             $new['artasia_participants'] = 'Participants';
         }
@@ -36,6 +38,12 @@ function artasia_site_column(string $column, int $post_id): void
             break;
         case 'artasia_year':
             echo esc_html(get_post_meta($post_id, 'artasia_program_year', true) ?: '—');
+            break;
+        case 'artasia_program_context':
+            echo esc_html(get_post_meta($post_id, 'artasia_program_context', true) ?: '—');
+            break;
+        case 'artasia_is_earlyon':
+            echo get_post_meta($post_id, 'artasia_is_earlyon', true) ? 'Yes' : '—';
             break;
         case 'artasia_section':
             echo esc_html(get_post_meta($post_id, 'artasia_section', true) ?: '—');

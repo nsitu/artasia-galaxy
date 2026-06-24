@@ -72,6 +72,20 @@ function artasia_register_meta_fields(): void
         'show_in_rest' => true,
         'sanitize_callback' => 'artasia_sanitize_integer_meta',
     ]);
+    register_post_meta('artasia_site', 'artasia_program_context', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'sanitize_text_field',
+    ]);
+    register_post_meta('artasia_site', 'artasia_is_earlyon', [
+        'type'         => 'boolean',
+        'single'       => true,
+        'default'      => false,
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_boolean_meta',
+    ]);
     register_post_meta('artasia_site', 'artasia_section', [
         'type'         => 'string',
         'single'       => true,
@@ -147,6 +161,11 @@ function artasia_sanitize_integer_meta($value, string $meta_key = '', string $ob
 function artasia_sanitize_float_meta($value, string $meta_key = '', string $object_type = '', string $object_subtype = ''): float
 {
     return floatval($value);
+}
+
+function artasia_sanitize_boolean_meta($value, string $meta_key = '', string $object_type = '', string $object_subtype = ''): bool
+{
+    return filter_var($value, FILTER_VALIDATE_BOOLEAN);
 }
 
 add_action('init', 'artasia_register_meta_fields');

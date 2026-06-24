@@ -24,6 +24,8 @@ function artasia_site_meta_box_html(WP_Post $post): void
     $venue_id       = get_post_meta($post->ID, 'artasia_venue_id', true);
     $partner_id     = get_post_meta($post->ID, 'artasia_partner_id', true);
     $program_year   = get_post_meta($post->ID, 'artasia_program_year', true);
+    $program_context = get_post_meta($post->ID, 'artasia_program_context', true);
+    $is_earlyon     = (bool) get_post_meta($post->ID, 'artasia_is_earlyon', true);
     $section        = get_post_meta($post->ID, 'artasia_section', true);
     $participant_count = get_post_meta($post->ID, 'artasia_participant_count', true);
     $participant_age = get_post_meta($post->ID, 'artasia_participant_age', true);
@@ -36,6 +38,10 @@ function artasia_site_meta_box_html(WP_Post $post): void
         <tr>
             <th><label for="artasia_program_year">Program Year</label></th>
             <td><input type="number" id="artasia_program_year" name="artasia_program_year" value="<?php echo esc_attr($program_year); ?>" /></td>
+        </tr>
+        <tr>
+            <th><label for="artasia_program_context">Program / Context</label></th>
+            <td><input type="text" id="artasia_program_context" name="artasia_program_context" value="<?php echo esc_attr($program_context); ?>" class="widefat" /></td>
         </tr>
         <tr>
             <th><label for="artasia_venue_id">Venue</label></th>
@@ -66,6 +72,15 @@ function artasia_site_meta_box_html(WP_Post $post): void
         <tr>
             <th><label for="artasia_section">Section</label></th>
             <td><input type="text" id="artasia_section" name="artasia_section" value="<?php echo esc_attr($section); ?>" /></td>
+        </tr>
+        <tr>
+            <th><label for="artasia_is_earlyon">EarlyON</label></th>
+            <td>
+                <label>
+                    <input type="checkbox" id="artasia_is_earlyon" name="artasia_is_earlyon" value="1" <?php checked($is_earlyon); ?> />
+                    Mark as an EarlyON site
+                </label>
+            </td>
         </tr>
         <tr>
             <th><label for="artasia_participant_count">Participants</label></th>
@@ -113,6 +128,8 @@ function artasia_save_site_meta(int $post_id): void
     }
 
     update_post_meta($post_id, 'artasia_program_year', intval($_POST['artasia_program_year'] ?? 0));
+    update_post_meta($post_id, 'artasia_program_context', sanitize_text_field($_POST['artasia_program_context'] ?? ''));
+    update_post_meta($post_id, 'artasia_is_earlyon', isset($_POST['artasia_is_earlyon']));
     update_post_meta($post_id, 'artasia_venue_id', intval($_POST['artasia_venue_id'] ?? 0));
     update_post_meta($post_id, 'artasia_partner_id', intval($_POST['artasia_partner_id'] ?? 0));
     update_post_meta($post_id, 'artasia_section', sanitize_text_field($_POST['artasia_section'] ?? ''));

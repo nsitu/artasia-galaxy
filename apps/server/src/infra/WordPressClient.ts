@@ -19,6 +19,8 @@ export interface WpArtasiaLocation {
   site_id: number;
   site_name: string;
   program_year: number;
+  program_context: string;
+  is_earlyon: boolean;
   section?: string;
   participant_count?: number;
   participant_age?: string;

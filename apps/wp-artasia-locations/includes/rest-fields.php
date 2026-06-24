@@ -83,6 +83,8 @@ function artasia_get_expanded_locations(): WP_REST_Response
             'site_id'            => $site->ID,
             'site_name'          => $site->post_title,
             'program_year'       => intval(get_post_meta($site->ID, 'artasia_program_year', true)),
+            'program_context'    => get_post_meta($site->ID, 'artasia_program_context', true) ?: '',
+            'is_earlyon'         => (bool) get_post_meta($site->ID, 'artasia_is_earlyon', true),
             'section'            => get_post_meta($site->ID, 'artasia_section', true) ?: '',
             'participant_count'  => intval(get_post_meta($site->ID, 'artasia_participant_count', true)),
             'participant_age'    => get_post_meta($site->ID, 'artasia_participant_age', true) ?: '',
