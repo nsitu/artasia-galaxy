@@ -76,11 +76,14 @@ function artasia_site_meta_box_html(WP_Post $post): void
                         </option>
                     <?php endforeach; ?>
                 </select>
+                <p class="description">Arts For All works with many community partners to deliver Artasia in Hamilton and surrounding Regions.</p>
             </td>
         </tr>
         <tr>
             <th><label for="artasia_program_context">Program / Context</label></th>
-            <td><input type="text" id="artasia_program_context" name="artasia_program_context" value="<?php echo esc_attr($program_context); ?>" placeholder="e.g. Beyond the Bell" class="widefat" /></td>
+            <td><input type="text" id="artasia_program_context" name="artasia_program_context" value="<?php echo esc_attr($program_context); ?>" placeholder="e.g. Beyond the Bell" class="widefat" />
+                <p class="description">Artasia Partners welcome us in the context of specific existing programming activites (e.g. Summer Camps).</p>
+            </td>
         </tr>
         <tr>
             <th><label for="artasia_is_earlyon">EarlyON</label></th>
@@ -89,6 +92,7 @@ function artasia_site_meta_box_html(WP_Post $post): void
                     <input type="checkbox" id="artasia_is_earlyon" name="artasia_is_earlyon" value="1" <?php checked($is_earlyon); ?> />
                     Mark as an EarlyON site
                 </label>
+                <p class="description">EarlyON is an Ontario Government initiative often embedded inside of partner locations and infrastructure.</p>
             </td>
         </tr>
         <tr>
