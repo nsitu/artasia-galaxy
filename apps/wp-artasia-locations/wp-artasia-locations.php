@@ -19,6 +19,7 @@ require_once ARTASIA_LOCATIONS_PATH . 'includes/meta-fields.php';
 require_once ARTASIA_LOCATIONS_PATH . 'includes/meta-boxes.php';
 require_once ARTASIA_LOCATIONS_PATH . 'includes/rest-fields.php';
 require_once ARTASIA_LOCATIONS_PATH . 'includes/admin-columns.php';
+require_once ARTASIA_LOCATIONS_PATH . 'includes/import.php';
 
 function artasia_admin_enqueue_assets(string $hook_suffix): void
 {
