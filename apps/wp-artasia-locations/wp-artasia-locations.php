@@ -60,7 +60,7 @@ function artasia_allow_partner_logo_mime_types(array $mime_types): array
 }
 add_filter('upload_mimes', 'artasia_allow_partner_logo_mime_types');
 
-function artasia_check_svg_filetype(array $data, string $file, string $filename, array $mimes): array
+function artasia_check_svg_filetype(array $data, string $file, string $filename, ?array $mimes = null): array
 {
     $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
     if ($extension !== 'svg') {
