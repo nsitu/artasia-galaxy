@@ -1,29 +1,36 @@
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { useGalleryStore } from "../../stores/galleryStore";
-
-const GAP_X = 3.0;
-const GAP_Y = 2.8;
+import { createGalleryLayout, getGalleryLayoutBounds } from "./galleryLayout";
 
 export default function CameraRig({ columns = 4 }: { columns?: number }) {
-  const { camera } = useThree();
+  const { camera, size } = useThree();
   const target = useRef(new THREE.Vector3(0, 0, 8));
   const lookTarget = useRef(new THREE.Vector3(0, 0, 0));
   const selectedIndex = useGalleryStore((s) => s.selectedPhotoIndex);
+  const photos = useGalleryStore((s) => s.photos);
+  const layout = useMemo(
+    () => createGalleryLayout(photos, columns),
+    [photos, columns]
+  );
+  const bounds = useMemo(() => getGalleryLayoutBounds(layout), [layout]);
 
   useFrame(() => {
     if (selectedIndex !== null) {
-      const col = selectedIndex % columns;
-      const row = Math.floor(selectedIndex / columns);
-      const x = (col - (columns - 1) / 2) * GAP_X;
-      const y = -(row * GAP_Y) + 1;
+      const selected = layout.find((item) => item.index === selectedIndex);
+      const [x, y] = selected?.position ?? [0, 0, 0];
 
       lookTarget.current.set(x, y, 0);
       target.current.set(x, y, 3.5);
     } else {
-      lookTarget.current.set(0, 0, 0);
-      target.current.set(0, 0, 8);
+      const aspect = size.width / Math.max(size.height, 1);
+      const verticalZ = bounds.height / (2 * Math.tan(THREE.MathUtils.degToRad(25)));
+      const horizontalZ = bounds.width / (2 * Math.tan(THREE.MathUtils.degToRad(25)) * aspect);
+      const z = Math.max(8, verticalZ, horizontalZ);
+
+      lookTarget.current.set(bounds.centerX, bounds.centerY, 0);
+      target.current.set(bounds.centerX, bounds.centerY, z);
     }
 
     camera.position.lerp(target.current, 0.06);

@@ -12,6 +12,8 @@ export interface Photo {
     make?: string;
     model?: string;
     focalLength?: number;
+    latitude?: number;
+    longitude?: number;
   };
   faces?: Array<{
     x: number;
@@ -82,6 +84,8 @@ function assetToPhoto(asset: ImmichAsset): Photo {
           make: asset.exifInfo.make,
           model: asset.exifInfo.model,
           focalLength: asset.exifInfo.focalLength,
+          latitude: asset.exifInfo.latitude,
+          longitude: asset.exifInfo.longitude,
         }
       : undefined,
     faces: asset.people
