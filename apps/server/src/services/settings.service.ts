@@ -10,6 +10,7 @@ export interface PlaybackSettings {
 
 export interface DisplaySettings {
   columns: number;
+  mode: "wall" | "terrain";
 }
 
 export interface AppSettings {
@@ -26,6 +27,7 @@ const FALLBACK_SETTINGS: AppSettings = {
   },
   display: {
     columns: 4,
+    mode: "terrain",
   },
 };
 

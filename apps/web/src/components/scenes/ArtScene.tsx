@@ -1,10 +1,11 @@
 import { Suspense, useEffect, useState, useRef, useCallback } from "react";
 import { Canvas } from "@react-three/fiber";
-import { Preload } from "@react-three/drei";
+import { OrbitControls, Preload } from "@react-three/drei";
 import { useGalleryStore } from "../../stores/galleryStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import GalleryWall from "./GalleryWall";
 import CameraRig from "./CameraRig";
+import TerrainGallery from "./TerrainGallery";
 import SettingsPanel from "../ui/SettingsPanel";
 import UploadPanel from "../ui/UploadPanel";
 
@@ -75,6 +76,9 @@ export default function ArtScene() {
   const albumLabel = selectedAlbumId
     ? albums.find((a) => a.id === selectedAlbumId)?.name ?? "Album"
     : "All Photos";
+  const selectedPhoto =
+    selectedPhotoIndex !== null ? photos[selectedPhotoIndex] : null;
+  const selectedDescription = selectedPhoto?.exifInfo?.description?.trim();
 
   return (
     <div style={{ width: "100vw", height: "100vh", position: "relative" }}>
@@ -212,6 +216,22 @@ export default function ArtScene() {
         </div>
       )}
 
+      {selectedPhoto && (
+        <div style={metadataOverlayStyle}>
+          <div style={metadataTitleStyle}>{selectedPhoto.fileName}</div>
+          <div style={metadataDescriptionStyle}>
+            {selectedDescription || "No description metadata."}
+          </div>
+          <button
+            onClick={() => selectPhoto(null)}
+            aria-label="Close metadata"
+            style={metadataCloseStyle}
+          >
+            x
+          </button>
+        </div>
+      )}
+
       {/* Keyboard hints */}
       <div
         style={{
@@ -242,14 +262,29 @@ export default function ArtScene() {
       />
 
       <Canvas
-        camera={{ position: [0, 0, 8], fov: 50 }}
+        camera={{ position: [0, 0, 16], fov: 50 }}
         dpr={[1, 1.5]}
         style={{ background: "#0a0a14" }}
       >
         <ambientLight intensity={0.8} />
         <Suspense fallback={null}>
-          <GalleryWall columns={display.columns} />
-          <CameraRig columns={display.columns} />
+          {display.mode === "wall" && <GalleryWall columns={display.columns} />}
+          {display.mode === "terrain" && <TerrainGallery />}
+          {display.mode === "wall" && (
+            <CameraRig columns={display.columns} mode={display.mode} />
+          )}
+          {display.mode === "terrain" && (
+            <OrbitControls
+              makeDefault
+              enableDamping
+              dampingFactor={0.08}
+              enablePan
+              enableZoom
+              screenSpacePanning
+              minDistance={3}
+              maxDistance={80}
+            />
+          )}
           <Preload all />
         </Suspense>
       </Canvas>
@@ -301,4 +336,50 @@ const centeredStyle: React.CSSProperties = {
   color: "#888",
   fontFamily: "monospace",
   pointerEvents: "none",
+};
+
+const metadataOverlayStyle: React.CSSProperties = {
+  position: "absolute",
+  left: 16,
+  bottom: 42,
+  zIndex: 14,
+  width: "min(420px, calc(100vw - 32px))",
+  maxHeight: "32vh",
+  overflowY: "auto",
+  background: "rgba(10,10,20,0.88)",
+  border: "1px solid rgba(255,255,255,0.16)",
+  borderRadius: 6,
+  padding: "12px 40px 12px 14px",
+  color: "#ddd",
+  fontFamily: "monospace",
+  fontSize: 13,
+  lineHeight: 1.45,
+};
+
+const metadataTitleStyle: React.CSSProperties = {
+  color: "#fff",
+  fontSize: 12,
+  marginBottom: 6,
+  overflowWrap: "anywhere",
+};
+
+const metadataDescriptionStyle: React.CSSProperties = {
+  color: "#bbb",
+  whiteSpace: "pre-wrap",
+  overflowWrap: "anywhere",
+};
+
+const metadataCloseStyle: React.CSSProperties = {
+  position: "absolute",
+  top: 8,
+  right: 8,
+  background: "rgba(255,255,255,0.08)",
+  border: "1px solid rgba(255,255,255,0.14)",
+  borderRadius: 4,
+  color: "#aaa",
+  cursor: "pointer",
+  fontFamily: "monospace",
+  fontSize: 12,
+  width: 24,
+  height: 24,
 };

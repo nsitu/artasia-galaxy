@@ -9,6 +9,7 @@ export interface PlaybackSettings {
 
 export interface DisplaySettings {
   columns: number;
+  mode: "wall" | "terrain";
 }
 
 interface SettingsState {
@@ -33,6 +34,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
   display: {
     columns: 4,
+    mode: "terrain",
   },
   loaded: false,
 

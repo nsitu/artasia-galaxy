@@ -12,6 +12,7 @@ export interface Photo {
     make?: string;
     model?: string;
     focalLength?: number;
+    description?: string;
     latitude?: number;
     longitude?: number;
   };

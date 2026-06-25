@@ -198,6 +198,41 @@ export default function SettingsPanel({ visible, onClose }: Props) {
             ))}
           </div>
         </div>
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 8,
+          }}
+        >
+          <span>Mode</span>
+          <div style={{ display: "flex", gap: 4 }}>
+            {(["wall", "terrain"] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => updateDisplay({ mode })}
+                style={{
+                  background:
+                    display.mode === mode
+                      ? "rgba(100,200,100,0.2)"
+                      : "rgba(255,255,255,0.05)",
+                  border: `1px solid ${display.mode === mode ? "rgba(100,200,100,0.4)" : "rgba(255,255,255,0.1)"}`,
+                  color: display.mode === mode ? "#8d8" : "#888",
+                  padding: "3px 10px",
+                  borderRadius: 4,
+                  cursor: "pointer",
+                  fontSize: 12,
+                  fontFamily: "monospace",
+                  textTransform: "capitalize",
+                }}
+              >
+                {mode}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Keyboard shortcuts */}

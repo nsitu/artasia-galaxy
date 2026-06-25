@@ -26,6 +26,7 @@ export interface ImmichAsset {
     exifImageWidth?: number;
     exifImageHeight?: number;
     focalLength?: number;
+    description?: string;
     latitude?: number;
     longitude?: number;
     city?: string;

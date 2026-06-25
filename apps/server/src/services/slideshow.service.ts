@@ -12,6 +12,7 @@ export interface Photo {
     make?: string;
     model?: string;
     focalLength?: number;
+    description?: string;
     latitude?: number;
     longitude?: number;
   };
@@ -84,6 +85,7 @@ function assetToPhoto(asset: ImmichAsset): Photo {
           make: asset.exifInfo.make,
           model: asset.exifInfo.model,
           focalLength: asset.exifInfo.focalLength,
+          description: asset.exifInfo.description,
           latitude: asset.exifInfo.latitude,
           longitude: asset.exifInfo.longitude,
         }
