@@ -13,6 +13,9 @@ RUN npm ci
 COPY apps/server apps/server
 COPY apps/web apps/web
 
+ARG VITE_MAPBOX_TOKEN
+ENV VITE_MAPBOX_TOKEN=$VITE_MAPBOX_TOKEN
+
 RUN npm run build --workspace @artasia/web
 RUN npm run build --workspace @artasia/server
 RUN npm prune --omit=dev --workspaces --include-workspace-root
