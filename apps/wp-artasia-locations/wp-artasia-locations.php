@@ -28,7 +28,7 @@ function artasia_admin_enqueue_assets(string $hook_suffix): void
     }
 
     $screen = get_current_screen();
-    if (!$screen || !in_array($screen->post_type, ['artasia_partner', 'artasia_site'], true)) {
+    if (!$screen || $screen->post_type !== 'artasia_partner') {
         return;
     }
 
@@ -37,16 +37,14 @@ function artasia_admin_enqueue_assets(string $hook_suffix): void
         filemtime(ARTASIA_LOCATIONS_PATH . 'assets/admin.css')
     );
 
-    if ($screen->post_type === 'artasia_partner') {
-        wp_enqueue_media();
-        wp_enqueue_script(
-            'artasia-locations-admin',
-            ARTASIA_LOCATIONS_URL . 'assets/admin.js',
-            ['jquery'],
-            $admin_asset_version,
-            true
-        );
-    }
+    wp_enqueue_media();
+    wp_enqueue_script(
+        'artasia-locations-admin',
+        ARTASIA_LOCATIONS_URL . 'assets/admin.js',
+        ['jquery'],
+        $admin_asset_version,
+        true
+    );
 
     wp_enqueue_style(
         'artasia-locations-admin',
@@ -56,23 +54,6 @@ function artasia_admin_enqueue_assets(string $hook_suffix): void
     );
 }
 add_action('admin_enqueue_scripts', 'artasia_admin_enqueue_assets');
-
-function artasia_enqueue_site_editor_assets(): void
-{
-    $screen = get_current_screen();
-    if (!$screen || $screen->post_type !== 'artasia_site') {
-        return;
-    }
-
-    wp_enqueue_script(
-        'artasia-site-editor',
-        ARTASIA_LOCATIONS_URL . 'assets/site-editor.js',
-        ['wp-plugins', 'wp-edit-post', 'wp-element'],
-        (string) filemtime(ARTASIA_LOCATIONS_PATH . 'assets/site-editor.js'),
-        true
-    );
-}
-add_action('enqueue_block_editor_assets', 'artasia_enqueue_site_editor_assets');
 
 function artasia_allow_partner_logo_mime_types(array $mime_types): array
 {

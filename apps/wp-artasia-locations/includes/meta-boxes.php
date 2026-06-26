@@ -128,8 +128,25 @@ function artasia_register_site_meta_box(): void
         'normal',
         'default'
     );
+
+    add_meta_box(
+        'artasia_site_context',
+        'About Artasia Sites',
+        'artasia_site_context_meta_box_html',
+        'artasia_site',
+        'side',
+        'high'
+    );
 }
 add_action('add_meta_boxes', 'artasia_register_site_meta_box');
+
+function artasia_site_context_meta_box_html(): void
+{
+?>
+    <p>An Artasia Site represents one year's activation of a particular venue by a particular Artasia Partner.</p>
+    <p>Use this post to connect the venue, Artasia Partner, program context, section, and participant details for that activation.</p>
+<?php
+}
 
 function artasia_save_site_meta(int $post_id): void
 {
