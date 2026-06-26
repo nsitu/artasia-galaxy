@@ -16,6 +16,21 @@
   background: #fff;
 }
 
+.artasia-admin-logo-wrapper {
+  display: inline-block;
+  max-width: 200px;
+  max-height: 150px;
+  overflow: hidden;
+}
+
+.artasia-admin-logo {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+}
+
 .artasia-placements-list-context {
   margin: 14px 0 18px;
   max-width: 960px;
