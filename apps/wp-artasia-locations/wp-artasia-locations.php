@@ -28,24 +28,41 @@ function artasia_admin_enqueue_assets(string $hook_suffix): void
     }
 
     $screen = get_current_screen();
-    if (!$screen || $screen->post_type !== 'artasia_partner') {
+    if (!$screen || !in_array($screen->post_type, ['artasia_partner', 'artasia_site'], true)) {
         return;
     }
 
-    wp_enqueue_media();
+    if ($screen->post_type === 'artasia_partner') {
+        wp_enqueue_media();
+    }
+
+    $admin_asset_version = (string) max(
+        filemtime(ARTASIA_LOCATIONS_PATH . 'assets/admin.js'),
+        filemtime(ARTASIA_LOCATIONS_PATH . 'assets/admin.css')
+    );
+
     wp_enqueue_script(
         'artasia-locations-admin',
         ARTASIA_LOCATIONS_URL . 'assets/admin.js',
         ['jquery'],
-        ARTASIA_LOCATIONS_VERSION,
+        $admin_asset_version,
         true
     );
     wp_enqueue_style(
         'artasia-locations-admin',
         ARTASIA_LOCATIONS_URL . 'assets/admin.css',
         [],
-        ARTASIA_LOCATIONS_VERSION
+        $admin_asset_version
     );
+
+    if ($screen->post_type === 'artasia_site') {
+        wp_localize_script('artasia-locations-admin', 'artasiaLocationsAdmin', [
+            'siteNotice' => [
+                'title' => 'About Artasia Sites',
+                'body'  => "An Artasia Site represents one year's activation of a particular venue by a particular Artasia Partner, including the program context, section, and participant details.",
+            ],
+        ]);
+    }
 }
 add_action('admin_enqueue_scripts', 'artasia_admin_enqueue_assets');
 

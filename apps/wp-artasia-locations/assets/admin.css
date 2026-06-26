@@ -13,3 +13,8 @@
   border: 1px solid #c3c4c7;
   background: #fff;
 }
+
+.artasia-site-editor-notice {
+  margin: 16px 20px 0;
+  max-width: calc(100% - 40px);
+}

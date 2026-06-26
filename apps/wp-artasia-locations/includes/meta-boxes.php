@@ -158,7 +158,7 @@ function artasia_site_admin_description(): void
 {
     $screen = get_current_screen();
 
-    if (!$screen || $screen->post_type !== 'artasia_site' || !in_array($screen->base, ['edit', 'post'], true)) {
+    if (!$screen || $screen->id !== 'edit-artasia_site') {
         return;
     }
 
