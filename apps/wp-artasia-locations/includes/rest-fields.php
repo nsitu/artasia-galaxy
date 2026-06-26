@@ -24,7 +24,7 @@ function artasia_get_expanded_placements(): WP_REST_Response
 
     $place_ids    = [];
     $partner_ids  = [];
-    $lead_ids     = [];
+    $team_member_ids = [];
     $placement_posts = $placements_query->posts;
 
     $project_ids  = [];
@@ -32,11 +32,11 @@ function artasia_get_expanded_placements(): WP_REST_Response
         $project_id = intval(get_post_meta($placement->ID, 'artasia_project_id', true));
         $vid = intval(get_post_meta($placement->ID, 'artasia_place_id', true));
         $partner_id = intval(get_post_meta($placement->ID, 'artasia_partner_id', true));
-        $lead_id = intval(get_post_meta($placement->ID, 'artasia_lead_id', true));
+        $team_member_id = intval(get_post_meta($placement->ID, 'artasia_team_member_id', true));
         if ($project_id) $project_ids[$project_id] = $project_id;
         if ($vid) $place_ids[$vid] = $vid;
         if ($partner_id) $partner_ids[$partner_id] = $partner_id;
-        if ($lead_id) $lead_ids[$lead_id] = $lead_id;
+        if ($team_member_id) $team_member_ids[$team_member_id] = $team_member_id;
     }
 
     $project_lookup = [];
@@ -96,16 +96,16 @@ function artasia_get_expanded_placements(): WP_REST_Response
         }
     }
 
-    $lead_lookup = [];
-    if (!empty($lead_ids)) {
-        $lead_query = new WP_Query([
+    $team_member_lookup = [];
+    if (!empty($team_member_ids)) {
+        $team_member_query = new WP_Query([
             'post_type'      => 'artasia_people',
             'posts_per_page' => -1,
-            'post__in'       => array_values($lead_ids),
+            'post__in'       => array_values($team_member_ids),
         ]);
-        foreach ($lead_query->posts as $person) {
+        foreach ($team_member_query->posts as $person) {
             $photo_id = intval(get_post_meta($person->ID, 'artasia_photo_id', true));
-            $lead_lookup[$person->ID] = [
+            $team_member_lookup[$person->ID] = [
                 'id'    => $person->ID,
                 'name'  => $person->post_title,
                 'role'  => get_post_meta($person->ID, 'artasia_role', true) ?: 'Artist Educator',
@@ -120,7 +120,7 @@ function artasia_get_expanded_placements(): WP_REST_Response
         $project_id = intval(get_post_meta($placement->ID, 'artasia_project_id', true));
         $vid = intval(get_post_meta($placement->ID, 'artasia_place_id', true));
         $partner_id = intval(get_post_meta($placement->ID, 'artasia_partner_id', true));
-        $lead_id = intval(get_post_meta($placement->ID, 'artasia_lead_id', true));
+        $team_member_id = intval(get_post_meta($placement->ID, 'artasia_team_member_id', true));
 
         $results[] = [
             'placement_id' => $placement->ID,
@@ -133,7 +133,7 @@ function artasia_get_expanded_placements(): WP_REST_Response
             'participant_age' => get_post_meta($placement->ID, 'artasia_participant_age', true) ?: '',
             'place'              => $place_lookup[$vid] ?? null,
             'partner'            => $partner_lookup[$partner_id] ?? null,
-            'lead'               => $lead_lookup[$lead_id] ?? null,
+            'team_member'        => $team_member_lookup[$team_member_id] ?? null,
         ];
     }
 

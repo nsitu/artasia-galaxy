@@ -15,7 +15,7 @@ function artasia_placement_columns(array $columns): array
             $new['artasia_project']  = 'Project';
             $new['artasia_place']    = 'Place';
             $new['artasia_partner']  = 'Artasia Partner';
-            $new['artasia_lead']     = 'Artasia Lead';
+            $new['artasia_team_member'] = 'Artasia Team Member';
             $new['artasia_program_context'] = 'Program / Context';
             $new['artasia_is_earlyon'] = 'EarlyON';
             $new['artasia_section']  = 'Section';
@@ -41,9 +41,9 @@ function artasia_placement_column(string $column, int $post_id): void
             $partner_id = intval(get_post_meta($post_id, 'artasia_partner_id', true));
             echo $partner_id ? esc_html(get_the_title($partner_id)) : '—';
             break;
-        case 'artasia_lead':
-            $lead_id = intval(get_post_meta($post_id, 'artasia_lead_id', true));
-            echo $lead_id ? esc_html(get_the_title($lead_id)) : '—';
+        case 'artasia_team_member':
+            $team_member_id = intval(get_post_meta($post_id, 'artasia_team_member_id', true));
+            echo $team_member_id ? esc_html(get_the_title($team_member_id)) : '—';
             break;
         case 'artasia_program_context':
             echo esc_html(get_post_meta($post_id, 'artasia_program_context', true) ?: '—');
@@ -142,6 +142,7 @@ function artasia_partner_columns(array $columns): array
     foreach ($columns as $key => $label) {
         $new[$key] = $label;
         if ($key === 'title') {
+            $new['artasia_logo'] = 'Logo';
             $new['artasia_partner_type'] = 'Type';
             $new['artasia_website']       = 'Website';
         }
@@ -153,6 +154,10 @@ add_filter('manage_artasia_partner_posts_columns', 'artasia_partner_columns');
 function artasia_partner_column(string $column, int $post_id): void
 {
     switch ($column) {
+        case 'artasia_logo':
+            $logo_id = intval(get_post_meta($post_id, 'artasia_logo_id', true));
+            echo $logo_id ? wp_get_attachment_image($logo_id, 'thumbnail', false, ['style' => 'max-width:48px;height:auto;']) : '—';
+            break;
         case 'artasia_partner_type':
             echo esc_html(get_post_meta($post_id, 'artasia_partner_type', true) ?: '—');
             break;
@@ -195,7 +200,7 @@ function artasia_people_column(string $column, int $post_id): void
             $placements = get_posts([
                 'post_type'   => 'artasia_placement',
                 'numberposts' => -1,
-                'meta_key'    => 'artasia_lead_id',
+                'meta_key'    => 'artasia_team_member_id',
                 'meta_value'  => $post_id,
                 'fields'      => 'ids',
             ]);

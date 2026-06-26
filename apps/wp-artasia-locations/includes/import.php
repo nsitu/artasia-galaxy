@@ -47,7 +47,7 @@ function artasia_render_import_page(): void
 
         <h2>Headers</h2>
         <p>Required headers: <code>placement_name</code>, <code>project_name</code>, <code>place_name</code>, <code>partner_name</code>.</p>
-        <p>Optional headers: <code>project_year</code>, <code>project_description</code>, <code>program_context</code>, <code>earlyon</code>, <code>section</code>, <code>participants</code>, <code>age_range</code>, <code>place_street_address</code>, <code>place_city</code>, <code>place_postal_code</code>, <code>place_latitude</code>, <code>place_longitude</code>, <code>place_notes</code>, <code>partner_type</code>, <code>partner_website</code>, <code>partner_notes</code>, <code>lead_name</code>, <code>lead_role</code>, <code>lead_notes</code>.</p>
+        <p>Optional headers: <code>project_year</code>, <code>project_description</code>, <code>program_context</code>, <code>earlyon</code>, <code>section</code>, <code>participants</code>, <code>age_range</code>, <code>place_street_address</code>, <code>place_city</code>, <code>place_postal_code</code>, <code>place_latitude</code>, <code>place_longitude</code>, <code>place_notes</code>, <code>partner_type</code>, <code>partner_website</code>, <code>partner_notes</code>, <code>team_member_name</code>, <code>team_member_role</code>, <code>team_member_notes</code>.</p>
         <p>For <code>earlyon</code>, use values like <code>yes</code>, <code>no</code>, <code>true</code>, <code>false</code>, <code>1</code>, or <code>0</code>.</p>
 
         <h2>Upload CSV</h2>
@@ -89,9 +89,9 @@ function artasia_download_import_template(): void
         'partner_type' => 'Partner Organization',
         'partner_website' => 'https://www.hpl.ca',
         'partner_notes' => 'Library partner',
-        'lead_name' => 'Taylor Morgan',
-        'lead_role' => 'Artist Educator',
-        'lead_notes' => 'Lead facilitator for this placement',
+        'team_member_name' => 'Taylor Morgan',
+        'team_member_role' => 'Artist Educator',
+        'team_member_notes' => 'Team member notes for this placement',
         'program_context' => 'Beyond the Bell',
         'earlyon' => 'no',
         'section' => 'Room 3',
@@ -200,13 +200,13 @@ function artasia_import_location_record(array $record): string
     $project_id = artasia_import_find_or_create_project($project_name, $project_year);
     $place_id = artasia_import_find_or_create_post('artasia_place', $place_name);
     $partner_id = artasia_import_find_or_create_post('artasia_partner', $partner_name);
-    $lead_id = 0;
-    $lead_name = artasia_import_value($record, 'lead_name');
-    if ($lead_name) {
-        $lead_id = artasia_import_find_or_create_post('artasia_people', $lead_name);
+    $team_member_id = 0;
+    $team_member_name = artasia_import_value($record, 'team_member_name');
+    if ($team_member_name) {
+        $team_member_id = artasia_import_find_or_create_post('artasia_people', $team_member_name);
     }
 
-    if (!$project_id || !$place_id || !$partner_id || ($lead_name && !$lead_id)) {
+    if (!$project_id || !$place_id || !$partner_id || ($team_member_name && !$team_member_id)) {
         return 'error';
     }
 
@@ -224,9 +224,9 @@ function artasia_import_location_record(array $record): string
     artasia_import_update_meta_if_present($partner_id, 'artasia_website', $record, 'partner_website', 'esc_url_raw');
     artasia_import_update_meta_if_present($partner_id, 'artasia_notes', $record, 'partner_notes', 'sanitize_textarea_field');
 
-    if ($lead_id) {
-        update_post_meta($lead_id, 'artasia_role', sanitize_text_field(artasia_import_value($record, 'lead_role') ?: 'Artist Educator'));
-        artasia_import_update_meta_if_present($lead_id, 'artasia_notes', $record, 'lead_notes', 'sanitize_textarea_field');
+    if ($team_member_id) {
+        update_post_meta($team_member_id, 'artasia_role', sanitize_text_field(artasia_import_value($record, 'team_member_role') ?: 'Artist Educator'));
+        artasia_import_update_meta_if_present($team_member_id, 'artasia_notes', $record, 'team_member_notes', 'sanitize_textarea_field');
     }
 
     $section = artasia_import_value($record, 'section');
@@ -247,8 +247,8 @@ function artasia_import_location_record(array $record): string
     update_post_meta($placement_id, 'artasia_project_id', $project_id);
     update_post_meta($placement_id, 'artasia_place_id', $place_id);
     update_post_meta($placement_id, 'artasia_partner_id', $partner_id);
-    if ($lead_id) {
-        update_post_meta($placement_id, 'artasia_lead_id', $lead_id);
+    if ($team_member_id) {
+        update_post_meta($placement_id, 'artasia_team_member_id', $team_member_id);
     }
     update_post_meta($placement_id, 'artasia_program_context', sanitize_text_field(artasia_import_value($record, 'program_context')));
     update_post_meta($placement_id, 'artasia_is_earlyon', artasia_import_boolean(artasia_import_value($record, 'earlyon')));
@@ -277,9 +277,9 @@ function artasia_import_csv_headers(): array
         'partner_type',
         'partner_website',
         'partner_notes',
-        'lead_name',
-        'lead_role',
-        'lead_notes',
+        'team_member_name',
+        'team_member_role',
+        'team_member_notes',
         'program_context',
         'earlyon',
         'section',

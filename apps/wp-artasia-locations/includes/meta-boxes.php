@@ -69,7 +69,7 @@ function artasia_post_type_contexts(): array
             'nav_label' => 'Placements',
             'paragraphs' => [
                 sprintf(
-                    'Each Placement assigns a %s from the Artasia team to lead programming for a given %s at a given %s.',
+                    'Each Placement assigns an %s to a given %s at a given %s.',
                     artasia_context_post_type_link('artasia_people', 'person'),
                     artasia_context_post_type_link('artasia_partner', 'partner'),
                     artasia_context_post_type_link('artasia_place', 'place')
@@ -165,7 +165,7 @@ function artasia_placement_meta_box_html(WP_Post $post): void
     $project_id     = get_post_meta($post->ID, 'artasia_project_id', true);
     $place_id       = get_post_meta($post->ID, 'artasia_place_id', true);
     $partner_id     = get_post_meta($post->ID, 'artasia_partner_id', true);
-    $lead_id        = get_post_meta($post->ID, 'artasia_lead_id', true);
+    $team_member_id = get_post_meta($post->ID, 'artasia_team_member_id', true);
     $program_context = get_post_meta($post->ID, 'artasia_program_context', true);
     $is_earlyon     = (bool) get_post_meta($post->ID, 'artasia_is_earlyon', true);
     $section        = get_post_meta($post->ID, 'artasia_section', true);
@@ -194,17 +194,17 @@ function artasia_placement_meta_box_html(WP_Post $post): void
             </td>
         </tr>
         <tr>
-            <th><label for="artasia_lead_id">Artasia Lead</label></th>
+            <th><label for="artasia_team_member_id">Artasia Team Member</label></th>
             <td>
-                <select id="artasia_lead_id" name="artasia_lead_id">
-                    <option value="0">&mdash; Select Artasia Lead &mdash;</option>
+                <select id="artasia_team_member_id" name="artasia_team_member_id">
+                    <option value="0">&mdash; Select Artasia Team Member &mdash;</option>
                     <?php foreach ($people as $person) : ?>
-                        <option value="<?php echo esc_attr($person->ID); ?>" <?php selected($lead_id, $person->ID); ?>>
+                        <option value="<?php echo esc_attr($person->ID); ?>" <?php selected($team_member_id, $person->ID); ?>>
                             <?php echo esc_html($person->post_title); ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
-                <p class="description">Select the team member who is the Artasia lead for this placement.</p>
+                <p class="description">Select an Artasia team member for this placement.</p>
             </td>
         </tr>
         <tr>
@@ -246,7 +246,7 @@ function artasia_placement_meta_box_html(WP_Post $post): void
         </tr>
         <tr>
             <th><label for="artasia_program_context">Program / Context</label></th>
-            <td><input type="text" id="artasia_program_context" name="artasia_program_context" value="<?php echo esc_attr($program_context); ?>" placeholder="e.g. Beyond the Bell" class="widefat" />
+            <td><input type="text" id="artasia_program_context" name="artasia_program_context" value="<?php echo esc_attr($program_context); ?>" placeholder="Optional (e.g. Beyond the Bell)" class="widefat" />
                 <p class="description">Artasia Partners welcome us in the context of specific existing programming activites (e.g. Summer Camps).</p>
             </td>
         </tr>
@@ -264,7 +264,7 @@ function artasia_placement_meta_box_html(WP_Post $post): void
         <tr>
             <th><label for="artasia_section">Section</label></th>
             <td>
-                <input type="text" id="artasia_section" name="artasia_section" value="<?php echo esc_attr($section); ?>" placeholder="e.g. Room 3" />
+                <input type="text" id="artasia_section" name="artasia_section" value="<?php echo esc_attr($section); ?>" placeholder="Optional (e.g. Room 3)" />
                 <p class="description">Sometimes the same program is delivered multiple times at the same location, e.g. in different rooms or at different times</p>
             </td>
         </tr>
@@ -337,7 +337,7 @@ function artasia_save_placement_meta(int $post_id): void
     update_post_meta($post_id, 'artasia_is_earlyon', isset($_POST['artasia_is_earlyon']));
     update_post_meta($post_id, 'artasia_place_id', intval($_POST['artasia_place_id'] ?? 0));
     update_post_meta($post_id, 'artasia_partner_id', intval($_POST['artasia_partner_id'] ?? 0));
-    update_post_meta($post_id, 'artasia_lead_id', intval($_POST['artasia_lead_id'] ?? 0));
+    update_post_meta($post_id, 'artasia_team_member_id', intval($_POST['artasia_team_member_id'] ?? 0));
     update_post_meta($post_id, 'artasia_section', sanitize_text_field($_POST['artasia_section'] ?? ''));
     update_post_meta($post_id, 'artasia_participant_count', intval($_POST['artasia_participant_count'] ?? 0));
     update_post_meta($post_id, 'artasia_participant_age', sanitize_text_field($_POST['artasia_participant_age'] ?? ''));
@@ -348,11 +348,11 @@ add_action('save_post_artasia_placement', 'artasia_save_placement_meta');
 
 function artasia_update_placement_title(int $post_id): void
 {
-    $lead_id = intval(get_post_meta($post_id, 'artasia_lead_id', true));
+    $team_member_id = intval(get_post_meta($post_id, 'artasia_team_member_id', true));
     $place_id = intval(get_post_meta($post_id, 'artasia_place_id', true));
     $partner_id = intval(get_post_meta($post_id, 'artasia_partner_id', true));
     $title_parts = array_filter([
-        $lead_id ? get_the_title($lead_id) : '',
+        $team_member_id ? get_the_title($team_member_id) : '',
         $place_id ? get_the_title($place_id) : '',
         $partner_id ? get_the_title($partner_id) : '',
     ]);

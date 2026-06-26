@@ -88,7 +88,7 @@ function artasia_register_meta_fields(): void
         'show_in_rest' => true,
         'sanitize_callback' => 'artasia_sanitize_integer_meta',
     ]);
-    register_post_meta('artasia_placement', 'artasia_lead_id', [
+    register_post_meta('artasia_placement', 'artasia_team_member_id', [
         'type'         => 'integer',
         'single'       => true,
         'default'      => 0,
