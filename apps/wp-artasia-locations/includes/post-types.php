@@ -131,18 +131,18 @@ function artasia_register_admin_menu(): void
 
     add_submenu_page(
         'edit.php?post_type=artasia_placement',
-        'Artasia Places',
-        'Places',
-        'edit_posts',
-        'edit.php?post_type=artasia_place'
-    );
-
-    add_submenu_page(
-        'edit.php?post_type=artasia_placement',
         'Artasia Partners',
         'Partners',
         'edit_posts',
         'edit.php?post_type=artasia_partner'
+    );
+
+    add_submenu_page(
+        'edit.php?post_type=artasia_placement',
+        'Artasia Places',
+        'Places',
+        'edit_posts',
+        'edit.php?post_type=artasia_place'
     );
 
     add_submenu_page(
@@ -171,7 +171,7 @@ add_action('admin_menu', 'artasia_register_admin_menu');
 function artasia_admin_parent_file($parent_file)
 {
     $screen = get_current_screen();
-    if (!$screen || !in_array($screen->post_type, ['artasia_project', 'artasia_place', 'artasia_partner', 'artasia_people', 'artasia_placement'], true)) {
+    if (!$screen || !in_array($screen->post_type, ['artasia_project', 'artasia_partner', 'artasia_place', 'artasia_people', 'artasia_placement'], true)) {
         return $parent_file;
     }
 
@@ -182,7 +182,7 @@ add_filter('parent_file', 'artasia_admin_parent_file');
 function artasia_admin_submenu_file($submenu_file)
 {
     $screen = get_current_screen();
-    if (!$screen || !in_array($screen->post_type, ['artasia_project', 'artasia_place', 'artasia_partner', 'artasia_people', 'artasia_placement'], true)) {
+    if (!$screen || !in_array($screen->post_type, ['artasia_project', 'artasia_partner', 'artasia_place', 'artasia_people', 'artasia_placement'], true)) {
         return $submenu_file;
     }
 

@@ -4,6 +4,24 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+function artasia_context_post_type_link(string $post_type, string $label): string
+{
+    return sprintf(
+        '<a href="%s">%s</a>',
+        esc_url(add_query_arg('post_type', $post_type, admin_url('edit.php'))),
+        esc_html($label)
+    );
+}
+
+function artasia_render_context_paragraph(string $paragraph): void
+{
+    echo wp_kses($paragraph, [
+        'a' => [
+            'href' => [],
+        ],
+    ]);
+}
+
 function artasia_post_type_contexts(): array
 {
     return [
@@ -12,15 +30,10 @@ function artasia_post_type_contexts(): array
             'nav_label' => 'Projects',
             'paragraphs' => [
                 'An Artasia Project captures the high-level annual flow for a year of Artasia activity.',
-                'Use this record for the project year, project name, and a short description that frames related placements.',
-            ],
-        ],
-        'artasia_place' => [
-            'title' => 'About Artasia Places',
-            'nav_label' => 'Places',
-            'paragraphs' => [
-                'An Artasia Place is a physical location such as a park, school, library, or community centre where Artasia activity can happen.',
-                'Use this record for stable location details such as address, city, coordinates, and access notes.',
+                sprintf(
+                    'Use this record for the project year, project name, and a short description that frames related %s.',
+                    artasia_context_post_type_link('artasia_placement', 'placements')
+                ),
             ],
         ],
         'artasia_partner' => [
@@ -31,11 +44,23 @@ function artasia_post_type_contexts(): array
                 'Use this record for partner identity, type, website, logo, and notes.',
             ],
         ],
+        'artasia_place' => [
+            'title' => 'About Artasia Places',
+            'nav_label' => 'Places',
+            'paragraphs' => [
+                'An Artasia Place is a physical location such as a park, school, library, or community centre where Artasia activity can happen.',
+                'Use this record for stable location details such as address, city, coordinates, and access notes.',
+            ],
+        ],
         'artasia_people' => [
             'title' => 'About Artasia People',
             'nav_label' => 'People',
             'paragraphs' => [
-                'Artasia People are team members who can be assigned as the Artasia Lead for a placement.',
+                sprintf(
+                    'Artasia People are team members who deliver programming to a %s during a %s.',
+                    artasia_context_post_type_link('artasia_partner', 'partner'),
+                    artasia_context_post_type_link('artasia_placement', 'placement')
+                ),
                 "Use this record for the person's name, role, photo, and internal notes.",
             ],
         ],
@@ -43,8 +68,18 @@ function artasia_post_type_contexts(): array
             'title' => 'About Artasia Placements',
             'nav_label' => 'Placements',
             'paragraphs' => [
-                'Each Placement assigns an Artasia Lead to a place within a project and partner context.',
-                'Use this record to connect the project, place, Artasia Partner, program context, section, and participant details.',
+                sprintf(
+                    'Each Placement assigns a %s from the Artasia team to lead programming for a given %s at a given %s.',
+                    artasia_context_post_type_link('artasia_people', 'person'),
+                    artasia_context_post_type_link('artasia_partner', 'partner'),
+                    artasia_context_post_type_link('artasia_place', 'place')
+                ),
+                sprintf(
+                    'Use this record to connect the %s, %s, %s, program context, section, and participant details.',
+                    artasia_context_post_type_link('artasia_project', 'project'),
+                    artasia_context_post_type_link('artasia_place', 'place'),
+                    artasia_context_post_type_link('artasia_partner', 'Artasia Partner')
+                ),
             ],
         ],
     ];
@@ -62,7 +97,7 @@ function artasia_context_meta_box_html(array $paragraphs): void
 ?>
     <img class="artasia-placements-list-logo" src="<?php echo esc_url(ARTASIA_LOCATIONS_URL . 'assets/artasia.svg'); ?>" alt="Artasia" />
     <?php foreach ($paragraphs as $paragraph) : ?>
-        <p><?php echo esc_html($paragraph); ?></p>
+        <p><?php artasia_render_context_paragraph($paragraph); ?></p>
     <?php endforeach; ?>
 <?php
 }
@@ -88,7 +123,7 @@ function artasia_context_list_header_html(string $current_post_type, array $para
         </div>
         <div class="artasia-placements-list-copy">
             <?php foreach ($paragraphs as $paragraph) : ?>
-                <p><?php echo esc_html($paragraph); ?></p>
+                <p><?php artasia_render_context_paragraph($paragraph); ?></p>
             <?php endforeach; ?>
         </div>
     </div>
@@ -727,7 +762,7 @@ function artasia_validate_image_attachment_id(int $attachment_id): int
 
 function artasia_remove_unnecessary_meta_boxes(): void
 {
-    $post_types = ['artasia_project', 'artasia_place', 'artasia_partner', 'artasia_people', 'artasia_placement'];
+    $post_types = ['artasia_project', 'artasia_partner', 'artasia_place', 'artasia_people', 'artasia_placement'];
     $meta_box_contexts = ['side', 'normal', 'advanced'];
 
     foreach ($post_types as $post_type) {
