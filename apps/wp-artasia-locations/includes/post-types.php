@@ -189,3 +189,13 @@ function artasia_admin_submenu_file($submenu_file)
     return 'edit.php?post_type=' . $screen->post_type;
 }
 add_filter('submenu_file', 'artasia_admin_submenu_file');
+
+function artasia_use_block_editor_for_post_type(bool $use_block_editor, string $post_type): bool
+{
+    if ($post_type === 'artasia_placement') {
+        return false;
+    }
+
+    return $use_block_editor;
+}
+add_filter('use_block_editor_for_post_type', 'artasia_use_block_editor_for_post_type', 10, 2);
