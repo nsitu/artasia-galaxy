@@ -600,6 +600,7 @@ function artasia_partner_meta_box_html(WP_Post $post): void
                 </div>
                 <button type="button" class="button" id="artasia_partner_logo_select">Select Logo</button>
                 <button type="button" class="button" id="artasia_partner_logo_remove" <?php disabled(!$logo_id); ?>>Remove Logo</button>
+                <p class="description">SVG files work best with Inline CSS (Presentation Attributes) and explicit dimensions (Non Responsive). Set your Illustrator export settings accordingly.</p>
             </td>
         </tr>
         <tr>
