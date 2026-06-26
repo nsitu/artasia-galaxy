@@ -9,6 +9,7 @@ function artasia_post_type_contexts(): array
     return [
         'artasia_site' => [
             'title' => 'About Artasia Sites',
+            'nav_label' => 'Sites',
             'paragraphs' => [
                 "An Artasia Site represents one year's activation of a particular venue by a particular Artasia Partner.",
                 'Use this post to connect the venue, Artasia Partner, program context, section, and participant details for that activation.',
@@ -16,6 +17,7 @@ function artasia_post_type_contexts(): array
         ],
         'artasia_venue' => [
             'title' => 'About Artasia Venues',
+            'nav_label' => 'Venues',
             'paragraphs' => [
                 'An Artasia Venue is a physical location such as a park, school, library, or community centre where Artasia activity can happen.',
                 'Use this record for stable location details such as address, city, coordinates, and access notes.',
@@ -23,6 +25,7 @@ function artasia_post_type_contexts(): array
         ],
         'artasia_partner' => [
             'title' => 'About Artasia Partners',
+            'nav_label' => 'Partners',
             'paragraphs' => [
                 'An Artasia Partner is an organization, program, community group, or school board that helps host or support Artasia.',
                 'Use this record for partner identity, type, website, logo, and notes.',
@@ -30,6 +33,7 @@ function artasia_post_type_contexts(): array
         ],
         'artasia_people' => [
             'title' => 'About Artasia People',
+            'nav_label' => 'People',
             'paragraphs' => [
                 'Artasia People are team members who can be assigned as the Artasia Lead for a site.',
                 "Use this record for the person's name, role, photo, and internal notes.",
@@ -55,11 +59,31 @@ function artasia_context_meta_box_html(array $paragraphs): void
 <?php
 }
 
-function artasia_context_list_header_html(array $paragraphs): void
+function artasia_context_list_header_html(string $current_post_type, array $paragraphs): void
 {
+    $contexts = artasia_post_type_contexts();
 ?>
     <div class="artasia-sites-list-context">
-        <?php artasia_context_meta_box_html($paragraphs); ?>
+        <div class="artasia-sites-list-header">
+            <img class="artasia-sites-list-logo" src="<?php echo esc_url(ARTASIA_LOCATIONS_URL . 'assets/artasia.svg'); ?>" alt="Artasia" />
+            <nav class="artasia-post-type-nav" aria-label="Artasia post types">
+                <?php foreach ($contexts as $post_type => $context) : ?>
+                    <?php $is_current = $post_type === $current_post_type; ?>
+                    <a
+                        class="artasia-post-type-nav-link<?php echo $is_current ? ' is-active' : ''; ?>"
+                        href="<?php echo esc_url(add_query_arg('post_type', $post_type, admin_url('edit.php'))); ?>"
+                        <?php echo $is_current ? 'aria-current="page"' : ''; ?>
+                    >
+                        <?php echo esc_html($context['nav_label']); ?>
+                    </a>
+                <?php endforeach; ?>
+            </nav>
+        </div>
+        <div class="artasia-sites-list-copy">
+            <?php foreach ($paragraphs as $paragraph) : ?>
+                <p><?php echo esc_html($paragraph); ?></p>
+            <?php endforeach; ?>
+        </div>
     </div>
 <?php
 }
@@ -270,7 +294,7 @@ function artasia_post_type_admin_description(): void
         return;
     }
 
-    artasia_context_list_header_html($context['paragraphs']);
+    artasia_context_list_header_html($screen->post_type, $context['paragraphs']);
 }
 add_action('all_admin_notices', 'artasia_post_type_admin_description');
 

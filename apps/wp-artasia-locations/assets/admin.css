@@ -18,7 +18,14 @@
 
 .artasia-sites-list-context {
   margin: 14px 0 18px;
-  max-width: 760px;
+  max-width: 960px;
+}
+
+.artasia-sites-list-header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
 }
 
 .artasia-sites-list-logo {
@@ -29,10 +36,43 @@
   margin: 0 0 10px;
 }
 
-.artasia-sites-list-context p:first-of-type {
+.artasia-post-type-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.artasia-post-type-nav-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid #c3c4c7;
+  border-radius: 3px;
+  background: #fff;
+  color: #1d2327;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.artasia-post-type-nav-link:hover,
+.artasia-post-type-nav-link:focus {
+  border-color: #2271b1;
+  color: #135e96;
+}
+
+.artasia-post-type-nav-link.is-active {
+  border-color: #1d2327;
+  background: #1d2327;
+  color: #fff;
+}
+
+.artasia-sites-list-copy p:first-of-type {
   margin-top: 0;
 }
 
-.artasia-sites-list-context p:last-of-type {
+.artasia-sites-list-copy p:last-of-type {
   margin-bottom: 0;
 }
