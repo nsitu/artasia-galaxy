@@ -4,9 +4,9 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-// --- Program Delivery columns ---
+// --- Placement columns ---
 
-function artasia_program_delivery_columns(array $columns): array
+function artasia_placement_columns(array $columns): array
 {
     $new = [];
     foreach ($columns as $key => $label) {
@@ -24,9 +24,9 @@ function artasia_program_delivery_columns(array $columns): array
     }
     return $new;
 }
-add_filter('manage_artasia_program_delivery_posts_columns', 'artasia_program_delivery_columns');
+add_filter('manage_artasia_placement_posts_columns', 'artasia_placement_columns');
 
-function artasia_program_delivery_column(string $column, int $post_id): void
+function artasia_placement_column(string $column, int $post_id): void
 {
     switch ($column) {
         case 'artasia_project':
@@ -59,7 +59,7 @@ function artasia_program_delivery_column(string $column, int $post_id): void
             break;
     }
 }
-add_action('manage_artasia_program_delivery_posts_custom_column', 'artasia_program_delivery_column', 10, 2);
+add_action('manage_artasia_placement_posts_custom_column', 'artasia_placement_column', 10, 2);
 
 // --- Project columns ---
 
@@ -70,7 +70,7 @@ function artasia_project_columns(array $columns): array
         $new[$key] = $label;
         if ($key === 'title') {
             $new['artasia_project_year'] = 'Year';
-            $new['artasia_project_deliveries'] = 'Program Deliveries';
+            $new['artasia_project_deliveries'] = 'Placements';
         }
     }
     return $new;
@@ -84,14 +84,14 @@ function artasia_project_column(string $column, int $post_id): void
             echo esc_html(get_post_meta($post_id, 'artasia_project_year', true) ?: '—');
             break;
         case 'artasia_project_deliveries':
-            $program_deliveries = get_posts([
-                'post_type'   => 'artasia_program_delivery',
+            $placements = get_posts([
+                'post_type'   => 'artasia_placement',
                 'numberposts' => -1,
                 'meta_key'    => 'artasia_project_id',
                 'meta_value'  => $post_id,
                 'fields'      => 'ids',
             ]);
-            echo esc_html((string) count($program_deliveries));
+            echo esc_html((string) count($placements));
             break;
     }
 }
@@ -174,7 +174,7 @@ function artasia_people_columns(array $columns): array
         if ($key === 'title') {
             $new['artasia_role'] = 'Role';
             $new['artasia_photo'] = 'Photo';
-            $new['artasia_assigned_program_deliveries'] = 'Assigned Program Deliveries';
+            $new['artasia_assigned_placements'] = 'Assigned Placements';
         }
     }
     return $new;
@@ -191,16 +191,16 @@ function artasia_people_column(string $column, int $post_id): void
             $photo_id = intval(get_post_meta($post_id, 'artasia_photo_id', true));
             echo $photo_id ? wp_get_attachment_image($photo_id, 'thumbnail', false, ['style' => 'max-width:48px;height:auto;']) : '—';
             break;
-        case 'artasia_assigned_program_deliveries':
-            $program_deliveries = get_posts([
-                'post_type'   => 'artasia_program_delivery',
+        case 'artasia_assigned_placements':
+            $placements = get_posts([
+                'post_type'   => 'artasia_placement',
                 'numberposts' => -1,
                 'meta_key'    => 'artasia_lead_id',
                 'meta_value'  => $post_id,
                 'fields'      => 'ids',
             ]);
 
-            echo esc_html((string) count($program_deliveries));
+            echo esc_html((string) count($placements));
             break;
     }
 }

@@ -16,19 +16,19 @@
   background: #fff;
 }
 
-.artasia-program-deliveries-list-context {
+.artasia-placements-list-context {
   margin: 14px 0 18px;
   max-width: 960px;
 }
 
-.artasia-program-deliveries-list-header {
+.artasia-placements-list-header {
   display: flex;
   align-items: center;
   gap: 24px;
   flex-wrap: wrap;
 }
 
-.artasia-program-deliveries-list-logo {
+.artasia-placements-list-logo {
   display: block;
   width: 150px;
   max-width: 100%;
@@ -69,11 +69,11 @@
   color: #fff;
 }
 
-.artasia-program-deliveries-list-copy p:first-of-type {
+.artasia-placements-list-copy p:first-of-type {
   margin-top: 0;
 }
 
-.artasia-program-deliveries-list-copy p:last-of-type {
+.artasia-placements-list-copy p:last-of-type {
   margin-bottom: 0;
 }
 

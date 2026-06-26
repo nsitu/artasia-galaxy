@@ -7,12 +7,12 @@ if (!defined('ABSPATH')) {
 function artasia_post_type_contexts(): array
 {
     return [
-        'artasia_program_delivery' => [
-            'title' => 'About Artasia Program Deliveries',
-            'nav_label' => 'Program Deliveries',
+        'artasia_placement' => [
+            'title' => 'About Artasia Placements',
+            'nav_label' => 'Placements',
             'paragraphs' => [
-                'Each Program Delivery defines a unique delivery of Artasia by linking a project, partner, place, and person.',
-                'Use this record to connect the place, Artasia Partner, program context, section, and participant details.',
+                'Each Placement assigns an Artasia Lead to a place within a project and partner context.',
+                'Use this record to connect the project, place, Artasia Partner, program context, section, and participant details.',
             ],
         ],
         'artasia_place' => [
@@ -28,7 +28,7 @@ function artasia_post_type_contexts(): array
             'nav_label' => 'Projects',
             'paragraphs' => [
                 'An Artasia Project captures the high-level annual flow for a year of Artasia activity.',
-                'Use this record for the project year, project name, and a short description that frames related program deliveries.',
+                'Use this record for the project year, project name, and a short description that frames related placements.',
             ],
         ],
         'artasia_partner' => [
@@ -43,7 +43,7 @@ function artasia_post_type_contexts(): array
             'title' => 'About Artasia People',
             'nav_label' => 'People',
             'paragraphs' => [
-                'Artasia People are team members who can be assigned as the Artasia Lead for a program delivery.',
+                'Artasia People are team members who can be assigned as the Artasia Lead for a placement.',
                 "Use this record for the person's name, role, photo, and internal notes.",
             ],
         ],
@@ -60,7 +60,7 @@ function artasia_get_post_type_context(string $post_type): ?array
 function artasia_context_meta_box_html(array $paragraphs): void
 {
 ?>
-    <img class="artasia-program-deliveries-list-logo" src="<?php echo esc_url(ARTASIA_LOCATIONS_URL . 'assets/artasia.svg'); ?>" alt="Artasia" />
+    <img class="artasia-placements-list-logo" src="<?php echo esc_url(ARTASIA_LOCATIONS_URL . 'assets/artasia.svg'); ?>" alt="Artasia" />
     <?php foreach ($paragraphs as $paragraph) : ?>
         <p><?php echo esc_html($paragraph); ?></p>
     <?php endforeach; ?>
@@ -71,9 +71,9 @@ function artasia_context_list_header_html(string $current_post_type, array $para
 {
     $contexts = artasia_post_type_contexts();
 ?>
-    <div class="artasia-program-deliveries-list-context">
-        <div class="artasia-program-deliveries-list-header">
-            <img class="artasia-program-deliveries-list-logo" src="<?php echo esc_url(ARTASIA_LOCATIONS_URL . 'assets/artasia.svg'); ?>" alt="Artasia" />
+    <div class="artasia-placements-list-context">
+        <div class="artasia-placements-list-header">
+            <img class="artasia-placements-list-logo" src="<?php echo esc_url(ARTASIA_LOCATIONS_URL . 'assets/artasia.svg'); ?>" alt="Artasia" />
             <nav class="artasia-post-type-nav" aria-label="Artasia post types">
                 <?php foreach ($contexts as $post_type => $context) : ?>
                     <?php $is_current = $post_type === $current_post_type; ?>
@@ -86,7 +86,7 @@ function artasia_context_list_header_html(string $current_post_type, array $para
                 <?php endforeach; ?>
             </nav>
         </div>
-        <div class="artasia-program-deliveries-list-copy">
+        <div class="artasia-placements-list-copy">
             <?php foreach ($paragraphs as $paragraph) : ?>
                 <p><?php echo esc_html($paragraph); ?></p>
             <?php endforeach; ?>
@@ -95,9 +95,9 @@ function artasia_context_list_header_html(string $current_post_type, array $para
 <?php
 }
 
-// --- Program Delivery Details meta box ---
+// --- Placement Details meta box ---
 
-function artasia_program_delivery_meta_box_html(WP_Post $post): void
+function artasia_placement_meta_box_html(WP_Post $post): void
 {
     $projects = get_posts([
         'post_type'   => 'artasia_project',
@@ -137,7 +137,7 @@ function artasia_program_delivery_meta_box_html(WP_Post $post): void
     $participant_count = get_post_meta($post->ID, 'artasia_participant_count', true);
     $participant_age = get_post_meta($post->ID, 'artasia_participant_age', true);
 
-    wp_nonce_field('artasia_program_delivery_meta', 'artasia_program_delivery_meta_nonce');
+    wp_nonce_field('artasia_placement_meta', 'artasia_placement_meta_nonce');
 ?>
     <table class="form-table">
         <tr>
@@ -155,7 +155,7 @@ function artasia_program_delivery_meta_box_html(WP_Post $post): void
                         </option>
                     <?php endforeach; ?>
                 </select>
-                <p class="description">Select the annual Artasia Project this program delivery belongs to.</p>
+                <p class="description">Select the annual Artasia Project this placement belongs to.</p>
             </td>
         </tr>
         <tr>
@@ -206,7 +206,7 @@ function artasia_program_delivery_meta_box_html(WP_Post $post): void
                         </option>
                     <?php endforeach; ?>
                 </select>
-                <p class="description">Select the team member who is the Artasia lead for this program delivery.</p>
+                <p class="description">Select the team member who is the Artasia lead for this placement.</p>
             </td>
         </tr>
         <tr>
@@ -221,7 +221,7 @@ function artasia_program_delivery_meta_box_html(WP_Post $post): void
                 <img class="artasia-earlyon-logo" src="<?php echo esc_url(ARTASIA_LOCATIONS_URL . 'assets/early-on.svg'); ?>" alt="EarlyON" />
                 <label>
                     <input type="checkbox" id="artasia_is_earlyon" name="artasia_is_earlyon" value="1" <?php checked($is_earlyon); ?> />
-                    Mark as an EarlyON program delivery
+                    Mark as an EarlyON placement
                 </label>
                 <p class="description">EarlyON is an Ontario Government initiative often embedded inside partner locations and infrastructure.</p>
             </td>
@@ -237,7 +237,7 @@ function artasia_program_delivery_meta_box_html(WP_Post $post): void
             <th><label for="artasia_participant_count">Participants</label></th>
             <td>
                 <input type="number" id="artasia_participant_count" name="artasia_participant_count" value="<?php echo esc_attr($participant_count); ?>" />
-                <p class="description">How many children are attending this program delivery?</p>
+                <p class="description">How many children are attending this placement?</p>
             </td>
         </tr>
         <tr>
@@ -251,33 +251,33 @@ function artasia_program_delivery_meta_box_html(WP_Post $post): void
 <?php
 }
 
-function artasia_register_program_delivery_meta_box(): void
+function artasia_register_placement_meta_box(): void
 {
-    $context = artasia_get_post_type_context('artasia_program_delivery');
+    $context = artasia_get_post_type_context('artasia_placement');
 
     add_meta_box(
-        'artasia_program_delivery_details',
-        'Program Delivery Details',
-        'artasia_program_delivery_meta_box_html',
-        'artasia_program_delivery',
+        'artasia_placement_details',
+        'Placement Details',
+        'artasia_placement_meta_box_html',
+        'artasia_placement',
         'normal',
         'default'
     );
 
     add_meta_box(
-        'artasia_program_delivery_context',
+        'artasia_placement_context',
         $context['title'],
-        'artasia_program_delivery_context_meta_box_html',
-        'artasia_program_delivery',
+        'artasia_placement_context_meta_box_html',
+        'artasia_placement',
         'side',
         'high'
     );
 }
-add_action('add_meta_boxes', 'artasia_register_program_delivery_meta_box');
+add_action('add_meta_boxes', 'artasia_register_placement_meta_box');
 
-function artasia_program_delivery_context_meta_box_html(): void
+function artasia_placement_context_meta_box_html(): void
 {
-    $context = artasia_get_post_type_context('artasia_program_delivery');
+    $context = artasia_get_post_type_context('artasia_placement');
     if (!$context) {
         return;
     }
@@ -285,9 +285,9 @@ function artasia_program_delivery_context_meta_box_html(): void
     artasia_context_meta_box_html($context['paragraphs']);
 }
 
-function artasia_save_program_delivery_meta(int $post_id): void
+function artasia_save_placement_meta(int $post_id): void
 {
-    if (!isset($_POST['artasia_program_delivery_meta_nonce']) || !wp_verify_nonce($_POST['artasia_program_delivery_meta_nonce'], 'artasia_program_delivery_meta')) {
+    if (!isset($_POST['artasia_placement_meta_nonce']) || !wp_verify_nonce($_POST['artasia_placement_meta_nonce'], 'artasia_placement_meta')) {
         return;
     }
     if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
@@ -307,7 +307,7 @@ function artasia_save_program_delivery_meta(int $post_id): void
     update_post_meta($post_id, 'artasia_participant_count', intval($_POST['artasia_participant_count'] ?? 0));
     update_post_meta($post_id, 'artasia_participant_age', sanitize_text_field($_POST['artasia_participant_age'] ?? ''));
 }
-add_action('save_post_artasia_program_delivery', 'artasia_save_program_delivery_meta');
+add_action('save_post_artasia_placement', 'artasia_save_placement_meta');
 
 // --- Project Details meta box ---
 
@@ -727,7 +727,7 @@ function artasia_validate_image_attachment_id(int $attachment_id): int
 
 function artasia_remove_unnecessary_meta_boxes(): void
 {
-    $post_types = ['artasia_place', 'artasia_project', 'artasia_program_delivery', 'artasia_partner', 'artasia_people'];
+    $post_types = ['artasia_place', 'artasia_project', 'artasia_placement', 'artasia_partner', 'artasia_people'];
     $meta_box_contexts = ['side', 'normal', 'advanced'];
 
     foreach ($post_types as $post_type) {

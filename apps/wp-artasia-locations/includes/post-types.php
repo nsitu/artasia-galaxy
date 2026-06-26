@@ -26,22 +26,22 @@ function artasia_register_post_types(): void
         'supports'     => ['title'],
     ]);
 
-    register_post_type('artasia_program_delivery', [
+    register_post_type('artasia_placement', [
         'labels' => [
-            'name'          => 'Artasia Program Deliveries',
-            'singular_name' => 'Artasia Program Delivery',
-            'add_new_item'  => 'Add New Artasia Program Delivery',
-            'edit_item'     => 'Edit Artasia Program Delivery',
-            'new_item'      => 'New Artasia Program Delivery',
-            'view_item'     => 'View Artasia Program Delivery',
-            'search_items'   => 'Search Artasia Program Deliveries',
-            'not_found'      => 'No Artasia program deliveries found',
+            'name'          => 'Artasia Placements',
+            'singular_name' => 'Artasia Placement',
+            'add_new_item'  => 'Add New Artasia Placement',
+            'edit_item'     => 'Edit Artasia Placement',
+            'new_item'      => 'New Artasia Placement',
+            'view_item'     => 'View Artasia Placement',
+            'search_items'   => 'Search Artasia Placements',
+            'not_found'      => 'No Artasia placements found',
         ],
         'public'       => true,
         'has_archive'  => false,
         'show_in_menu' => false,
         'show_in_rest' => true,
-        'rest_base'    => 'artasia_program_delivery',
+        'rest_base'    => 'artasia_placement',
         'menu_icon'    => 'dashicons-art',
         'supports'     => ['title'],
     ]);
@@ -115,22 +115,22 @@ function artasia_register_admin_menu(): void
         'Artasia',
         'Artasia',
         'edit_posts',
-        'edit.php?post_type=artasia_program_delivery',
+        'edit.php?post_type=artasia_placement',
         '',
         'dashicons-art',
         20
     );
 
     add_submenu_page(
-        'edit.php?post_type=artasia_program_delivery',
-        'Artasia Program Deliveries',
-        'Program Deliveries',
+        'edit.php?post_type=artasia_placement',
+        'Artasia Placements',
+        'Placements',
         'edit_posts',
-        'edit.php?post_type=artasia_program_delivery'
+        'edit.php?post_type=artasia_placement'
     );
 
     add_submenu_page(
-        'edit.php?post_type=artasia_program_delivery',
+        'edit.php?post_type=artasia_placement',
         'Artasia Places',
         'Places',
         'edit_posts',
@@ -138,7 +138,7 @@ function artasia_register_admin_menu(): void
     );
 
     add_submenu_page(
-        'edit.php?post_type=artasia_program_delivery',
+        'edit.php?post_type=artasia_placement',
         'Artasia Projects',
         'Projects',
         'edit_posts',
@@ -146,7 +146,7 @@ function artasia_register_admin_menu(): void
     );
 
     add_submenu_page(
-        'edit.php?post_type=artasia_program_delivery',
+        'edit.php?post_type=artasia_placement',
         'Artasia Partners',
         'Partners',
         'edit_posts',
@@ -154,7 +154,7 @@ function artasia_register_admin_menu(): void
     );
 
     add_submenu_page(
-        'edit.php?post_type=artasia_program_delivery',
+        'edit.php?post_type=artasia_placement',
         'Artasia People',
         'People',
         'edit_posts',
@@ -166,18 +166,18 @@ add_action('admin_menu', 'artasia_register_admin_menu');
 function artasia_admin_parent_file($parent_file)
 {
     $screen = get_current_screen();
-    if (!$screen || !in_array($screen->post_type, ['artasia_program_delivery', 'artasia_place', 'artasia_project', 'artasia_partner', 'artasia_people'], true)) {
+    if (!$screen || !in_array($screen->post_type, ['artasia_placement', 'artasia_place', 'artasia_project', 'artasia_partner', 'artasia_people'], true)) {
         return $parent_file;
     }
 
-    return 'edit.php?post_type=artasia_program_delivery';
+    return 'edit.php?post_type=artasia_placement';
 }
 add_filter('parent_file', 'artasia_admin_parent_file');
 
 function artasia_admin_submenu_file($submenu_file)
 {
     $screen = get_current_screen();
-    if (!$screen || !in_array($screen->post_type, ['artasia_program_delivery', 'artasia_place', 'artasia_project', 'artasia_partner', 'artasia_people'], true)) {
+    if (!$screen || !in_array($screen->post_type, ['artasia_placement', 'artasia_place', 'artasia_project', 'artasia_partner', 'artasia_people'], true)) {
         return $submenu_file;
     }
 

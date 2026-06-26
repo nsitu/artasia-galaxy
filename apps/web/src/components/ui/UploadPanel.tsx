@@ -22,17 +22,17 @@ interface UploadPanelProps {
 export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
   const [options, setOptions] = useState<UploadOptions | null>(null);
   const [uploader, setUploader] = useState("");
-  const [programDeliveryKey, setProgramDeliveryKey] = useState("");
+  const [placementKey, setPlacementKey] = useState("");
   const [selectedTag, setSelectedTag] = useState("");
   const [items, setItems] = useState<UploadItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const uploadInProgressRef = useRef(false);
 
-  function programDeliveryLabel(location: UploadOptions["programDeliveries"][number]) {
+  function placementLabel(location: UploadOptions["placements"][number]) {
     return location.partner_name
-      ? `${location.partner_name} - ${location.program_delivery_name}`
-      : location.program_delivery_name;
+      ? `${location.partner_name} - ${location.placement_name}`
+      : location.placement_name;
   }
 
   useEffect(() => {
@@ -42,16 +42,16 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
         setOptions(data);
         setUploader(data.uploaders[0] ?? "");
         setSelectedTag(data.tags[0] ?? "");
-        const firstProgramDelivery = data.programDeliveries[0];
-        if (firstProgramDelivery) setProgramDeliveryKey(String(firstProgramDelivery.program_delivery_id));
+        const firstPlacement = data.placements[0];
+        if (firstPlacement) setPlacementKey(String(firstPlacement.placement_id));
       })
       .catch((err) => setError((err as Error).message));
   }, [visible, options]);
 
-  const selectedProgramDelivery = useMemo(() => {
+  const selectedPlacement = useMemo(() => {
     if (!options) return null;
-    return options.programDeliveries.find((programDelivery) => String(programDelivery.program_delivery_id) === programDeliveryKey) ?? null;
-  }, [programDeliveryKey, options]);
+    return options.placements.find((placement) => String(placement.placement_id) === placementKey) ?? null;
+  }, [placementKey, options]);
 
   function addFiles(fileList: FileList | File[]) {
     const files = Array.from(fileList);
@@ -72,12 +72,12 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
     const hasQueued = items.some((item) => item.status === "queued");
     if (!hasQueued || uploadInProgressRef.current) return;
     void uploadQueued();
-  }, [items, visible, uploader, selectedProgramDelivery, selectedTag]);
+  }, [items, visible, uploader, selectedPlacement, selectedTag]);
 
   async function uploadQueued() {
     if (uploadInProgressRef.current) return;
-    if (!selectedProgramDelivery) {
-      setError("Select a program delivery.");
+    if (!selectedPlacement) {
+      setError("Select a placement.");
       return;
     }
     if (!uploader) {
@@ -106,7 +106,7 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
           const results = await uploadFiles({
             files: [item.file],
             uploader,
-            location: selectedProgramDelivery,
+            location: selectedPlacement,
             tags: selectedTag ? [selectedTag] : [],
             onProgress: (progress) => {
               setItems((current) =>
@@ -180,15 +180,15 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
           </label>
 
           <label style={labelStyle}>
-            Program Delivery
+            Placement
             <select
-              value={programDeliveryKey}
-              onChange={(e) => setProgramDeliveryKey(e.target.value)}
+              value={placementKey}
+              onChange={(e) => setPlacementKey(e.target.value)}
               style={inputStyle}
             >
-              {(options?.programDeliveries ?? []).map((programDelivery) => (
-                <option key={programDelivery.program_delivery_id} value={String(programDelivery.program_delivery_id)}>
-                  {programDeliveryLabel(programDelivery)}
+              {(options?.placements ?? []).map((placement) => (
+                <option key={placement.placement_id} value={String(placement.placement_id)}>
+                  {placementLabel(placement)}
                 </option>
               ))}
             </select>

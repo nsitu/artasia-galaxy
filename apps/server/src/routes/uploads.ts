@@ -13,8 +13,8 @@ import {
 } from "../infra/ImmichClient.js";
 import { uploadRateLimit } from "../middleware/uploadRateLimit.js";
 import {
-  findConfiguredProgramDelivery,
-  getProgramDeliveryTagNames,
+  findConfiguredPlacement,
+  getPlacementTagNames,
   getAllowedTagNames,
   getUploadConfig,
   isConfiguredUploader,
@@ -141,8 +141,8 @@ router.post(
 
     try {
       const uploader = typeof req.body.uploader === "string" ? req.body.uploader.trim() : "";
-      const program_delivery_id = parseInt(typeof req.body.program_delivery_id === "string" ? req.body.program_delivery_id.trim() : "", 10);
-      const location = await findConfiguredProgramDelivery(program_delivery_id);
+      const placement_id = parseInt(typeof req.body.placement_id === "string" ? req.body.placement_id.trim() : "", 10);
+      const location = await findConfiguredPlacement(placement_id);
       const selectedTags = await getAllowedTagNames(parseTags(req.body.tags));
 
       if (!uploader || !await isConfiguredUploader(uploader)) {
@@ -175,7 +175,7 @@ router.post(
       }
 
       const album = await ensureAlbum(uploader);
-      const tagNames = [...selectedTags, ...getProgramDeliveryTagNames(location)];
+      const tagNames = [...selectedTags, ...getPlacementTagNames(location)];
 
       const results = await processWithConcurrency(files, 2, async (file) => {
         const validationError = validateFile(file);
@@ -220,7 +220,7 @@ router.post(
 
       res.json({
         uploader,
-        program_delivery_id,
+        placement_id,
         tags: tagNames,
         results,
       });

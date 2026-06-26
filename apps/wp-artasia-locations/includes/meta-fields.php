@@ -66,64 +66,64 @@ function artasia_register_meta_fields(): void
         'sanitize_callback' => 'sanitize_textarea_field',
     ]);
 
-    // --- Program Delivery meta ---
-    register_post_meta('artasia_program_delivery', 'artasia_project_id', [
+    // --- Placement meta ---
+    register_post_meta('artasia_placement', 'artasia_project_id', [
         'type'         => 'integer',
         'single'       => true,
         'default'      => 0,
         'show_in_rest' => true,
         'sanitize_callback' => 'artasia_sanitize_integer_meta',
     ]);
-    register_post_meta('artasia_program_delivery', 'artasia_place_id', [
+    register_post_meta('artasia_placement', 'artasia_place_id', [
         'type'         => 'integer',
         'single'       => true,
         'default'      => 0,
         'show_in_rest' => true,
         'sanitize_callback' => 'artasia_sanitize_integer_meta',
     ]);
-    register_post_meta('artasia_program_delivery', 'artasia_partner_id', [
+    register_post_meta('artasia_placement', 'artasia_partner_id', [
         'type'         => 'integer',
         'single'       => true,
         'default'      => 0,
         'show_in_rest' => true,
         'sanitize_callback' => 'artasia_sanitize_integer_meta',
     ]);
-    register_post_meta('artasia_program_delivery', 'artasia_lead_id', [
+    register_post_meta('artasia_placement', 'artasia_lead_id', [
         'type'         => 'integer',
         'single'       => true,
         'default'      => 0,
         'show_in_rest' => true,
         'sanitize_callback' => 'artasia_sanitize_integer_meta',
     ]);
-    register_post_meta('artasia_program_delivery', 'artasia_program_context', [
+    register_post_meta('artasia_placement', 'artasia_program_context', [
         'type'         => 'string',
         'single'       => true,
         'default'      => '',
         'show_in_rest' => true,
         'sanitize_callback' => 'sanitize_text_field',
     ]);
-    register_post_meta('artasia_program_delivery', 'artasia_is_earlyon', [
+    register_post_meta('artasia_placement', 'artasia_is_earlyon', [
         'type'         => 'boolean',
         'single'       => true,
         'default'      => false,
         'show_in_rest' => true,
         'sanitize_callback' => 'artasia_sanitize_boolean_meta',
     ]);
-    register_post_meta('artasia_program_delivery', 'artasia_section', [
+    register_post_meta('artasia_placement', 'artasia_section', [
         'type'         => 'string',
         'single'       => true,
         'default'      => '',
         'show_in_rest' => true,
         'sanitize_callback' => 'sanitize_text_field',
     ]);
-    register_post_meta('artasia_program_delivery', 'artasia_participant_count', [
+    register_post_meta('artasia_placement', 'artasia_participant_count', [
         'type'         => 'integer',
         'single'       => true,
         'default'      => 0,
         'show_in_rest' => true,
         'sanitize_callback' => 'artasia_sanitize_integer_meta',
     ]);
-    register_post_meta('artasia_program_delivery', 'artasia_participant_age', [
+    register_post_meta('artasia_placement', 'artasia_participant_age', [
         'type'         => 'string',
         'single'       => true,
         'default'      => '',

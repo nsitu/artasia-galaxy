@@ -5,17 +5,17 @@ if (!defined('ABSPATH')) {
 }
 
 add_action('rest_api_init', function () {
-    register_rest_route('artasia/v1', '/program-deliveries', [
+    register_rest_route('artasia/v1', '/placements', [
         'methods'             => 'GET',
-        'callback'            => 'artasia_get_expanded_program_deliveries',
+        'callback'            => 'artasia_get_expanded_placements',
         'permission_callback' => '__return_true',
     ]);
 });
 
-function artasia_get_expanded_program_deliveries(): WP_REST_Response
+function artasia_get_expanded_placements(): WP_REST_Response
 {
-    $program_deliveries_query = new WP_Query([
-        'post_type'      => 'artasia_program_delivery',
+    $placements_query = new WP_Query([
+        'post_type'      => 'artasia_placement',
         'posts_per_page' => -1,
         'post_status'    => 'publish',
         'orderby'        => 'date',
@@ -25,14 +25,14 @@ function artasia_get_expanded_program_deliveries(): WP_REST_Response
     $place_ids    = [];
     $partner_ids  = [];
     $lead_ids     = [];
-    $program_delivery_posts = $program_deliveries_query->posts;
+    $placement_posts = $placements_query->posts;
 
     $project_ids  = [];
-    foreach ($program_delivery_posts as $program_delivery) {
-        $project_id = intval(get_post_meta($program_delivery->ID, 'artasia_project_id', true));
-        $vid = intval(get_post_meta($program_delivery->ID, 'artasia_place_id', true));
-        $partner_id = intval(get_post_meta($program_delivery->ID, 'artasia_partner_id', true));
-        $lead_id = intval(get_post_meta($program_delivery->ID, 'artasia_lead_id', true));
+    foreach ($placement_posts as $placement) {
+        $project_id = intval(get_post_meta($placement->ID, 'artasia_project_id', true));
+        $vid = intval(get_post_meta($placement->ID, 'artasia_place_id', true));
+        $partner_id = intval(get_post_meta($placement->ID, 'artasia_partner_id', true));
+        $lead_id = intval(get_post_meta($placement->ID, 'artasia_lead_id', true));
         if ($project_id) $project_ids[$project_id] = $project_id;
         if ($vid) $place_ids[$vid] = $vid;
         if ($partner_id) $partner_ids[$partner_id] = $partner_id;
@@ -116,21 +116,21 @@ function artasia_get_expanded_program_deliveries(): WP_REST_Response
 
     $results = [];
 
-    foreach ($program_delivery_posts as $program_delivery) {
-        $project_id = intval(get_post_meta($program_delivery->ID, 'artasia_project_id', true));
-        $vid = intval(get_post_meta($program_delivery->ID, 'artasia_place_id', true));
-        $partner_id = intval(get_post_meta($program_delivery->ID, 'artasia_partner_id', true));
-        $lead_id = intval(get_post_meta($program_delivery->ID, 'artasia_lead_id', true));
+    foreach ($placement_posts as $placement) {
+        $project_id = intval(get_post_meta($placement->ID, 'artasia_project_id', true));
+        $vid = intval(get_post_meta($placement->ID, 'artasia_place_id', true));
+        $partner_id = intval(get_post_meta($placement->ID, 'artasia_partner_id', true));
+        $lead_id = intval(get_post_meta($placement->ID, 'artasia_lead_id', true));
 
         $results[] = [
-            'program_delivery_id' => $program_delivery->ID,
-            'program_delivery_name' => $program_delivery->post_title,
+            'placement_id' => $placement->ID,
+            'placement_name' => $placement->post_title,
             'project' => $project_lookup[$project_id] ?? null,
-            'program_context' => get_post_meta($program_delivery->ID, 'artasia_program_context', true) ?: '',
-            'is_earlyon' => (bool) get_post_meta($program_delivery->ID, 'artasia_is_earlyon', true),
-            'section' => get_post_meta($program_delivery->ID, 'artasia_section', true) ?: '',
-            'participant_count' => intval(get_post_meta($program_delivery->ID, 'artasia_participant_count', true)),
-            'participant_age' => get_post_meta($program_delivery->ID, 'artasia_participant_age', true) ?: '',
+            'program_context' => get_post_meta($placement->ID, 'artasia_program_context', true) ?: '',
+            'is_earlyon' => (bool) get_post_meta($placement->ID, 'artasia_is_earlyon', true),
+            'section' => get_post_meta($placement->ID, 'artasia_section', true) ?: '',
+            'participant_count' => intval(get_post_meta($placement->ID, 'artasia_participant_count', true)),
+            'participant_age' => get_post_meta($placement->ID, 'artasia_participant_age', true) ?: '',
             'place'              => $place_lookup[$vid] ?? null,
             'partner'            => $partner_lookup[$partner_id] ?? null,
             'lead'               => $lead_lookup[$lead_id] ?? null,

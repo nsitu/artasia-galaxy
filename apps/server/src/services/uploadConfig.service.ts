@@ -1,13 +1,13 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  getArtasiaProgramDeliveries,
-  type WpArtasiaProgramDelivery,
+  getArtasiaPlacements,
+  type WpArtasiaPlacement,
 } from "../infra/WordPressClient.js";
 
-export interface ArtasiaProgramDelivery {
-  program_delivery_id: number;
-  program_delivery_name: string;
+export interface ArtasiaPlacement {
+  placement_id: number;
+  placement_name: string;
   partner_name: string;
   address?: string;
   lat?: number;
@@ -15,7 +15,7 @@ export interface ArtasiaProgramDelivery {
 }
 
 export interface UploadConfig {
-  programDeliveries: ArtasiaProgramDelivery[];
+  placements: ArtasiaPlacement[];
   tags: string[];
   uploaders: string[];
 }
@@ -78,12 +78,12 @@ function normalizeKey(value: string) {
   return value.trim().toLowerCase();
 }
 
-function mapWpProgramDelivery(wp: WpArtasiaProgramDelivery): ArtasiaProgramDelivery {
+function mapWpPlacement(wp: WpArtasiaPlacement): ArtasiaPlacement {
   const lat = wp.place?.lat;
   const lng = wp.place?.lng;
   return {
-    program_delivery_id: wp.program_delivery_id,
-    program_delivery_name: wp.program_delivery_name,
+    placement_id: wp.placement_id,
+    placement_name: wp.placement_name,
     partner_name: wp.partner?.name ?? "",
     ...(wp.place?.address ? { address: wp.place.address } : {}),
     ...(lat != null && lat !== 0 ? { lat } : {}),
@@ -92,19 +92,19 @@ function mapWpProgramDelivery(wp: WpArtasiaProgramDelivery): ArtasiaProgramDeliv
 }
 
 export async function getUploadConfig(): Promise<UploadConfig> {
-  const wpProgramDeliveries = await getArtasiaProgramDeliveries();
-  const programDeliveries = wpProgramDeliveries.map(mapWpProgramDelivery);
+  const wpPlacements = await getArtasiaPlacements();
+  const placements = wpPlacements.map(mapWpPlacement);
   const tags = cleanStringList(readJson<unknown>("upload-tags.json", []));
   const uploaders = cleanStringList(readJson<unknown>("uploaders.json", []), {
     excludeReservedAlbums: true,
   });
 
-  return { programDeliveries, tags, uploaders };
+  return { placements, tags, uploaders };
 }
 
-export async function findConfiguredProgramDelivery(program_delivery_id: number): Promise<WpArtasiaProgramDelivery | undefined> {
-  const wpProgramDeliveries = await getArtasiaProgramDeliveries();
-  return wpProgramDeliveries.find((location) => location.program_delivery_id === program_delivery_id);
+export async function findConfiguredPlacement(placement_id: number): Promise<WpArtasiaPlacement | undefined> {
+  const wpPlacements = await getArtasiaPlacements();
+  return wpPlacements.find((location) => location.placement_id === placement_id);
 }
 
 export async function getAllowedTagNames(requestedTags: unknown): Promise<string[]> {
@@ -122,6 +122,6 @@ export async function isConfiguredUploader(value: string): Promise<boolean> {
   return config.uploaders.some((uploader) => normalizeKey(uploader) === key);
 }
 
-export function getProgramDeliveryTagNames(location: WpArtasiaProgramDelivery): string[] {
-  return nonEmptyValues([location.partner?.name, location.program_delivery_name]);
+export function getPlacementTagNames(location: WpArtasiaPlacement): string[] {
+  return nonEmptyValues([location.partner?.name, location.placement_name]);
 }
