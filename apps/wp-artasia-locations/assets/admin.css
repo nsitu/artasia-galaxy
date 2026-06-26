@@ -76,3 +76,10 @@
 .artasia-sites-list-copy p:last-of-type {
   margin-bottom: 0;
 }
+
+.artasia-earlyon-logo {
+  display: block;
+  max-width: 120px;
+  height: auto;
+  margin: 0 0 10px;
+}

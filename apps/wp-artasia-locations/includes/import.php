@@ -37,8 +37,8 @@ function artasia_render_import_page(): void
             </div>
         <?php endif; ?>
 
-        <p>Upload a CSV file to create Artasia Venues, Artasia Partners, and Artasia Sites in one pass.</p>
-        <p>The importer finds existing Venues and Partners by title. If none exists, it creates them. Sites are matched by site name, Artasia Year, Venue, Partner, and Section.</p>
+        <p>Upload a CSV file to create Artasia Venues, Artasia Partners, Artasia People, and Artasia Sites in one pass.</p>
+        <p>The importer finds existing Venues, Partners, and People by title. If none exists, it creates them. Sites are matched by site name, Artasia Year, Venue, Partner, and Section.</p>
 
         <h2>CSV Template</h2>
         <p>
@@ -47,7 +47,7 @@ function artasia_render_import_page(): void
 
         <h2>Headers</h2>
         <p>Required headers: <code>site_name</code>, <code>venue_name</code>, <code>partner_name</code>.</p>
-        <p>Optional headers: <code>artasia_year</code>, <code>program_context</code>, <code>earlyon</code>, <code>section</code>, <code>participants</code>, <code>age_range</code>, <code>venue_street_address</code>, <code>venue_city</code>, <code>venue_postal_code</code>, <code>venue_latitude</code>, <code>venue_longitude</code>, <code>venue_notes</code>, <code>partner_type</code>, <code>partner_website</code>, <code>partner_notes</code>.</p>
+        <p>Optional headers: <code>artasia_year</code>, <code>program_context</code>, <code>earlyon</code>, <code>section</code>, <code>participants</code>, <code>age_range</code>, <code>venue_street_address</code>, <code>venue_city</code>, <code>venue_postal_code</code>, <code>venue_latitude</code>, <code>venue_longitude</code>, <code>venue_notes</code>, <code>partner_type</code>, <code>partner_website</code>, <code>partner_notes</code>, <code>lead_name</code>, <code>lead_role</code>, <code>lead_notes</code>.</p>
         <p>For <code>earlyon</code>, use values like <code>yes</code>, <code>no</code>, <code>true</code>, <code>false</code>, <code>1</code>, or <code>0</code>.</p>
 
         <h2>Upload CSV</h2>
@@ -87,6 +87,9 @@ function artasia_download_import_template(): void
         'partner_type' => 'Partner Organization',
         'partner_website' => 'https://www.hpl.ca',
         'partner_notes' => 'Library partner',
+        'lead_name' => 'Taylor Morgan',
+        'lead_role' => 'Artist Educator',
+        'lead_notes' => 'Lead facilitator for this site',
         'program_context' => 'Beyond the Bell',
         'earlyon' => 'no',
         'section' => 'Room 3',
@@ -188,8 +191,13 @@ function artasia_import_location_record(array $record): string
 
     $venue_id = artasia_import_find_or_create_post('artasia_venue', $venue_name);
     $partner_id = artasia_import_find_or_create_post('artasia_partner', $partner_name);
+    $lead_id = 0;
+    $lead_name = artasia_import_value($record, 'lead_name');
+    if ($lead_name) {
+        $lead_id = artasia_import_find_or_create_post('artasia_people', $lead_name);
+    }
 
-    if (!$venue_id || !$partner_id) {
+    if (!$venue_id || !$partner_id || ($lead_name && !$lead_id)) {
         return 'error';
     }
 
@@ -203,6 +211,11 @@ function artasia_import_location_record(array $record): string
     artasia_import_update_meta_if_present($partner_id, 'artasia_partner_type', $record, 'partner_type', 'sanitize_text_field');
     artasia_import_update_meta_if_present($partner_id, 'artasia_website', $record, 'partner_website', 'esc_url_raw');
     artasia_import_update_meta_if_present($partner_id, 'artasia_notes', $record, 'partner_notes', 'sanitize_textarea_field');
+
+    if ($lead_id) {
+        update_post_meta($lead_id, 'artasia_role', sanitize_text_field(artasia_import_value($record, 'lead_role') ?: 'Artist Educator'));
+        artasia_import_update_meta_if_present($lead_id, 'artasia_notes', $record, 'lead_notes', 'sanitize_textarea_field');
+    }
 
     $year = intval(artasia_import_value($record, 'artasia_year'));
     if (!$year) {
@@ -226,6 +239,9 @@ function artasia_import_location_record(array $record): string
     update_post_meta($site_id, 'artasia_program_year', $year);
     update_post_meta($site_id, 'artasia_venue_id', $venue_id);
     update_post_meta($site_id, 'artasia_partner_id', $partner_id);
+    if ($lead_id) {
+        update_post_meta($site_id, 'artasia_lead_id', $lead_id);
+    }
     update_post_meta($site_id, 'artasia_program_context', sanitize_text_field(artasia_import_value($record, 'program_context')));
     update_post_meta($site_id, 'artasia_is_earlyon', artasia_import_boolean(artasia_import_value($record, 'earlyon')));
     update_post_meta($site_id, 'artasia_section', sanitize_text_field($section));
@@ -251,6 +267,9 @@ function artasia_import_csv_headers(): array
         'partner_type',
         'partner_website',
         'partner_notes',
+        'lead_name',
+        'lead_role',
+        'lead_notes',
         'program_context',
         'earlyon',
         'section',

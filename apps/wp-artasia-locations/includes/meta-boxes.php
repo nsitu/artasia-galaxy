@@ -191,6 +191,7 @@ function artasia_site_meta_box_html(WP_Post $post): void
         <tr>
             <th><label for="artasia_is_earlyon">EarlyON</label></th>
             <td>
+                <img class="artasia-earlyon-logo" src="<?php echo esc_url(ARTASIA_LOCATIONS_URL . 'assets/early-on.svg'); ?>" alt="EarlyON" />
                 <label>
                     <input type="checkbox" id="artasia_is_earlyon" name="artasia_is_earlyon" value="1" <?php checked($is_earlyon); ?> />
                     Mark as an EarlyON site
