@@ -6,43 +6,43 @@ if (!defined('ABSPATH')) {
 
 function artasia_register_meta_fields(): void
 {
-    // --- Venue meta ---
-    register_post_meta('artasia_venue', 'artasia_address', [
+    // --- Place meta ---
+    register_post_meta('artasia_place', 'artasia_address', [
         'type'         => 'string',
         'single'       => true,
         'default'      => '',
         'show_in_rest' => true,
         'sanitize_callback' => 'sanitize_text_field',
     ]);
-    register_post_meta('artasia_venue', 'artasia_lat', [
+    register_post_meta('artasia_place', 'artasia_lat', [
         'type'         => 'number',
         'single'       => true,
         'default'      => 0,
         'show_in_rest' => true,
         'sanitize_callback' => 'artasia_sanitize_float_meta',
     ]);
-    register_post_meta('artasia_venue', 'artasia_lng', [
+    register_post_meta('artasia_place', 'artasia_lng', [
         'type'         => 'number',
         'single'       => true,
         'default'      => 0,
         'show_in_rest' => true,
         'sanitize_callback' => 'artasia_sanitize_float_meta',
     ]);
-    register_post_meta('artasia_venue', 'artasia_city', [
+    register_post_meta('artasia_place', 'artasia_city', [
         'type'         => 'string',
         'single'       => true,
         'default'      => '',
         'show_in_rest' => true,
         'sanitize_callback' => 'sanitize_text_field',
     ]);
-    register_post_meta('artasia_venue', 'artasia_postal_code', [
+    register_post_meta('artasia_place', 'artasia_postal_code', [
         'type'         => 'string',
         'single'       => true,
         'default'      => '',
         'show_in_rest' => true,
         'sanitize_callback' => 'sanitize_text_field',
     ]);
-    register_post_meta('artasia_venue', 'artasia_accessibility_notes', [
+    register_post_meta('artasia_place', 'artasia_accessibility_notes', [
         'type'         => 'string',
         'single'       => true,
         'default'      => '',
@@ -50,64 +50,64 @@ function artasia_register_meta_fields(): void
         'sanitize_callback' => 'sanitize_textarea_field',
     ]);
 
-    // --- Site meta ---
-    register_post_meta('artasia_site', 'artasia_venue_id', [
+    // --- Program Delivery meta ---
+    register_post_meta('artasia_program_delivery', 'artasia_place_id', [
         'type'         => 'integer',
         'single'       => true,
         'default'      => 0,
         'show_in_rest' => true,
         'sanitize_callback' => 'artasia_sanitize_integer_meta',
     ]);
-    register_post_meta('artasia_site', 'artasia_partner_id', [
+    register_post_meta('artasia_program_delivery', 'artasia_partner_id', [
         'type'         => 'integer',
         'single'       => true,
         'default'      => 0,
         'show_in_rest' => true,
         'sanitize_callback' => 'artasia_sanitize_integer_meta',
     ]);
-    register_post_meta('artasia_site', 'artasia_lead_id', [
+    register_post_meta('artasia_program_delivery', 'artasia_lead_id', [
         'type'         => 'integer',
         'single'       => true,
         'default'      => 0,
         'show_in_rest' => true,
         'sanitize_callback' => 'artasia_sanitize_integer_meta',
     ]);
-    register_post_meta('artasia_site', 'artasia_program_year', [
+    register_post_meta('artasia_program_delivery', 'artasia_program_year', [
         'type'         => 'integer',
         'single'       => true,
         'default'      => intval(date('Y')),
         'show_in_rest' => true,
         'sanitize_callback' => 'artasia_sanitize_integer_meta',
     ]);
-    register_post_meta('artasia_site', 'artasia_program_context', [
+    register_post_meta('artasia_program_delivery', 'artasia_program_context', [
         'type'         => 'string',
         'single'       => true,
         'default'      => '',
         'show_in_rest' => true,
         'sanitize_callback' => 'sanitize_text_field',
     ]);
-    register_post_meta('artasia_site', 'artasia_is_earlyon', [
+    register_post_meta('artasia_program_delivery', 'artasia_is_earlyon', [
         'type'         => 'boolean',
         'single'       => true,
         'default'      => false,
         'show_in_rest' => true,
         'sanitize_callback' => 'artasia_sanitize_boolean_meta',
     ]);
-    register_post_meta('artasia_site', 'artasia_section', [
+    register_post_meta('artasia_program_delivery', 'artasia_section', [
         'type'         => 'string',
         'single'       => true,
         'default'      => '',
         'show_in_rest' => true,
         'sanitize_callback' => 'sanitize_text_field',
     ]);
-    register_post_meta('artasia_site', 'artasia_participant_count', [
+    register_post_meta('artasia_program_delivery', 'artasia_participant_count', [
         'type'         => 'integer',
         'single'       => true,
         'default'      => 0,
         'show_in_rest' => true,
         'sanitize_callback' => 'artasia_sanitize_integer_meta',
     ]);
-    register_post_meta('artasia_site', 'artasia_participant_age', [
+    register_post_meta('artasia_program_delivery', 'artasia_participant_age', [
         'type'         => 'string',
         'single'       => true,
         'default'      => '',

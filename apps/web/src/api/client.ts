@@ -64,9 +64,9 @@ export async function fetchAlbums(): Promise<Album[]> {
   return res.json();
 }
 
-export interface UploadLocation {
-  site_id: number;
-  site_name: string;
+export interface UploadProgramDelivery {
+  program_delivery_id: number;
+  program_delivery_name: string;
   partner_name: string;
   address?: string;
   lat?: number;
@@ -74,7 +74,7 @@ export interface UploadLocation {
 }
 
 export interface UploadOptions {
-  locations: UploadLocation[];
+  programDeliveries: UploadProgramDelivery[];
   tags: string[];
   uploaders: string[];
   limits: {
@@ -103,7 +103,7 @@ export async function fetchUploadOptions(): Promise<UploadOptions> {
 export function uploadFiles(params: {
   files: File[];
   uploader: string;
-  location: UploadLocation;
+  location: UploadProgramDelivery;
   tags: string[];
   onProgress?: (percent: number) => void;
 }): Promise<UploadResult[]> {
@@ -111,7 +111,7 @@ export function uploadFiles(params: {
     const form = new FormData();
     for (const file of params.files) form.append("files", file);
     form.append("uploader", params.uploader);
-    form.append("site_id", String(params.location.site_id));
+    form.append("program_delivery_id", String(params.location.program_delivery_id));
     form.append("tags", JSON.stringify(params.tags));
 
     const xhr = new XMLHttpRequest();

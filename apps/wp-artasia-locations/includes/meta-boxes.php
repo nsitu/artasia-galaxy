@@ -7,19 +7,19 @@ if (!defined('ABSPATH')) {
 function artasia_post_type_contexts(): array
 {
     return [
-        'artasia_site' => [
-            'title' => 'About Artasia Sites',
-            'nav_label' => 'Sites',
+        'artasia_program_delivery' => [
+            'title' => 'About Artasia Program Deliveries',
+            'nav_label' => 'Program Deliveries',
             'paragraphs' => [
-                "An Artasia Site represents one year's activation of a particular venue by a particular Artasia Partner.",
-                'Use this post to connect the venue, Artasia Partner, program context, section, and participant details for that activation.',
+                'Each Program Delivery defines a unique delivery of Artasia by linking a partner, a place, and a person.',
+                'Use this record to connect the place, Artasia Partner, program context, section, and participant details.',
             ],
         ],
-        'artasia_venue' => [
-            'title' => 'About Artasia Venues',
-            'nav_label' => 'Venues',
+        'artasia_place' => [
+            'title' => 'About Artasia Places',
+            'nav_label' => 'Places',
             'paragraphs' => [
-                'An Artasia Venue is a physical location such as a park, school, library, or community centre where Artasia activity can happen.',
+                'An Artasia Place is a physical location such as a park, school, library, or community centre where Artasia activity can happen.',
                 'Use this record for stable location details such as address, city, coordinates, and access notes.',
             ],
         ],
@@ -35,7 +35,7 @@ function artasia_post_type_contexts(): array
             'title' => 'About Artasia People',
             'nav_label' => 'People',
             'paragraphs' => [
-                'Artasia People are team members who can be assigned as the Artasia Lead for a site.',
+                'Artasia People are team members who can be assigned as the Artasia Lead for a program delivery.',
                 "Use this record for the person's name, role, photo, and internal notes.",
             ],
         ],
@@ -52,7 +52,7 @@ function artasia_get_post_type_context(string $post_type): ?array
 function artasia_context_meta_box_html(array $paragraphs): void
 {
 ?>
-    <img class="artasia-sites-list-logo" src="<?php echo esc_url(ARTASIA_LOCATIONS_URL . 'assets/artasia.svg'); ?>" alt="Artasia" />
+    <img class="artasia-program-deliveries-list-logo" src="<?php echo esc_url(ARTASIA_LOCATIONS_URL . 'assets/artasia.svg'); ?>" alt="Artasia" />
     <?php foreach ($paragraphs as $paragraph) : ?>
         <p><?php echo esc_html($paragraph); ?></p>
     <?php endforeach; ?>
@@ -63,23 +63,22 @@ function artasia_context_list_header_html(string $current_post_type, array $para
 {
     $contexts = artasia_post_type_contexts();
 ?>
-    <div class="artasia-sites-list-context">
-        <div class="artasia-sites-list-header">
-            <img class="artasia-sites-list-logo" src="<?php echo esc_url(ARTASIA_LOCATIONS_URL . 'assets/artasia.svg'); ?>" alt="Artasia" />
+    <div class="artasia-program-deliveries-list-context">
+        <div class="artasia-program-deliveries-list-header">
+            <img class="artasia-program-deliveries-list-logo" src="<?php echo esc_url(ARTASIA_LOCATIONS_URL . 'assets/artasia.svg'); ?>" alt="Artasia" />
             <nav class="artasia-post-type-nav" aria-label="Artasia post types">
                 <?php foreach ($contexts as $post_type => $context) : ?>
                     <?php $is_current = $post_type === $current_post_type; ?>
                     <a
                         class="artasia-post-type-nav-link<?php echo $is_current ? ' is-active' : ''; ?>"
                         href="<?php echo esc_url(add_query_arg('post_type', $post_type, admin_url('edit.php'))); ?>"
-                        <?php echo $is_current ? 'aria-current="page"' : ''; ?>
-                    >
+                        <?php echo $is_current ? 'aria-current="page"' : ''; ?>>
                         <?php echo esc_html($context['nav_label']); ?>
                     </a>
                 <?php endforeach; ?>
             </nav>
         </div>
-        <div class="artasia-sites-list-copy">
+        <div class="artasia-program-deliveries-list-copy">
             <?php foreach ($paragraphs as $paragraph) : ?>
                 <p><?php echo esc_html($paragraph); ?></p>
             <?php endforeach; ?>
@@ -88,12 +87,12 @@ function artasia_context_list_header_html(string $current_post_type, array $para
 <?php
 }
 
-// --- Site Details meta box ---
+// --- Program Delivery Details meta box ---
 
-function artasia_site_meta_box_html(WP_Post $post): void
+function artasia_program_delivery_meta_box_html(WP_Post $post): void
 {
-    $venues = get_posts([
-        'post_type'   => 'artasia_venue',
+    $places = get_posts([
+        'post_type'   => 'artasia_place',
         'numberposts' => -1,
         'orderby'     => 'title',
         'order'       => 'ASC',
@@ -111,7 +110,7 @@ function artasia_site_meta_box_html(WP_Post $post): void
         'order'       => 'ASC',
     ]);
 
-    $venue_id       = get_post_meta($post->ID, 'artasia_venue_id', true);
+    $place_id       = get_post_meta($post->ID, 'artasia_place_id', true);
     $partner_id     = get_post_meta($post->ID, 'artasia_partner_id', true);
     $lead_id        = get_post_meta($post->ID, 'artasia_lead_id', true);
     $program_year   = get_post_meta($post->ID, 'artasia_program_year', true);
@@ -124,7 +123,7 @@ function artasia_site_meta_box_html(WP_Post $post): void
     $participant_count = get_post_meta($post->ID, 'artasia_participant_count', true);
     $participant_age = get_post_meta($post->ID, 'artasia_participant_age', true);
 
-    wp_nonce_field('artasia_site_meta', 'artasia_site_meta_nonce');
+    wp_nonce_field('artasia_program_delivery_meta', 'artasia_program_delivery_meta_nonce');
 ?>
     <table class="form-table">
         <tr>
@@ -132,26 +131,26 @@ function artasia_site_meta_box_html(WP_Post $post): void
             <td><input type="number" id="artasia_program_year" name="artasia_program_year" value="<?php echo esc_attr($program_year); ?>" /></td>
         </tr>
         <tr>
-            <th><label for="artasia_venue_id">Venue</label></th>
+            <th><label for="artasia_place_id">Place</label></th>
             <td>
-                <select id="artasia_venue_id" name="artasia_venue_id">
-                    <option value="0">— Select Venue —</option>
-                    <?php foreach ($venues as $venue) : ?>
-                        <option value="<?php echo esc_attr($venue->ID); ?>" <?php selected($venue_id, $venue->ID); ?>>
+                <select id="artasia_place_id" name="artasia_place_id">
+                    <option value="0">— Select Place —</option>
+                    <?php foreach ($places as $place) : ?>
+                        <option value="<?php echo esc_attr($place->ID); ?>" <?php selected($place_id, $place->ID); ?>>
                             <?php
-                            $venue_label = $venue->post_title;
-                            $venue_address = get_post_meta($venue->ID, 'artasia_address', true);
-                            $venue_city = get_post_meta($venue->ID, 'artasia_city', true);
-                            $venue_details = array_filter([$venue_address, $venue_city]);
-                            if (!empty($venue_details)) {
-                                $venue_label .= ' - ' . implode(', ', $venue_details);
+                            $place_label = $place->post_title;
+                            $place_address = get_post_meta($place->ID, 'artasia_address', true);
+                            $place_city = get_post_meta($place->ID, 'artasia_city', true);
+                            $place_details = array_filter([$place_address, $place_city]);
+                            if (!empty($place_details)) {
+                                $place_label .= ' - ' . implode(', ', $place_details);
                             }
-                            echo esc_html($venue_label);
+                            echo esc_html($place_label);
                             ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
-                <p class="description">A Venue is a location such as a Park, School, or Community Centre.</p>
+                <p class="description">A Place is a location such as a Park, School, or Community Centre.</p>
             </td>
         </tr>
         <tr>
@@ -179,7 +178,7 @@ function artasia_site_meta_box_html(WP_Post $post): void
                         </option>
                     <?php endforeach; ?>
                 </select>
-                <p class="description">Select the team member who is the Artasia lead for this site.</p>
+                <p class="description">Select the team member who is the Artasia lead for this program delivery.</p>
             </td>
         </tr>
         <tr>
@@ -194,9 +193,9 @@ function artasia_site_meta_box_html(WP_Post $post): void
                 <img class="artasia-earlyon-logo" src="<?php echo esc_url(ARTASIA_LOCATIONS_URL . 'assets/early-on.svg'); ?>" alt="EarlyON" />
                 <label>
                     <input type="checkbox" id="artasia_is_earlyon" name="artasia_is_earlyon" value="1" <?php checked($is_earlyon); ?> />
-                    Mark as an EarlyON site
+                    Mark as an EarlyON program delivery
                 </label>
-                <p class="description">EarlyON is an Ontario Government initiative often embedded inside of partner locations and infrastructure.</p>
+                <p class="description">EarlyON is an Ontario Government initiative often embedded inside partner locations and infrastructure.</p>
             </td>
         </tr>
         <tr>
@@ -210,7 +209,7 @@ function artasia_site_meta_box_html(WP_Post $post): void
             <th><label for="artasia_participant_count">Participants</label></th>
             <td>
                 <input type="number" id="artasia_participant_count" name="artasia_participant_count" value="<?php echo esc_attr($participant_count); ?>" />
-                <p class="description">How many children are attending the program at this site?</p>
+                <p class="description">How many children are attending this program delivery?</p>
             </td>
         </tr>
         <tr>
@@ -224,33 +223,33 @@ function artasia_site_meta_box_html(WP_Post $post): void
 <?php
 }
 
-function artasia_register_site_meta_box(): void
+function artasia_register_program_delivery_meta_box(): void
 {
-    $context = artasia_get_post_type_context('artasia_site');
+    $context = artasia_get_post_type_context('artasia_program_delivery');
 
     add_meta_box(
-        'artasia_site_details',
-        'Site Details',
-        'artasia_site_meta_box_html',
-        'artasia_site',
+        'artasia_program_delivery_details',
+        'Program Delivery Details',
+        'artasia_program_delivery_meta_box_html',
+        'artasia_program_delivery',
         'normal',
         'default'
     );
 
     add_meta_box(
-        'artasia_site_context',
+        'artasia_program_delivery_context',
         $context['title'],
-        'artasia_site_context_meta_box_html',
-        'artasia_site',
+        'artasia_program_delivery_context_meta_box_html',
+        'artasia_program_delivery',
         'side',
         'high'
     );
 }
-add_action('add_meta_boxes', 'artasia_register_site_meta_box');
+add_action('add_meta_boxes', 'artasia_register_program_delivery_meta_box');
 
-function artasia_site_context_meta_box_html(): void
+function artasia_program_delivery_context_meta_box_html(): void
 {
-    $context = artasia_get_post_type_context('artasia_site');
+    $context = artasia_get_post_type_context('artasia_program_delivery');
     if (!$context) {
         return;
     }
@@ -258,9 +257,9 @@ function artasia_site_context_meta_box_html(): void
     artasia_context_meta_box_html($context['paragraphs']);
 }
 
-function artasia_save_site_meta(int $post_id): void
+function artasia_save_program_delivery_meta(int $post_id): void
 {
-    if (!isset($_POST['artasia_site_meta_nonce']) || !wp_verify_nonce($_POST['artasia_site_meta_nonce'], 'artasia_site_meta')) {
+    if (!isset($_POST['artasia_program_delivery_meta_nonce']) || !wp_verify_nonce($_POST['artasia_program_delivery_meta_nonce'], 'artasia_program_delivery_meta')) {
         return;
     }
     if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
@@ -273,14 +272,14 @@ function artasia_save_site_meta(int $post_id): void
     update_post_meta($post_id, 'artasia_program_year', intval($_POST['artasia_program_year'] ?? 0));
     update_post_meta($post_id, 'artasia_program_context', sanitize_text_field($_POST['artasia_program_context'] ?? ''));
     update_post_meta($post_id, 'artasia_is_earlyon', isset($_POST['artasia_is_earlyon']));
-    update_post_meta($post_id, 'artasia_venue_id', intval($_POST['artasia_venue_id'] ?? 0));
+    update_post_meta($post_id, 'artasia_place_id', intval($_POST['artasia_place_id'] ?? 0));
     update_post_meta($post_id, 'artasia_partner_id', intval($_POST['artasia_partner_id'] ?? 0));
     update_post_meta($post_id, 'artasia_lead_id', intval($_POST['artasia_lead_id'] ?? 0));
     update_post_meta($post_id, 'artasia_section', sanitize_text_field($_POST['artasia_section'] ?? ''));
     update_post_meta($post_id, 'artasia_participant_count', intval($_POST['artasia_participant_count'] ?? 0));
     update_post_meta($post_id, 'artasia_participant_age', sanitize_text_field($_POST['artasia_participant_age'] ?? ''));
 }
-add_action('save_post_artasia_site', 'artasia_save_site_meta');
+add_action('save_post_artasia_program_delivery', 'artasia_save_program_delivery_meta');
 
 function artasia_post_type_admin_description(): void
 {
@@ -299,9 +298,9 @@ function artasia_post_type_admin_description(): void
 }
 add_action('all_admin_notices', 'artasia_post_type_admin_description');
 
-// --- Venue Details meta box ---
+// --- Place Details meta box ---
 
-function artasia_venue_meta_box_html(WP_Post $post): void
+function artasia_place_meta_box_html(WP_Post $post): void
 {
     $address  = get_post_meta($post->ID, 'artasia_address', true);
     $lat      = get_post_meta($post->ID, 'artasia_lat', true);
@@ -310,7 +309,7 @@ function artasia_venue_meta_box_html(WP_Post $post): void
     $postal   = get_post_meta($post->ID, 'artasia_postal_code', true);
     $access   = get_post_meta($post->ID, 'artasia_accessibility_notes', true);
 
-    wp_nonce_field('artasia_venue_meta', 'artasia_venue_meta_nonce');
+    wp_nonce_field('artasia_place_meta', 'artasia_place_meta_nonce');
 ?>
     <table class="form-table">
         <tr>
@@ -341,33 +340,33 @@ function artasia_venue_meta_box_html(WP_Post $post): void
 <?php
 }
 
-function artasia_register_venue_meta_box(): void
+function artasia_register_place_meta_box(): void
 {
-    $context = artasia_get_post_type_context('artasia_venue');
+    $context = artasia_get_post_type_context('artasia_place');
 
     add_meta_box(
-        'artasia_venue_details',
-        ' venue Details',
-        'artasia_venue_meta_box_html',
-        'artasia_venue',
+        'artasia_place_details',
+        'Place Details',
+        'artasia_place_meta_box_html',
+        'artasia_place',
         'normal',
         'default'
     );
 
     add_meta_box(
-        'artasia_venue_context',
+        'artasia_place_context',
         $context['title'],
-        'artasia_venue_context_meta_box_html',
-        'artasia_venue',
+        'artasia_place_context_meta_box_html',
+        'artasia_place',
         'side',
         'high'
     );
 }
-add_action('add_meta_boxes', 'artasia_register_venue_meta_box');
+add_action('add_meta_boxes', 'artasia_register_place_meta_box');
 
-function artasia_venue_context_meta_box_html(): void
+function artasia_place_context_meta_box_html(): void
 {
-    $context = artasia_get_post_type_context('artasia_venue');
+    $context = artasia_get_post_type_context('artasia_place');
     if (!$context) {
         return;
     }
@@ -375,9 +374,9 @@ function artasia_venue_context_meta_box_html(): void
     artasia_context_meta_box_html($context['paragraphs']);
 }
 
-function artasia_save_venue_meta(int $post_id): void
+function artasia_save_place_meta(int $post_id): void
 {
-    if (!isset($_POST['artasia_venue_meta_nonce']) || !wp_verify_nonce($_POST['artasia_venue_meta_nonce'], 'artasia_venue_meta')) {
+    if (!isset($_POST['artasia_place_meta_nonce']) || !wp_verify_nonce($_POST['artasia_place_meta_nonce'], 'artasia_place_meta')) {
         return;
     }
     if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
@@ -394,7 +393,7 @@ function artasia_save_venue_meta(int $post_id): void
     update_post_meta($post_id, 'artasia_postal_code', sanitize_text_field($_POST['artasia_postal_code'] ?? ''));
     update_post_meta($post_id, 'artasia_accessibility_notes', sanitize_textarea_field($_POST['artasia_accessibility_notes'] ?? ''));
 }
-add_action('save_post_artasia_venue', 'artasia_save_venue_meta');
+add_action('save_post_artasia_place', 'artasia_save_place_meta');
 
 // --- Artasia Partner Details meta box ---
 
@@ -624,7 +623,7 @@ function artasia_validate_image_attachment_id(int $attachment_id): int
 
 function artasia_remove_unnecessary_meta_boxes(): void
 {
-    $post_types = ['artasia_venue', 'artasia_site', 'artasia_partner', 'artasia_people'];
+    $post_types = ['artasia_place', 'artasia_program_delivery', 'artasia_partner', 'artasia_people'];
     $meta_box_contexts = ['side', 'normal', 'advanced'];
 
     foreach ($post_types as $post_type) {

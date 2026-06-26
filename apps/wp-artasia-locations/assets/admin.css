@@ -16,19 +16,19 @@
   background: #fff;
 }
 
-.artasia-sites-list-context {
+.artasia-program-deliveries-list-context {
   margin: 14px 0 18px;
   max-width: 960px;
 }
 
-.artasia-sites-list-header {
+.artasia-program-deliveries-list-header {
   display: flex;
   align-items: center;
   gap: 24px;
   flex-wrap: wrap;
 }
 
-.artasia-sites-list-logo {
+.artasia-program-deliveries-list-logo {
   display: block;
   width: 150px;
   max-width: 100%;
@@ -69,11 +69,11 @@
   color: #fff;
 }
 
-.artasia-sites-list-copy p:first-of-type {
+.artasia-program-deliveries-list-copy p:first-of-type {
   margin-top: 0;
 }
 
-.artasia-sites-list-copy p:last-of-type {
+.artasia-program-deliveries-list-copy p:last-of-type {
   margin-bottom: 0;
 }
 

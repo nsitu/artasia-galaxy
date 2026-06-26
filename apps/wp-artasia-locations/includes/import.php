@@ -7,11 +7,11 @@ if (!defined('ABSPATH')) {
 function artasia_register_import_page(): void
 {
     add_submenu_page(
-        'edit.php?post_type=artasia_site',
+        'edit.php?post_type=artasia_program_delivery',
         'Artasia CSV Import',
         'CSV Import',
         'edit_posts',
-        'artasia-locations-import',
+        'artasia-program-deliveries-import',
         'artasia_render_import_page'
     );
 }
@@ -20,7 +20,7 @@ add_action('admin_menu', 'artasia_register_import_page');
 function artasia_render_import_page(): void
 {
     if (!current_user_can('edit_posts')) {
-        wp_die(esc_html__('You do not have permission to import Artasia locations.', 'wp-artasia-locations'));
+        wp_die(esc_html__('You do not have permission to import Artasia program deliveries.', 'wp-artasia-locations'));
     }
 
     $imported = isset($_GET['imported']) ? intval($_GET['imported']) : null;
@@ -33,31 +33,31 @@ function artasia_render_import_page(): void
 
         <?php if ($imported !== null) : ?>
             <div class="notice notice-success is-dismissible">
-                <p><?php echo esc_html(sprintf('Import complete: %d site rows imported, %d skipped, %d with errors.', $imported, $skipped, $errors)); ?></p>
+                <p><?php echo esc_html(sprintf('Import complete: %d program delivery rows imported, %d skipped, %d with errors.', $imported, $skipped, $errors)); ?></p>
             </div>
         <?php endif; ?>
 
-        <p>Upload a CSV file to create Artasia Venues, Artasia Partners, Artasia People, and Artasia Sites in one pass.</p>
-        <p>The importer finds existing Venues, Partners, and People by title. If none exists, it creates them. Sites are matched by site name, Artasia Year, Venue, Partner, and Section.</p>
+        <p>Upload a CSV file to create Artasia Places, Artasia Partners, Artasia People, and Artasia Program Deliveries in one pass.</p>
+        <p>The importer finds existing Places, Partners, and People by title. If none exists, it creates them. Program Deliveries are matched by program delivery name, Artasia Year, Place, Partner, and Section.</p>
 
         <h2>CSV Template</h2>
         <p>
-            <a class="button" href="<?php echo esc_url(admin_url('admin-post.php?action=artasia_locations_import_template')); ?>">Download example CSV</a>
+            <a class="button" href="<?php echo esc_url(admin_url('admin-post.php?action=artasia_program_deliveries_import_template')); ?>">Download example CSV</a>
         </p>
 
         <h2>Headers</h2>
-        <p>Required headers: <code>site_name</code>, <code>venue_name</code>, <code>partner_name</code>.</p>
-        <p>Optional headers: <code>artasia_year</code>, <code>program_context</code>, <code>earlyon</code>, <code>section</code>, <code>participants</code>, <code>age_range</code>, <code>venue_street_address</code>, <code>venue_city</code>, <code>venue_postal_code</code>, <code>venue_latitude</code>, <code>venue_longitude</code>, <code>venue_notes</code>, <code>partner_type</code>, <code>partner_website</code>, <code>partner_notes</code>, <code>lead_name</code>, <code>lead_role</code>, <code>lead_notes</code>.</p>
+        <p>Required headers: <code>program_delivery_name</code>, <code>place_name</code>, <code>partner_name</code>.</p>
+        <p>Optional headers: <code>artasia_year</code>, <code>program_context</code>, <code>earlyon</code>, <code>section</code>, <code>participants</code>, <code>age_range</code>, <code>place_street_address</code>, <code>place_city</code>, <code>place_postal_code</code>, <code>place_latitude</code>, <code>place_longitude</code>, <code>place_notes</code>, <code>partner_type</code>, <code>partner_website</code>, <code>partner_notes</code>, <code>lead_name</code>, <code>lead_role</code>, <code>lead_notes</code>.</p>
         <p>For <code>earlyon</code>, use values like <code>yes</code>, <code>no</code>, <code>true</code>, <code>false</code>, <code>1</code>, or <code>0</code>.</p>
 
         <h2>Upload CSV</h2>
         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" enctype="multipart/form-data">
-            <input type="hidden" name="action" value="artasia_locations_import_csv" />
-            <?php wp_nonce_field('artasia_locations_import_csv', 'artasia_locations_import_nonce'); ?>
+            <input type="hidden" name="action" value="artasia_program_deliveries_import_csv" />
+            <?php wp_nonce_field('artasia_program_deliveries_import_csv', 'artasia_program_deliveries_import_nonce'); ?>
             <table class="form-table">
                 <tr>
-                    <th scope="row"><label for="artasia_locations_csv">CSV File</label></th>
-                    <td><input type="file" id="artasia_locations_csv" name="artasia_locations_csv" accept=".csv,text/csv" required /></td>
+                    <th scope="row"><label for="artasia_program_deliveries_csv">CSV File</label></th>
+                    <td><input type="file" id="artasia_program_deliveries_csv" name="artasia_program_deliveries_csv" accept=".csv,text/csv" required /></td>
                 </tr>
             </table>
             <?php submit_button('Import CSV'); ?>
@@ -74,22 +74,22 @@ function artasia_download_import_template(): void
 
     $headers = artasia_import_csv_headers();
     $example = [
-        'site_name' => 'Artasia at Central Library',
+        'program_delivery_name' => 'Artasia at Central Library',
         'artasia_year' => date('Y'),
-        'venue_name' => 'Central Library',
-        'venue_street_address' => '55 York Blvd',
-        'venue_city' => 'Hamilton',
-        'venue_postal_code' => 'L8R 3K1',
-        'venue_latitude' => '43.258',
-        'venue_longitude' => '-79.872',
-        'venue_notes' => 'Use main entrance',
+        'place_name' => 'Central Library',
+        'place_street_address' => '55 York Blvd',
+        'place_city' => 'Hamilton',
+        'place_postal_code' => 'L8R 3K1',
+        'place_latitude' => '43.258',
+        'place_longitude' => '-79.872',
+        'place_notes' => 'Use main entrance',
         'partner_name' => 'Hamilton Public Library',
         'partner_type' => 'Partner Organization',
         'partner_website' => 'https://www.hpl.ca',
         'partner_notes' => 'Library partner',
         'lead_name' => 'Taylor Morgan',
         'lead_role' => 'Artist Educator',
-        'lead_notes' => 'Lead facilitator for this site',
+        'lead_notes' => 'Lead facilitator for this program delivery',
         'program_context' => 'Beyond the Bell',
         'earlyon' => 'no',
         'section' => 'Room 3',
@@ -99,7 +99,7 @@ function artasia_download_import_template(): void
 
     nocache_headers();
     header('Content-Type: text/csv; charset=utf-8');
-    header('Content-Disposition: attachment; filename="artasia-locations-import-template.csv"');
+    header('Content-Disposition: attachment; filename="artasia-program-deliveries-import-template.csv"');
 
     $output = fopen('php://output', 'w');
     fputcsv($output, $headers);
@@ -109,33 +109,33 @@ function artasia_download_import_template(): void
     fclose($output);
     exit;
 }
-add_action('admin_post_artasia_locations_import_template', 'artasia_download_import_template');
+add_action('admin_post_artasia_program_deliveries_import_template', 'artasia_download_import_template');
 
 function artasia_handle_import_csv(): void
 {
     if (!current_user_can('edit_posts')) {
-        wp_die(esc_html__('You do not have permission to import Artasia locations.', 'wp-artasia-locations'));
+        wp_die(esc_html__('You do not have permission to import Artasia program deliveries.', 'wp-artasia-locations'));
     }
 
-    if (!isset($_POST['artasia_locations_import_nonce']) || !wp_verify_nonce($_POST['artasia_locations_import_nonce'], 'artasia_locations_import_csv')) {
+    if (!isset($_POST['artasia_program_deliveries_import_nonce']) || !wp_verify_nonce($_POST['artasia_program_deliveries_import_nonce'], 'artasia_program_deliveries_import_csv')) {
         wp_die(esc_html__('Invalid import request.', 'wp-artasia-locations'));
     }
 
-    if (empty($_FILES['artasia_locations_csv']['tmp_name']) || !is_uploaded_file($_FILES['artasia_locations_csv']['tmp_name'])) {
+    if (empty($_FILES['artasia_program_deliveries_csv']['tmp_name']) || !is_uploaded_file($_FILES['artasia_program_deliveries_csv']['tmp_name'])) {
         artasia_redirect_import_page(['imported' => 0, 'skipped' => 0, 'errors' => 1]);
     }
 
-    $filename = isset($_FILES['artasia_locations_csv']['name']) ? sanitize_file_name($_FILES['artasia_locations_csv']['name']) : '';
+    $filename = isset($_FILES['artasia_program_deliveries_csv']['name']) ? sanitize_file_name($_FILES['artasia_program_deliveries_csv']['name']) : '';
     if (strtolower(pathinfo($filename, PATHINFO_EXTENSION)) !== 'csv') {
         artasia_redirect_import_page(['imported' => 0, 'skipped' => 0, 'errors' => 1]);
     }
 
-    $result = artasia_import_locations_csv($_FILES['artasia_locations_csv']['tmp_name']);
+    $result = artasia_import_program_deliveries_csv($_FILES['artasia_program_deliveries_csv']['tmp_name']);
     artasia_redirect_import_page($result);
 }
-add_action('admin_post_artasia_locations_import_csv', 'artasia_handle_import_csv');
+add_action('admin_post_artasia_program_deliveries_import_csv', 'artasia_handle_import_csv');
 
-function artasia_import_locations_csv(string $path): array
+function artasia_import_program_deliveries_csv(string $path): array
 {
     $handle = fopen($path, 'r');
     if (!$handle) {
@@ -181,15 +181,15 @@ function artasia_import_locations_csv(string $path): array
 
 function artasia_import_location_record(array $record): string
 {
-    $site_name = artasia_import_value($record, 'site_name');
-    $venue_name = artasia_import_value($record, 'venue_name');
+    $program_delivery_name = artasia_import_value($record, 'program_delivery_name');
+    $place_name = artasia_import_value($record, 'place_name');
     $partner_name = artasia_import_value($record, 'partner_name');
 
-    if (!$site_name || !$venue_name || !$partner_name) {
+    if (!$program_delivery_name || !$place_name || !$partner_name) {
         return 'skipped';
     }
 
-    $venue_id = artasia_import_find_or_create_post('artasia_venue', $venue_name);
+    $place_id = artasia_import_find_or_create_post('artasia_place', $place_name);
     $partner_id = artasia_import_find_or_create_post('artasia_partner', $partner_name);
     $lead_id = 0;
     $lead_name = artasia_import_value($record, 'lead_name');
@@ -197,16 +197,16 @@ function artasia_import_location_record(array $record): string
         $lead_id = artasia_import_find_or_create_post('artasia_people', $lead_name);
     }
 
-    if (!$venue_id || !$partner_id || ($lead_name && !$lead_id)) {
+    if (!$place_id || !$partner_id || ($lead_name && !$lead_id)) {
         return 'error';
     }
 
-    artasia_import_update_meta_if_present($venue_id, 'artasia_address', $record, 'venue_street_address', 'sanitize_text_field');
-    artasia_import_update_meta_if_present($venue_id, 'artasia_city', $record, 'venue_city', 'sanitize_text_field');
-    artasia_import_update_meta_if_present($venue_id, 'artasia_postal_code', $record, 'venue_postal_code', 'sanitize_text_field');
-    artasia_import_update_meta_if_present($venue_id, 'artasia_lat', $record, 'venue_latitude', 'floatval');
-    artasia_import_update_meta_if_present($venue_id, 'artasia_lng', $record, 'venue_longitude', 'floatval');
-    artasia_import_update_meta_if_present($venue_id, 'artasia_accessibility_notes', $record, 'venue_notes', 'sanitize_textarea_field');
+    artasia_import_update_meta_if_present($place_id, 'artasia_address', $record, 'place_street_address', 'sanitize_text_field');
+    artasia_import_update_meta_if_present($place_id, 'artasia_city', $record, 'place_city', 'sanitize_text_field');
+    artasia_import_update_meta_if_present($place_id, 'artasia_postal_code', $record, 'place_postal_code', 'sanitize_text_field');
+    artasia_import_update_meta_if_present($place_id, 'artasia_lat', $record, 'place_latitude', 'floatval');
+    artasia_import_update_meta_if_present($place_id, 'artasia_lng', $record, 'place_longitude', 'floatval');
+    artasia_import_update_meta_if_present($place_id, 'artasia_accessibility_notes', $record, 'place_notes', 'sanitize_textarea_field');
 
     artasia_import_update_meta_if_present($partner_id, 'artasia_partner_type', $record, 'partner_type', 'sanitize_text_field');
     artasia_import_update_meta_if_present($partner_id, 'artasia_website', $record, 'partner_website', 'esc_url_raw');
@@ -223,30 +223,30 @@ function artasia_import_location_record(array $record): string
     }
     $section = artasia_import_value($record, 'section');
 
-    $site_id = artasia_import_find_site($site_name, $year, $venue_id, $partner_id, $section);
-    if (!$site_id) {
-        $site_id = wp_insert_post([
-            'post_title' => $site_name,
-            'post_type' => 'artasia_site',
+    $program_delivery_id = artasia_import_find_program_delivery($program_delivery_name, $year, $place_id, $partner_id, $section);
+    if (!$program_delivery_id) {
+        $program_delivery_id = wp_insert_post([
+            'post_title' => $program_delivery_name,
+            'post_type' => 'artasia_program_delivery',
             'post_status' => 'publish',
         ], true);
     }
 
-    if (is_wp_error($site_id) || !$site_id) {
+    if (is_wp_error($program_delivery_id) || !$program_delivery_id) {
         return 'error';
     }
 
-    update_post_meta($site_id, 'artasia_program_year', $year);
-    update_post_meta($site_id, 'artasia_venue_id', $venue_id);
-    update_post_meta($site_id, 'artasia_partner_id', $partner_id);
+    update_post_meta($program_delivery_id, 'artasia_program_year', $year);
+    update_post_meta($program_delivery_id, 'artasia_place_id', $place_id);
+    update_post_meta($program_delivery_id, 'artasia_partner_id', $partner_id);
     if ($lead_id) {
-        update_post_meta($site_id, 'artasia_lead_id', $lead_id);
+        update_post_meta($program_delivery_id, 'artasia_lead_id', $lead_id);
     }
-    update_post_meta($site_id, 'artasia_program_context', sanitize_text_field(artasia_import_value($record, 'program_context')));
-    update_post_meta($site_id, 'artasia_is_earlyon', artasia_import_boolean(artasia_import_value($record, 'earlyon')));
-    update_post_meta($site_id, 'artasia_section', sanitize_text_field($section));
-    update_post_meta($site_id, 'artasia_participant_count', intval(artasia_import_value($record, 'participants')));
-    update_post_meta($site_id, 'artasia_participant_age', sanitize_text_field(artasia_import_value($record, 'age_range')));
+    update_post_meta($program_delivery_id, 'artasia_program_context', sanitize_text_field(artasia_import_value($record, 'program_context')));
+    update_post_meta($program_delivery_id, 'artasia_is_earlyon', artasia_import_boolean(artasia_import_value($record, 'earlyon')));
+    update_post_meta($program_delivery_id, 'artasia_section', sanitize_text_field($section));
+    update_post_meta($program_delivery_id, 'artasia_participant_count', intval(artasia_import_value($record, 'participants')));
+    update_post_meta($program_delivery_id, 'artasia_participant_age', sanitize_text_field(artasia_import_value($record, 'age_range')));
 
     return 'imported';
 }
@@ -254,15 +254,15 @@ function artasia_import_location_record(array $record): string
 function artasia_import_csv_headers(): array
 {
     return [
-        'site_name',
+        'program_delivery_name',
         'artasia_year',
-        'venue_name',
-        'venue_street_address',
-        'venue_city',
-        'venue_postal_code',
-        'venue_latitude',
-        'venue_longitude',
-        'venue_notes',
+        'place_name',
+        'place_street_address',
+        'place_city',
+        'place_postal_code',
+        'place_latitude',
+        'place_longitude',
+        'place_notes',
         'partner_name',
         'partner_type',
         'partner_website',
@@ -301,10 +301,10 @@ function artasia_import_find_or_create_post(string $post_type, string $title): i
     return is_wp_error($post_id) ? 0 : intval($post_id);
 }
 
-function artasia_import_find_site(string $title, int $year, int $venue_id, int $partner_id, string $section): int
+function artasia_import_find_program_delivery(string $title, int $year, int $place_id, int $partner_id, string $section): int
 {
     $matches = get_posts([
-        'post_type' => 'artasia_site',
+        'post_type' => 'artasia_program_delivery',
         'title' => $title,
         'post_status' => ['publish', 'draft', 'pending', 'private'],
         'numberposts' => 1,
@@ -318,8 +318,8 @@ function artasia_import_find_site(string $title, int $year, int $venue_id, int $
                 'type' => 'NUMERIC',
             ],
             [
-                'key' => 'artasia_venue_id',
-                'value' => $venue_id,
+                'key' => 'artasia_place_id',
+                'value' => $place_id,
                 'compare' => '=',
                 'type' => 'NUMERIC',
             ],
@@ -391,8 +391,8 @@ function artasia_import_row_is_empty(array $row): bool
 function artasia_redirect_import_page(array $result): void
 {
     wp_safe_redirect(add_query_arg([
-        'post_type' => 'artasia_site',
-        'page' => 'artasia-locations-import',
+        'post_type' => 'artasia_program_delivery',
+        'page' => 'artasia-program-deliveries-import',
         'imported' => intval($result['imported'] ?? 0),
         'skipped' => intval($result['skipped'] ?? 0),
         'errors' => intval($result['errors'] ?? 0),

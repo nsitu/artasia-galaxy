@@ -1,13 +1,13 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  getArtasiaLocations,
-  type WpArtasiaLocation,
+  getArtasiaProgramDeliveries,
+  type WpArtasiaProgramDelivery,
 } from "../infra/WordPressClient.js";
 
-export interface ArtasiaLocation {
-  site_id: number;
-  site_name: string;
+export interface ArtasiaProgramDelivery {
+  program_delivery_id: number;
+  program_delivery_name: string;
   partner_name: string;
   address?: string;
   lat?: number;
@@ -15,7 +15,7 @@ export interface ArtasiaLocation {
 }
 
 export interface UploadConfig {
-  locations: ArtasiaLocation[];
+  programDeliveries: ArtasiaProgramDelivery[];
   tags: string[];
   uploaders: string[];
 }
@@ -78,33 +78,33 @@ function normalizeKey(value: string) {
   return value.trim().toLowerCase();
 }
 
-function mapWpLocation(wp: WpArtasiaLocation): ArtasiaLocation {
-  const lat = wp.venue?.lat;
-  const lng = wp.venue?.lng;
+function mapWpProgramDelivery(wp: WpArtasiaProgramDelivery): ArtasiaProgramDelivery {
+  const lat = wp.place?.lat;
+  const lng = wp.place?.lng;
   return {
-    site_id: wp.site_id,
-    site_name: wp.site_name,
+    program_delivery_id: wp.program_delivery_id,
+    program_delivery_name: wp.program_delivery_name,
     partner_name: wp.partner?.name ?? "",
-    ...(wp.venue?.address ? { address: wp.venue.address } : {}),
+    ...(wp.place?.address ? { address: wp.place.address } : {}),
     ...(lat != null && lat !== 0 ? { lat } : {}),
     ...(lng != null && lng !== 0 ? { lng } : {}),
   };
 }
 
 export async function getUploadConfig(): Promise<UploadConfig> {
-  const wpLocations = await getArtasiaLocations();
-  const locations = wpLocations.map(mapWpLocation);
+  const wpProgramDeliveries = await getArtasiaProgramDeliveries();
+  const programDeliveries = wpProgramDeliveries.map(mapWpProgramDelivery);
   const tags = cleanStringList(readJson<unknown>("upload-tags.json", []));
   const uploaders = cleanStringList(readJson<unknown>("uploaders.json", []), {
     excludeReservedAlbums: true,
   });
 
-  return { locations, tags, uploaders };
+  return { programDeliveries, tags, uploaders };
 }
 
-export async function findConfiguredLocation(site_id: number): Promise<WpArtasiaLocation | undefined> {
-  const wpLocations = await getArtasiaLocations();
-  return wpLocations.find((location) => location.site_id === site_id);
+export async function findConfiguredProgramDelivery(program_delivery_id: number): Promise<WpArtasiaProgramDelivery | undefined> {
+  const wpProgramDeliveries = await getArtasiaProgramDeliveries();
+  return wpProgramDeliveries.find((location) => location.program_delivery_id === program_delivery_id);
 }
 
 export async function getAllowedTagNames(requestedTags: unknown): Promise<string[]> {
@@ -122,6 +122,6 @@ export async function isConfiguredUploader(value: string): Promise<boolean> {
   return config.uploaders.some((uploader) => normalizeKey(uploader) === key);
 }
 
-export function getLocationTagNames(location: WpArtasiaLocation): string[] {
-  return nonEmptyValues([location.partner?.name, location.site_name]);
+export function getProgramDeliveryTagNames(location: WpArtasiaProgramDelivery): string[] {
+  return nonEmptyValues([location.partner?.name, location.program_delivery_name]);
 }

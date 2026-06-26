@@ -22,17 +22,17 @@ interface UploadPanelProps {
 export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
   const [options, setOptions] = useState<UploadOptions | null>(null);
   const [uploader, setUploader] = useState("");
-  const [locationKey, setLocationKey] = useState("");
+  const [programDeliveryKey, setProgramDeliveryKey] = useState("");
   const [selectedTag, setSelectedTag] = useState("");
   const [items, setItems] = useState<UploadItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const uploadInProgressRef = useRef(false);
 
-  function locationLabel(location: UploadOptions["locations"][number]) {
+  function programDeliveryLabel(location: UploadOptions["programDeliveries"][number]) {
     return location.partner_name
-      ? `${location.partner_name} - ${location.site_name}`
-      : location.site_name;
+      ? `${location.partner_name} - ${location.program_delivery_name}`
+      : location.program_delivery_name;
   }
 
   useEffect(() => {
@@ -42,16 +42,16 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
         setOptions(data);
         setUploader(data.uploaders[0] ?? "");
         setSelectedTag(data.tags[0] ?? "");
-        const firstLocation = data.locations[0];
-        if (firstLocation) setLocationKey(String(firstLocation.site_id));
+        const firstProgramDelivery = data.programDeliveries[0];
+        if (firstProgramDelivery) setProgramDeliveryKey(String(firstProgramDelivery.program_delivery_id));
       })
       .catch((err) => setError((err as Error).message));
   }, [visible, options]);
 
-  const selectedLocation = useMemo(() => {
+  const selectedProgramDelivery = useMemo(() => {
     if (!options) return null;
-    return options.locations.find((location) => String(location.site_id) === locationKey) ?? null;
-  }, [locationKey, options]);
+    return options.programDeliveries.find((programDelivery) => String(programDelivery.program_delivery_id) === programDeliveryKey) ?? null;
+  }, [programDeliveryKey, options]);
 
   function addFiles(fileList: FileList | File[]) {
     const files = Array.from(fileList);
@@ -72,12 +72,12 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
     const hasQueued = items.some((item) => item.status === "queued");
     if (!hasQueued || uploadInProgressRef.current) return;
     void uploadQueued();
-  }, [items, visible, uploader, selectedLocation, selectedTag]);
+  }, [items, visible, uploader, selectedProgramDelivery, selectedTag]);
 
   async function uploadQueued() {
     if (uploadInProgressRef.current) return;
-    if (!selectedLocation) {
-      setError("Select a location.");
+    if (!selectedProgramDelivery) {
+      setError("Select a program delivery.");
       return;
     }
     if (!uploader) {
@@ -106,7 +106,7 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
           const results = await uploadFiles({
             files: [item.file],
             uploader,
-            location: selectedLocation,
+            location: selectedProgramDelivery,
             tags: selectedTag ? [selectedTag] : [],
             onProgress: (progress) => {
               setItems((current) =>
@@ -180,15 +180,15 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
           </label>
 
           <label style={labelStyle}>
-            Location
+            Program Delivery
             <select
-              value={locationKey}
-              onChange={(e) => setLocationKey(e.target.value)}
+              value={programDeliveryKey}
+              onChange={(e) => setProgramDeliveryKey(e.target.value)}
               style={inputStyle}
             >
-              {(options?.locations ?? []).map((location) => (
-                <option key={location.site_id} value={String(location.site_id)}>
-                  {locationLabel(location)}
+              {(options?.programDeliveries ?? []).map((programDelivery) => (
+                <option key={programDelivery.program_delivery_id} value={String(programDelivery.program_delivery_id)}>
+                  {programDeliveryLabel(programDelivery)}
                 </option>
               ))}
             </select>

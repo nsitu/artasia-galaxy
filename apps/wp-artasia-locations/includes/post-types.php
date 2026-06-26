@@ -6,42 +6,42 @@ if (!defined('ABSPATH')) {
 
 function artasia_register_post_types(): void
 {
-    register_post_type('artasia_venue', [
+    register_post_type('artasia_place', [
         'labels' => [
-            'name'          => 'Artasia Venues',
-            'singular_name' => 'Artasia Venue',
-            'add_new_item'  => 'Add New Artasia Venue',
-            'edit_item'     => 'Edit Artasia Venue',
-            'new_item'      => 'New Artasia Venue',
-            'view_item'     => 'View Artasia Venue',
-            'search_items'   => 'Search Artasia Venues',
-            'not_found'      => 'No Artasia venues found',
+            'name'          => 'Artasia Places',
+            'singular_name' => 'Artasia Place',
+            'add_new_item'  => 'Add New Artasia Place',
+            'edit_item'     => 'Edit Artasia Place',
+            'new_item'      => 'New Artasia Place',
+            'view_item'     => 'View Artasia Place',
+            'search_items'   => 'Search Artasia Places',
+            'not_found'      => 'No Artasia places found',
         ],
         'public'       => true,
         'has_archive'  => false,
         'show_in_menu' => false,
         'show_in_rest' => true,
-        'rest_base'    => 'artasia_venue',
+        'rest_base'    => 'artasia_place',
         'menu_icon'    => 'dashicons-location-alt',
         'supports'     => ['title'],
     ]);
 
-    register_post_type('artasia_site', [
+    register_post_type('artasia_program_delivery', [
         'labels' => [
-            'name'          => 'Artasia Sites',
-            'singular_name' => 'Artasia Site',
-            'add_new_item'  => 'Add New Artasia Site',
-            'edit_item'     => 'Edit Artasia Site',
-            'new_item'      => 'New Artasia Site',
-            'view_item'     => 'View Artasia Site',
-            'search_items'   => 'Search Artasia Sites',
-            'not_found'      => 'No Artasia sites found',
+            'name'          => 'Artasia Program Deliveries',
+            'singular_name' => 'Artasia Program Delivery',
+            'add_new_item'  => 'Add New Artasia Program Delivery',
+            'edit_item'     => 'Edit Artasia Program Delivery',
+            'new_item'      => 'New Artasia Program Delivery',
+            'view_item'     => 'View Artasia Program Delivery',
+            'search_items'   => 'Search Artasia Program Deliveries',
+            'not_found'      => 'No Artasia program deliveries found',
         ],
         'public'       => true,
         'has_archive'  => false,
         'show_in_menu' => false,
         'show_in_rest' => true,
-        'rest_base'    => 'artasia_site',
+        'rest_base'    => 'artasia_program_delivery',
         'menu_icon'    => 'dashicons-art',
         'supports'     => ['title'],
     ]);
@@ -95,30 +95,30 @@ function artasia_register_admin_menu(): void
         'Artasia',
         'Artasia',
         'edit_posts',
-        'edit.php?post_type=artasia_site',
+        'edit.php?post_type=artasia_program_delivery',
         '',
         'dashicons-art',
         20
     );
 
     add_submenu_page(
-        'edit.php?post_type=artasia_site',
-        'Artasia Sites',
-        'Sites',
+        'edit.php?post_type=artasia_program_delivery',
+        'Artasia Program Deliveries',
+        'Program Deliveries',
         'edit_posts',
-        'edit.php?post_type=artasia_site'
+        'edit.php?post_type=artasia_program_delivery'
     );
 
     add_submenu_page(
-        'edit.php?post_type=artasia_site',
-        'Artasia Venues',
-        'Venues',
+        'edit.php?post_type=artasia_program_delivery',
+        'Artasia Places',
+        'Places',
         'edit_posts',
-        'edit.php?post_type=artasia_venue'
+        'edit.php?post_type=artasia_place'
     );
 
     add_submenu_page(
-        'edit.php?post_type=artasia_site',
+        'edit.php?post_type=artasia_program_delivery',
         'Artasia Partners',
         'Partners',
         'edit_posts',
@@ -126,7 +126,7 @@ function artasia_register_admin_menu(): void
     );
 
     add_submenu_page(
-        'edit.php?post_type=artasia_site',
+        'edit.php?post_type=artasia_program_delivery',
         'Artasia People',
         'People',
         'edit_posts',
@@ -138,18 +138,18 @@ add_action('admin_menu', 'artasia_register_admin_menu');
 function artasia_admin_parent_file($parent_file)
 {
     $screen = get_current_screen();
-    if (!$screen || !in_array($screen->post_type, ['artasia_site', 'artasia_venue', 'artasia_partner', 'artasia_people'], true)) {
+    if (!$screen || !in_array($screen->post_type, ['artasia_program_delivery', 'artasia_place', 'artasia_partner', 'artasia_people'], true)) {
         return $parent_file;
     }
 
-    return 'edit.php?post_type=artasia_site';
+    return 'edit.php?post_type=artasia_program_delivery';
 }
 add_filter('parent_file', 'artasia_admin_parent_file');
 
 function artasia_admin_submenu_file($submenu_file)
 {
     $screen = get_current_screen();
-    if (!$screen || !in_array($screen->post_type, ['artasia_site', 'artasia_venue', 'artasia_partner', 'artasia_people'], true)) {
+    if (!$screen || !in_array($screen->post_type, ['artasia_program_delivery', 'artasia_place', 'artasia_partner', 'artasia_people'], true)) {
         return $submenu_file;
     }
 

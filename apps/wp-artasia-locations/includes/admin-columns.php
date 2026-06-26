@@ -4,15 +4,15 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-// --- Site columns ---
+// --- Program Delivery columns ---
 
-function artasia_site_columns(array $columns): array
+function artasia_program_delivery_columns(array $columns): array
 {
     $new = [];
     foreach ($columns as $key => $label) {
         $new[$key] = $label;
         if ($key === 'title') {
-            $new['artasia_venue']    = 'Venue';
+            $new['artasia_place']    = 'Place';
             $new['artasia_partner']  = 'Artasia Partner';
             $new['artasia_lead']     = 'Artasia Lead';
             $new['artasia_year']     = 'Year';
@@ -24,13 +24,13 @@ function artasia_site_columns(array $columns): array
     }
     return $new;
 }
-add_filter('manage_artasia_site_posts_columns', 'artasia_site_columns');
+add_filter('manage_artasia_program_delivery_posts_columns', 'artasia_program_delivery_columns');
 
-function artasia_site_column(string $column, int $post_id): void
+function artasia_program_delivery_column(string $column, int $post_id): void
 {
     switch ($column) {
-        case 'artasia_venue':
-            $vid = intval(get_post_meta($post_id, 'artasia_venue_id', true));
+        case 'artasia_place':
+            $vid = intval(get_post_meta($post_id, 'artasia_place_id', true));
             echo $vid ? esc_html(get_the_title($vid)) : '—';
             break;
         case 'artasia_partner':
@@ -58,11 +58,11 @@ function artasia_site_column(string $column, int $post_id): void
             break;
     }
 }
-add_action('manage_artasia_site_posts_custom_column', 'artasia_site_column', 10, 2);
+add_action('manage_artasia_program_delivery_posts_custom_column', 'artasia_program_delivery_column', 10, 2);
 
-// --- Venue columns ---
+// --- Place columns ---
 
-function artasia_venue_columns(array $columns): array
+function artasia_place_columns(array $columns): array
 {
     $new = [];
     foreach ($columns as $key => $label) {
@@ -74,9 +74,9 @@ function artasia_venue_columns(array $columns): array
     }
     return $new;
 }
-add_filter('manage_artasia_venue_posts_columns', 'artasia_venue_columns');
+add_filter('manage_artasia_place_posts_columns', 'artasia_place_columns');
 
-function artasia_venue_column(string $column, int $post_id): void
+function artasia_place_column(string $column, int $post_id): void
 {
     switch ($column) {
         case 'artasia_address':
@@ -87,7 +87,7 @@ function artasia_venue_column(string $column, int $post_id): void
             break;
     }
 }
-add_action('manage_artasia_venue_posts_custom_column', 'artasia_venue_column', 10, 2);
+add_action('manage_artasia_place_posts_custom_column', 'artasia_place_column', 10, 2);
 
 // --- Artasia Partner columns ---
 
@@ -129,7 +129,7 @@ function artasia_people_columns(array $columns): array
         if ($key === 'title') {
             $new['artasia_role'] = 'Role';
             $new['artasia_photo'] = 'Photo';
-            $new['artasia_assigned_sites'] = 'Assigned Sites';
+            $new['artasia_assigned_program_deliveries'] = 'Assigned Program Deliveries';
         }
     }
     return $new;
@@ -146,16 +146,16 @@ function artasia_people_column(string $column, int $post_id): void
             $photo_id = intval(get_post_meta($post_id, 'artasia_photo_id', true));
             echo $photo_id ? wp_get_attachment_image($photo_id, 'thumbnail', false, ['style' => 'max-width:48px;height:auto;']) : '—';
             break;
-        case 'artasia_assigned_sites':
-            $sites = get_posts([
-                'post_type'   => 'artasia_site',
+        case 'artasia_assigned_program_deliveries':
+            $program_deliveries = get_posts([
+                'post_type'   => 'artasia_program_delivery',
                 'numberposts' => -1,
                 'meta_key'    => 'artasia_lead_id',
                 'meta_value'  => $post_id,
                 'fields'      => 'ids',
             ]);
 
-            echo esc_html((string) count($sites));
+            echo esc_html((string) count($program_deliveries));
             break;
     }
 }

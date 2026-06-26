@@ -13,8 +13,8 @@ import {
 } from "../infra/ImmichClient.js";
 import { uploadRateLimit } from "../middleware/uploadRateLimit.js";
 import {
-  findConfiguredLocation,
-  getLocationTagNames,
+  findConfiguredProgramDelivery,
+  getProgramDeliveryTagNames,
   getAllowedTagNames,
   getUploadConfig,
   isConfiguredUploader,
@@ -141,8 +141,8 @@ router.post(
 
     try {
       const uploader = typeof req.body.uploader === "string" ? req.body.uploader.trim() : "";
-      const site_id = parseInt(typeof req.body.site_id === "string" ? req.body.site_id.trim() : "", 10);
-      const location = await findConfiguredLocation(site_id);
+      const program_delivery_id = parseInt(typeof req.body.program_delivery_id === "string" ? req.body.program_delivery_id.trim() : "", 10);
+      const location = await findConfiguredProgramDelivery(program_delivery_id);
       const selectedTags = await getAllowedTagNames(parseTags(req.body.tags));
 
       if (!uploader || !await isConfiguredUploader(uploader)) {
@@ -175,7 +175,7 @@ router.post(
       }
 
       const album = await ensureAlbum(uploader);
-      const tagNames = [...selectedTags, ...getLocationTagNames(location)];
+      const tagNames = [...selectedTags, ...getProgramDeliveryTagNames(location)];
 
       const results = await processWithConcurrency(files, 2, async (file) => {
         const validationError = validateFile(file);
@@ -196,8 +196,8 @@ router.post(
           });
 
           await applyDefaultLocationIfMissing(uploaded.id, {
-            lat: location.venue?.lat,
-            lng: location.venue?.lng,
+            lat: location.place?.lat,
+            lng: location.place?.lng,
           });
           await tagAsset(uploaded.id, tagNames);
           await addAssetsToAlbum(album.id, [uploaded.id]);
@@ -220,7 +220,7 @@ router.post(
 
       res.json({
         uploader,
-        site_id,
+        program_delivery_id,
         tags: tagNames,
         results,
       });

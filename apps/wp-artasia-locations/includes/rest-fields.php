@@ -5,54 +5,54 @@ if (!defined('ABSPATH')) {
 }
 
 add_action('rest_api_init', function () {
-    register_rest_route('artasia/v1', '/locations', [
+    register_rest_route('artasia/v1', '/program-deliveries', [
         'methods'             => 'GET',
-        'callback'            => 'artasia_get_expanded_locations',
+        'callback'            => 'artasia_get_expanded_program_deliveries',
         'permission_callback' => '__return_true',
     ]);
 });
 
-function artasia_get_expanded_locations(): WP_REST_Response
+function artasia_get_expanded_program_deliveries(): WP_REST_Response
 {
-    $sites_query = new WP_Query([
-        'post_type'      => 'artasia_site',
+    $program_deliveries_query = new WP_Query([
+        'post_type'      => 'artasia_program_delivery',
         'posts_per_page' => -1,
         'post_status'    => 'publish',
         'orderby'        => 'date',
         'order'          => 'ASC',
     ]);
 
-    $venue_ids    = [];
+    $place_ids    = [];
     $partner_ids  = [];
     $lead_ids     = [];
-    $site_posts   = $sites_query->posts;
+    $program_delivery_posts = $program_deliveries_query->posts;
 
-    foreach ($site_posts as $site) {
-        $vid = intval(get_post_meta($site->ID, 'artasia_venue_id', true));
-        $partner_id = intval(get_post_meta($site->ID, 'artasia_partner_id', true));
-        $lead_id = intval(get_post_meta($site->ID, 'artasia_lead_id', true));
-        if ($vid) $venue_ids[$vid] = $vid;
+    foreach ($program_delivery_posts as $program_delivery) {
+        $vid = intval(get_post_meta($program_delivery->ID, 'artasia_place_id', true));
+        $partner_id = intval(get_post_meta($program_delivery->ID, 'artasia_partner_id', true));
+        $lead_id = intval(get_post_meta($program_delivery->ID, 'artasia_lead_id', true));
+        if ($vid) $place_ids[$vid] = $vid;
         if ($partner_id) $partner_ids[$partner_id] = $partner_id;
         if ($lead_id) $lead_ids[$lead_id] = $lead_id;
     }
 
-    $venue_lookup = [];
-    if (!empty($venue_ids)) {
-        $venue_query = new WP_Query([
-            'post_type'      => 'artasia_venue',
+    $place_lookup = [];
+    if (!empty($place_ids)) {
+        $place_query = new WP_Query([
+            'post_type'      => 'artasia_place',
             'posts_per_page' => -1,
-            'post__in'       => array_values($venue_ids),
+            'post__in'       => array_values($place_ids),
         ]);
-        foreach ($venue_query->posts as $venue) {
-            $venue_lookup[$venue->ID] = [
-                'id'               => $venue->ID,
-                'name'             => $venue->post_title,
-                'address'          => get_post_meta($venue->ID, 'artasia_address', true) ?: '',
-                'lat'              => floatval(get_post_meta($venue->ID, 'artasia_lat', true)),
-                'lng'              => floatval(get_post_meta($venue->ID, 'artasia_lng', true)),
-                'city'             => get_post_meta($venue->ID, 'artasia_city', true) ?: '',
-                'postal_code'      => get_post_meta($venue->ID, 'artasia_postal_code', true) ?: '',
-                'accessibility_notes' => get_post_meta($venue->ID, 'artasia_accessibility_notes', true) ?: '',
+        foreach ($place_query->posts as $place) {
+            $place_lookup[$place->ID] = [
+                'id'               => $place->ID,
+                'name'             => $place->post_title,
+                'address'          => get_post_meta($place->ID, 'artasia_address', true) ?: '',
+                'lat'              => floatval(get_post_meta($place->ID, 'artasia_lat', true)),
+                'lng'              => floatval(get_post_meta($place->ID, 'artasia_lng', true)),
+                'city'             => get_post_meta($place->ID, 'artasia_city', true) ?: '',
+                'postal_code'      => get_post_meta($place->ID, 'artasia_postal_code', true) ?: '',
+                'accessibility_notes' => get_post_meta($place->ID, 'artasia_accessibility_notes', true) ?: '',
             ];
         }
     }
@@ -96,21 +96,21 @@ function artasia_get_expanded_locations(): WP_REST_Response
 
     $results = [];
 
-    foreach ($site_posts as $site) {
-        $vid = intval(get_post_meta($site->ID, 'artasia_venue_id', true));
-        $partner_id = intval(get_post_meta($site->ID, 'artasia_partner_id', true));
-        $lead_id = intval(get_post_meta($site->ID, 'artasia_lead_id', true));
+    foreach ($program_delivery_posts as $program_delivery) {
+        $vid = intval(get_post_meta($program_delivery->ID, 'artasia_place_id', true));
+        $partner_id = intval(get_post_meta($program_delivery->ID, 'artasia_partner_id', true));
+        $lead_id = intval(get_post_meta($program_delivery->ID, 'artasia_lead_id', true));
 
         $results[] = [
-            'site_id'            => $site->ID,
-            'site_name'          => $site->post_title,
-            'program_year'       => intval(get_post_meta($site->ID, 'artasia_program_year', true)),
-            'program_context'    => get_post_meta($site->ID, 'artasia_program_context', true) ?: '',
-            'is_earlyon'         => (bool) get_post_meta($site->ID, 'artasia_is_earlyon', true),
-            'section'            => get_post_meta($site->ID, 'artasia_section', true) ?: '',
-            'participant_count'  => intval(get_post_meta($site->ID, 'artasia_participant_count', true)),
-            'participant_age'    => get_post_meta($site->ID, 'artasia_participant_age', true) ?: '',
-            'venue'              => $venue_lookup[$vid] ?? null,
+            'program_delivery_id' => $program_delivery->ID,
+            'program_delivery_name' => $program_delivery->post_title,
+            'program_year' => intval(get_post_meta($program_delivery->ID, 'artasia_program_year', true)),
+            'program_context' => get_post_meta($program_delivery->ID, 'artasia_program_context', true) ?: '',
+            'is_earlyon' => (bool) get_post_meta($program_delivery->ID, 'artasia_is_earlyon', true),
+            'section' => get_post_meta($program_delivery->ID, 'artasia_section', true) ?: '',
+            'participant_count' => intval(get_post_meta($program_delivery->ID, 'artasia_participant_count', true)),
+            'participant_age' => get_post_meta($program_delivery->ID, 'artasia_participant_age', true) ?: '',
+            'place'              => $place_lookup[$vid] ?? null,
             'partner'            => $partner_lookup[$partner_id] ?? null,
             'lead'               => $lead_lookup[$lead_id] ?? null,
         ];

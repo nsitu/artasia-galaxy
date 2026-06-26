@@ -1,4 +1,4 @@
-export interface WpVenue {
+export interface WpPlace {
   id: number;
   name: string;
   address: string;
@@ -27,16 +27,16 @@ export interface WpPerson {
   } | null;
 }
 
-export interface WpArtasiaLocation {
-  site_id: number;
-  site_name: string;
+export interface WpArtasiaProgramDelivery {
+  program_delivery_id: number;
+  program_delivery_name: string;
   program_year: number;
   program_context: string;
   is_earlyon: boolean;
   section?: string;
   participant_count?: number;
   participant_age?: string;
-  venue: WpVenue | null;
+  place: WpPlace | null;
   partner: WpPartner | null;
   lead: WpPerson | null;
 }
@@ -44,8 +44,8 @@ export interface WpArtasiaLocation {
 const WORDPRESS_URL = process.env.WORDPRESS_URL ?? "https://artsforall.co";
 const CACHE_TTL_MS = 60_000;
 
-let cache: { data: WpArtasiaLocation[]; timestamp: number } | null = null;
-let lastKnownGood: WpArtasiaLocation[] | null = null;
+let cache: { data: WpArtasiaProgramDelivery[]; timestamp: number } | null = null;
+let lastKnownGood: WpArtasiaProgramDelivery[] | null = null;
 
 export function getWordPressConfig() {
   return { url: WORDPRESS_URL };
@@ -76,19 +76,19 @@ async function wpRequest(path: string): Promise<Response> {
   return res;
 }
 
-export async function getArtasiaLocations(): Promise<WpArtasiaLocation[]> {
+export async function getArtasiaProgramDeliveries(): Promise<WpArtasiaProgramDelivery[]> {
   if (cache && Date.now() - cache.timestamp < CACHE_TTL_MS) {
     return cache.data;
   }
 
   try {
-    const res = await wpRequest("/wp-json/artasia/v1/locations");
-    const data = (await res.json()) as WpArtasiaLocation[];
+    const res = await wpRequest("/wp-json/artasia/v1/program-deliveries");
+    const data = (await res.json()) as WpArtasiaProgramDelivery[];
     cache = { data, timestamp: Date.now() };
     lastKnownGood = data;
     return data;
   } catch (err) {
-    console.warn(`[WordPress] failed to fetch locations: ${(err as Error).message}`);
+    console.warn(`[WordPress] failed to fetch program deliveries: ${(err as Error).message}`);
     if (lastKnownGood) {
       console.warn("[WordPress] serving last-known-good cache");
       return lastKnownGood;
