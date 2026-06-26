@@ -192,7 +192,9 @@ add_filter('submenu_file', 'artasia_admin_submenu_file');
 
 function artasia_use_block_editor_for_post_type(bool $use_block_editor, string $post_type): bool
 {
-    if ($post_type === 'artasia_placement') {
+    $artasia_post_types = ['artasia_project', 'artasia_partner', 'artasia_place', 'artasia_people', 'artasia_placement'];
+
+    if (in_array($post_type, $artasia_post_types, true)) {
         return false;
     }
 
