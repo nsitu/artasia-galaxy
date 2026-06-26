@@ -4,6 +4,66 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+function artasia_post_type_contexts(): array
+{
+    return [
+        'artasia_site' => [
+            'title' => 'About Artasia Sites',
+            'paragraphs' => [
+                "An Artasia Site represents one year's activation of a particular venue by a particular Artasia Partner.",
+                'Use this post to connect the venue, Artasia Partner, program context, section, and participant details for that activation.',
+            ],
+        ],
+        'artasia_venue' => [
+            'title' => 'About Artasia Venues',
+            'paragraphs' => [
+                'An Artasia Venue is a physical location such as a park, school, library, or community centre where Artasia activity can happen.',
+                'Use this record for stable location details such as address, city, coordinates, and access notes.',
+            ],
+        ],
+        'artasia_partner' => [
+            'title' => 'About Artasia Partners',
+            'paragraphs' => [
+                'An Artasia Partner is an organization, program, community group, or school board that helps host or support Artasia.',
+                'Use this record for partner identity, type, website, logo, and notes.',
+            ],
+        ],
+        'artasia_people' => [
+            'title' => 'About Artasia People',
+            'paragraphs' => [
+                'Artasia People are team members who can be assigned as the Artasia Lead for a site.',
+                "Use this record for the person's name, role, photo, and internal notes.",
+            ],
+        ],
+    ];
+}
+
+function artasia_get_post_type_context(string $post_type): ?array
+{
+    $contexts = artasia_post_type_contexts();
+
+    return $contexts[$post_type] ?? null;
+}
+
+function artasia_context_meta_box_html(array $paragraphs): void
+{
+?>
+    <img class="artasia-sites-list-logo" src="<?php echo esc_url(ARTASIA_LOCATIONS_URL . 'assets/artasia.svg'); ?>" alt="Artasia" />
+    <?php foreach ($paragraphs as $paragraph) : ?>
+        <p><?php echo esc_html($paragraph); ?></p>
+    <?php endforeach; ?>
+<?php
+}
+
+function artasia_context_list_header_html(array $paragraphs): void
+{
+?>
+    <div class="artasia-sites-list-context">
+        <?php artasia_context_meta_box_html($paragraphs); ?>
+    </div>
+<?php
+}
+
 // --- Site Details meta box ---
 
 function artasia_site_meta_box_html(WP_Post $post): void
@@ -141,6 +201,8 @@ function artasia_site_meta_box_html(WP_Post $post): void
 
 function artasia_register_site_meta_box(): void
 {
+    $context = artasia_get_post_type_context('artasia_site');
+
     add_meta_box(
         'artasia_site_details',
         'Site Details',
@@ -152,7 +214,7 @@ function artasia_register_site_meta_box(): void
 
     add_meta_box(
         'artasia_site_context',
-        'About Artasia Sites',
+        $context['title'],
         'artasia_site_context_meta_box_html',
         'artasia_site',
         'side',
@@ -163,21 +225,12 @@ add_action('add_meta_boxes', 'artasia_register_site_meta_box');
 
 function artasia_site_context_meta_box_html(): void
 {
-?>
-    <img class="artasia-sites-list-logo" src="<?php echo esc_url(ARTASIA_LOCATIONS_URL . 'assets/artasia.svg'); ?>" alt="Artasia" />
-    <p>An Artasia Site represents one year's activation of a particular venue by a particular Artasia Partner.</p>
-    <p>Use this post to connect the venue, Artasia Partner, program context, section, and participant details for that activation.</p>
-<?php
-}
+    $context = artasia_get_post_type_context('artasia_site');
+    if (!$context) {
+        return;
+    }
 
-function artasia_context_meta_box_html(array $paragraphs): void
-{
-?>
-    <img class="artasia-sites-list-logo" src="<?php echo esc_url(ARTASIA_LOCATIONS_URL . 'assets/artasia.svg'); ?>" alt="Artasia" />
-    <?php foreach ($paragraphs as $paragraph) : ?>
-        <p><?php echo esc_html($paragraph); ?></p>
-    <?php endforeach; ?>
-<?php
+    artasia_context_meta_box_html($context['paragraphs']);
 }
 
 function artasia_save_site_meta(int $post_id): void
@@ -204,23 +257,22 @@ function artasia_save_site_meta(int $post_id): void
 }
 add_action('save_post_artasia_site', 'artasia_save_site_meta');
 
-function artasia_site_admin_description(): void
+function artasia_post_type_admin_description(): void
 {
     $screen = get_current_screen();
 
-    if (!$screen || $screen->id !== 'edit-artasia_site') {
+    if (!$screen || strpos((string) $screen->id, 'edit-') !== 0) {
         return;
     }
 
-?>
-    <div class="artasia-sites-list-context">
-        <img class="artasia-sites-list-logo" src="<?php echo esc_url(ARTASIA_LOCATIONS_URL . 'assets/artasia.svg'); ?>" alt="Artasia" />
-        <p>An Artasia Site represents one year's activation of a particular venue by a particular Artasia Partner.</p>
-        <p>Use these records to connect venues, Artasia Partners, program context, section, and participant details for each activation.</p>
-    </div>
-<?php
+    $context = artasia_get_post_type_context($screen->post_type);
+    if (!$context) {
+        return;
+    }
+
+    artasia_context_list_header_html($context['paragraphs']);
 }
-add_action('all_admin_notices', 'artasia_site_admin_description');
+add_action('all_admin_notices', 'artasia_post_type_admin_description');
 
 // --- Venue Details meta box ---
 
@@ -266,6 +318,8 @@ function artasia_venue_meta_box_html(WP_Post $post): void
 
 function artasia_register_venue_meta_box(): void
 {
+    $context = artasia_get_post_type_context('artasia_venue');
+
     add_meta_box(
         'artasia_venue_details',
         ' venue Details',
@@ -277,7 +331,7 @@ function artasia_register_venue_meta_box(): void
 
     add_meta_box(
         'artasia_venue_context',
-        'About Artasia Venues',
+        $context['title'],
         'artasia_venue_context_meta_box_html',
         'artasia_venue',
         'side',
@@ -288,10 +342,12 @@ add_action('add_meta_boxes', 'artasia_register_venue_meta_box');
 
 function artasia_venue_context_meta_box_html(): void
 {
-    artasia_context_meta_box_html([
-        'An Artasia Venue is a physical location such as a park, school, library, or community centre where Artasia activity can happen.',
-        'Use this record for stable location details such as address, city, coordinates, and access notes.',
-    ]);
+    $context = artasia_get_post_type_context('artasia_venue');
+    if (!$context) {
+        return;
+    }
+
+    artasia_context_meta_box_html($context['paragraphs']);
 }
 
 function artasia_save_venue_meta(int $post_id): void
@@ -370,6 +426,8 @@ function artasia_partner_meta_box_html(WP_Post $post): void
 
 function artasia_register_partner_meta_box(): void
 {
+    $context = artasia_get_post_type_context('artasia_partner');
+
     add_meta_box(
         'artasia_partner_details',
         'Artasia Partner Details',
@@ -381,7 +439,7 @@ function artasia_register_partner_meta_box(): void
 
     add_meta_box(
         'artasia_partner_context',
-        'About Artasia Partners',
+        $context['title'],
         'artasia_partner_context_meta_box_html',
         'artasia_partner',
         'side',
@@ -392,10 +450,12 @@ add_action('add_meta_boxes', 'artasia_register_partner_meta_box');
 
 function artasia_partner_context_meta_box_html(): void
 {
-    artasia_context_meta_box_html([
-        'An Artasia Partner is an organization, program, community group, or school board that helps host or support Artasia.',
-        'Use this record for partner identity, type, website, logo, and notes.',
-    ]);
+    $context = artasia_get_post_type_context('artasia_partner');
+    if (!$context) {
+        return;
+    }
+
+    artasia_context_meta_box_html($context['paragraphs']);
 }
 
 function artasia_save_partner_meta(int $post_id): void
@@ -471,6 +531,8 @@ function artasia_people_meta_box_html(WP_Post $post): void
 
 function artasia_register_people_meta_box(): void
 {
+    $context = artasia_get_post_type_context('artasia_people');
+
     add_meta_box(
         'artasia_people_details',
         'Artasia People Details',
@@ -482,7 +544,7 @@ function artasia_register_people_meta_box(): void
 
     add_meta_box(
         'artasia_people_context',
-        'About Artasia People',
+        $context['title'],
         'artasia_people_context_meta_box_html',
         'artasia_people',
         'side',
@@ -493,10 +555,12 @@ add_action('add_meta_boxes', 'artasia_register_people_meta_box');
 
 function artasia_people_context_meta_box_html(): void
 {
-    artasia_context_meta_box_html([
-        'Artasia People are team members who can be assigned as the Artasia Lead for a site.',
-        "Use this record for the person's name, role, photo, and internal notes.",
-    ]);
+    $context = artasia_get_post_type_context('artasia_people');
+    if (!$context) {
+        return;
+    }
+
+    artasia_context_meta_box_html($context['paragraphs']);
 }
 
 function artasia_save_people_meta(int $post_id): void
