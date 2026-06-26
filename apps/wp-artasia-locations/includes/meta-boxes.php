@@ -561,11 +561,12 @@ add_action('save_post_artasia_place', 'artasia_save_place_meta');
 
 function artasia_partner_meta_box_html(WP_Post $post): void
 {
-    $type    = get_post_meta($post->ID, 'artasia_partner_type', true);
-    $website = get_post_meta($post->ID, 'artasia_website', true);
-    $logo_id = intval(get_post_meta($post->ID, 'artasia_logo_id', true));
-    $logo_url = $logo_id ? wp_get_attachment_url($logo_id) : '';
-    $notes   = get_post_meta($post->ID, 'artasia_notes', true);
+    $type      = get_post_meta($post->ID, 'artasia_partner_type', true);
+    $acronym   = get_post_meta($post->ID, 'artasia_partner_acronym', true);
+    $website   = get_post_meta($post->ID, 'artasia_website', true);
+    $logo_id   = intval(get_post_meta($post->ID, 'artasia_logo_id', true));
+    $logo_url  = $logo_id ? wp_get_attachment_url($logo_id) : '';
+    $notes     = get_post_meta($post->ID, 'artasia_notes', true);
 
     $type_options = ['Partner Organization', 'Program', 'Community Group', 'School Board', 'Other'];
 
@@ -584,6 +585,10 @@ function artasia_partner_meta_box_html(WP_Post $post): void
                     <?php endforeach; ?>
                 </select>
             </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_partner_acronym">Acronym</label></th>
+            <td><input type="text" id="artasia_partner_acronym" name="artasia_partner_acronym" value="<?php echo esc_attr($acronym); ?>" class="widefat" /></td>
         </tr>
         <tr>
             <th><label for="artasia_website">Website</label></th>
@@ -658,6 +663,7 @@ function artasia_save_partner_meta(int $post_id): void
     }
 
     update_post_meta($post_id, 'artasia_partner_type', sanitize_text_field($_POST['artasia_partner_type'] ?? ''));
+    update_post_meta($post_id, 'artasia_partner_acronym', sanitize_text_field($_POST['artasia_partner_acronym'] ?? ''));
     update_post_meta($post_id, 'artasia_website', esc_url_raw($_POST['artasia_website'] ?? ''));
     update_post_meta($post_id, 'artasia_logo_id', artasia_validate_partner_logo_id(intval($_POST['artasia_logo_id'] ?? 0)));
     update_post_meta($post_id, 'artasia_notes', sanitize_textarea_field($_POST['artasia_notes'] ?? ''));
