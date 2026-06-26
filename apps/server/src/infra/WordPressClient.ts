@@ -27,10 +27,17 @@ export interface WpPerson {
   } | null;
 }
 
+export interface WpProject {
+  id: number;
+  name: string;
+  year: number;
+  description: string;
+}
+
 export interface WpArtasiaProgramDelivery {
   program_delivery_id: number;
   program_delivery_name: string;
-  program_year: number;
+  project: WpProject | null;
   program_context: string;
   is_earlyon: boolean;
   section?: string;

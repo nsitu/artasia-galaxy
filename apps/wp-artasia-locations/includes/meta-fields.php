@@ -50,7 +50,30 @@ function artasia_register_meta_fields(): void
         'sanitize_callback' => 'sanitize_textarea_field',
     ]);
 
+    // --- Project meta ---
+    register_post_meta('artasia_project', 'artasia_project_year', [
+        'type'         => 'integer',
+        'single'       => true,
+        'default'      => intval(date('Y')),
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_integer_meta',
+    ]);
+    register_post_meta('artasia_project', 'artasia_project_description', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'sanitize_textarea_field',
+    ]);
+
     // --- Program Delivery meta ---
+    register_post_meta('artasia_program_delivery', 'artasia_project_id', [
+        'type'         => 'integer',
+        'single'       => true,
+        'default'      => 0,
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_integer_meta',
+    ]);
     register_post_meta('artasia_program_delivery', 'artasia_place_id', [
         'type'         => 'integer',
         'single'       => true,
@@ -69,13 +92,6 @@ function artasia_register_meta_fields(): void
         'type'         => 'integer',
         'single'       => true,
         'default'      => 0,
-        'show_in_rest' => true,
-        'sanitize_callback' => 'artasia_sanitize_integer_meta',
-    ]);
-    register_post_meta('artasia_program_delivery', 'artasia_program_year', [
-        'type'         => 'integer',
-        'single'       => true,
-        'default'      => intval(date('Y')),
         'show_in_rest' => true,
         'sanitize_callback' => 'artasia_sanitize_integer_meta',
     ]);

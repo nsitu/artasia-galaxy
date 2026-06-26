@@ -27,13 +27,33 @@ function artasia_get_expanded_program_deliveries(): WP_REST_Response
     $lead_ids     = [];
     $program_delivery_posts = $program_deliveries_query->posts;
 
+    $project_ids  = [];
     foreach ($program_delivery_posts as $program_delivery) {
+        $project_id = intval(get_post_meta($program_delivery->ID, 'artasia_project_id', true));
         $vid = intval(get_post_meta($program_delivery->ID, 'artasia_place_id', true));
         $partner_id = intval(get_post_meta($program_delivery->ID, 'artasia_partner_id', true));
         $lead_id = intval(get_post_meta($program_delivery->ID, 'artasia_lead_id', true));
+        if ($project_id) $project_ids[$project_id] = $project_id;
         if ($vid) $place_ids[$vid] = $vid;
         if ($partner_id) $partner_ids[$partner_id] = $partner_id;
         if ($lead_id) $lead_ids[$lead_id] = $lead_id;
+    }
+
+    $project_lookup = [];
+    if (!empty($project_ids)) {
+        $project_query = new WP_Query([
+            'post_type'      => 'artasia_project',
+            'posts_per_page' => -1,
+            'post__in'       => array_values($project_ids),
+        ]);
+        foreach ($project_query->posts as $project) {
+            $project_lookup[$project->ID] = [
+                'id'          => $project->ID,
+                'name'        => $project->post_title,
+                'year'        => intval(get_post_meta($project->ID, 'artasia_project_year', true)),
+                'description' => get_post_meta($project->ID, 'artasia_project_description', true) ?: '',
+            ];
+        }
     }
 
     $place_lookup = [];
@@ -97,6 +117,7 @@ function artasia_get_expanded_program_deliveries(): WP_REST_Response
     $results = [];
 
     foreach ($program_delivery_posts as $program_delivery) {
+        $project_id = intval(get_post_meta($program_delivery->ID, 'artasia_project_id', true));
         $vid = intval(get_post_meta($program_delivery->ID, 'artasia_place_id', true));
         $partner_id = intval(get_post_meta($program_delivery->ID, 'artasia_partner_id', true));
         $lead_id = intval(get_post_meta($program_delivery->ID, 'artasia_lead_id', true));
@@ -104,7 +125,7 @@ function artasia_get_expanded_program_deliveries(): WP_REST_Response
         $results[] = [
             'program_delivery_id' => $program_delivery->ID,
             'program_delivery_name' => $program_delivery->post_title,
-            'program_year' => intval(get_post_meta($program_delivery->ID, 'artasia_program_year', true)),
+            'project' => $project_lookup[$project_id] ?? null,
             'program_context' => get_post_meta($program_delivery->ID, 'artasia_program_context', true) ?: '',
             'is_earlyon' => (bool) get_post_meta($program_delivery->ID, 'artasia_is_earlyon', true),
             'section' => get_post_meta($program_delivery->ID, 'artasia_section', true) ?: '',

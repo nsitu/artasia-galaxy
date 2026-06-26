@@ -37,8 +37,8 @@ function artasia_render_import_page(): void
             </div>
         <?php endif; ?>
 
-        <p>Upload a CSV file to create Artasia Places, Artasia Partners, Artasia People, and Artasia Program Deliveries in one pass.</p>
-        <p>The importer finds existing Places, Partners, and People by title. If none exists, it creates them. Program Deliveries are matched by program delivery name, Artasia Year, Place, Partner, and Section.</p>
+        <p>Upload a CSV file to create Artasia Projects, Places, Partners, People, and Program Deliveries in one pass.</p>
+        <p>The importer finds existing Projects, Places, Partners, and People by title. If none exists, it creates them. Program Deliveries are matched by program delivery name, Project, Place, Partner, and Section.</p>
 
         <h2>CSV Template</h2>
         <p>
@@ -46,8 +46,8 @@ function artasia_render_import_page(): void
         </p>
 
         <h2>Headers</h2>
-        <p>Required headers: <code>program_delivery_name</code>, <code>place_name</code>, <code>partner_name</code>.</p>
-        <p>Optional headers: <code>artasia_year</code>, <code>program_context</code>, <code>earlyon</code>, <code>section</code>, <code>participants</code>, <code>age_range</code>, <code>place_street_address</code>, <code>place_city</code>, <code>place_postal_code</code>, <code>place_latitude</code>, <code>place_longitude</code>, <code>place_notes</code>, <code>partner_type</code>, <code>partner_website</code>, <code>partner_notes</code>, <code>lead_name</code>, <code>lead_role</code>, <code>lead_notes</code>.</p>
+        <p>Required headers: <code>program_delivery_name</code>, <code>project_name</code>, <code>place_name</code>, <code>partner_name</code>.</p>
+        <p>Optional headers: <code>project_year</code>, <code>project_description</code>, <code>program_context</code>, <code>earlyon</code>, <code>section</code>, <code>participants</code>, <code>age_range</code>, <code>place_street_address</code>, <code>place_city</code>, <code>place_postal_code</code>, <code>place_latitude</code>, <code>place_longitude</code>, <code>place_notes</code>, <code>partner_type</code>, <code>partner_website</code>, <code>partner_notes</code>, <code>lead_name</code>, <code>lead_role</code>, <code>lead_notes</code>.</p>
         <p>For <code>earlyon</code>, use values like <code>yes</code>, <code>no</code>, <code>true</code>, <code>false</code>, <code>1</code>, or <code>0</code>.</p>
 
         <h2>Upload CSV</h2>
@@ -75,7 +75,9 @@ function artasia_download_import_template(): void
     $headers = artasia_import_csv_headers();
     $example = [
         'program_delivery_name' => 'Artasia at Central Library',
-        'artasia_year' => date('Y'),
+        'project_name' => 'Artasia ' . date('Y'),
+        'project_year' => date('Y'),
+        'project_description' => 'Annual Artasia project flow',
         'place_name' => 'Central Library',
         'place_street_address' => '55 York Blvd',
         'place_city' => 'Hamilton',
@@ -182,13 +184,20 @@ function artasia_import_program_deliveries_csv(string $path): array
 function artasia_import_location_record(array $record): string
 {
     $program_delivery_name = artasia_import_value($record, 'program_delivery_name');
+    $project_name = artasia_import_value($record, 'project_name');
     $place_name = artasia_import_value($record, 'place_name');
     $partner_name = artasia_import_value($record, 'partner_name');
 
-    if (!$program_delivery_name || !$place_name || !$partner_name) {
+    if (!$program_delivery_name || !$project_name || !$place_name || !$partner_name) {
         return 'skipped';
     }
 
+    $project_year = intval(artasia_import_value($record, 'project_year'));
+    if (!$project_year) {
+        $project_year = intval(date('Y'));
+    }
+
+    $project_id = artasia_import_find_or_create_project($project_name, $project_year);
     $place_id = artasia_import_find_or_create_post('artasia_place', $place_name);
     $partner_id = artasia_import_find_or_create_post('artasia_partner', $partner_name);
     $lead_id = 0;
@@ -197,9 +206,12 @@ function artasia_import_location_record(array $record): string
         $lead_id = artasia_import_find_or_create_post('artasia_people', $lead_name);
     }
 
-    if (!$place_id || !$partner_id || ($lead_name && !$lead_id)) {
+    if (!$project_id || !$place_id || !$partner_id || ($lead_name && !$lead_id)) {
         return 'error';
     }
+
+    update_post_meta($project_id, 'artasia_project_year', $project_year);
+    artasia_import_update_meta_if_present($project_id, 'artasia_project_description', $record, 'project_description', 'sanitize_textarea_field');
 
     artasia_import_update_meta_if_present($place_id, 'artasia_address', $record, 'place_street_address', 'sanitize_text_field');
     artasia_import_update_meta_if_present($place_id, 'artasia_city', $record, 'place_city', 'sanitize_text_field');
@@ -217,13 +229,9 @@ function artasia_import_location_record(array $record): string
         artasia_import_update_meta_if_present($lead_id, 'artasia_notes', $record, 'lead_notes', 'sanitize_textarea_field');
     }
 
-    $year = intval(artasia_import_value($record, 'artasia_year'));
-    if (!$year) {
-        $year = intval(date('Y'));
-    }
     $section = artasia_import_value($record, 'section');
 
-    $program_delivery_id = artasia_import_find_program_delivery($program_delivery_name, $year, $place_id, $partner_id, $section);
+    $program_delivery_id = artasia_import_find_program_delivery($program_delivery_name, $project_id, $place_id, $partner_id, $section);
     if (!$program_delivery_id) {
         $program_delivery_id = wp_insert_post([
             'post_title' => $program_delivery_name,
@@ -236,7 +244,7 @@ function artasia_import_location_record(array $record): string
         return 'error';
     }
 
-    update_post_meta($program_delivery_id, 'artasia_program_year', $year);
+    update_post_meta($program_delivery_id, 'artasia_project_id', $project_id);
     update_post_meta($program_delivery_id, 'artasia_place_id', $place_id);
     update_post_meta($program_delivery_id, 'artasia_partner_id', $partner_id);
     if ($lead_id) {
@@ -255,7 +263,9 @@ function artasia_import_csv_headers(): array
 {
     return [
         'program_delivery_name',
-        'artasia_year',
+        'project_name',
+        'project_year',
+        'project_description',
         'place_name',
         'place_street_address',
         'place_city',
@@ -276,6 +286,37 @@ function artasia_import_csv_headers(): array
         'participants',
         'age_range',
     ];
+}
+
+function artasia_import_find_or_create_project(string $title, int $year): int
+{
+    $matches = get_posts([
+        'post_type' => 'artasia_project',
+        'title' => $title,
+        'post_status' => ['publish', 'draft', 'pending', 'private'],
+        'numberposts' => 1,
+        'fields' => 'ids',
+        'meta_query' => [
+            [
+                'key' => 'artasia_project_year',
+                'value' => $year,
+                'compare' => '=',
+                'type' => 'NUMERIC',
+            ],
+        ],
+    ]);
+
+    if (!empty($matches)) {
+        return intval($matches[0]);
+    }
+
+    $post_id = wp_insert_post([
+        'post_title' => $title,
+        'post_type' => 'artasia_project',
+        'post_status' => 'publish',
+    ], true);
+
+    return is_wp_error($post_id) ? 0 : intval($post_id);
 }
 
 function artasia_import_find_or_create_post(string $post_type, string $title): int
@@ -301,7 +342,7 @@ function artasia_import_find_or_create_post(string $post_type, string $title): i
     return is_wp_error($post_id) ? 0 : intval($post_id);
 }
 
-function artasia_import_find_program_delivery(string $title, int $year, int $place_id, int $partner_id, string $section): int
+function artasia_import_find_program_delivery(string $title, int $project_id, int $place_id, int $partner_id, string $section): int
 {
     $matches = get_posts([
         'post_type' => 'artasia_program_delivery',
@@ -312,8 +353,8 @@ function artasia_import_find_program_delivery(string $title, int $year, int $pla
         'meta_query' => [
             'relation' => 'AND',
             [
-                'key' => 'artasia_program_year',
-                'value' => $year,
+                'key' => 'artasia_project_id',
+                'value' => $project_id,
                 'compare' => '=',
                 'type' => 'NUMERIC',
             ],

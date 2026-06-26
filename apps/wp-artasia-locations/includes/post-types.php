@@ -46,6 +46,26 @@ function artasia_register_post_types(): void
         'supports'     => ['title'],
     ]);
 
+    register_post_type('artasia_project', [
+        'labels' => [
+            'name'          => 'Artasia Projects',
+            'singular_name' => 'Artasia Project',
+            'add_new_item'  => 'Add New Artasia Project',
+            'edit_item'     => 'Edit Artasia Project',
+            'new_item'      => 'New Artasia Project',
+            'view_item'     => 'View Artasia Project',
+            'search_items'  => 'Search Artasia Projects',
+            'not_found'     => 'No Artasia projects found',
+        ],
+        'public'       => true,
+        'has_archive'  => false,
+        'show_in_menu' => false,
+        'show_in_rest' => true,
+        'rest_base'    => 'artasia_project',
+        'menu_icon'    => 'dashicons-calendar-alt',
+        'supports'     => ['title'],
+    ]);
+
     register_post_type('artasia_partner', [
         'labels' => [
             'name'          => 'Artasia Partners',
@@ -119,6 +139,14 @@ function artasia_register_admin_menu(): void
 
     add_submenu_page(
         'edit.php?post_type=artasia_program_delivery',
+        'Artasia Projects',
+        'Projects',
+        'edit_posts',
+        'edit.php?post_type=artasia_project'
+    );
+
+    add_submenu_page(
+        'edit.php?post_type=artasia_program_delivery',
         'Artasia Partners',
         'Partners',
         'edit_posts',
@@ -138,7 +166,7 @@ add_action('admin_menu', 'artasia_register_admin_menu');
 function artasia_admin_parent_file($parent_file)
 {
     $screen = get_current_screen();
-    if (!$screen || !in_array($screen->post_type, ['artasia_program_delivery', 'artasia_place', 'artasia_partner', 'artasia_people'], true)) {
+    if (!$screen || !in_array($screen->post_type, ['artasia_program_delivery', 'artasia_place', 'artasia_project', 'artasia_partner', 'artasia_people'], true)) {
         return $parent_file;
     }
 
@@ -149,7 +177,7 @@ add_filter('parent_file', 'artasia_admin_parent_file');
 function artasia_admin_submenu_file($submenu_file)
 {
     $screen = get_current_screen();
-    if (!$screen || !in_array($screen->post_type, ['artasia_program_delivery', 'artasia_place', 'artasia_partner', 'artasia_people'], true)) {
+    if (!$screen || !in_array($screen->post_type, ['artasia_program_delivery', 'artasia_place', 'artasia_project', 'artasia_partner', 'artasia_people'], true)) {
         return $submenu_file;
     }
 

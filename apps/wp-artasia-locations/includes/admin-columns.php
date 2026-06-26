@@ -12,10 +12,10 @@ function artasia_program_delivery_columns(array $columns): array
     foreach ($columns as $key => $label) {
         $new[$key] = $label;
         if ($key === 'title') {
+            $new['artasia_project']  = 'Project';
             $new['artasia_place']    = 'Place';
             $new['artasia_partner']  = 'Artasia Partner';
             $new['artasia_lead']     = 'Artasia Lead';
-            $new['artasia_year']     = 'Year';
             $new['artasia_program_context'] = 'Program / Context';
             $new['artasia_is_earlyon'] = 'EarlyON';
             $new['artasia_section']  = 'Section';
@@ -29,6 +29,10 @@ add_filter('manage_artasia_program_delivery_posts_columns', 'artasia_program_del
 function artasia_program_delivery_column(string $column, int $post_id): void
 {
     switch ($column) {
+        case 'artasia_project':
+            $project_id = intval(get_post_meta($post_id, 'artasia_project_id', true));
+            echo $project_id ? esc_html(artasia_project_admin_label($project_id)) : '—';
+            break;
         case 'artasia_place':
             $vid = intval(get_post_meta($post_id, 'artasia_place_id', true));
             echo $vid ? esc_html(get_the_title($vid)) : '—';
@@ -40,9 +44,6 @@ function artasia_program_delivery_column(string $column, int $post_id): void
         case 'artasia_lead':
             $lead_id = intval(get_post_meta($post_id, 'artasia_lead_id', true));
             echo $lead_id ? esc_html(get_the_title($lead_id)) : '—';
-            break;
-        case 'artasia_year':
-            echo esc_html(get_post_meta($post_id, 'artasia_program_year', true) ?: '—');
             break;
         case 'artasia_program_context':
             echo esc_html(get_post_meta($post_id, 'artasia_program_context', true) ?: '—');
@@ -59,6 +60,50 @@ function artasia_program_delivery_column(string $column, int $post_id): void
     }
 }
 add_action('manage_artasia_program_delivery_posts_custom_column', 'artasia_program_delivery_column', 10, 2);
+
+// --- Project columns ---
+
+function artasia_project_columns(array $columns): array
+{
+    $new = [];
+    foreach ($columns as $key => $label) {
+        $new[$key] = $label;
+        if ($key === 'title') {
+            $new['artasia_project_year'] = 'Year';
+            $new['artasia_project_deliveries'] = 'Program Deliveries';
+        }
+    }
+    return $new;
+}
+add_filter('manage_artasia_project_posts_columns', 'artasia_project_columns');
+
+function artasia_project_column(string $column, int $post_id): void
+{
+    switch ($column) {
+        case 'artasia_project_year':
+            echo esc_html(get_post_meta($post_id, 'artasia_project_year', true) ?: '—');
+            break;
+        case 'artasia_project_deliveries':
+            $program_deliveries = get_posts([
+                'post_type'   => 'artasia_program_delivery',
+                'numberposts' => -1,
+                'meta_key'    => 'artasia_project_id',
+                'meta_value'  => $post_id,
+                'fields'      => 'ids',
+            ]);
+            echo esc_html((string) count($program_deliveries));
+            break;
+    }
+}
+add_action('manage_artasia_project_posts_custom_column', 'artasia_project_column', 10, 2);
+
+function artasia_project_admin_label(int $project_id): string
+{
+    $title = get_the_title($project_id);
+    $year = get_post_meta($project_id, 'artasia_project_year', true);
+
+    return trim($year . ' - ' . $title, ' -');
+}
 
 // --- Place columns ---
 
