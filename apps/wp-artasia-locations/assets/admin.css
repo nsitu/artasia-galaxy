@@ -18,13 +18,11 @@
 
 .artasia-admin-logo-wrapper {
   display: inline-flex;
-  width: 200px;
-  height: 150px;
+  max-width: 200px;
+  max-height: 150px;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: #fff;
-  border: 1px solid #c3c4c7;
 }
 
 .artasia-admin-logo {
