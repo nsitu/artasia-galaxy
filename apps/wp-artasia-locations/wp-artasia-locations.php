@@ -28,7 +28,7 @@ function artasia_admin_enqueue_assets(string $hook_suffix): void
     }
 
     $screen = get_current_screen();
-    if (!$screen || !in_array($screen->post_type, ['artasia_place', 'artasia_project', 'artasia_partner', 'artasia_placement', 'artasia_people'], true)) {
+    if (!$screen || !in_array($screen->post_type, ['artasia_project', 'artasia_place', 'artasia_partner', 'artasia_people', 'artasia_placement'], true)) {
         return;
     }
 

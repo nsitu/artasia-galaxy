@@ -7,12 +7,12 @@ if (!defined('ABSPATH')) {
 function artasia_post_type_contexts(): array
 {
     return [
-        'artasia_placement' => [
-            'title' => 'About Artasia Placements',
-            'nav_label' => 'Placements',
+        'artasia_project' => [
+            'title' => 'About Artasia Projects',
+            'nav_label' => 'Projects',
             'paragraphs' => [
-                'Each Placement assigns an Artasia Lead to a place within a project and partner context.',
-                'Use this record to connect the project, place, Artasia Partner, program context, section, and participant details.',
+                'An Artasia Project captures the high-level annual flow for a year of Artasia activity.',
+                'Use this record for the project year, project name, and a short description that frames related placements.',
             ],
         ],
         'artasia_place' => [
@@ -21,14 +21,6 @@ function artasia_post_type_contexts(): array
             'paragraphs' => [
                 'An Artasia Place is a physical location such as a park, school, library, or community centre where Artasia activity can happen.',
                 'Use this record for stable location details such as address, city, coordinates, and access notes.',
-            ],
-        ],
-        'artasia_project' => [
-            'title' => 'About Artasia Projects',
-            'nav_label' => 'Projects',
-            'paragraphs' => [
-                'An Artasia Project captures the high-level annual flow for a year of Artasia activity.',
-                'Use this record for the project year, project name, and a short description that frames related placements.',
             ],
         ],
         'artasia_partner' => [
@@ -45,6 +37,14 @@ function artasia_post_type_contexts(): array
             'paragraphs' => [
                 'Artasia People are team members who can be assigned as the Artasia Lead for a placement.',
                 "Use this record for the person's name, role, photo, and internal notes.",
+            ],
+        ],
+        'artasia_placement' => [
+            'title' => 'About Artasia Placements',
+            'nav_label' => 'Placements',
+            'paragraphs' => [
+                'Each Placement assigns an Artasia Lead to a place within a project and partner context.',
+                'Use this record to connect the project, place, Artasia Partner, program context, section, and participant details.',
             ],
         ],
     ];
@@ -727,7 +727,7 @@ function artasia_validate_image_attachment_id(int $attachment_id): int
 
 function artasia_remove_unnecessary_meta_boxes(): void
 {
-    $post_types = ['artasia_place', 'artasia_project', 'artasia_placement', 'artasia_partner', 'artasia_people'];
+    $post_types = ['artasia_project', 'artasia_place', 'artasia_partner', 'artasia_people', 'artasia_placement'];
     $meta_box_contexts = ['side', 'normal', 'advanced'];
 
     foreach ($post_types as $post_type) {
