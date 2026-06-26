@@ -1,9 +1,11 @@
-.artasia-logo-preview {
+.artasia-logo-preview,
+.artasia-image-preview {
   margin: 0 0 10px;
   min-height: 0;
 }
 
-.artasia-logo-preview img {
+.artasia-logo-preview img,
+.artasia-image-preview img {
   display: block;
   max-width: 220px;
   max-height: 120px;

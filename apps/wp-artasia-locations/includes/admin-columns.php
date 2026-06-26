@@ -127,6 +127,8 @@ function artasia_people_columns(array $columns): array
     foreach ($columns as $key => $label) {
         $new[$key] = $label;
         if ($key === 'title') {
+            $new['artasia_role'] = 'Role';
+            $new['artasia_photo'] = 'Photo';
             $new['artasia_assigned_sites'] = 'Assigned Sites';
         }
     }
@@ -136,18 +138,25 @@ add_filter('manage_artasia_people_posts_columns', 'artasia_people_columns');
 
 function artasia_people_column(string $column, int $post_id): void
 {
-    if ($column !== 'artasia_assigned_sites') {
-        return;
+    switch ($column) {
+        case 'artasia_role':
+            echo esc_html(get_post_meta($post_id, 'artasia_role', true) ?: 'Artist Educator');
+            break;
+        case 'artasia_photo':
+            $photo_id = intval(get_post_meta($post_id, 'artasia_photo_id', true));
+            echo $photo_id ? wp_get_attachment_image($photo_id, 'thumbnail', false, ['style' => 'max-width:48px;height:auto;']) : '—';
+            break;
+        case 'artasia_assigned_sites':
+            $sites = get_posts([
+                'post_type'   => 'artasia_site',
+                'numberposts' => -1,
+                'meta_key'    => 'artasia_lead_id',
+                'meta_value'  => $post_id,
+                'fields'      => 'ids',
+            ]);
+
+            echo esc_html((string) count($sites));
+            break;
     }
-
-    $sites = get_posts([
-        'post_type'   => 'artasia_site',
-        'numberposts' => -1,
-        'meta_key'    => 'artasia_lead_id',
-        'meta_value'  => $post_id,
-        'fields'      => 'ids',
-    ]);
-
-    echo esc_html((string) count($sites));
 }
 add_action('manage_artasia_people_posts_custom_column', 'artasia_people_column', 10, 2);

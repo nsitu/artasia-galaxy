@@ -144,6 +144,29 @@ function artasia_register_meta_fields(): void
         'show_in_rest' => true,
         'sanitize_callback' => 'sanitize_textarea_field',
     ]);
+
+    // --- Artasia People meta ---
+    register_post_meta('artasia_people', 'artasia_role', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => 'Artist Educator',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'sanitize_text_field',
+    ]);
+    register_post_meta('artasia_people', 'artasia_photo_id', [
+        'type'         => 'integer',
+        'single'       => true,
+        'default'      => 0,
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_integer_meta',
+    ]);
+    register_post_meta('artasia_people', 'artasia_notes', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'sanitize_textarea_field',
+    ]);
 }
 
 function artasia_sanitize_integer_meta($value, string $meta_key = '', string $object_type = '', string $object_subtype = ''): int

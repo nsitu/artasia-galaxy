@@ -1,62 +1,89 @@
 jQuery(function ($) {
-  var $logoId = $('#artasia_partner_logo_id');
-
-  if (!$logoId.length || !window.wp || !wp.media) {
+  if (!window.wp || !wp.media) {
     return;
   }
 
-  var allowedMimeTypes = ['image/png', 'image/svg+xml'];
-  var frame;
-  var $preview = $('#artasia_partner_logo_preview');
-  var $removeButton = $('#artasia_partner_logo_remove');
+  function setupImagePicker(options) {
+    var $attachmentId = $(options.inputSelector);
 
-  function setLogo(attachment) {
-    $logoId.val(attachment.id);
-    $preview.html($('<img>', {
-      src: attachment.url,
-      alt: ''
-    }));
-    $removeButton.prop('disabled', false);
-  }
-
-  $('#artasia_partner_logo_select').on('click', function (event) {
-    event.preventDefault();
-
-    if (frame) {
-      frame.open();
+    if (!$attachmentId.length) {
       return;
     }
 
-    frame = wp.media({
-      title: 'Select Artasia Partner Logo',
-      button: {
-        text: 'Use this logo'
-      },
-      library: {
-        type: 'image'
-      },
-      multiple: false
-    });
+    var frame;
+    var $preview = $(options.previewSelector);
+    var $removeButton = $(options.removeSelector);
 
-    frame.on('select', function () {
-      var attachment = frame.state().get('selection').first().toJSON();
+    function setImage(attachment) {
+      $attachmentId.val(attachment.id);
+      $preview.html($('<img>', {
+        src: attachment.url,
+        alt: ''
+      }));
+      $removeButton.prop('disabled', false);
+    }
 
-      if (allowedMimeTypes.indexOf(attachment.mime) === -1) {
-        window.alert('Please choose a PNG or SVG logo.');
+    $(options.selectSelector).on('click', function (event) {
+      event.preventDefault();
+
+      if (frame) {
+        frame.open();
         return;
       }
 
-      setLogo(attachment);
+      frame = wp.media({
+        title: options.title,
+        button: {
+          text: options.buttonText
+        },
+        library: {
+          type: 'image'
+        },
+        multiple: false
+      });
+
+      frame.on('select', function () {
+        var attachment = frame.state().get('selection').first().toJSON();
+
+        if (options.allowedMimeTypes && options.allowedMimeTypes.indexOf(attachment.mime) === -1) {
+          window.alert(options.invalidMessage);
+          return;
+        }
+
+        setImage(attachment);
+      });
+
+      frame.open();
     });
 
-    frame.open();
+    $removeButton.on('click', function (event) {
+      event.preventDefault();
+
+      $attachmentId.val('0');
+      $preview.empty();
+      $removeButton.prop('disabled', true);
+    });
+  }
+
+  setupImagePicker({
+    inputSelector: '#artasia_partner_logo_id',
+    previewSelector: '#artasia_partner_logo_preview',
+    selectSelector: '#artasia_partner_logo_select',
+    removeSelector: '#artasia_partner_logo_remove',
+    title: 'Select Artasia Partner Logo',
+    buttonText: 'Use this logo',
+    allowedMimeTypes: ['image/png', 'image/svg+xml'],
+    invalidMessage: 'Please choose a PNG or SVG logo.'
   });
 
-  $removeButton.on('click', function (event) {
-    event.preventDefault();
-
-    $logoId.val('0');
-    $preview.empty();
-    $removeButton.prop('disabled', true);
+  setupImagePicker({
+    inputSelector: '#artasia_people_photo_id',
+    previewSelector: '#artasia_people_photo_preview',
+    selectSelector: '#artasia_people_photo_select',
+    removeSelector: '#artasia_people_photo_remove',
+    title: 'Select Artasia Person Photo',
+    buttonText: 'Use this photo',
+    invalidMessage: 'Please choose an image file.',
+    allowedMimeTypes: null
   });
 });

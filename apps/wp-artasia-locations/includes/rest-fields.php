@@ -84,9 +84,12 @@ function artasia_get_expanded_locations(): WP_REST_Response
             'post__in'       => array_values($lead_ids),
         ]);
         foreach ($lead_query->posts as $person) {
+            $photo_id = intval(get_post_meta($person->ID, 'artasia_photo_id', true));
             $lead_lookup[$person->ID] = [
-                'id'   => $person->ID,
-                'name' => $person->post_title,
+                'id'    => $person->ID,
+                'name'  => $person->post_title,
+                'role'  => get_post_meta($person->ID, 'artasia_role', true) ?: 'Artist Educator',
+                'photo' => artasia_get_people_photo_response($photo_id),
             ];
         }
     }
@@ -117,6 +120,25 @@ function artasia_get_expanded_locations(): WP_REST_Response
 }
 
 function artasia_get_partner_logo_response(int $attachment_id): ?array
+{
+    if (!$attachment_id) {
+        return null;
+    }
+
+    $url = wp_get_attachment_url($attachment_id);
+    if (!$url) {
+        return null;
+    }
+
+    return [
+        'id'        => $attachment_id,
+        'url'       => $url,
+        'mime_type' => get_post_mime_type($attachment_id) ?: '',
+        'alt'       => get_post_meta($attachment_id, '_wp_attachment_image_alt', true) ?: '',
+    ];
+}
+
+function artasia_get_people_photo_response(int $attachment_id): ?array
 {
     if (!$attachment_id) {
         return null;

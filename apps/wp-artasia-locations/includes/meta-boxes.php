@@ -170,6 +170,16 @@ function artasia_site_context_meta_box_html(): void
 <?php
 }
 
+function artasia_context_meta_box_html(array $paragraphs): void
+{
+?>
+    <img class="artasia-sites-list-logo" src="<?php echo esc_url(ARTASIA_LOCATIONS_URL . 'assets/artasia.svg'); ?>" alt="Artasia" />
+    <?php foreach ($paragraphs as $paragraph) : ?>
+        <p><?php echo esc_html($paragraph); ?></p>
+    <?php endforeach; ?>
+<?php
+}
+
 function artasia_save_site_meta(int $post_id): void
 {
     if (!isset($_POST['artasia_site_meta_nonce']) || !wp_verify_nonce($_POST['artasia_site_meta_nonce'], 'artasia_site_meta')) {
@@ -264,8 +274,25 @@ function artasia_register_venue_meta_box(): void
         'normal',
         'default'
     );
+
+    add_meta_box(
+        'artasia_venue_context',
+        'About Artasia Venues',
+        'artasia_venue_context_meta_box_html',
+        'artasia_venue',
+        'side',
+        'high'
+    );
 }
 add_action('add_meta_boxes', 'artasia_register_venue_meta_box');
+
+function artasia_venue_context_meta_box_html(): void
+{
+    artasia_context_meta_box_html([
+        'An Artasia Venue is a physical location such as a park, school, library, or community centre where Artasia activity can happen.',
+        'Use this record for stable location details such as address, city, coordinates, and access notes.',
+    ]);
+}
 
 function artasia_save_venue_meta(int $post_id): void
 {
@@ -351,8 +378,25 @@ function artasia_register_partner_meta_box(): void
         'normal',
         'default'
     );
+
+    add_meta_box(
+        'artasia_partner_context',
+        'About Artasia Partners',
+        'artasia_partner_context_meta_box_html',
+        'artasia_partner',
+        'side',
+        'high'
+    );
 }
 add_action('add_meta_boxes', 'artasia_register_partner_meta_box');
+
+function artasia_partner_context_meta_box_html(): void
+{
+    artasia_context_meta_box_html([
+        'An Artasia Partner is an organization, program, community group, or school board that helps host or support Artasia.',
+        'Use this record for partner identity, type, website, logo, and notes.',
+    ]);
+}
 
 function artasia_save_partner_meta(int $post_id): void
 {
@@ -385,9 +429,113 @@ function artasia_validate_partner_logo_id(int $attachment_id): int
     return in_array($mime_type, $allowed_mime_types, true) ? $attachment_id : 0;
 }
 
+// --- Artasia People Details meta box ---
+
+function artasia_people_meta_box_html(WP_Post $post): void
+{
+    $role = get_post_meta($post->ID, 'artasia_role', true);
+    if (!$role) {
+        $role = 'Artist Educator';
+    }
+    $photo_id = intval(get_post_meta($post->ID, 'artasia_photo_id', true));
+    $photo_url = $photo_id ? wp_get_attachment_url($photo_id) : '';
+    $notes = get_post_meta($post->ID, 'artasia_notes', true);
+
+    wp_nonce_field('artasia_people_meta', 'artasia_people_meta_nonce');
+?>
+    <table class="form-table">
+        <tr>
+            <th><label for="artasia_role">Role</label></th>
+            <td><input type="text" id="artasia_role" name="artasia_role" value="<?php echo esc_attr($role); ?>" class="widefat" /></td>
+        </tr>
+        <tr>
+            <th><label for="artasia_people_photo_id">Photo</label></th>
+            <td>
+                <input type="hidden" id="artasia_people_photo_id" name="artasia_photo_id" value="<?php echo esc_attr($photo_id); ?>" />
+                <div id="artasia_people_photo_preview" class="artasia-image-preview">
+                    <?php if ($photo_url) : ?>
+                        <img src="<?php echo esc_url($photo_url); ?>" alt="" />
+                    <?php endif; ?>
+                </div>
+                <button type="button" class="button" id="artasia_people_photo_select">Select Photo</button>
+                <button type="button" class="button" id="artasia_people_photo_remove" <?php disabled(!$photo_id); ?>>Remove Photo</button>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_people_notes">Notes</label></th>
+            <td><textarea id="artasia_people_notes" name="artasia_notes" rows="4" class="widefat"><?php echo esc_textarea($notes); ?></textarea></td>
+        </tr>
+    </table>
+<?php
+}
+
+function artasia_register_people_meta_box(): void
+{
+    add_meta_box(
+        'artasia_people_details',
+        'Artasia People Details',
+        'artasia_people_meta_box_html',
+        'artasia_people',
+        'normal',
+        'default'
+    );
+
+    add_meta_box(
+        'artasia_people_context',
+        'About Artasia People',
+        'artasia_people_context_meta_box_html',
+        'artasia_people',
+        'side',
+        'high'
+    );
+}
+add_action('add_meta_boxes', 'artasia_register_people_meta_box');
+
+function artasia_people_context_meta_box_html(): void
+{
+    artasia_context_meta_box_html([
+        'Artasia People are team members who can be assigned as the Artasia Lead for a site.',
+        "Use this record for the person's name, role, photo, and internal notes.",
+    ]);
+}
+
+function artasia_save_people_meta(int $post_id): void
+{
+    if (!isset($_POST['artasia_people_meta_nonce']) || !wp_verify_nonce($_POST['artasia_people_meta_nonce'], 'artasia_people_meta')) {
+        return;
+    }
+    if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
+        return;
+    }
+    if (!current_user_can('edit_post', $post_id)) {
+        return;
+    }
+
+    $role = sanitize_text_field($_POST['artasia_role'] ?? '');
+    if (!$role) {
+        $role = 'Artist Educator';
+    }
+
+    update_post_meta($post_id, 'artasia_role', $role);
+    update_post_meta($post_id, 'artasia_photo_id', artasia_validate_image_attachment_id(intval($_POST['artasia_photo_id'] ?? 0)));
+    update_post_meta($post_id, 'artasia_notes', sanitize_textarea_field($_POST['artasia_notes'] ?? ''));
+}
+add_action('save_post_artasia_people', 'artasia_save_people_meta');
+
+function artasia_validate_image_attachment_id(int $attachment_id): int
+{
+    if (!$attachment_id) {
+        return 0;
+    }
+
+    $mime_type = get_post_mime_type($attachment_id);
+
+    return strpos((string) $mime_type, 'image/') === 0 ? $attachment_id : 0;
+}
+
 function artasia_remove_unnecessary_meta_boxes(): void
 {
-    $post_types = ['artasia_venue', 'artasia_site', 'artasia_partner'];
+    $post_types = ['artasia_venue', 'artasia_site', 'artasia_partner', 'artasia_people'];
     $meta_box_contexts = ['side', 'normal', 'advanced'];
 
     foreach ($post_types as $post_type) {

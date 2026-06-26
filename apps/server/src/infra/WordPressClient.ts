@@ -18,6 +18,13 @@ export interface WpPartner {
 export interface WpPerson {
   id: number;
   name: string;
+  role: string;
+  photo?: {
+    id: number;
+    url: string;
+    mime_type: string;
+    alt: string;
+  } | null;
 }
 
 export interface WpArtasiaLocation {
