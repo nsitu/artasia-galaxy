@@ -135,7 +135,7 @@ function artasia_register_admin_menu(): void
 }
 add_action('admin_menu', 'artasia_register_admin_menu');
 
-function artasia_admin_parent_file(string $parent_file): string
+function artasia_admin_parent_file($parent_file)
 {
     $screen = get_current_screen();
     if (!$screen || !in_array($screen->post_type, ['artasia_site', 'artasia_venue', 'artasia_partner', 'artasia_people'], true)) {
@@ -146,7 +146,7 @@ function artasia_admin_parent_file(string $parent_file): string
 }
 add_filter('parent_file', 'artasia_admin_parent_file');
 
-function artasia_admin_submenu_file(string $submenu_file): string
+function artasia_admin_submenu_file($submenu_file)
 {
     $screen = get_current_screen();
     if (!$screen || !in_array($screen->post_type, ['artasia_site', 'artasia_venue', 'artasia_partner', 'artasia_people'], true)) {
