@@ -157,11 +157,9 @@ function artasia_partner_column(string $column, int $post_id): void
         case 'artasia_logo':
             $logo_id = intval(get_post_meta($post_id, 'artasia_logo_id', true));
             if ($logo_id) {
-                $logo_url = wp_get_attachment_image_url($logo_id, 'medium');
-                if ($logo_url) {
-                    echo '<div class="artasia-admin-logo-wrapper">';
-                    echo '<img class="artasia-admin-logo" src="' . esc_url($logo_url) . '" alt="" />';
-                    echo '</div>';
+                $logo = wp_get_attachment_image($logo_id, [200, 150], false, ['class' => 'artasia-admin-logo']);
+                if ($logo) {
+                    echo '<div class="artasia-admin-logo-wrapper">' . $logo . '</div>';
                     break;
                 }
             }
