@@ -160,6 +160,11 @@ function artasia_register_admin_menu(): void
         'edit_posts',
         'edit.php?post_type=artasia_placement'
     );
+
+    remove_submenu_page(
+        'edit.php?post_type=artasia_placement',
+        'edit.php?post_type=artasia_placement'
+    );
 }
 add_action('admin_menu', 'artasia_register_admin_menu');
 
