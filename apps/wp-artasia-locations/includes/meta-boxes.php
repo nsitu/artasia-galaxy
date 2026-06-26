@@ -154,20 +154,22 @@ function artasia_save_site_meta(int $post_id): void
 }
 add_action('save_post_artasia_site', 'artasia_save_site_meta');
 
-function artasia_site_edit_page_description(WP_Post $post): void
+function artasia_site_admin_description(): void
 {
-    if ($post->post_type !== 'artasia_site') {
+    $screen = get_current_screen();
+
+    if (!$screen || $screen->post_type !== 'artasia_site' || !in_array($screen->base, ['edit', 'post'], true)) {
         return;
     }
 
 ?>
     <div class="notice notice-info inline">
-        <p><strong>Description</strong></p>
-        <p><?php echo esc_html("Note that an Artasia 'site' refers to an activation of a particular venue by a particular partner in a particular year."); ?></p>
+        <p><strong>About Artasia Sites</strong></p>
+        <p><?php echo esc_html("An Artasia Site represents one year's activation of a particular venue by a particular Artasia Partner, including the program context, section, and participant details."); ?></p>
     </div>
 <?php
 }
-add_action('edit_form_top', 'artasia_site_edit_page_description');
+add_action('all_admin_notices', 'artasia_site_admin_description');
 
 // --- Venue Details meta box ---
 
