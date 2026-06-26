@@ -24,13 +24,16 @@ function artasia_get_expanded_locations(): WP_REST_Response
 
     $venue_ids    = [];
     $partner_ids  = [];
+    $lead_ids     = [];
     $site_posts   = $sites_query->posts;
 
     foreach ($site_posts as $site) {
         $vid = intval(get_post_meta($site->ID, 'artasia_venue_id', true));
         $partner_id = intval(get_post_meta($site->ID, 'artasia_partner_id', true));
+        $lead_id = intval(get_post_meta($site->ID, 'artasia_lead_id', true));
         if ($vid) $venue_ids[$vid] = $vid;
         if ($partner_id) $partner_ids[$partner_id] = $partner_id;
+        if ($lead_id) $lead_ids[$lead_id] = $lead_id;
     }
 
     $venue_lookup = [];
@@ -73,11 +76,27 @@ function artasia_get_expanded_locations(): WP_REST_Response
         }
     }
 
+    $lead_lookup = [];
+    if (!empty($lead_ids)) {
+        $lead_query = new WP_Query([
+            'post_type'      => 'artasia_people',
+            'posts_per_page' => -1,
+            'post__in'       => array_values($lead_ids),
+        ]);
+        foreach ($lead_query->posts as $person) {
+            $lead_lookup[$person->ID] = [
+                'id'   => $person->ID,
+                'name' => $person->post_title,
+            ];
+        }
+    }
+
     $results = [];
 
     foreach ($site_posts as $site) {
         $vid = intval(get_post_meta($site->ID, 'artasia_venue_id', true));
         $partner_id = intval(get_post_meta($site->ID, 'artasia_partner_id', true));
+        $lead_id = intval(get_post_meta($site->ID, 'artasia_lead_id', true));
 
         $results[] = [
             'site_id'            => $site->ID,
@@ -90,6 +109,7 @@ function artasia_get_expanded_locations(): WP_REST_Response
             'participant_age'    => get_post_meta($site->ID, 'artasia_participant_age', true) ?: '',
             'venue'              => $venue_lookup[$vid] ?? null,
             'partner'            => $partner_lookup[$partner_id] ?? null,
+            'lead'               => $lead_lookup[$lead_id] ?? null,
         ];
     }
 

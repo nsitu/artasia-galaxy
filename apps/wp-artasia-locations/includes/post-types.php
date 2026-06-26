@@ -62,6 +62,25 @@ function artasia_register_post_types(): void
         'menu_icon'    => 'dashicons-groups',
         'supports'     => ['title'],
     ]);
+
+    register_post_type('artasia_people', [
+        'labels' => [
+            'name'          => 'Artasia People',
+            'singular_name' => 'Artasia Person',
+            'add_new_item'  => 'Add New Artasia Person',
+            'edit_item'     => 'Edit Artasia Person',
+            'new_item'      => 'New Artasia Person',
+            'view_item'     => 'View Artasia Person',
+            'search_items'  => 'Search Artasia People',
+            'not_found'     => 'No Artasia people found',
+        ],
+        'public'       => true,
+        'has_archive'  => false,
+        'show_in_rest' => true,
+        'rest_base'    => 'artasia_people',
+        'menu_icon'    => 'dashicons-id-alt',
+        'supports'     => ['title'],
+    ]);
 }
 
 add_action('init', 'artasia_register_post_types');

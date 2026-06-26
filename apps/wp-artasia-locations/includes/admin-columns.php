@@ -14,6 +14,7 @@ function artasia_site_columns(array $columns): array
         if ($key === 'title') {
             $new['artasia_venue']    = 'Venue';
             $new['artasia_partner']  = 'Artasia Partner';
+            $new['artasia_lead']     = 'Artasia Lead';
             $new['artasia_year']     = 'Year';
             $new['artasia_program_context'] = 'Program / Context';
             $new['artasia_is_earlyon'] = 'EarlyON';
@@ -35,6 +36,10 @@ function artasia_site_column(string $column, int $post_id): void
         case 'artasia_partner':
             $partner_id = intval(get_post_meta($post_id, 'artasia_partner_id', true));
             echo $partner_id ? esc_html(get_the_title($partner_id)) : '—';
+            break;
+        case 'artasia_lead':
+            $lead_id = intval(get_post_meta($post_id, 'artasia_lead_id', true));
+            echo $lead_id ? esc_html(get_the_title($lead_id)) : '—';
             break;
         case 'artasia_year':
             echo esc_html(get_post_meta($post_id, 'artasia_program_year', true) ?: '—');
@@ -113,3 +118,36 @@ function artasia_partner_column(string $column, int $post_id): void
     }
 }
 add_action('manage_artasia_partner_posts_custom_column', 'artasia_partner_column', 10, 2);
+
+// --- Artasia People columns ---
+
+function artasia_people_columns(array $columns): array
+{
+    $new = [];
+    foreach ($columns as $key => $label) {
+        $new[$key] = $label;
+        if ($key === 'title') {
+            $new['artasia_assigned_sites'] = 'Assigned Sites';
+        }
+    }
+    return $new;
+}
+add_filter('manage_artasia_people_posts_columns', 'artasia_people_columns');
+
+function artasia_people_column(string $column, int $post_id): void
+{
+    if ($column !== 'artasia_assigned_sites') {
+        return;
+    }
+
+    $sites = get_posts([
+        'post_type'   => 'artasia_site',
+        'numberposts' => -1,
+        'meta_key'    => 'artasia_lead_id',
+        'meta_value'  => $post_id,
+        'fields'      => 'ids',
+    ]);
+
+    echo esc_html((string) count($sites));
+}
+add_action('manage_artasia_people_posts_custom_column', 'artasia_people_column', 10, 2);

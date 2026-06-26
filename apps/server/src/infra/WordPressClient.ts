@@ -15,6 +15,11 @@ export interface WpPartner {
   website?: string;
 }
 
+export interface WpPerson {
+  id: number;
+  name: string;
+}
+
 export interface WpArtasiaLocation {
   site_id: number;
   site_name: string;
@@ -26,6 +31,7 @@ export interface WpArtasiaLocation {
   participant_age?: string;
   venue: WpVenue | null;
   partner: WpPartner | null;
+  lead: WpPerson | null;
 }
 
 const WORDPRESS_URL = process.env.WORDPRESS_URL ?? "https://artsforall.co";

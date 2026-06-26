@@ -32,7 +32,7 @@ function artasia_admin_enqueue_assets(string $hook_suffix): void
         return;
     }
 
-    if ($screen->post_type === 'artasia_site' && $screen->id !== 'edit-artasia_site') {
+    if ($screen->post_type === 'artasia_site' && !in_array($hook_suffix, ['post.php', 'post-new.php', 'edit.php'], true)) {
         return;
     }
 

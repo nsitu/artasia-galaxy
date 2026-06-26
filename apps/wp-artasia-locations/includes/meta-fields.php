@@ -65,6 +65,13 @@ function artasia_register_meta_fields(): void
         'show_in_rest' => true,
         'sanitize_callback' => 'artasia_sanitize_integer_meta',
     ]);
+    register_post_meta('artasia_site', 'artasia_lead_id', [
+        'type'         => 'integer',
+        'single'       => true,
+        'default'      => 0,
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_integer_meta',
+    ]);
     register_post_meta('artasia_site', 'artasia_program_year', [
         'type'         => 'integer',
         'single'       => true,

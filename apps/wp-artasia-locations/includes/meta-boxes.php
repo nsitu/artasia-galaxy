@@ -20,9 +20,16 @@ function artasia_site_meta_box_html(WP_Post $post): void
         'orderby'     => 'title',
         'order'       => 'ASC',
     ]);
+    $people = get_posts([
+        'post_type'   => 'artasia_people',
+        'numberposts' => -1,
+        'orderby'     => 'title',
+        'order'       => 'ASC',
+    ]);
 
     $venue_id       = get_post_meta($post->ID, 'artasia_venue_id', true);
     $partner_id     = get_post_meta($post->ID, 'artasia_partner_id', true);
+    $lead_id        = get_post_meta($post->ID, 'artasia_lead_id', true);
     $program_year   = get_post_meta($post->ID, 'artasia_program_year', true);
     if (!$program_year) {
         $program_year = date('Y');
@@ -75,6 +82,20 @@ function artasia_site_meta_box_html(WP_Post $post): void
                     <?php endforeach; ?>
                 </select>
                 <p class="description">Arts For All works with many community partners to deliver Artasia in Hamilton and surrounding Regions.</p>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_lead_id">Artasia Lead</label></th>
+            <td>
+                <select id="artasia_lead_id" name="artasia_lead_id">
+                    <option value="0">&mdash; Select Artasia Lead &mdash;</option>
+                    <?php foreach ($people as $person) : ?>
+                        <option value="<?php echo esc_attr($person->ID); ?>" <?php selected($lead_id, $person->ID); ?>>
+                            <?php echo esc_html($person->post_title); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <p class="description">Select the team member who is the Artasia lead for this site.</p>
             </td>
         </tr>
         <tr>
@@ -166,6 +187,7 @@ function artasia_save_site_meta(int $post_id): void
     update_post_meta($post_id, 'artasia_is_earlyon', isset($_POST['artasia_is_earlyon']));
     update_post_meta($post_id, 'artasia_venue_id', intval($_POST['artasia_venue_id'] ?? 0));
     update_post_meta($post_id, 'artasia_partner_id', intval($_POST['artasia_partner_id'] ?? 0));
+    update_post_meta($post_id, 'artasia_lead_id', intval($_POST['artasia_lead_id'] ?? 0));
     update_post_meta($post_id, 'artasia_section', sanitize_text_field($_POST['artasia_section'] ?? ''));
     update_post_meta($post_id, 'artasia_participant_count', intval($_POST['artasia_participant_count'] ?? 0));
     update_post_meta($post_id, 'artasia_participant_age', sanitize_text_field($_POST['artasia_participant_age'] ?? ''));
