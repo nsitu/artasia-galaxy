@@ -14,7 +14,6 @@
   background: #fff;
 }
 
-.artasia-site-editor-notice {
-  margin: 16px 20px 0;
-  max-width: calc(100% - 40px);
+.artasia-site-info-panel p {
+  margin-top: 0;
 }
