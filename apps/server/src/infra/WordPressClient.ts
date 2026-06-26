@@ -24,8 +24,8 @@ export interface WpArtasiaLocation {
   section?: string;
   participant_count?: number;
   participant_age?: string;
-  venue: WpVenue;
-  partner: WpPartner;
+  venue: WpVenue | null;
+  partner: WpPartner | null;
 }
 
 const WORDPRESS_URL = process.env.WORDPRESS_URL ?? "https://artsforall.co";

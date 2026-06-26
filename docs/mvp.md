@@ -184,10 +184,16 @@ The VM `.env` file provides runtime configuration. Important values:
 ARTASIA_IMAGE=ghcr.io/nsitu/artasia-galaxy:latest
 IMMICH_URL=https://photos.artsforall.co
 IMMICH_API_KEY=...
-WORDPRESS_URL=http://127.0.0.1
+WORDPRESS_URL=http://host.docker.internal
 ```
 
 `IMMICH_URL` uses the public Immich HTTPS URL because the Galaxy app runs inside Docker. Inside the container, `127.0.0.1` refers to the Galaxy container, not the VM host.
+
+`WORDPRESS_URL` has the same container boundary. Using the public URL is also valid:
+
+```dotenv
+WORDPRESS_URL=https://artsforall.co
+```
 
 ## nginx
 

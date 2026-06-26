@@ -93,7 +93,10 @@ export interface UploadResult {
 
 export async function fetchUploadOptions(): Promise<UploadOptions> {
   const res = await fetch("/api/v1/uploads/options");
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
   return res.json();
 }
 

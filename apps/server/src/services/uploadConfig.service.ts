@@ -50,6 +50,12 @@ function cleanString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function nonEmptyValues(values: Array<string | undefined>) {
+  return values
+    .map((value) => value?.trim())
+    .filter((value): value is string => Boolean(value));
+}
+
 function cleanStringList(input: unknown, options?: { excludeReservedAlbums?: boolean }) {
   if (!Array.isArray(input)) return [];
   const seen = new Set<string>();
@@ -114,4 +120,8 @@ export async function isConfiguredUploader(value: string): Promise<boolean> {
   const key = normalizeKey(value);
   const config = await getUploadConfig();
   return config.uploaders.some((uploader) => normalizeKey(uploader) === key);
+}
+
+export function getLocationTagNames(location: WpArtasiaLocation): string[] {
+  return nonEmptyValues([location.partner?.name, location.site_name]);
 }

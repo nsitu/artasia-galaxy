@@ -14,6 +14,7 @@ import {
 import { uploadRateLimit } from "../middleware/uploadRateLimit.js";
 import {
   findConfiguredLocation,
+  getLocationTagNames,
   getAllowedTagNames,
   getUploadConfig,
   isConfiguredUploader,
@@ -174,7 +175,7 @@ router.post(
       }
 
       const album = await ensureAlbum(uploader);
-      const tagNames = [...selectedTags, location.partner.name, location.site_name];
+      const tagNames = [...selectedTags, ...getLocationTagNames(location)];
 
       const results = await processWithConcurrency(files, 2, async (file) => {
         const validationError = validateFile(file);

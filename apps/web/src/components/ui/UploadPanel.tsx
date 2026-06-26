@@ -29,6 +29,12 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const uploadInProgressRef = useRef(false);
 
+  function locationLabel(location: UploadOptions["locations"][number]) {
+    return location.partner_name
+      ? `${location.partner_name} - ${location.site_name}`
+      : location.site_name;
+  }
+
   useEffect(() => {
     if (!visible || options) return;
     fetchUploadOptions()
@@ -182,7 +188,7 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
             >
               {(options?.locations ?? []).map((location) => (
                 <option key={location.site_id} value={String(location.site_id)}>
-                  {location.partner_name} - {location.site_name}
+                  {locationLabel(location)}
                 </option>
               ))}
             </select>
