@@ -43,7 +43,7 @@ function artasia_register_post_types(): void
         'show_in_rest' => true,
         'rest_base'    => 'artasia_placement',
         'menu_icon'    => 'dashicons-art',
-        'supports'     => [],
+        'supports'     => false,
     ]);
 
     register_post_type('artasia_project', [
@@ -108,6 +108,13 @@ function artasia_register_post_types(): void
 }
 
 add_action('init', 'artasia_register_post_types');
+
+function artasia_remove_placement_editor_support(): void
+{
+    remove_post_type_support('artasia_placement', 'title');
+    remove_post_type_support('artasia_placement', 'editor');
+}
+add_action('init', 'artasia_remove_placement_editor_support', 11);
 
 function artasia_register_admin_menu(): void
 {
