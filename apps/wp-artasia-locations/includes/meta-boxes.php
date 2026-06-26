@@ -180,14 +180,10 @@ function artasia_site_admin_description(): void
     }
 
 ?>
-    <div class="postbox artasia-sites-list-context">
-        <div class="postbox-header">
-            <h2>About Artasia Sites</h2>
-        </div>
-        <div class="inside">
-            <p>An Artasia Site represents one year's activation of a particular venue by a particular Artasia Partner.</p>
-            <p>Use these records to connect venues, Artasia Partners, program context, section, and participant details for each activation.</p>
-        </div>
+    <div class="artasia-sites-list-context">
+        <img class="artasia-sites-list-logo" src="<?php echo esc_url(ARTASIA_LOCATIONS_URL . 'assets/artasia.svg'); ?>" alt="Artasia" />
+        <p>An Artasia Site represents one year's activation of a particular venue by a particular Artasia Partner.</p>
+        <p>Use these records to connect venues, Artasia Partners, program context, section, and participant details for each activation.</p>
     </div>
 <?php
 }

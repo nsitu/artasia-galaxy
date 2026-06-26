@@ -15,18 +15,21 @@
 }
 
 .artasia-sites-list-context {
-  margin-top: 10px;
-  max-width: 960px;
+  margin: 14px 0 18px;
+  max-width: 760px;
 }
 
-.artasia-sites-list-context .inside {
-  margin: 12px;
+.artasia-sites-list-logo {
+  display: block;
+  width: 150px;
+  height: auto;
+  margin: 0 0 10px;
 }
 
-.artasia-sites-list-context .inside p:first-child {
+.artasia-sites-list-context p:first-of-type {
   margin-top: 0;
 }
 
-.artasia-sites-list-context .inside p:last-child {
+.artasia-sites-list-context p:last-of-type {
   margin-bottom: 0;
 }
