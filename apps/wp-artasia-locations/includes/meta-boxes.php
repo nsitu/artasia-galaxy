@@ -194,6 +194,34 @@ function artasia_placement_meta_box_html(WP_Post $post): void
             </td>
         </tr>
         <tr>
+            <th><label for="artasia_lead_id">Artasia Lead</label></th>
+            <td>
+                <select id="artasia_lead_id" name="artasia_lead_id">
+                    <option value="0">&mdash; Select Artasia Lead &mdash;</option>
+                    <?php foreach ($people as $person) : ?>
+                        <option value="<?php echo esc_attr($person->ID); ?>" <?php selected($lead_id, $person->ID); ?>>
+                            <?php echo esc_html($person->post_title); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <p class="description">Select the team member who is the Artasia lead for this placement.</p>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_partner_id">Artasia Partner</label></th>
+            <td>
+                <select id="artasia_partner_id" name="artasia_partner_id">
+                    <option value="0">— Select Artasia Partner —</option>
+                    <?php foreach ($partners as $partner) : ?>
+                        <option value="<?php echo esc_attr($partner->ID); ?>" <?php selected($partner_id, $partner->ID); ?>>
+                            <?php echo esc_html($partner->post_title); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <p class="description">Arts For All works with many community partners to deliver Artasia in Hamilton and surrounding Regions.</p>
+            </td>
+        </tr>
+        <tr>
             <th><label for="artasia_place_id">Place</label></th>
             <td>
                 <select id="artasia_place_id" name="artasia_place_id">
@@ -214,34 +242,6 @@ function artasia_placement_meta_box_html(WP_Post $post): void
                     <?php endforeach; ?>
                 </select>
                 <p class="description">A Place is a location such as a Park, School, or Community Centre.</p>
-            </td>
-        </tr>
-        <tr>
-            <th><label for="artasia_partner_id">Artasia Partner</label></th>
-            <td>
-                <select id="artasia_partner_id" name="artasia_partner_id">
-                    <option value="0">— Select Artasia Partner —</option>
-                    <?php foreach ($partners as $partner) : ?>
-                        <option value="<?php echo esc_attr($partner->ID); ?>" <?php selected($partner_id, $partner->ID); ?>>
-                            <?php echo esc_html($partner->post_title); ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-                <p class="description">Arts For All works with many community partners to deliver Artasia in Hamilton and surrounding Regions.</p>
-            </td>
-        </tr>
-        <tr>
-            <th><label for="artasia_lead_id">Artasia Lead</label></th>
-            <td>
-                <select id="artasia_lead_id" name="artasia_lead_id">
-                    <option value="0">&mdash; Select Artasia Lead &mdash;</option>
-                    <?php foreach ($people as $person) : ?>
-                        <option value="<?php echo esc_attr($person->ID); ?>" <?php selected($lead_id, $person->ID); ?>>
-                            <?php echo esc_html($person->post_title); ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-                <p class="description">Select the team member who is the Artasia lead for this placement.</p>
             </td>
         </tr>
         <tr>
@@ -341,8 +341,31 @@ function artasia_save_placement_meta(int $post_id): void
     update_post_meta($post_id, 'artasia_section', sanitize_text_field($_POST['artasia_section'] ?? ''));
     update_post_meta($post_id, 'artasia_participant_count', intval($_POST['artasia_participant_count'] ?? 0));
     update_post_meta($post_id, 'artasia_participant_age', sanitize_text_field($_POST['artasia_participant_age'] ?? ''));
+
+    artasia_update_placement_title($post_id);
 }
 add_action('save_post_artasia_placement', 'artasia_save_placement_meta');
+
+function artasia_update_placement_title(int $post_id): void
+{
+    $lead_id = intval(get_post_meta($post_id, 'artasia_lead_id', true));
+    $place_id = intval(get_post_meta($post_id, 'artasia_place_id', true));
+    $partner_id = intval(get_post_meta($post_id, 'artasia_partner_id', true));
+    $title_parts = array_filter([
+        $lead_id ? get_the_title($lead_id) : '',
+        $place_id ? get_the_title($place_id) : '',
+        $partner_id ? get_the_title($partner_id) : '',
+    ]);
+    $generated_title = !empty($title_parts) ? implode(' - ', $title_parts) : 'Artasia Placement';
+
+    remove_action('save_post_artasia_placement', 'artasia_save_placement_meta');
+    wp_update_post([
+        'ID' => $post_id,
+        'post_title' => $generated_title,
+        'post_name' => sanitize_title($generated_title),
+    ]);
+    add_action('save_post_artasia_placement', 'artasia_save_placement_meta');
+}
 
 // --- Project Details meta box ---
 
