@@ -180,9 +180,14 @@ function artasia_site_admin_description(): void
     }
 
 ?>
-    <div class="notice notice-info inline">
-        <p><strong>About Artasia Sites</strong></p>
-        <p><?php echo esc_html("An Artasia Site represents one year's activation of a particular venue by a particular Artasia Partner, including the program context, section, and participant details."); ?></p>
+    <div class="postbox artasia-sites-list-context">
+        <div class="postbox-header">
+            <h2>About Artasia Sites</h2>
+        </div>
+        <div class="inside">
+            <p>An Artasia Site represents one year's activation of a particular venue by a particular Artasia Partner.</p>
+            <p>Use these records to connect venues, Artasia Partners, program context, section, and participant details for each activation.</p>
+        </div>
     </div>
 <?php
 }

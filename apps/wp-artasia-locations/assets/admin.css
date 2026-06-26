@@ -13,3 +13,20 @@
   border: 1px solid #c3c4c7;
   background: #fff;
 }
+
+.artasia-sites-list-context {
+  margin-top: 10px;
+  max-width: 960px;
+}
+
+.artasia-sites-list-context .inside {
+  margin: 12px;
+}
+
+.artasia-sites-list-context .inside p:first-child {
+  margin-top: 0;
+}
+
+.artasia-sites-list-context .inside p:last-child {
+  margin-bottom: 0;
+}
