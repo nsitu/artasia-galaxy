@@ -21,7 +21,8 @@
 
 .artasia-sites-list-logo {
   display: block;
-  width: 150px;
+  max-width: 150px;
+  width: 100%;
   height: auto;
   margin: 0 0 10px;
 }

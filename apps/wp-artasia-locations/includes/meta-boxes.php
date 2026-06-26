@@ -143,6 +143,7 @@ add_action('add_meta_boxes', 'artasia_register_site_meta_box');
 function artasia_site_context_meta_box_html(): void
 {
 ?>
+    <img class="artasia-sites-list-logo" src="<?php echo esc_url(ARTASIA_LOCATIONS_URL . 'assets/artasia.svg'); ?>" alt="Artasia" />
     <p>An Artasia Site represents one year's activation of a particular venue by a particular Artasia Partner.</p>
     <p>Use this post to connect the venue, Artasia Partner, program context, section, and participant details for that activation.</p>
 <?php
