@@ -156,7 +156,7 @@ function artasia_partner_column(string $column, int $post_id): void
     switch ($column) {
         case 'artasia_logo':
             $logo_id = intval(get_post_meta($post_id, 'artasia_logo_id', true));
-            echo $logo_id ? wp_get_attachment_image($logo_id, 'thumbnail', false, ['style' => 'max-width:48px;height:auto;']) : '—';
+            echo $logo_id ? wp_get_attachment_image($logo_id, 'medium', false, ['style' => 'max-width:300px;max-height:150px;width:auto;height:auto;']) : '—';
             break;
         case 'artasia_partner_type':
             echo esc_html(get_post_meta($post_id, 'artasia_partner_type', true) ?: '—');
