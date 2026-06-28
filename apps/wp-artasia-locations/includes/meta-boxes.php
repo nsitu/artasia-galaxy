@@ -130,6 +130,66 @@ function artasia_context_list_header_html(string $current_post_type, array $para
 <?php
 }
 
+function artasia_placement_weekday_options(): array
+{
+    return [
+        'monday' => 'Monday',
+        'tuesday' => 'Tuesday',
+        'wednesday' => 'Wednesday',
+        'thursday' => 'Thursday',
+        'friday' => 'Friday',
+    ];
+}
+
+function artasia_placement_time_options(): array
+{
+    $options = [];
+    for ($minutes = 9 * 60; $minutes <= 20 * 60; $minutes += 30) {
+        $value = sprintf('%02d:%02d', intdiv($minutes, 60), $minutes % 60);
+        $options[$value] = date_i18n('g:ia', strtotime($value));
+    }
+
+    return $options;
+}
+
+function artasia_sanitize_placement_weekday($value, string $meta_key = '', string $object_type = '', string $object_subtype = ''): string
+{
+    $value = strtolower(sanitize_key((string) $value));
+    $options = artasia_placement_weekday_options();
+
+    return isset($options[$value]) ? $value : '';
+}
+
+function artasia_sanitize_placement_time($value, string $meta_key = '', string $object_type = '', string $object_subtype = ''): string
+{
+    $value = sanitize_text_field((string) $value);
+    $options = artasia_placement_time_options();
+
+    return isset($options[$value]) ? $value : '';
+}
+
+function artasia_format_placement_schedule(int $post_id): string
+{
+    $weekdays = artasia_placement_weekday_options();
+    $times = artasia_placement_time_options();
+    $weekday = get_post_meta($post_id, 'artasia_delivery_weekday', true);
+    $start_time = get_post_meta($post_id, 'artasia_delivery_start_time', true);
+    $end_time = get_post_meta($post_id, 'artasia_delivery_end_time', true);
+
+    if (!$weekday && !$start_time && !$end_time) {
+        return '';
+    }
+
+    $time_range = trim(sprintf(
+        '%s%s%s',
+        $times[$start_time] ?? '',
+        ($start_time && $end_time) ? ' - ' : '',
+        $times[$end_time] ?? ''
+    ));
+
+    return trim(sprintf('%s%s%s', $weekdays[$weekday] ?? '', ($weekday && $time_range) ? ', ' : '', $time_range));
+}
+
 // --- Placement Details meta box ---
 
 function artasia_placement_meta_box_html(WP_Post $post): void
@@ -171,6 +231,11 @@ function artasia_placement_meta_box_html(WP_Post $post): void
     $section        = get_post_meta($post->ID, 'artasia_section', true);
     $participant_count = get_post_meta($post->ID, 'artasia_participant_count', true);
     $participant_age = get_post_meta($post->ID, 'artasia_participant_age', true);
+    $delivery_weekday = get_post_meta($post->ID, 'artasia_delivery_weekday', true);
+    $delivery_start_time = get_post_meta($post->ID, 'artasia_delivery_start_time', true);
+    $delivery_end_time = get_post_meta($post->ID, 'artasia_delivery_end_time', true);
+    $weekday_options = artasia_placement_weekday_options();
+    $time_options = artasia_placement_time_options();
 
     wp_nonce_field('artasia_placement_meta', 'artasia_placement_meta_nonce');
 ?>
@@ -269,6 +334,48 @@ function artasia_placement_meta_box_html(WP_Post $post): void
             </td>
         </tr>
         <tr>
+            <th><label for="artasia_delivery_weekday">Delivery Day</label></th>
+            <td>
+                <select id="artasia_delivery_weekday" name="artasia_delivery_weekday">
+                    <option value="">&mdash; Select Day &mdash;</option>
+                    <?php foreach ($weekday_options as $value => $label) : ?>
+                        <option value="<?php echo esc_attr($value); ?>" <?php selected($delivery_weekday, $value); ?>>
+                            <?php echo esc_html($label); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <p class="description">Select the weekday this placement is delivered.</p>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_delivery_start_time">Start Time</label></th>
+            <td>
+                <select id="artasia_delivery_start_time" name="artasia_delivery_start_time">
+                    <option value="">&mdash; Select Start Time &mdash;</option>
+                    <?php foreach ($time_options as $value => $label) : ?>
+                        <option value="<?php echo esc_attr($value); ?>" <?php selected($delivery_start_time, $value); ?>>
+                            <?php echo esc_html($label); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <p class="description">Times are available in 30-minute increments from 9:00am to 8:00pm.</p>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_delivery_end_time">End Time</label></th>
+            <td>
+                <select id="artasia_delivery_end_time" name="artasia_delivery_end_time">
+                    <option value="">&mdash; Select End Time &mdash;</option>
+                    <?php foreach ($time_options as $value => $label) : ?>
+                        <option value="<?php echo esc_attr($value); ?>" <?php selected($delivery_end_time, $value); ?>>
+                            <?php echo esc_html($label); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <p class="description">Select the planned weekly end time for this placement.</p>
+            </td>
+        </tr>
+        <tr>
             <th><label for="artasia_participant_count">Participants</label></th>
             <td>
                 <input type="number" id="artasia_participant_count" name="artasia_participant_count" value="<?php echo esc_attr($participant_count); ?>" />
@@ -339,6 +446,9 @@ function artasia_save_placement_meta(int $post_id): void
     update_post_meta($post_id, 'artasia_partner_id', intval($_POST['artasia_partner_id'] ?? 0));
     update_post_meta($post_id, 'artasia_team_member_id', intval($_POST['artasia_team_member_id'] ?? 0));
     update_post_meta($post_id, 'artasia_section', sanitize_text_field($_POST['artasia_section'] ?? ''));
+    update_post_meta($post_id, 'artasia_delivery_weekday', artasia_sanitize_placement_weekday($_POST['artasia_delivery_weekday'] ?? ''));
+    update_post_meta($post_id, 'artasia_delivery_start_time', artasia_sanitize_placement_time($_POST['artasia_delivery_start_time'] ?? ''));
+    update_post_meta($post_id, 'artasia_delivery_end_time', artasia_sanitize_placement_time($_POST['artasia_delivery_end_time'] ?? ''));
     update_post_meta($post_id, 'artasia_participant_count', intval($_POST['artasia_participant_count'] ?? 0));
     update_post_meta($post_id, 'artasia_participant_age', sanitize_text_field($_POST['artasia_participant_age'] ?? ''));
 

@@ -19,6 +19,7 @@ function artasia_placement_columns(array $columns): array
             $new['artasia_program_context'] = 'Program / Context';
             $new['artasia_is_earlyon'] = 'EarlyON';
             $new['artasia_section']  = 'Section';
+            $new['artasia_delivery_schedule'] = 'Schedule';
             $new['artasia_participants'] = 'Participants';
         }
     }
@@ -53,6 +54,9 @@ function artasia_placement_column(string $column, int $post_id): void
             break;
         case 'artasia_section':
             echo esc_html(get_post_meta($post_id, 'artasia_section', true) ?: '—');
+            break;
+        case 'artasia_delivery_schedule':
+            echo esc_html(artasia_format_placement_schedule($post_id) ?: '-');
             break;
         case 'artasia_participants':
             echo esc_html(get_post_meta($post_id, 'artasia_participant_count', true) ?: '—');

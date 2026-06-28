@@ -68,6 +68,10 @@ export interface UploadPlacement {
   placement_id: number;
   placement_name: string;
   partner_name: string;
+  delivery_weekday?: string;
+  delivery_start_time?: string;
+  delivery_end_time?: string;
+  delivery_schedule?: string;
   address?: string;
   lat?: number;
   lng?: number;

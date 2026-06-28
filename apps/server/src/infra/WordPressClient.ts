@@ -41,6 +41,10 @@ export interface WpArtasiaPlacement {
   program_context: string;
   is_earlyon: boolean;
   section?: string;
+  delivery_weekday?: string;
+  delivery_start_time?: string;
+  delivery_end_time?: string;
+  delivery_schedule?: string;
   participant_count?: number;
   participant_age?: string;
   place: WpPlace | null;

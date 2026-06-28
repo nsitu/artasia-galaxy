@@ -47,8 +47,9 @@ function artasia_render_import_page(): void
 
         <h2>Headers</h2>
         <p>Required headers: <code>placement_name</code>, <code>project_name</code>, <code>place_name</code>, <code>partner_name</code>.</p>
-        <p>Optional headers: <code>project_year</code>, <code>project_description</code>, <code>program_context</code>, <code>earlyon</code>, <code>section</code>, <code>participants</code>, <code>age_range</code>, <code>place_street_address</code>, <code>place_city</code>, <code>place_postal_code</code>, <code>place_latitude</code>, <code>place_longitude</code>, <code>place_notes</code>, <code>partner_type</code>, <code>partner_website</code>, <code>partner_notes</code>, <code>team_member_name</code>, <code>team_member_role</code>, <code>team_member_notes</code>.</p>
+        <p>Optional headers: <code>project_year</code>, <code>project_description</code>, <code>program_context</code>, <code>earlyon</code>, <code>section</code>, <code>delivery_weekday</code>, <code>delivery_start_time</code>, <code>delivery_end_time</code>, <code>participants</code>, <code>age_range</code>, <code>place_street_address</code>, <code>place_city</code>, <code>place_postal_code</code>, <code>place_latitude</code>, <code>place_longitude</code>, <code>place_notes</code>, <code>partner_type</code>, <code>partner_website</code>, <code>partner_notes</code>, <code>team_member_name</code>, <code>team_member_role</code>, <code>team_member_notes</code>.</p>
         <p>For <code>earlyon</code>, use values like <code>yes</code>, <code>no</code>, <code>true</code>, <code>false</code>, <code>1</code>, or <code>0</code>.</p>
+        <p>For delivery times, use 24-hour values like <code>09:00</code>, <code>09:30</code>, or <code>20:00</code>.</p>
 
         <h2>Upload CSV</h2>
         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" enctype="multipart/form-data">
@@ -95,6 +96,9 @@ function artasia_download_import_template(): void
         'program_context' => 'Beyond the Bell',
         'earlyon' => 'no',
         'section' => 'Room 3',
+        'delivery_weekday' => 'monday',
+        'delivery_start_time' => '09:00',
+        'delivery_end_time' => '11:30',
         'participants' => '24',
         'age_range' => '6-10',
     ];
@@ -253,6 +257,9 @@ function artasia_import_location_record(array $record): string
     update_post_meta($placement_id, 'artasia_program_context', sanitize_text_field(artasia_import_value($record, 'program_context')));
     update_post_meta($placement_id, 'artasia_is_earlyon', artasia_import_boolean(artasia_import_value($record, 'earlyon')));
     update_post_meta($placement_id, 'artasia_section', sanitize_text_field($section));
+    update_post_meta($placement_id, 'artasia_delivery_weekday', artasia_sanitize_placement_weekday(artasia_import_value($record, 'delivery_weekday')));
+    update_post_meta($placement_id, 'artasia_delivery_start_time', artasia_sanitize_placement_time(artasia_import_value($record, 'delivery_start_time')));
+    update_post_meta($placement_id, 'artasia_delivery_end_time', artasia_sanitize_placement_time(artasia_import_value($record, 'delivery_end_time')));
     update_post_meta($placement_id, 'artasia_participant_count', intval(artasia_import_value($record, 'participants')));
     update_post_meta($placement_id, 'artasia_participant_age', sanitize_text_field(artasia_import_value($record, 'age_range')));
 
@@ -283,6 +290,9 @@ function artasia_import_csv_headers(): array
         'program_context',
         'earlyon',
         'section',
+        'delivery_weekday',
+        'delivery_start_time',
+        'delivery_end_time',
         'participants',
         'age_range',
     ];

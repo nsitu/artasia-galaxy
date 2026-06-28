@@ -9,6 +9,10 @@ export interface ArtasiaPlacement {
   placement_id: number;
   placement_name: string;
   partner_name: string;
+  delivery_weekday?: string;
+  delivery_start_time?: string;
+  delivery_end_time?: string;
+  delivery_schedule?: string;
   address?: string;
   lat?: number;
   lng?: number;
@@ -85,6 +89,10 @@ function mapWpPlacement(wp: WpArtasiaPlacement): ArtasiaPlacement {
     placement_id: wp.placement_id,
     placement_name: wp.placement_name,
     partner_name: wp.partner?.name ?? "",
+    ...(wp.delivery_weekday ? { delivery_weekday: wp.delivery_weekday } : {}),
+    ...(wp.delivery_start_time ? { delivery_start_time: wp.delivery_start_time } : {}),
+    ...(wp.delivery_end_time ? { delivery_end_time: wp.delivery_end_time } : {}),
+    ...(wp.delivery_schedule ? { delivery_schedule: wp.delivery_schedule } : {}),
     ...(wp.place?.address ? { address: wp.place.address } : {}),
     ...(lat != null && lat !== 0 ? { lat } : {}),
     ...(lng != null && lng !== 0 ? { lng } : {}),

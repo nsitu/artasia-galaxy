@@ -116,6 +116,27 @@ function artasia_register_meta_fields(): void
         'show_in_rest' => true,
         'sanitize_callback' => 'sanitize_text_field',
     ]);
+    register_post_meta('artasia_placement', 'artasia_delivery_weekday', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_placement_weekday',
+    ]);
+    register_post_meta('artasia_placement', 'artasia_delivery_start_time', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_placement_time',
+    ]);
+    register_post_meta('artasia_placement', 'artasia_delivery_end_time', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_placement_time',
+    ]);
     register_post_meta('artasia_placement', 'artasia_participant_count', [
         'type'         => 'integer',
         'single'       => true,
