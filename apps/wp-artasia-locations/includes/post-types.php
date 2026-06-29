@@ -64,6 +64,7 @@ function artasia_register_post_types(): void
         'rest_base'    => 'artasia_project',
         'menu_icon'    => 'dashicons-calendar-alt',
         'supports'     => ['title'],
+        'taxonomies'   => ['post_tag'],
     ]);
 
     register_post_type('artasia_partner', [
