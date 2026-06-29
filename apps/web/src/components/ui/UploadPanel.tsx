@@ -51,7 +51,8 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
   }, [options, uploaderKey]);
 
   const filteredPlacements = useMemo(() => {
-    if (!options || !selectedUploader) return [];
+    if (!options) return [];
+    if (!selectedUploader) return options.placements;
     return options.placements.filter((placement) => placement.team_member_id === selectedUploader.id);
   }, [options, selectedUploader]);
 
@@ -186,6 +187,10 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
           </button>
         </div>
 
+        <p style={introStyle}>
+          To upload documentation for your site, choose your name, site, and delivery week.
+        </p>
+
         {error && <div style={errorStyle}>{error}</div>}
 
         <div style={fieldGridStyle}>
@@ -215,16 +220,22 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
             <select
               value={placementKey}
               onChange={(e) => {
-                setPlacementKey(e.target.value);
+                const nextPlacementKey = e.target.value;
+                setPlacementKey(nextPlacementKey);
+                if (options && nextPlacementKey) {
+                  const placement = options.placements.find(
+                    (entry) => String(entry.placement_id) === nextPlacementKey
+                  );
+                  if (placement?.team_member_id) {
+                    setUploaderKey(String(placement.team_member_id));
+                  }
+                }
                 setError(null);
               }}
               style={inputStyle}
-              disabled={!selectedUploader}
               required
             >
-              <option value="">
-                {selectedUploader ? "Select an Artasia Site" : "Select an Artasia Team Member first"}
-              </option>
+              <option value="">Select an Artasia Site</option>
               {filteredPlacements.map((placement) => (
                 <option key={placement.placement_id} value={String(placement.placement_id)}>
                   {placementLabel(placement)}
@@ -234,19 +245,22 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
           </label>
         </div>
 
-        <div style={tagListStyle}>
-          {(options?.tags ?? []).map((tag) => (
-            <label key={tag} style={tagStyle}>
-              <input
-                type="radio"
-                name="upload-tag"
-                checked={selectedTag === tag}
-                onChange={() => setSelectedTag(tag)}
-              />
-              {tag}
-            </label>
-          ))}
-        </div>
+        <fieldset style={tagFieldsetStyle}>
+          <legend style={tagLegendStyle}>Program Week / Activity</legend>
+          <div style={tagListStyle}>
+            {(options?.tags ?? []).map((tag) => (
+              <label key={tag} style={tagStyle}>
+                <input
+                  type="radio"
+                  name="upload-tag"
+                  checked={selectedTag === tag}
+                  onChange={() => setSelectedTag(tag)}
+                />
+                {tag}
+              </label>
+            ))}
+          </div>
+        </fieldset>
 
         <div
           style={dropzoneStyle}
@@ -369,6 +383,13 @@ const titleStyle: React.CSSProperties = {
   fontWeight: 600,
 };
 
+const introStyle: React.CSSProperties = {
+  margin: "0 0 14px",
+  color: "#b9bfcc",
+  fontSize: 14,
+  lineHeight: 1.45,
+};
+
 const iconButtonStyle: React.CSSProperties = {
   background: "transparent",
   border: "1px solid rgba(255,255,255,0.22)",
@@ -404,7 +425,19 @@ const tagListStyle: React.CSSProperties = {
   display: "flex",
   flexWrap: "wrap",
   gap: 10,
-  marginTop: 14,
+};
+
+const tagFieldsetStyle: React.CSSProperties = {
+  border: 0,
+  padding: 0,
+  margin: "14px 0 0",
+};
+
+const tagLegendStyle: React.CSSProperties = {
+  padding: 0,
+  marginBottom: 8,
+  color: "#aaa",
+  fontSize: 13,
 };
 
 const tagStyle: React.CSSProperties = {

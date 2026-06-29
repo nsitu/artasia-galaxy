@@ -126,6 +126,12 @@ interface WpActivity {
   description?: string;
 }
 
+function activityUploadTagName(activity: WpActivity): string {
+  const name = activity.name?.trim();
+  if (!name) return "";
+  return activity.week && activity.week > 0 ? `${activity.week} - ${name}` : name;
+}
+
 export async function getUploadTags({
   forceFresh = false,
 }: { forceFresh?: boolean } = {}): Promise<string[]> {
@@ -139,7 +145,7 @@ export async function getUploadTags({
     const tags = Array.from(
       new Set(
         activities
-          .map((activity) => activity.name?.trim())
+          .map(activityUploadTagName)
           .filter((name): name is string => Boolean(name))
       )
     );
