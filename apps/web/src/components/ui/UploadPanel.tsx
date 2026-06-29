@@ -245,22 +245,20 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
           </label>
         </div>
 
-        <fieldset style={tagFieldsetStyle}>
-          <legend style={tagLegendStyle}>Program Week / Activity</legend>
-          <div style={tagListStyle}>
+        <label style={activityLabelStyle}>
+          Program Week / Activity
+          <select
+            value={selectedTag}
+            onChange={(e) => setSelectedTag(e.target.value)}
+            style={inputStyle}
+          >
             {(options?.tags ?? []).map((tag) => (
-              <label key={tag} style={tagStyle}>
-                <input
-                  type="radio"
-                  name="upload-tag"
-                  checked={selectedTag === tag}
-                  onChange={() => setSelectedTag(tag)}
-                />
+              <option key={tag} value={tag}>
                 {tag}
-              </label>
+              </option>
             ))}
-          </div>
-        </fieldset>
+          </select>
+        </label>
 
         <div
           style={dropzoneStyle}
@@ -421,33 +419,9 @@ const inputStyle: React.CSSProperties = {
   padding: "9px 10px",
 };
 
-const tagListStyle: React.CSSProperties = {
-  display: "flex",
-  flexWrap: "wrap",
-  gap: 10,
-};
-
-const tagFieldsetStyle: React.CSSProperties = {
-  border: 0,
-  padding: 0,
+const activityLabelStyle: React.CSSProperties = {
+  ...labelStyle,
   margin: "14px 0 0",
-};
-
-const tagLegendStyle: React.CSSProperties = {
-  padding: 0,
-  marginBottom: 8,
-  color: "#aaa",
-  fontSize: 13,
-};
-
-const tagStyle: React.CSSProperties = {
-  display: "flex",
-  gap: 6,
-  alignItems: "center",
-  background: "#191c25",
-  border: "1px solid rgba(255,255,255,0.12)",
-  borderRadius: 4,
-  padding: "7px 10px",
 };
 
 const dropzoneStyle: React.CSSProperties = {

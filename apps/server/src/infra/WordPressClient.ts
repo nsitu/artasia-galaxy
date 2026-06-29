@@ -132,6 +132,13 @@ function activityUploadTagName(activity: WpActivity): string {
   return activity.week && activity.week > 0 ? `${activity.week} - ${name}` : name;
 }
 
+function compareActivitiesByWeek(a: WpActivity, b: WpActivity): number {
+  const aWeek = a.week && a.week > 0 ? a.week : Number.MAX_SAFE_INTEGER;
+  const bWeek = b.week && b.week > 0 ? b.week : Number.MAX_SAFE_INTEGER;
+  if (aWeek !== bWeek) return aWeek - bWeek;
+  return a.name.localeCompare(b.name);
+}
+
 export async function getUploadTags({
   forceFresh = false,
 }: { forceFresh?: boolean } = {}): Promise<string[]> {
@@ -145,6 +152,7 @@ export async function getUploadTags({
     const tags = Array.from(
       new Set(
         activities
+          .sort(compareActivitiesByWeek)
           .map(activityUploadTagName)
           .filter((name): name is string => Boolean(name))
       )
