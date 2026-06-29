@@ -18,7 +18,7 @@ The MVP includes:
 - GitHub Actions build, publish, and deploy pipeline.
 - nginx HTTPS reverse proxy on the existing Bitnami VM.
 
-WordPress integration appears in the original architecture plan, but it is not part of the immediate MVP roadmap.
+WordPress provides the Artasia placement metadata, upload tags, and uploader names used by the public upload companion.
 
 ## Local Development
 
@@ -92,13 +92,7 @@ The `data/` directory is bind-mounted into the container at:
 /data
 ```
 
-It stores non-secret JSON configuration and runtime JSON state. The committed files under `data/` are examples only:
-
-```text
-data/locations.json
-data/upload-tags.json
-data/uploaders.json
-```
+It stores non-secret runtime JSON state. Upload tags, uploader names, and placement data are managed in WordPress by the `wp-artasia-locations` plugin. Legacy `data/upload-tags.json` and `data/uploaders.json` files are ignored if present.
 
 Secrets should remain in `/opt/artasia-galaxy/.env`, not in `data/`.
 
@@ -111,7 +105,7 @@ mkdir -p data
 
 ## VM Setup Assumptions
 
-The GitHub Actions deploy workflow assumes the VM has already been prepared. The workflow copies `docker-compose.yml` from the repo, pulls the latest Docker image, and restarts Compose. It does not copy `.env` or `data/*.json`; those remain VM-managed.
+The GitHub Actions deploy workflow assumes the VM has already been prepared. The workflow copies `docker-compose.yml` from the repo, pulls the latest Docker image, and restarts Compose. It does not copy `.env` or runtime files under `data/`; those remain VM-managed.
 
 Expected VM layout:
 
@@ -120,9 +114,8 @@ Expected VM layout:
   docker-compose.yml
   .env
   data/
-    locations.json
-    upload-tags.json
-    uploaders.json
+    settings.*.json
+    upload-tmp/
 ```
 
 Initial setup:
@@ -147,7 +140,7 @@ IMMICH_API_KEY=...
 WORDPRESS_URL=http://127.0.0.1
 ```
 
-Copy production JSON config files manually into:
+Runtime settings and upload temp files are written under:
 
 ```text
 /opt/artasia-galaxy/data/

@@ -10,7 +10,36 @@ add_action('rest_api_init', function () {
         'callback'            => 'artasia_get_expanded_placements',
         'permission_callback' => '__return_true',
     ]);
+
+    register_rest_route('artasia/v1', '/uploaders', [
+        'methods'             => 'GET',
+        'callback'            => 'artasia_get_uploaders',
+        'permission_callback' => '__return_true',
+    ]);
 });
+
+function artasia_get_uploaders(): WP_REST_Response
+{
+    $people_query = new WP_Query([
+        'post_type'      => 'artasia_people',
+        'posts_per_page' => -1,
+        'post_status'    => 'publish',
+        'orderby'        => 'title',
+        'order'          => 'ASC',
+    ]);
+
+    $results = [];
+    foreach ($people_query->posts as $person) {
+        $results[] = [
+            'id'    => $person->ID,
+            'name'  => $person->post_title,
+            'role'  => get_post_meta($person->ID, 'artasia_role', true) ?: 'Artist Educator',
+            'email' => get_post_meta($person->ID, 'artasia_email', true) ?: '',
+        ];
+    }
+
+    return rest_ensure_response($results);
+}
 
 function artasia_get_expanded_placements(): WP_REST_Response
 {

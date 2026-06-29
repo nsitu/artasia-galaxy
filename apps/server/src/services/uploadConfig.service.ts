@@ -1,7 +1,6 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import {
   getArtasiaPlacements,
+  getArtasiaUploaders,
   getUploadTags,
   type WpArtasiaPlacement,
 } from "../infra/WordPressClient.js";
@@ -26,31 +25,7 @@ export interface UploadConfig {
   uploaders: string[];
 }
 
-function resolveDataDir() {
-  if (process.env.DATA_DIR) return process.env.DATA_DIR;
-
-  const candidates = [
-    join(process.cwd(), "data"),
-    join(process.cwd(), "../../data"),
-  ];
-
-  return candidates.find((candidate) => existsSync(join(candidate, "upload-tags.json"))) ?? candidates[0];
-}
-
-const DATA_DIR = resolveDataDir();
 const RESERVED_ALBUMS = new Set(["published"]);
-
-function readJson<T>(fileName: string, fallback: T): T {
-  const path = join(DATA_DIR, fileName);
-  if (!existsSync(path)) return fallback;
-
-  try {
-    return JSON.parse(readFileSync(path, "utf-8")) as T;
-  } catch (err) {
-    console.warn(`[upload-config] failed to read ${path}: ${(err as Error).message}`);
-    return fallback;
-  }
-}
 
 function cleanString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -103,10 +78,13 @@ function mapWpPlacement(wp: WpArtasiaPlacement): ArtasiaPlacement {
 }
 
 export async function getUploadConfig(): Promise<UploadConfig> {
-  const wpPlacements = await getArtasiaPlacements();
+  const [wpPlacements, wpUploaders] = await Promise.all([
+    getArtasiaPlacements(),
+    getArtasiaUploaders(),
+  ]);
   const placements = wpPlacements.map(mapWpPlacement);
   const tags = cleanStringList(await getUploadTags());
-  const uploaders = cleanStringList(readJson<unknown>("uploaders.json", []), {
+  const uploaders = cleanStringList(wpUploaders.map((uploader) => uploader.name), {
     excludeReservedAlbums: true,
   });
 

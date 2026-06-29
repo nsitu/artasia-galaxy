@@ -63,6 +63,9 @@ let lastKnownGood: WpArtasiaPlacement[] | null = null;
 let uploadTagCache: { data: string[]; timestamp: number } | null = null;
 let uploadTagLastKnownGood: string[] | null = null;
 
+let uploaderCache: { data: WpPerson[]; timestamp: number } | null = null;
+let uploaderLastKnownGood: WpPerson[] | null = null;
+
 export function getWordPressConfig() {
   return { url: WORDPRESS_URL };
 }
@@ -145,6 +148,29 @@ export async function getUploadTags({
     if (!forceFresh && uploadTagLastKnownGood) {
       console.warn("[WordPress] serving last-known-good upload tags");
       return uploadTagLastKnownGood;
+    }
+    throw err;
+  }
+}
+
+export async function getArtasiaUploaders({
+  forceFresh = false,
+}: { forceFresh?: boolean } = {}): Promise<WpPerson[]> {
+  if (!forceFresh && uploaderCache && Date.now() - uploaderCache.timestamp < CACHE_TTL_MS) {
+    return uploaderCache.data;
+  }
+
+  try {
+    const res = await wpRequest("/wp-json/artasia/v1/uploaders");
+    const data = (await res.json()) as WpPerson[];
+    uploaderCache = { data, timestamp: Date.now() };
+    uploaderLastKnownGood = data;
+    return data;
+  } catch (err) {
+    console.warn(`[WordPress] failed to fetch uploaders: ${(err as Error).message}`);
+    if (!forceFresh && uploaderLastKnownGood) {
+      console.warn("[WordPress] serving last-known-good uploaders");
+      return uploaderLastKnownGood;
     }
     throw err;
   }
