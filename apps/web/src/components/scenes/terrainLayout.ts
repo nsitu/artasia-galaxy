@@ -21,6 +21,10 @@ export interface TerrainRequest {
   estimatedSatelliteTiles: number;
 }
 
+export interface TerrainDetailRequest extends TerrainRequest {
+  center: [number, number];
+}
+
 export interface TerrainPhotoLayoutItem {
   photo: Photo;
   index: number;
@@ -33,6 +37,7 @@ const RADIUS_PADDING = 1.35;
 const TERRAIN_UNITS_SIDE = 12;
 const CLUSTER_RADIUS = 0.75;
 const MAX_HIGH_DETAIL_SATELLITE_TILES = 72;
+const MAX_DETAIL_SATELLITE_TILES = 64;
 const HIGH_DETAIL_ZOOMS = [17, 16, 15, 14, 13, 12] as const;
 
 export function getGeoPhotos(photos: Photo[]): GeoPhoto[] {
@@ -87,6 +92,32 @@ export function createTerrainPhotoLayout(
       position: [x + offset[0], y + offset[1], z],
     };
   });
+}
+
+export function createTerrainDetailRequest({
+  origin,
+  center,
+  radiusKm,
+  baseUnitsPerMeter,
+  baseZoom,
+}: {
+  origin: [number, number];
+  center: [number, number];
+  radiusKm: number;
+  baseUnitsPerMeter: number;
+  baseZoom: number;
+}): TerrainDetailRequest | null {
+  const zoom = chooseBoundedDetailZoom(origin, radiusKm, baseZoom);
+  if (!zoom) return null;
+
+  return {
+    origin,
+    center,
+    radiusKm,
+    zoom,
+    unitsSide: baseUnitsPerMeter * radiusKm * Math.SQRT2 * 1000,
+    estimatedSatelliteTiles: estimateSatelliteTileCount(origin, radiusKm, zoom),
+  };
 }
 
 export function getTerrainLayoutBounds(layout: TerrainPhotoLayoutItem[], unitsSide: number) {
@@ -144,6 +175,17 @@ function chooseTerrainZoom(origin: [number, number], radiusKm: number, furthestK
   }
 
   return baseZoom;
+}
+
+function chooseBoundedDetailZoom(origin: [number, number], radiusKm: number, baseZoom: number) {
+  for (const zoom of HIGH_DETAIL_ZOOMS) {
+    if (zoom <= baseZoom) return null;
+    if (estimateSatelliteTileCount(origin, radiusKm, zoom) <= MAX_DETAIL_SATELLITE_TILES) {
+      return zoom;
+    }
+  }
+
+  return null;
 }
 
 function chooseRegionalTerrainZoom(radiusKm: number) {
