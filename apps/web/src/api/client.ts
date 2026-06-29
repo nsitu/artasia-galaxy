@@ -87,6 +87,16 @@ export interface UploadUploader {
   email?: string;
 }
 
+export interface MapPlacement {
+  placement_id: number;
+  placement_name: string;
+  partner_name?: string;
+  place_name?: string;
+  address?: string;
+  lat: number;
+  lng: number;
+}
+
 export interface UploadOptions {
   placements: UploadPlacement[];
   tags: string[];
@@ -107,6 +117,15 @@ export interface UploadResult {
 
 export async function fetchUploadOptions(): Promise<UploadOptions> {
   const res = await fetch("/api/v1/uploads/options");
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function fetchMapPlacements(): Promise<MapPlacement[]> {
+  const res = await fetch("/api/v1/placements");
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(body.error ?? `HTTP ${res.status}`);

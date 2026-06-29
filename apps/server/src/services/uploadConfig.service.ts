@@ -22,6 +22,16 @@ export interface ArtasiaPlacement {
   lng?: number;
 }
 
+export interface ArtasiaMapPlacement {
+  placement_id: number;
+  placement_name: string;
+  partner_name?: string;
+  place_name?: string;
+  address?: string;
+  lat: number;
+  lng: number;
+}
+
 export interface UploadUploader {
   id: number;
   name: string;
@@ -110,6 +120,28 @@ export async function getUploadConfig(): Promise<UploadConfig> {
     .filter((uploader) => uploader.name && !RESERVED_ALBUMS.has(normalizeKey(uploader.name)));
 
   return { placements, tags, uploaders };
+}
+
+export async function getMapPlacements(): Promise<ArtasiaMapPlacement[]> {
+  const wpPlacements = await getArtasiaPlacements();
+
+  return wpPlacements.flatMap((wp) => {
+    const lat = wp.place?.lat;
+    const lng = wp.place?.lng;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) {
+      return [];
+    }
+
+    return [{
+      placement_id: wp.placement_id,
+      placement_name: wp.placement_name,
+      ...(wp.partner?.name ? { partner_name: wp.partner.name } : {}),
+      ...(wp.place?.name ? { place_name: wp.place.name } : {}),
+      ...(wp.place?.address ? { address: wp.place.address } : {}),
+      lat: lat as number,
+      lng: lng as number,
+    }];
+  });
 }
 
 export async function findConfiguredPlacement(placement_id: number): Promise<WpArtasiaPlacement | undefined> {

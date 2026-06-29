@@ -8,6 +8,11 @@ export interface GeoPhoto {
   lng: number;
 }
 
+export interface TerrainCoordinate {
+  lat: number;
+  lng: number;
+}
+
 export interface TerrainRequest {
   origin: [number, number];
   radiusKm: number;
@@ -39,17 +44,17 @@ export function getGeoPhotos(photos: Photo[]): GeoPhoto[] {
   });
 }
 
-export function createTerrainRequest(geoPhotos: GeoPhoto[]): TerrainRequest | null {
-  if (geoPhotos.length === 0) return null;
+export function createTerrainRequest(points: TerrainCoordinate[]): TerrainRequest | null {
+  if (points.length === 0) return null;
 
-  const lats = geoPhotos.map((item) => item.lat);
-  const lngs = geoPhotos.map((item) => item.lng);
+  const lats = points.map((item) => item.lat);
+  const lngs = points.map((item) => item.lng);
   const origin: [number, number] = [
     (Math.min(...lats) + Math.max(...lats)) / 2,
     (Math.min(...lngs) + Math.max(...lngs)) / 2,
   ];
   const furthestKm = Math.max(
-    ...geoPhotos.map((item) => haversineKm(origin, [item.lat, item.lng]))
+    ...points.map((item) => haversineKm(origin, [item.lat, item.lng]))
   );
   const radiusKm = Math.max(furthestKm * RADIUS_PADDING, MIN_RADIUS_KM);
   const zoom = chooseTerrainZoom(origin, radiusKm, furthestKm);
