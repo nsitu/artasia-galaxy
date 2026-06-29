@@ -5,7 +5,7 @@ import { collectDrift } from "./reconcile.service.js";
 export async function initializeImmichStructure() {
   const config = await getUploadConfig();
   await getPublishedAlbum();
-  await ensureConfiguredAlbums(config.uploaders);
+  await ensureConfiguredAlbums(config.uploaders.map((uploader) => uploader.name));
 }
 
 export async function logReconcileDriftAtBoot() {

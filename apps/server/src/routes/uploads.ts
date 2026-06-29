@@ -14,10 +14,10 @@ import {
 import { uploadRateLimit } from "../middleware/uploadRateLimit.js";
 import {
   findConfiguredPlacement,
+  findConfiguredUploader,
   getPlacementTagNames,
   getAllowedTagNames,
   getUploadConfig,
-  isConfiguredUploader,
 } from "../services/uploadConfig.service.js";
 import {
   ALLOWED_UPLOAD_EXTENSIONS,
@@ -141,17 +141,29 @@ router.post(
 
     try {
       const uploader = typeof req.body.uploader === "string" ? req.body.uploader.trim() : "";
+      const uploader_id = parseInt(typeof req.body.uploader_id === "string" ? req.body.uploader_id.trim() : "", 10);
       const placement_id = parseInt(typeof req.body.placement_id === "string" ? req.body.placement_id.trim() : "", 10);
-      const location = await findConfiguredPlacement(placement_id);
+      const [location, selectedUploader] = await Promise.all([
+        findConfiguredPlacement(placement_id),
+        findConfiguredUploader({
+          id: Number.isFinite(uploader_id) ? uploader_id : undefined,
+          name: uploader,
+        }),
+      ]);
       const selectedTags = await getAllowedTagNames(parseTags(req.body.tags));
 
-      if (!uploader || !await isConfiguredUploader(uploader)) {
+      if (!selectedUploader) {
         res.status(400).json({ error: "Select a valid uploader." });
         return;
       }
 
       if (!location) {
         res.status(400).json({ error: "Select a valid placement." });
+        return;
+      }
+
+      if (location.team_member?.id !== selectedUploader.id) {
+        res.status(400).json({ error: "Select a placement assigned to the selected uploader." });
         return;
       }
 
@@ -174,7 +186,7 @@ router.post(
         return;
       }
 
-      const album = await ensureAlbum(uploader);
+      const album = await ensureAlbum(selectedUploader.name);
       const tagNames = [...selectedTags, ...getPlacementTagNames(location)];
 
       const results = await processWithConcurrency(files, 2, async (file) => {
@@ -219,7 +231,8 @@ router.post(
       });
 
       res.json({
-        uploader,
+        uploader: selectedUploader.name,
+        uploader_id: selectedUploader.id,
         placement_id,
         tags: tagNames,
         results,

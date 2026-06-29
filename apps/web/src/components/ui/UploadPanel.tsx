@@ -21,7 +21,7 @@ interface UploadPanelProps {
 
 export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
   const [options, setOptions] = useState<UploadOptions | null>(null);
-  const [uploader, setUploader] = useState("");
+  const [uploaderKey, setUploaderKey] = useState("");
   const [placementKey, setPlacementKey] = useState("");
   const [selectedTag, setSelectedTag] = useState("");
   const [items, setItems] = useState<UploadItem[]>([]);
@@ -40,18 +40,36 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
     fetchUploadOptions()
       .then((data) => {
         setOptions(data);
-        setUploader(data.uploaders[0] ?? "");
         setSelectedTag(data.tags[0] ?? "");
       })
       .catch((err) => setError((err as Error).message));
   }, [visible, options]);
 
-  const selectedPlacement = useMemo(() => {
+  const selectedUploader = useMemo(() => {
     if (!options) return null;
-    return options.placements.find((placement) => String(placement.placement_id) === placementKey) ?? null;
-  }, [placementKey, options]);
+    return options.uploaders.find((uploader) => String(uploader.id) === uploaderKey) ?? null;
+  }, [options, uploaderKey]);
+
+  const filteredPlacements = useMemo(() => {
+    if (!options || !selectedUploader) return [];
+    return options.placements.filter((placement) => placement.team_member_id === selectedUploader.id);
+  }, [options, selectedUploader]);
+
+  const selectedPlacement = useMemo(() => {
+    return filteredPlacements.find((placement) => String(placement.placement_id) === placementKey) ?? null;
+  }, [filteredPlacements, placementKey]);
+
+  useEffect(() => {
+    setPlacementKey((current) =>
+      filteredPlacements.some((placement) => String(placement.placement_id) === current) ? current : ""
+    );
+  }, [filteredPlacements]);
 
   function addFiles(fileList: FileList | File[]) {
+    if (!selectedUploader) {
+      setError("Select an uploader before adding files.");
+      return;
+    }
     if (!selectedPlacement) {
       setError("Select a placement before adding files.");
       return;
@@ -75,16 +93,16 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
     const hasQueued = items.some((item) => item.status === "queued");
     if (!hasQueued || uploadInProgressRef.current) return;
     void uploadQueued();
-  }, [items, visible, uploader, selectedPlacement, selectedTag]);
+  }, [items, visible, selectedUploader, selectedPlacement, selectedTag]);
 
   async function uploadQueued() {
     if (uploadInProgressRef.current) return;
-    if (!selectedPlacement) {
-      setError("Select a placement.");
+    if (!selectedUploader) {
+      setError("Select an uploader.");
       return;
     }
-    if (!uploader) {
-      setError("Select an uploader.");
+    if (!selectedPlacement) {
+      setError("Select a placement.");
       return;
     }
 
@@ -108,7 +126,7 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
         try {
           const results = await uploadFiles({
             files: [item.file],
-            uploader,
+            uploader: selectedUploader,
             location: selectedPlacement,
             tags: selectedTag ? [selectedTag] : [],
             onProgress: (progress) => {
@@ -173,10 +191,20 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
         <div style={fieldGridStyle}>
           <label style={labelStyle}>
             Uploader
-            <select value={uploader} onChange={(e) => setUploader(e.target.value)} style={inputStyle}>
-              {(options?.uploaders ?? []).map((name) => (
-                <option key={name} value={name}>
-                  {name}
+            <select
+              value={uploaderKey}
+              onChange={(e) => {
+                setUploaderKey(e.target.value);
+                setPlacementKey("");
+                setError(null);
+              }}
+              style={inputStyle}
+              required
+            >
+              <option value="">Select an uploader</option>
+              {(options?.uploaders ?? []).map((uploader) => (
+                <option key={uploader.id} value={String(uploader.id)}>
+                  {uploader.name}
                 </option>
               ))}
             </select>
@@ -191,10 +219,13 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
                 setError(null);
               }}
               style={inputStyle}
+              disabled={!selectedUploader}
               required
             >
-              <option value="">Select a placement</option>
-              {(options?.placements ?? []).map((placement) => (
+              <option value="">
+                {selectedUploader ? "Select a placement" : "Select an uploader first"}
+              </option>
+              {filteredPlacements.map((placement) => (
                 <option key={placement.placement_id} value={String(placement.placement_id)}>
                   {placementLabel(placement)}
                 </option>
@@ -225,6 +256,10 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
             addFiles(e.dataTransfer.files);
           }}
           onClick={() => {
+            if (!selectedUploader) {
+              setError("Select an uploader before adding files.");
+              return;
+            }
             if (!selectedPlacement) {
               setError("Select a placement before adding files.");
               return;
@@ -232,7 +267,7 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
             inputRef.current?.click();
           }}
         >
-          {selectedPlacement ? "Drop images or videos here" : "Select a placement first"}
+          {selectedPlacement ? "Drop images or videos here" : "Select an uploader and placement first"}
           <span style={{ color: "#777", marginTop: 6 }}>
             {selectedPlacement ? "or click to choose files" : "then drop files or click to choose"}
           </span>
@@ -242,7 +277,7 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
             multiple
             accept="image/*,video/*"
             style={{ display: "none" }}
-            disabled={!selectedPlacement}
+            disabled={!selectedUploader || !selectedPlacement}
             onChange={(e) => e.target.files && addFiles(e.target.files)}
           />
         </div>

@@ -3,11 +3,14 @@ import {
   getArtasiaUploaders,
   getUploadTags,
   type WpArtasiaPlacement,
+  type WpPerson,
 } from "../infra/WordPressClient.js";
 
 export interface ArtasiaPlacement {
   placement_id: number;
   placement_name: string;
+  team_member_id?: number;
+  team_member_name?: string;
   partner_name: string;
   delivery_weekday?: string;
   delivery_start_time?: string;
@@ -19,10 +22,17 @@ export interface ArtasiaPlacement {
   lng?: number;
 }
 
+export interface UploadUploader {
+  id: number;
+  name: string;
+  role: string;
+  email?: string;
+}
+
 export interface UploadConfig {
   placements: ArtasiaPlacement[];
   tags: string[];
-  uploaders: string[];
+  uploaders: UploadUploader[];
 }
 
 const RESERVED_ALBUMS = new Set(["published"]);
@@ -59,12 +69,23 @@ function normalizeKey(value: string) {
   return value.trim().toLowerCase();
 }
 
+function mapWpUploader(uploader: WpPerson): UploadUploader {
+  return {
+    id: uploader.id,
+    name: uploader.name,
+    role: uploader.role,
+    ...(uploader.email ? { email: uploader.email } : {}),
+  };
+}
+
 function mapWpPlacement(wp: WpArtasiaPlacement): ArtasiaPlacement {
   const lat = wp.place?.lat;
   const lng = wp.place?.lng;
   return {
     placement_id: wp.placement_id,
     placement_name: wp.placement_name,
+    ...(wp.team_member?.id ? { team_member_id: wp.team_member.id } : {}),
+    ...(wp.team_member?.name ? { team_member_name: wp.team_member.name } : {}),
     partner_name: wp.partner?.name ?? "",
     ...(wp.delivery_weekday ? { delivery_weekday: wp.delivery_weekday } : {}),
     ...(wp.delivery_start_time ? { delivery_start_time: wp.delivery_start_time } : {}),
@@ -84,9 +105,9 @@ export async function getUploadConfig(): Promise<UploadConfig> {
   ]);
   const placements = wpPlacements.map(mapWpPlacement);
   const tags = cleanStringList(await getUploadTags());
-  const uploaders = cleanStringList(wpUploaders.map((uploader) => uploader.name), {
-    excludeReservedAlbums: true,
-  });
+  const uploaders = wpUploaders
+    .map(mapWpUploader)
+    .filter((uploader) => uploader.name && !RESERVED_ALBUMS.has(normalizeKey(uploader.name)));
 
   return { placements, tags, uploaders };
 }
@@ -105,10 +126,18 @@ export async function getAllowedTagNames(requestedTags: unknown): Promise<string
     .filter((tag): tag is string => Boolean(tag));
 }
 
-export async function isConfiguredUploader(value: string): Promise<boolean> {
-  const key = normalizeKey(value);
+export async function findConfiguredUploader(params: {
+  id?: number;
+  name?: string;
+}): Promise<UploadUploader | undefined> {
   const config = await getUploadConfig();
-  return config.uploaders.some((uploader) => normalizeKey(uploader) === key);
+  if (params.id != null && Number.isFinite(params.id)) {
+    return config.uploaders.find((uploader) => uploader.id === params.id);
+  }
+
+  const key = normalizeKey(params.name ?? "");
+  if (!key) return undefined;
+  return config.uploaders.find((uploader) => normalizeKey(uploader.name) === key);
 }
 
 export const PLACEMENT_ANCHOR_TAG_PREFIX = "placement:";
