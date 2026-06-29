@@ -15,6 +15,7 @@ define('ARTASIA_LOCATIONS_PATH', plugin_dir_path(__FILE__));
 define('ARTASIA_LOCATIONS_URL', plugin_dir_url(__FILE__));
 
 require_once ARTASIA_LOCATIONS_PATH . 'includes/post-types.php';
+require_once ARTASIA_LOCATIONS_PATH . 'includes/taxonomies.php';
 require_once ARTASIA_LOCATIONS_PATH . 'includes/meta-fields.php';
 require_once ARTASIA_LOCATIONS_PATH . 'includes/meta-boxes.php';
 require_once ARTASIA_LOCATIONS_PATH . 'includes/rest-fields.php';
@@ -93,5 +94,6 @@ add_filter('wp_check_filetype_and_ext', 'artasia_check_svg_filetype', 10, 4);
 
 register_activation_hook(__FILE__, function () {
     artasia_register_post_types();
+    artasia_register_upload_tag_taxonomy();
     flush_rewrite_rules();
 });

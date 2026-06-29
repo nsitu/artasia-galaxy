@@ -1,8 +1,28 @@
 import { ensureConfiguredAlbums, getPublishedAlbum } from "../infra/ImmichClient.js";
 import { getUploadConfig } from "./uploadConfig.service.js";
+import { collectDrift } from "./reconcile.service.js";
 
 export async function initializeImmichStructure() {
   const config = await getUploadConfig();
   await getPublishedAlbum();
   await ensureConfiguredAlbums(config.uploaders);
+}
+
+export async function logReconcileDriftAtBoot() {
+  if (process.env.RECONCILE_SKIP_BOOT_DRIFT === "1") return;
+  try {
+    const drift = await collectDrift();
+    const stale = drift.staleDerived.length;
+    const orphaned = drift.orphaned.length;
+    const restored = drift.restored.length;
+    if (stale || orphaned || restored) {
+      console.warn(
+        `[startup] reconcile drift: ${stale} stale, ${orphaned} orphaned, ${restored} to restore (in-sync: ${drift.inSync}/${drift.scanned})`
+      );
+    } else {
+      console.log(`[startup] reconcile drift: clean (${drift.scanned} anchors in-sync)`);
+    }
+  } catch (err) {
+    console.warn(`[startup] reconcile drift check failed: ${(err as Error).message}`);
+  }
 }

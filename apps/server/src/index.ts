@@ -6,9 +6,10 @@ import assetRoutes from "./routes/assets.js";
 import slideshowRoutes from "./routes/slideshow.js";
 import albumRoutes from "./routes/albums.js";
 import uploadRoutes from "./routes/uploads.js";
+import reconcileRoutes from "./routes/reconcile.js";
 import settingsRoutes, { mountSSE } from "./routes/settings.js";
 import { checkImmichHealth, getImmichConfig } from "./infra/ImmichClient.js";
-import { initializeImmichStructure } from "./services/startup.service.js";
+import { initializeImmichStructure, logReconcileDriftAtBoot } from "./services/startup.service.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -22,6 +23,7 @@ app.use("/api/v1/assets", assetRoutes);
 app.use("/api/v1/slideshow", slideshowRoutes);
 app.use("/api/v1/albums", albumRoutes);
 app.use("/api/v1/uploads", uploadRoutes);
+app.use("/api/v1/reconcile", reconcileRoutes);
 app.use("/api/v1/settings", settingsRoutes);
 mountSSE(app);
 
@@ -70,4 +72,8 @@ app.listen(PORT, () => {
 
 initializeImmichStructure().catch((err) => {
   console.warn(`[startup] Immich structure initialization failed: ${(err as Error).message}`);
+});
+
+logReconcileDriftAtBoot().catch((err) => {
+  console.warn(`[startup] reconcile drift check failed: ${(err as Error).message}`);
 });

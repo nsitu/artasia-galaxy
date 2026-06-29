@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   getArtasiaPlacements,
+  getUploadTags,
   type WpArtasiaPlacement,
 } from "../infra/WordPressClient.js";
 
@@ -102,7 +103,7 @@ function mapWpPlacement(wp: WpArtasiaPlacement): ArtasiaPlacement {
 export async function getUploadConfig(): Promise<UploadConfig> {
   const wpPlacements = await getArtasiaPlacements();
   const placements = wpPlacements.map(mapWpPlacement);
-  const tags = cleanStringList(readJson<unknown>("upload-tags.json", []));
+  const tags = cleanStringList(await getUploadTags());
   const uploaders = cleanStringList(readJson<unknown>("uploaders.json", []), {
     excludeReservedAlbums: true,
   });
@@ -130,6 +131,17 @@ export async function isConfiguredUploader(value: string): Promise<boolean> {
   return config.uploaders.some((uploader) => normalizeKey(uploader) === key);
 }
 
+export const PLACEMENT_ANCHOR_TAG_PREFIX = "placement:";
+export const PLACEMENT_ANCHOR_TAG_PATTERN = /^placement:(\d+)$/;
+
+export function placementAnchorTag(postId: number): string {
+  return `${PLACEMENT_ANCHOR_TAG_PREFIX}${postId}`;
+}
+
 export function getPlacementTagNames(location: WpArtasiaPlacement): string[] {
-  return nonEmptyValues([location.partner?.name, location.placement_name]);
+  return nonEmptyValues([
+    placementAnchorTag(location.placement_id),
+    location.partner?.name,
+    location.placement_name,
+  ]);
 }

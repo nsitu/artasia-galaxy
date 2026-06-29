@@ -58,6 +58,9 @@ const CACHE_TTL_MS = 60_000;
 let cache: { data: WpArtasiaPlacement[]; timestamp: number } | null = null;
 let lastKnownGood: WpArtasiaPlacement[] | null = null;
 
+let uploadTagCache: { data: string[]; timestamp: number } | null = null;
+let uploadTagLastKnownGood: string[] | null = null;
+
 export function getWordPressConfig() {
   return { url: WORDPRESS_URL };
 }
@@ -87,8 +90,10 @@ async function wpRequest(path: string): Promise<Response> {
   return res;
 }
 
-export async function getArtasiaPlacements(): Promise<WpArtasiaPlacement[]> {
-  if (cache && Date.now() - cache.timestamp < CACHE_TTL_MS) {
+export async function getArtasiaPlacements({
+  forceFresh = false,
+}: { forceFresh?: boolean } = {}): Promise<WpArtasiaPlacement[]> {
+  if (!forceFresh && cache && Date.now() - cache.timestamp < CACHE_TTL_MS) {
     return cache.data;
   }
 
@@ -100,9 +105,44 @@ export async function getArtasiaPlacements(): Promise<WpArtasiaPlacement[]> {
     return data;
   } catch (err) {
     console.warn(`[WordPress] failed to fetch placements: ${(err as Error).message}`);
-    if (lastKnownGood) {
+    if (!forceFresh && lastKnownGood) {
       console.warn("[WordPress] serving last-known-good cache");
       return lastKnownGood;
+    }
+    throw err;
+  }
+}
+
+interface WpUploadTagTerm {
+  name: string;
+  count?: number;
+}
+
+export async function getUploadTags({
+  forceFresh = false,
+}: { forceFresh?: boolean } = {}): Promise<string[]> {
+  if (!forceFresh && uploadTagCache && Date.now() - uploadTagCache.timestamp < CACHE_TTL_MS) {
+    return uploadTagCache.data;
+  }
+
+  try {
+    const res = await wpRequest("/wp-json/wp/v2/artasia_upload_tag?per_page=100&orderby=name&order=asc");
+    const terms = (await res.json()) as WpUploadTagTerm[];
+    const tags = Array.from(
+      new Set(
+        terms
+          .map((term) => term.name?.trim())
+          .filter((name): name is string => Boolean(name))
+      )
+    );
+    uploadTagCache = { data: tags, timestamp: Date.now() };
+    uploadTagLastKnownGood = tags;
+    return tags;
+  } catch (err) {
+    console.warn(`[WordPress] failed to fetch upload tags: ${(err as Error).message}`);
+    if (!forceFresh && uploadTagLastKnownGood) {
+      console.warn("[WordPress] serving last-known-good upload tags");
+      return uploadTagLastKnownGood;
     }
     throw err;
   }

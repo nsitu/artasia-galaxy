@@ -134,6 +134,8 @@ export async function searchAssets(params: {
   albumId?: string;
   albumIds?: string[];
   personIds?: string[];
+  tagId?: string;
+  tagIds?: string[];
   type?: "IMAGE" | "VIDEO" | "ALL";
   page?: number;
   size?: number;
@@ -151,6 +153,8 @@ export async function searchAssets(params: {
   if (params.albumId) body.albumId = params.albumId;
   if (params.albumIds?.length) body.albumIds = params.albumIds;
   if (params.personIds?.length) body.personIds = params.personIds;
+  if (params.tagId) body.tagId = params.tagId;
+  if (params.tagIds?.length) body.tagIds = params.tagIds;
   if (params.takenAfter) body.takenAfter = params.takenAfter;
   if (params.takenBefore) body.takenBefore = params.takenBefore;
 
@@ -161,6 +165,23 @@ export async function searchAssets(params: {
   });
 
   return res.json();
+}
+
+export async function searchAssetIdsByTag(tagId: string): Promise<string[]> {
+  const assetIds: string[] = [];
+  let page = 1;
+  const size = 100;
+  for (;;) {
+    const res = await searchAssets({ tagId, page, size, type: "ALL" });
+    for (const item of res.assets.items) assetIds.push(item.id);
+    if (!res.assets.nextPage || res.assets.items.length < size) break;
+    page += 1;
+  }
+  return assetIds;
+}
+
+export async function listAssetIdsByTag(tagId: string): Promise<string[]> {
+  return searchAssetIdsByTag(tagId);
 }
 
 export interface ImmichAlbum {
@@ -282,6 +303,39 @@ export async function tagAsset(assetId: string, tagNames: string[]) {
       tagIds: tags.map((tag) => tag.id),
     }),
   });
+}
+
+export async function tagAssets(assetIds: string[], tagIds: string[]) {
+  if (assetIds.length === 0 || tagIds.length === 0) return;
+  await immichRequest("/tags/assets", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      assetIds,
+      tagIds,
+    }),
+  });
+}
+
+export async function untagAssets(assetIds: string[], tagIds: string[]) {
+  if (assetIds.length === 0 || tagIds.length === 0) return;
+  await immichRequest("/tags/assets", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      assetIds,
+      tagIds,
+    }),
+  });
+}
+
+export async function renameTag(tagId: string, newName: string): Promise<ImmichTag> {
+  const res = await immichRequest(`/tags/${tagId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: newName.trim() }),
+  });
+  return res.json();
 }
 
 export async function getServerStatistics(): Promise<ImmichServerStats> {

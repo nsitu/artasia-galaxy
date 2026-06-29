@@ -11,6 +11,8 @@ services:
       PORT: 3000
       DATA_DIR: /data
       WORDPRESS_URL: ${WORDPRESS_URL:-https://artsforall.co}
+      RECONCILE_SECRET: ${RECONCILE_SECRET}
+      RECONCILE_SKIP_BOOT_DRIFT: ${RECONCILE_SKIP_BOOT_DRIFT:-0}
     volumes:
       - ./data:/data
     restart: unless-stopped

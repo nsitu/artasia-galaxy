@@ -4,32 +4,60 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-function artasia_register_import_page(): void
+const ARTASIA_TOOLS_PAGE_SLUG = 'artasia-tools';
+
+function artasia_register_tools_page(): void
 {
     add_submenu_page(
         'edit.php?post_type=artasia_placement',
-        'Artasia CSV Import',
-        'CSV Import',
+        'Artasia Tools',
+        'Tools',
         'edit_posts',
-        'artasia-placements-import',
-        'artasia_render_import_page'
+        ARTASIA_TOOLS_PAGE_SLUG,
+        'artasia_render_tools_page'
     );
 }
-add_action('admin_menu', 'artasia_register_import_page');
+add_action('admin_menu', 'artasia_register_tools_page');
 
-function artasia_render_import_page(): void
+function artasia_default_reconcile_url(): string
+{
+    return 'https://galaxy.artsforall.co/api/v1/reconcile';
+}
+
+function artasia_get_reconcile_url(): string
+{
+    $value = get_option('artasia_reconcile_url', '');
+    return $value ? $value : artasia_default_reconcile_url();
+}
+
+function artasia_get_reconcile_secret(): string
+{
+    return (string) get_option('artasia_reconcile_secret', '');
+}
+
+function artasia_render_tools_page(): void
 {
     if (!current_user_can('edit_posts')) {
-        wp_die(esc_html__('You do not have permission to import Artasia placements.', 'wp-artasia-locations'));
+        wp_die(esc_html__('You do not have permission to access Artasia tools.', 'wp-artasia-locations'));
     }
 
     $imported = isset($_GET['imported']) ? intval($_GET['imported']) : null;
     $skipped = isset($_GET['skipped']) ? intval($_GET['skipped']) : null;
     $errors = isset($_GET['errors']) ? intval($_GET['errors']) : null;
 
+    $reconcile_status = isset($_GET['reconcile']) ? sanitize_key((string) $_GET['reconcile']) : '';
+    $reconcile_applied = isset($_GET['applied']) ? intval($_GET['applied']) : null;
+    $reconcile_mutations = isset($_GET['mutations']) ? intval($_GET['mutations']) : null;
+    $reconcile_message = isset($_GET['message']) ? sanitize_text_field((string) $_GET['message']) : '';
+
+    $settings_saved = isset($_GET['settings_saved']) ? true : false;
+    $settings_error = isset($_GET['settings_error']) ? sanitize_text_field((string) $_GET['settings_error']) : '';
+
+    $reconcile_url = artasia_get_reconcile_url();
+    $reconcile_secret_set = (bool) artasia_get_reconcile_secret();
     ?>
     <div class="wrap">
-        <h1>Artasia CSV Import</h1>
+        <h1>Artasia Tools</h1>
 
         <?php if ($imported !== null) : ?>
             <div class="notice notice-success is-dismissible">
@@ -37,21 +65,89 @@ function artasia_render_import_page(): void
             </div>
         <?php endif; ?>
 
+        <?php if ($settings_saved) : ?>
+            <div class="notice notice-success is-dismissible"><p>Reconcile settings saved.</p></div>
+        <?php endif; ?>
+        <?php if ($settings_error) : ?>
+            <div class="notice notice-error is-dismissible"><p><?php echo esc_html($settings_error); ?></p></div>
+        <?php endif; ?>
+
+        <?php if ($reconcile_status === 'success') : ?>
+            <div class="notice notice-success is-dismissible">
+                <p>
+                    <?php
+                    if ($reconcile_applied) {
+                        echo esc_html(sprintf('Reconcile ran successfully. %d mutation(s) applied.', $reconcile_mutations));
+                    } else {
+                        echo esc_html('Reconcile ran. No drift detected — nothing to apply.');
+                    }
+                    ?>
+                </p>
+            </div>
+        <?php elseif ($reconcile_status === 'error') : ?>
+            <div class="notice notice-error is-dismissible">
+                <p><?php echo esc_html(sprintf('Reconcile failed: %s', $reconcile_message ?: 'unknown error')); ?></p>
+            </div>
+        <?php endif; ?>
+
+        <h2>Reconcile Immich</h2>
+        <p>Trigger a manual reconcile between WordPress placement data and Immich tags. The Galaxy server will sync human-readable tags on existing assets via the durable <code>placement:&lt;id&gt;</code> anchor tags, archive orphaned placements, and restore previously archived ones.</p>
+
+        <h3>Settings</h3>
+        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+            <input type="hidden" name="action" value="artasia_save_reconcile_settings" />
+            <?php wp_nonce_field('artasia_save_reconcile_settings', 'artasia_reconcile_settings_nonce'); ?>
+            <table class="form-table">
+                <tr>
+                    <th scope="row"><label for="artasia_reconcile_url">Reconcile endpoint URL</label></th>
+                    <td>
+                        <input type="url" id="artasia_reconcile_url" name="artasia_reconcile_url" value="<?php echo esc_attr($reconcile_url); ?>" class="regular-text" />
+                        <p class="description">Galaxy <code>/api/v1/reconcile</code> endpoint. Production default: <code><?php echo esc_html(artasia_default_reconcile_url()); ?></code>.</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="artasia_reconcile_secret">Reconcile secret</label></th>
+                    <td>
+                        <input type="password" id="artasia_reconcile_secret" name="artasia_reconcile_secret" value="" placeholder="<?php echo $reconcile_secret_set ? '(stored — leave blank to keep)' : ''; ?>" class="regular-text" autocomplete="new-password" />
+                        <p class="description">Shared secret matching the Galaxy server's <code>RECONCILE_SECRET</code> env var. Sent via the <code>x-reconcile-secret</code> header.</p>
+                    </td>
+                </tr>
+            </table>
+            <?php submit_button('Save settings'); ?>
+        </form>
+
+        <h3>Run reconcile</h3>
+        <?php if (!$reconcile_secret_set) : ?>
+            <div class="notice notice-warning inline"><p>The reconcile secret is not set. Save the settings above before running reconcile.</p></div>
+        <?php else : ?>
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                <input type="hidden" name="action" value="artasia_reconcile_run" />
+                <?php wp_nonce_field('artasia_reconcile_run', 'artasia_reconcile_run_nonce'); ?>
+                <p class="submit">
+                    <button type="submit" class="button button-primary" id="artasia-reconcile-run">Run reconcile now</button>
+                    <span class="description">Sends an authenticated POST to the Galaxy reconcile endpoint. May take a few seconds depending on the number of placements and assets.</span>
+                </p>
+            </form>
+        <?php endif; ?>
+
+        <hr />
+
+        <h2>CSV Import</h2>
         <p>Upload a CSV file to create Artasia Projects, Places, Partners, People, and Placements in one pass.</p>
         <p>The importer finds existing Projects, Places, Partners, and People by title. If none exists, it creates them. Placements are matched by placement name, Project, Place, Partner, and Section.</p>
 
-        <h2>CSV Template</h2>
+        <h3>CSV Template</h3>
         <p>
             <a class="button" href="<?php echo esc_url(admin_url('admin-post.php?action=artasia_placements_import_template')); ?>">Download example CSV</a>
         </p>
 
-        <h2>Headers</h2>
+        <h3>Headers</h3>
         <p>Required headers: <code>placement_name</code>, <code>project_name</code>, <code>place_name</code>, <code>partner_name</code>.</p>
         <p>Optional headers: <code>project_year</code>, <code>project_description</code>, <code>program_context</code>, <code>earlyon</code>, <code>section</code>, <code>delivery_weekday</code>, <code>delivery_start_time</code>, <code>delivery_end_time</code>, <code>participants</code>, <code>age_range</code>, <code>place_street_address</code>, <code>place_city</code>, <code>place_postal_code</code>, <code>place_latitude</code>, <code>place_longitude</code>, <code>place_notes</code>, <code>partner_type</code>, <code>partner_website</code>, <code>partner_notes</code>, <code>team_member_name</code>, <code>team_member_role</code>, <code>team_member_notes</code>.</p>
         <p>For <code>earlyon</code>, use values like <code>yes</code>, <code>no</code>, <code>true</code>, <code>false</code>, <code>1</code>, or <code>0</code>.</p>
         <p>For delivery times, use 24-hour values like <code>09:00</code>, <code>09:30</code>, or <code>20:00</code>.</p>
 
-        <h2>Upload CSV</h2>
+        <h3>Upload CSV</h3>
         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" enctype="multipart/form-data">
             <input type="hidden" name="action" value="artasia_placements_import_csv" />
             <?php wp_nonce_field('artasia_placements_import_csv', 'artasia_placements_import_nonce'); ?>
@@ -66,6 +162,83 @@ function artasia_render_import_page(): void
     </div>
     <?php
 }
+
+function artasia_handle_save_reconcile_settings(): void
+{
+    if (!current_user_can('edit_posts')) {
+        wp_die(esc_html__('You do not have permission to update reconcile settings.', 'wp-artasia-locations'));
+    }
+
+    if (!isset($_POST['artasia_reconcile_settings_nonce']) || !wp_verify_nonce($_POST['artasia_reconcile_settings_nonce'], 'artasia_save_reconcile_settings')) {
+        wp_die(esc_html__('Invalid reconcile settings request.', 'wp-artasia-locations'));
+    }
+
+    $url = isset($_POST['artasia_reconcile_url']) ? esc_url_raw(trim((string) $_POST['artasia_reconcile_url'])) : '';
+    if ($url) {
+        update_option('artasia_reconcile_url', $url);
+    } else {
+        delete_option('artasia_reconcile_url');
+    }
+
+    $secret = isset($_POST['artasia_reconcile_secret']) ? trim((string) $_POST['artasia_reconcile_secret']) : '';
+    if ($secret !== '') {
+        update_option('artasia_reconcile_secret', $secret);
+    }
+
+    wp_safe_redirect(add_query_arg(['post_type' => 'artasia_placement', 'page' => ARTASIA_TOOLS_PAGE_SLUG, 'settings_saved' => '1'], admin_url('edit.php')));
+    exit;
+}
+add_action('admin_post_artasia_save_reconcile_settings', 'artasia_handle_save_reconcile_settings');
+
+function artasia_handle_reconcile_run(): void
+{
+    if (!current_user_can('edit_posts')) {
+        wp_die(esc_html__('You do not have permission to run reconcile.', 'wp-artasia-locations'));
+    }
+
+    if (!isset($_POST['artasia_reconcile_run_nonce']) || !wp_verify_nonce($_POST['artasia_reconcile_run_nonce'], 'artasia_reconcile_run')) {
+        wp_die(esc_html__('Invalid reconcile request.', 'wp-artasia-locations'));
+    }
+
+    $url = artasia_get_reconcile_url();
+    $secret = artasia_get_reconcile_secret();
+
+    if (!$secret) {
+        wp_safe_redirect(add_query_arg(['post_type' => 'artasia_placement', 'page' => ARTASIA_TOOLS_PAGE_SLUG, 'reconcile' => 'error', 'message' => 'No secret configured'], admin_url('edit.php')));
+        exit;
+    }
+
+    $response = wp_remote_post($url, [
+        'timeout' => 30,
+        'headers' => [
+            'x-reconcile-secret' => $secret,
+            'Accept' => 'application/json',
+        ],
+    ]);
+
+    if (is_wp_error($response)) {
+        $message = $response->get_error_message() ?: 'WP HTTP error';
+        wp_safe_redirect(add_query_arg(['post_type' => 'artasia_placement', 'page' => ARTASIA_TOOLS_PAGE_SLUG, 'reconcile' => 'error', 'message' => rawurlencode($message)], admin_url('edit.php')));
+        exit;
+    }
+
+    $status_code = wp_remote_retrieve_response_code($response);
+    $body = wp_remote_retrieve_body($response);
+    $decoded = json_decode($body, true);
+
+    if ($status_code < 200 || $status_code >= 300) {
+        $message = is_array($decoded) && !empty($decoded['error']) ? (string) $decoded['error'] : sprintf('HTTP %d', $status_code);
+        wp_safe_redirect(add_query_arg(['post_type' => 'artasia_placement', 'page' => ARTASIA_TOOLS_PAGE_SLUG, 'reconcile' => 'error', 'message' => rawurlencode($message)], admin_url('edit.php')));
+        exit;
+    }
+
+    $applied = is_array($decoded) && !empty($decoded['applied']) ? 1 : 0;
+    $mutations = is_array($decoded) && isset($decoded['mutations']) && is_array($decoded['mutations']) ? count($decoded['mutations']) : 0;
+
+    wp_safe_redirect(add_query_arg(['post_type' => 'artasia_placement', 'page' => ARTASIA_TOOLS_PAGE_SLUG, 'reconcile' => 'success', 'applied' => $applied, 'mutations' => $mutations], admin_url('edit.php')));
+    exit;
+}
+add_action('admin_post_artasia_reconcile_run', 'artasia_handle_reconcile_run');
 
 function artasia_download_import_template(): void
 {
@@ -443,7 +616,7 @@ function artasia_redirect_import_page(array $result): void
 {
     wp_safe_redirect(add_query_arg([
         'post_type' => 'artasia_placement',
-        'page' => 'artasia-placements-import',
+        'page' => ARTASIA_TOOLS_PAGE_SLUG,
         'imported' => intval($result['imported'] ?? 0),
         'skipped' => intval($result['skipped'] ?? 0),
         'errors' => intval($result['errors'] ?? 0),
