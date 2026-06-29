@@ -119,6 +119,7 @@ function artasia_place_columns(array $columns): array
         if ($key === 'title') {
             $new['artasia_address'] = 'Address';
             $new['artasia_city']    = 'City';
+            $new['artasia_shared_with'] = 'Shared With';
         }
     }
     return $new;
@@ -133,6 +134,9 @@ function artasia_place_column(string $column, int $post_id): void
             break;
         case 'artasia_city':
             echo esc_html(get_post_meta($post_id, 'artasia_city', true) ?: '—');
+            break;
+        case 'artasia_shared_with':
+            echo esc_html(get_post_meta($post_id, 'artasia_shared_with', true) ?: '—');
             break;
     }
 }
@@ -189,6 +193,7 @@ function artasia_people_columns(array $columns): array
         $new[$key] = $label;
         if ($key === 'title') {
             $new['artasia_role'] = 'Role';
+            $new['artasia_email'] = 'Email';
             $new['artasia_photo'] = 'Photo';
             $new['artasia_assigned_placements'] = 'Assigned Placements';
         }
@@ -202,6 +207,10 @@ function artasia_people_column(string $column, int $post_id): void
     switch ($column) {
         case 'artasia_role':
             echo esc_html(get_post_meta($post_id, 'artasia_role', true) ?: 'Artist Educator');
+            break;
+        case 'artasia_email':
+            $email = get_post_meta($post_id, 'artasia_email', true);
+            echo $email ? '<a href="mailto:' . esc_attr($email) . '">' . esc_html($email) . '</a>' : '—';
             break;
         case 'artasia_photo':
             $photo_id = intval(get_post_meta($post_id, 'artasia_photo_id', true));

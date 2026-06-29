@@ -151,7 +151,7 @@ router.post(
       }
 
       if (!location) {
-        res.status(400).json({ error: "Select a valid Artasia location." });
+        res.status(400).json({ error: "Select a valid placement." });
         return;
       }
 

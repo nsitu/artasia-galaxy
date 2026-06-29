@@ -15,6 +15,7 @@ export interface ArtasiaPlacement {
   delivery_end_time?: string;
   delivery_schedule?: string;
   address?: string;
+  shared_with?: string;
   lat?: number;
   lng?: number;
 }
@@ -95,6 +96,7 @@ function mapWpPlacement(wp: WpArtasiaPlacement): ArtasiaPlacement {
     ...(wp.delivery_end_time ? { delivery_end_time: wp.delivery_end_time } : {}),
     ...(wp.delivery_schedule ? { delivery_schedule: wp.delivery_schedule } : {}),
     ...(wp.place?.address ? { address: wp.place.address } : {}),
+    ...(wp.place?.shared_with ? { shared_with: wp.place.shared_with } : {}),
     ...(lat != null && lat !== 0 ? { lat } : {}),
     ...(lng != null && lng !== 0 ? { lng } : {}),
   };

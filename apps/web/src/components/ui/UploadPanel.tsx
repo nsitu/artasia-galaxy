@@ -42,8 +42,6 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
         setOptions(data);
         setUploader(data.uploaders[0] ?? "");
         setSelectedTag(data.tags[0] ?? "");
-        const firstPlacement = data.placements[0];
-        if (firstPlacement) setPlacementKey(String(firstPlacement.placement_id));
       })
       .catch((err) => setError((err as Error).message));
   }, [visible, options]);
@@ -54,6 +52,11 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
   }, [placementKey, options]);
 
   function addFiles(fileList: FileList | File[]) {
+    if (!selectedPlacement) {
+      setError("Select a placement before adding files.");
+      return;
+    }
+
     const files = Array.from(fileList);
     setError(null);
     setItems((current) => [
@@ -183,9 +186,14 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
             Placement
             <select
               value={placementKey}
-              onChange={(e) => setPlacementKey(e.target.value)}
+              onChange={(e) => {
+                setPlacementKey(e.target.value);
+                setError(null);
+              }}
               style={inputStyle}
+              required
             >
+              <option value="">Select a placement</option>
               {(options?.placements ?? []).map((placement) => (
                 <option key={placement.placement_id} value={String(placement.placement_id)}>
                   {placementLabel(placement)}
@@ -216,16 +224,25 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
             e.preventDefault();
             addFiles(e.dataTransfer.files);
           }}
-          onClick={() => inputRef.current?.click()}
+          onClick={() => {
+            if (!selectedPlacement) {
+              setError("Select a placement before adding files.");
+              return;
+            }
+            inputRef.current?.click();
+          }}
         >
-          Drop images or videos here
-          <span style={{ color: "#777", marginTop: 6 }}>or click to choose files</span>
+          {selectedPlacement ? "Drop images or videos here" : "Select a placement first"}
+          <span style={{ color: "#777", marginTop: 6 }}>
+            {selectedPlacement ? "or click to choose files" : "then drop files or click to choose"}
+          </span>
           <input
             ref={inputRef}
             type="file"
             multiple
             accept="image/*,video/*"
             style={{ display: "none" }}
+            disabled={!selectedPlacement}
             onChange={(e) => e.target.files && addFiles(e.target.files)}
           />
         </div>

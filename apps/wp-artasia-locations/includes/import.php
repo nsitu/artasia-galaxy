@@ -143,7 +143,7 @@ function artasia_render_tools_page(): void
 
         <h3>Headers</h3>
         <p>Required headers: <code>placement_name</code>, <code>project_name</code>, <code>place_name</code>, <code>partner_name</code>.</p>
-        <p>Optional headers: <code>project_year</code>, <code>project_description</code>, <code>program_context</code>, <code>earlyon</code>, <code>section</code>, <code>delivery_weekday</code>, <code>delivery_start_time</code>, <code>delivery_end_time</code>, <code>participants</code>, <code>age_range</code>, <code>place_street_address</code>, <code>place_city</code>, <code>place_postal_code</code>, <code>place_latitude</code>, <code>place_longitude</code>, <code>place_notes</code>, <code>partner_type</code>, <code>partner_website</code>, <code>partner_notes</code>, <code>team_member_name</code>, <code>team_member_role</code>, <code>team_member_notes</code>.</p>
+        <p>Optional headers: <code>project_year</code>, <code>project_description</code>, <code>program_context</code>, <code>earlyon</code>, <code>section</code>, <code>delivery_weekday</code>, <code>delivery_start_time</code>, <code>delivery_end_time</code>, <code>participants</code>, <code>age_range</code>, <code>place_street_address</code>, <code>place_city</code>, <code>place_postal_code</code>, <code>place_shared_with</code>, <code>place_latitude</code>, <code>place_longitude</code>, <code>place_notes</code>, <code>partner_type</code>, <code>partner_website</code>, <code>partner_notes</code>, <code>team_member_name</code>, <code>team_member_role</code>, <code>team_member_email</code>, <code>team_member_notes</code>.</p>
         <p>For <code>earlyon</code>, use values like <code>yes</code>, <code>no</code>, <code>true</code>, <code>false</code>, <code>1</code>, or <code>0</code>.</p>
         <p>For delivery times, use 24-hour values like <code>09:00</code>, <code>09:30</code>, or <code>20:00</code>.</p>
 
@@ -256,6 +256,7 @@ function artasia_download_import_template(): void
         'place_street_address' => '55 York Blvd',
         'place_city' => 'Hamilton',
         'place_postal_code' => 'L8R 3K1',
+        'place_shared_with' => 'Central Public School',
         'place_latitude' => '43.258',
         'place_longitude' => '-79.872',
         'place_notes' => 'Use main entrance',
@@ -265,6 +266,7 @@ function artasia_download_import_template(): void
         'partner_notes' => 'Library partner',
         'team_member_name' => 'Taylor Morgan',
         'team_member_role' => 'Artist Educator',
+        'team_member_email' => 'taylor@example.org',
         'team_member_notes' => 'Team member notes for this placement',
         'program_context' => 'Beyond the Bell',
         'earlyon' => 'no',
@@ -393,6 +395,7 @@ function artasia_import_location_record(array $record): string
     artasia_import_update_meta_if_present($place_id, 'artasia_address', $record, 'place_street_address', 'sanitize_text_field');
     artasia_import_update_meta_if_present($place_id, 'artasia_city', $record, 'place_city', 'sanitize_text_field');
     artasia_import_update_meta_if_present($place_id, 'artasia_postal_code', $record, 'place_postal_code', 'sanitize_text_field');
+    artasia_import_update_meta_if_present($place_id, 'artasia_shared_with', $record, 'place_shared_with', 'sanitize_text_field');
     artasia_import_update_meta_if_present($place_id, 'artasia_lat', $record, 'place_latitude', 'floatval');
     artasia_import_update_meta_if_present($place_id, 'artasia_lng', $record, 'place_longitude', 'floatval');
     artasia_import_update_meta_if_present($place_id, 'artasia_accessibility_notes', $record, 'place_notes', 'sanitize_textarea_field');
@@ -403,6 +406,7 @@ function artasia_import_location_record(array $record): string
 
     if ($team_member_id) {
         update_post_meta($team_member_id, 'artasia_role', sanitize_text_field(artasia_import_value($record, 'team_member_role') ?: 'Artist Educator'));
+        artasia_import_update_meta_if_present($team_member_id, 'artasia_email', $record, 'team_member_email', 'sanitize_email');
         artasia_import_update_meta_if_present($team_member_id, 'artasia_notes', $record, 'team_member_notes', 'sanitize_textarea_field');
     }
 
@@ -450,6 +454,7 @@ function artasia_import_csv_headers(): array
         'place_street_address',
         'place_city',
         'place_postal_code',
+        'place_shared_with',
         'place_latitude',
         'place_longitude',
         'place_notes',
@@ -459,6 +464,7 @@ function artasia_import_csv_headers(): array
         'partner_notes',
         'team_member_name',
         'team_member_role',
+        'team_member_email',
         'team_member_notes',
         'program_context',
         'earlyon',

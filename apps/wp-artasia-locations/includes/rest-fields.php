@@ -72,6 +72,7 @@ function artasia_get_expanded_placements(): WP_REST_Response
                 'lng'              => floatval(get_post_meta($place->ID, 'artasia_lng', true)),
                 'city'             => get_post_meta($place->ID, 'artasia_city', true) ?: '',
                 'postal_code'      => get_post_meta($place->ID, 'artasia_postal_code', true) ?: '',
+                'shared_with'      => get_post_meta($place->ID, 'artasia_shared_with', true) ?: '',
                 'accessibility_notes' => get_post_meta($place->ID, 'artasia_accessibility_notes', true) ?: '',
             ];
         }
@@ -109,6 +110,7 @@ function artasia_get_expanded_placements(): WP_REST_Response
                 'id'    => $person->ID,
                 'name'  => $person->post_title,
                 'role'  => get_post_meta($person->ID, 'artasia_role', true) ?: 'Artist Educator',
+                'email' => get_post_meta($person->ID, 'artasia_email', true) ?: '',
                 'photo' => artasia_get_people_photo_response($photo_id),
             ];
         }

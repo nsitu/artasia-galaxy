@@ -42,6 +42,13 @@ function artasia_register_meta_fields(): void
         'show_in_rest' => true,
         'sanitize_callback' => 'sanitize_text_field',
     ]);
+    register_post_meta('artasia_place', 'artasia_shared_with', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'sanitize_text_field',
+    ]);
     register_post_meta('artasia_place', 'artasia_accessibility_notes', [
         'type'         => 'string',
         'single'       => true,
@@ -196,6 +203,13 @@ function artasia_register_meta_fields(): void
         'default'      => 'Artist Educator',
         'show_in_rest' => true,
         'sanitize_callback' => 'sanitize_text_field',
+    ]);
+    register_post_meta('artasia_people', 'artasia_email', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'sanitize_email',
     ]);
     register_post_meta('artasia_people', 'artasia_photo_id', [
         'type'         => 'integer',

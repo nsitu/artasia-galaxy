@@ -49,7 +49,7 @@ function artasia_post_type_contexts(): array
             'nav_label' => 'Places',
             'paragraphs' => [
                 'An Artasia Place is a physical location such as a park, school, library, or community centre where Artasia activity can happen.',
-                'Use this record for stable location details such as address, city, coordinates, and access notes.',
+                'Use this record for stable location details such as address, city, shared building context, coordinates, and access notes.',
             ],
         ],
         'artasia_people' => [
@@ -61,7 +61,7 @@ function artasia_post_type_contexts(): array
                     artasia_context_post_type_link('artasia_partner', 'partner'),
                     artasia_context_post_type_link('artasia_placement', 'placement')
                 ),
-                "Use this record for the person's name, role, photo, and internal notes.",
+                "Use this record for the person's name, role, email address, photo, and internal notes.",
             ],
         ],
         'artasia_placement' => [
@@ -579,6 +579,7 @@ function artasia_place_meta_box_html(WP_Post $post): void
     $lng      = get_post_meta($post->ID, 'artasia_lng', true);
     $city     = get_post_meta($post->ID, 'artasia_city', true);
     $postal   = get_post_meta($post->ID, 'artasia_postal_code', true);
+    $shared_with = get_post_meta($post->ID, 'artasia_shared_with', true);
     $access   = get_post_meta($post->ID, 'artasia_accessibility_notes', true);
 
     wp_nonce_field('artasia_place_meta', 'artasia_place_meta_nonce');
@@ -595,6 +596,13 @@ function artasia_place_meta_box_html(WP_Post $post): void
         <tr>
             <th><label for="artasia_postal_code">Postal Code</label></th>
             <td><input type="text" id="artasia_postal_code" name="artasia_postal_code" value="<?php echo esc_attr($postal); ?>" /></td>
+        </tr>
+        <tr>
+            <th><label for="artasia_shared_with">Shared With</label></th>
+            <td>
+                <input type="text" id="artasia_shared_with" name="artasia_shared_with" value="<?php echo esc_attr($shared_with); ?>" class="widefat" />
+                <p class="description">Who else shares this building or venue? For example, a daycare may share a building with a school.</p>
+            </td>
         </tr>
         <tr>
             <th><label for="artasia_lat">Latitude</label></th>
@@ -663,6 +671,7 @@ function artasia_save_place_meta(int $post_id): void
     update_post_meta($post_id, 'artasia_lng', floatval($_POST['artasia_lng'] ?? 0));
     update_post_meta($post_id, 'artasia_city', sanitize_text_field($_POST['artasia_city'] ?? ''));
     update_post_meta($post_id, 'artasia_postal_code', sanitize_text_field($_POST['artasia_postal_code'] ?? ''));
+    update_post_meta($post_id, 'artasia_shared_with', sanitize_text_field($_POST['artasia_shared_with'] ?? ''));
     update_post_meta($post_id, 'artasia_accessibility_notes', sanitize_textarea_field($_POST['artasia_accessibility_notes'] ?? ''));
 }
 add_action('save_post_artasia_place', 'artasia_save_place_meta');
@@ -800,6 +809,7 @@ function artasia_people_meta_box_html(WP_Post $post): void
     if (!$role) {
         $role = 'Artist Educator';
     }
+    $email = get_post_meta($post->ID, 'artasia_email', true);
     $photo_id = intval(get_post_meta($post->ID, 'artasia_photo_id', true));
     $photo_url = $photo_id ? wp_get_attachment_url($photo_id) : '';
     $notes = get_post_meta($post->ID, 'artasia_notes', true);
@@ -810,6 +820,10 @@ function artasia_people_meta_box_html(WP_Post $post): void
         <tr>
             <th><label for="artasia_role">Role</label></th>
             <td><input type="text" id="artasia_role" name="artasia_role" value="<?php echo esc_attr($role); ?>" class="widefat" /></td>
+        </tr>
+        <tr>
+            <th><label for="artasia_email">Email Address</label></th>
+            <td><input type="email" id="artasia_email" name="artasia_email" value="<?php echo esc_attr($email); ?>" class="widefat" /></td>
         </tr>
         <tr>
             <th><label for="artasia_people_photo_id">Photo</label></th>
@@ -884,6 +898,7 @@ function artasia_save_people_meta(int $post_id): void
     }
 
     update_post_meta($post_id, 'artasia_role', $role);
+    update_post_meta($post_id, 'artasia_email', sanitize_email($_POST['artasia_email'] ?? ''));
     update_post_meta($post_id, 'artasia_photo_id', artasia_validate_image_attachment_id(intval($_POST['artasia_photo_id'] ?? 0)));
     update_post_meta($post_id, 'artasia_notes', sanitize_textarea_field($_POST['artasia_notes'] ?? ''));
 }

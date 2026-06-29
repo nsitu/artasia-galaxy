@@ -6,6 +6,7 @@ export interface WpPlace {
   lng: number;
   city?: string;
   postal_code?: string;
+  shared_with?: string;
 }
 
 export interface WpPartner {
@@ -19,6 +20,7 @@ export interface WpPerson {
   id: number;
   name: string;
   role: string;
+  email?: string;
   photo?: {
     id: number;
     url: string;
