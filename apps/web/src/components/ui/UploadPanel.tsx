@@ -67,11 +67,11 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
 
   function addFiles(fileList: FileList | File[]) {
     if (!selectedUploader) {
-      setError("Select an uploader before adding files.");
+      setError("Select an Artasia Team Member before adding files.");
       return;
     }
     if (!selectedPlacement) {
-      setError("Select a placement before adding files.");
+      setError("Select an Artasia Site before adding files.");
       return;
     }
 
@@ -98,11 +98,11 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
   async function uploadQueued() {
     if (uploadInProgressRef.current) return;
     if (!selectedUploader) {
-      setError("Select an uploader.");
+      setError("Select an Artasia Team Member.");
       return;
     }
     if (!selectedPlacement) {
-      setError("Select a placement.");
+      setError("Select an Artasia Site.");
       return;
     }
 
@@ -190,7 +190,7 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
 
         <div style={fieldGridStyle}>
           <label style={labelStyle}>
-            Uploader
+            Artasia Team Member
             <select
               value={uploaderKey}
               onChange={(e) => {
@@ -201,7 +201,7 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
               style={inputStyle}
               required
             >
-              <option value="">Select an uploader</option>
+              <option value="">Select an Artasia Team Member</option>
               {(options?.uploaders ?? []).map((uploader) => (
                 <option key={uploader.id} value={String(uploader.id)}>
                   {uploader.name}
@@ -211,7 +211,7 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
           </label>
 
           <label style={labelStyle}>
-            Placement
+            Artasia Site
             <select
               value={placementKey}
               onChange={(e) => {
@@ -223,7 +223,7 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
               required
             >
               <option value="">
-                {selectedUploader ? "Select a placement" : "Select an uploader first"}
+                {selectedUploader ? "Select an Artasia Site" : "Select an Artasia Team Member first"}
               </option>
               {filteredPlacements.map((placement) => (
                 <option key={placement.placement_id} value={String(placement.placement_id)}>
@@ -257,17 +257,17 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
           }}
           onClick={() => {
             if (!selectedUploader) {
-              setError("Select an uploader before adding files.");
+              setError("Select an Artasia Team Member before adding files.");
               return;
             }
             if (!selectedPlacement) {
-              setError("Select a placement before adding files.");
+              setError("Select an Artasia Site before adding files.");
               return;
             }
             inputRef.current?.click();
           }}
         >
-          {selectedPlacement ? "Drop images or videos here" : "Select an uploader and placement first"}
+          {selectedPlacement ? "Drop images or videos here" : "Select an Artasia Team Member and Artasia Site first"}
           <span style={{ color: "#777", marginTop: 6 }}>
             {selectedPlacement ? "or click to choose files" : "then drop files or click to choose"}
           </span>

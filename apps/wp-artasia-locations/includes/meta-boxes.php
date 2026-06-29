@@ -31,9 +31,21 @@ function artasia_post_type_contexts(): array
             'paragraphs' => [
                 'An Artasia Project captures the high-level annual flow for a year of Artasia activity.',
                 sprintf(
-                    'Use this record for the project year, project name, and a short description that frames related %s.',
+                    'Use this record for the project year, project name, and a short description that frames related %s and %s.',
+                    artasia_context_post_type_link('artasia_activity', 'activities'),
                     artasia_context_post_type_link('artasia_placement', 'placements')
                 ),
+            ],
+        ],
+        'artasia_activity' => [
+            'title' => 'About Artasia Activities',
+            'nav_label' => 'Activities',
+            'paragraphs' => [
+                sprintf(
+                    'An Artasia Activity is a planned creative activity connected to an %s.',
+                    artasia_context_post_type_link('artasia_project', 'Artasia Project')
+                ),
+                'Use this record for the activity name, project, program week, and activity description.',
             ],
         ],
         'artasia_partner' => [
@@ -531,6 +543,115 @@ function artasia_save_project_meta(int $post_id): void
 }
 add_action('save_post_artasia_project', 'artasia_save_project_meta');
 
+// --- Activity Details meta box ---
+
+function artasia_activity_meta_box_html(WP_Post $post): void
+{
+    $projects = get_posts([
+        'post_type'   => 'artasia_project',
+        'numberposts' => -1,
+        'meta_key'    => 'artasia_project_year',
+        'orderby'     => [
+            'meta_value_num' => 'DESC',
+            'title' => 'ASC',
+        ],
+    ]);
+
+    $project_id = get_post_meta($post->ID, 'artasia_project_id', true);
+    $week = get_post_meta($post->ID, 'artasia_activity_week', true);
+    $description = get_post_meta($post->ID, 'artasia_activity_description', true);
+
+    wp_nonce_field('artasia_activity_meta', 'artasia_activity_meta_nonce');
+?>
+    <table class="form-table">
+        <tr>
+            <th><label for="artasia_project_id">Project</label></th>
+            <td>
+                <select id="artasia_project_id" name="artasia_project_id">
+                    <option value="0">&mdash; Select Artasia Project &mdash;</option>
+                    <?php foreach ($projects as $project) : ?>
+                        <?php
+                        $project_year = get_post_meta($project->ID, 'artasia_project_year', true);
+                        $project_label = trim($project_year . ' - ' . $project->post_title, ' -');
+                        ?>
+                        <option value="<?php echo esc_attr($project->ID); ?>" <?php selected($project_id, $project->ID); ?>>
+                            <?php echo esc_html($project_label); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <p class="description">Select the Artasia Project this activity belongs to.</p>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_activity_week">Program Week</label></th>
+            <td>
+                <input type="number" min="1" step="1" id="artasia_activity_week" name="artasia_activity_week" value="<?php echo esc_attr($week); ?>" />
+                <p class="description">Optional week number when this activity is typically delivered.</p>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_activity_description">Description</label></th>
+            <td>
+                <textarea id="artasia_activity_description" name="artasia_activity_description" rows="6" class="widefat"><?php echo esc_textarea($description); ?></textarea>
+                <p class="description">Describe the activity, materials, intent, or delivery notes.</p>
+            </td>
+        </tr>
+    </table>
+<?php
+}
+
+function artasia_register_activity_meta_box(): void
+{
+    $context = artasia_get_post_type_context('artasia_activity');
+
+    add_meta_box(
+        'artasia_activity_details',
+        'Activity Details',
+        'artasia_activity_meta_box_html',
+        'artasia_activity',
+        'normal',
+        'default'
+    );
+
+    add_meta_box(
+        'artasia_activity_context',
+        $context['title'],
+        'artasia_activity_context_meta_box_html',
+        'artasia_activity',
+        'side',
+        'high'
+    );
+}
+add_action('add_meta_boxes', 'artasia_register_activity_meta_box');
+
+function artasia_activity_context_meta_box_html(): void
+{
+    $context = artasia_get_post_type_context('artasia_activity');
+    if (!$context) {
+        return;
+    }
+
+    artasia_context_meta_box_html($context['paragraphs']);
+}
+
+function artasia_save_activity_meta(int $post_id): void
+{
+    if (!isset($_POST['artasia_activity_meta_nonce']) || !wp_verify_nonce($_POST['artasia_activity_meta_nonce'], 'artasia_activity_meta')) {
+        return;
+    }
+    if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
+        return;
+    }
+    if (!current_user_can('edit_post', $post_id)) {
+        return;
+    }
+
+    update_post_meta($post_id, 'artasia_project_id', intval($_POST['artasia_project_id'] ?? 0));
+    update_post_meta($post_id, 'artasia_activity_week', intval($_POST['artasia_activity_week'] ?? 0));
+    update_post_meta($post_id, 'artasia_activity_description', sanitize_textarea_field($_POST['artasia_activity_description'] ?? ''));
+}
+add_action('save_post_artasia_activity', 'artasia_save_activity_meta');
+
 function artasia_post_type_admin_description(): void
 {
     $screen = get_current_screen();
@@ -895,7 +1016,7 @@ function artasia_validate_image_attachment_id(int $attachment_id): int
 
 function artasia_remove_unnecessary_meta_boxes(): void
 {
-    $post_types = ['artasia_project', 'artasia_partner', 'artasia_place', 'artasia_people', 'artasia_placement'];
+    $post_types = ['artasia_project', 'artasia_activity', 'artasia_partner', 'artasia_place', 'artasia_people', 'artasia_placement'];
     $meta_box_contexts = ['side', 'normal', 'advanced'];
 
     foreach ($post_types as $post_type) {

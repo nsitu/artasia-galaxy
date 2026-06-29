@@ -73,6 +73,29 @@ function artasia_register_meta_fields(): void
         'sanitize_callback' => 'sanitize_textarea_field',
     ]);
 
+    // --- Activity meta ---
+    register_post_meta('artasia_activity', 'artasia_project_id', [
+        'type'         => 'integer',
+        'single'       => true,
+        'default'      => 0,
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_integer_meta',
+    ]);
+    register_post_meta('artasia_activity', 'artasia_activity_week', [
+        'type'         => 'integer',
+        'single'       => true,
+        'default'      => 0,
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_integer_meta',
+    ]);
+    register_post_meta('artasia_activity', 'artasia_activity_description', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'sanitize_textarea_field',
+    ]);
+
     // --- Placement meta ---
     register_post_meta('artasia_placement', 'artasia_project_id', [
         'type'         => 'integer',

@@ -74,6 +74,7 @@ function artasia_project_columns(array $columns): array
         $new[$key] = $label;
         if ($key === 'title') {
             $new['artasia_project_year'] = 'Year';
+            $new['artasia_project_activities'] = 'Activities';
             $new['artasia_project_deliveries'] = 'Placements';
         }
     }
@@ -97,6 +98,16 @@ function artasia_project_column(string $column, int $post_id): void
             ]);
             echo esc_html((string) count($placements));
             break;
+        case 'artasia_project_activities':
+            $activities = get_posts([
+                'post_type'   => 'artasia_activity',
+                'numberposts' => -1,
+                'meta_key'    => 'artasia_project_id',
+                'meta_value'  => $post_id,
+                'fields'      => 'ids',
+            ]);
+            echo esc_html((string) count($activities));
+            break;
     }
 }
 add_action('manage_artasia_project_posts_custom_column', 'artasia_project_column', 10, 2);
@@ -108,6 +119,37 @@ function artasia_project_admin_label(int $project_id): string
 
     return trim($year . ' - ' . $title, ' -');
 }
+
+// --- Activity columns ---
+
+function artasia_activity_columns(array $columns): array
+{
+    $new = [];
+    foreach ($columns as $key => $label) {
+        $new[$key] = $label;
+        if ($key === 'title') {
+            $new['artasia_project'] = 'Project';
+            $new['artasia_activity_week'] = 'Program Week';
+        }
+    }
+    return $new;
+}
+add_filter('manage_artasia_activity_posts_columns', 'artasia_activity_columns');
+
+function artasia_activity_column(string $column, int $post_id): void
+{
+    switch ($column) {
+        case 'artasia_project':
+            $project_id = intval(get_post_meta($post_id, 'artasia_project_id', true));
+            echo $project_id ? esc_html(artasia_project_admin_label($project_id)) : '-';
+            break;
+        case 'artasia_activity_week':
+            $week = intval(get_post_meta($post_id, 'artasia_activity_week', true));
+            echo $week ? esc_html((string) $week) : '-';
+            break;
+    }
+}
+add_action('manage_artasia_activity_posts_custom_column', 'artasia_activity_column', 10, 2);
 
 // --- Place columns ---
 
