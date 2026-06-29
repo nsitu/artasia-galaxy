@@ -18,7 +18,7 @@ The MVP includes:
 - GitHub Actions build, publish, and deploy pipeline.
 - nginx HTTPS reverse proxy on the existing Bitnami VM.
 
-WordPress provides the Artasia placement metadata, upload tags, and uploader names used by the public upload companion.
+WordPress provides the Artasia placement metadata, activity-backed upload tags, and uploader names used by the public upload companion.
 
 ## Local Development
 
@@ -92,7 +92,7 @@ The `data/` directory is bind-mounted into the container at:
 /data
 ```
 
-It stores non-secret runtime JSON state. Upload tags, uploader names, and placement data are managed in WordPress by the `wp-artasia-locations` plugin. Legacy `data/upload-tags.json` and `data/uploaders.json` files are ignored if present.
+It stores non-secret runtime JSON state. Upload tags, uploader names, and placement data are managed in WordPress by the `wp-artasia-locations` plugin. Upload tags come from published Artasia Activities through `/wp-json/artasia/v1/activities`. Legacy `data/upload-tags.json` and `data/uploaders.json` files are ignored if present.
 
 Secrets should remain in `/opt/artasia-galaxy/.env`, not in `data/`.
 
@@ -162,8 +162,8 @@ The Artasia server-side Immich API key must have these Immich permissions:
 | `asset.read` | Query assets from the `Published` album for the public gallery. |
 | `asset.view` | Proxy thumbnails and previews. |
 | `asset.download` | Proxy original assets if needed. |
-| `tag.read` | Find existing sensory, partner, and site tags. |
-| `tag.create` | Create missing sensory, partner, and site tags. |
+| `tag.read` | Find existing activity, partner, and site tags. |
+| `tag.create` | Create missing activity, partner, and site tags. |
 | `tag.asset` | Attach tags to uploaded assets. |
 | `server.statistics` | Read Immich storage usage and disable uploads above 50 GB. |
 

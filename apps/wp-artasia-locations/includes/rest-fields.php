@@ -16,7 +16,37 @@ add_action('rest_api_init', function () {
         'callback'            => 'artasia_get_uploaders',
         'permission_callback' => '__return_true',
     ]);
+
+    register_rest_route('artasia/v1', '/activities', [
+        'methods'             => 'GET',
+        'callback'            => 'artasia_get_activities',
+        'permission_callback' => '__return_true',
+    ]);
 });
+
+function artasia_get_activities(): WP_REST_Response
+{
+    $activity_query = new WP_Query([
+        'post_type'      => 'artasia_activity',
+        'posts_per_page' => -1,
+        'post_status'    => 'publish',
+        'orderby'        => 'title',
+        'order'          => 'ASC',
+    ]);
+
+    $results = [];
+    foreach ($activity_query->posts as $activity) {
+        $results[] = [
+            'id'          => $activity->ID,
+            'name'        => $activity->post_title,
+            'project_id'  => intval(get_post_meta($activity->ID, 'artasia_project_id', true)),
+            'week'        => intval(get_post_meta($activity->ID, 'artasia_activity_week', true)),
+            'description' => get_post_meta($activity->ID, 'artasia_activity_description', true) ?: '',
+        ];
+    }
+
+    return rest_ensure_response($results);
+}
 
 function artasia_get_uploaders(): WP_REST_Response
 {

@@ -118,9 +118,12 @@ export async function getArtasiaPlacements({
   }
 }
 
-interface WpUploadTagTerm {
+interface WpActivity {
+  id: number;
   name: string;
-  count?: number;
+  project_id?: number;
+  week?: number;
+  description?: string;
 }
 
 export async function getUploadTags({
@@ -131,12 +134,12 @@ export async function getUploadTags({
   }
 
   try {
-    const res = await wpRequest("/wp-json/wp/v2/artasia_upload_tag?per_page=100&orderby=name&order=asc");
-    const terms = (await res.json()) as WpUploadTagTerm[];
+    const res = await wpRequest("/wp-json/artasia/v1/activities");
+    const activities = (await res.json()) as WpActivity[];
     const tags = Array.from(
       new Set(
-        terms
-          .map((term) => term.name?.trim())
+        activities
+          .map((activity) => activity.name?.trim())
           .filter((name): name is string => Boolean(name))
       )
     );
@@ -144,9 +147,9 @@ export async function getUploadTags({
     uploadTagLastKnownGood = tags;
     return tags;
   } catch (err) {
-    console.warn(`[WordPress] failed to fetch upload tags: ${(err as Error).message}`);
+    console.warn(`[WordPress] failed to fetch activity upload tags: ${(err as Error).message}`);
     if (!forceFresh && uploadTagLastKnownGood) {
-      console.warn("[WordPress] serving last-known-good upload tags");
+      console.warn("[WordPress] serving last-known-good activity upload tags");
       return uploadTagLastKnownGood;
     }
     throw err;
