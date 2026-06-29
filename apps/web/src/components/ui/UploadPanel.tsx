@@ -194,7 +194,7 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
         {error && <div style={errorStyle}>{error}</div>}
 
         <div style={fieldGridStyle}>
-          <label style={labelStyle}>
+          <label style={compactLabelStyle}>
             Artasia Team Member
             <select
               value={uploaderKey}
@@ -215,7 +215,7 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
             </select>
           </label>
 
-          <label style={labelStyle}>
+          <label style={siteLabelStyle}>
             Artasia Site
             <select
               value={placementKey}
@@ -243,22 +243,22 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
               ))}
             </select>
           </label>
-        </div>
 
-        <label style={activityLabelStyle}>
-          Program Week / Activity
-          <select
-            value={selectedTag}
-            onChange={(e) => setSelectedTag(e.target.value)}
-            style={inputStyle}
-          >
-            {(options?.tags ?? []).map((tag) => (
-              <option key={tag} value={tag}>
-                {tag}
-              </option>
-            ))}
-          </select>
-        </label>
+          <label style={compactLabelStyle}>
+            Program Week / Activity
+            <select
+              value={selectedTag}
+              onChange={(e) => setSelectedTag(e.target.value)}
+              style={inputStyle}
+            >
+              {(options?.tags ?? []).map((tag) => (
+                <option key={tag} value={tag}>
+                  {tag}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
 
         <div
           style={dropzoneStyle}
@@ -357,7 +357,7 @@ const backdropStyle: React.CSSProperties = {
 };
 
 const panelStyle: React.CSSProperties = {
-  width: "min(760px, 100%)",
+  width: "min(980px, 100%)",
   maxHeight: "90vh",
   overflowY: "auto",
   background: "#11131a",
@@ -400,8 +400,9 @@ const iconButtonStyle: React.CSSProperties = {
 
 const fieldGridStyle: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gridTemplateColumns: "minmax(150px, 0.85fr) minmax(260px, 1.4fr) minmax(150px, 0.85fr)",
   gap: 12,
+  alignItems: "end",
 };
 
 const labelStyle: React.CSSProperties = {
@@ -409,19 +410,26 @@ const labelStyle: React.CSSProperties = {
   gap: 6,
   fontSize: 13,
   color: "#aaa",
+  minWidth: 0,
+};
+
+const compactLabelStyle: React.CSSProperties = {
+  ...labelStyle,
+};
+
+const siteLabelStyle: React.CSSProperties = {
+  ...labelStyle,
 };
 
 const inputStyle: React.CSSProperties = {
+  width: "100%",
+  minWidth: 0,
+  boxSizing: "border-box",
   background: "#191c25",
   color: "#f2f2f2",
   border: "1px solid rgba(255,255,255,0.18)",
   borderRadius: 4,
   padding: "9px 10px",
-};
-
-const activityLabelStyle: React.CSSProperties = {
-  ...labelStyle,
-  margin: "14px 0 0",
 };
 
 const dropzoneStyle: React.CSSProperties = {
