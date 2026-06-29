@@ -281,7 +281,7 @@ export default function ArtScene() {
               enablePan
               enableZoom
               screenSpacePanning
-              minDistance={3}
+              minDistance={1.5}
               maxDistance={80}
             />
           )}

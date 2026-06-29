@@ -58,6 +58,11 @@ export default function TerrainGallery() {
           tokenMapbox: MAPBOX_TOKEN,
           unitsSide: request.unitsSide,
         });
+        console.info("Artasia terrain request", {
+          radiusKm: request.radiusKm,
+          zoom: request.zoom,
+          estimatedSatelliteTiles: request.estimatedSatelliteTiles,
+        });
         setProjection(tgeo.getProjection(request.origin, request.radiusKm, request.unitsSide));
         if (!MAPBOX_TOKEN) {
           setTerrain(null);

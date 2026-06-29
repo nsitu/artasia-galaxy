@@ -13,6 +13,7 @@ export interface TerrainRequest {
   radiusKm: number;
   zoom: number;
   unitsSide: number;
+  estimatedSatelliteTiles: number;
 }
 
 export interface TerrainPhotoLayoutItem {
@@ -22,10 +23,12 @@ export interface TerrainPhotoLayoutItem {
 }
 
 const EARTH_RADIUS_KM = 6371;
-const MIN_RADIUS_KM = 25;
+const MIN_RADIUS_KM = 10;
 const RADIUS_PADDING = 1.35;
 const TERRAIN_UNITS_SIDE = 12;
 const CLUSTER_RADIUS = 0.75;
+const MAX_HIGH_DETAIL_SATELLITE_TILES = 72;
+const HIGH_DETAIL_ZOOMS = [17, 16, 15, 14, 13, 12] as const;
 
 export function getGeoPhotos(photos: Photo[]): GeoPhoto[] {
   return photos.flatMap((photo, index) => {
@@ -48,12 +51,15 @@ export function createTerrainRequest(geoPhotos: GeoPhoto[]): TerrainRequest | nu
   const furthestKm = Math.max(
     ...geoPhotos.map((item) => haversineKm(origin, [item.lat, item.lng]))
   );
+  const radiusKm = Math.max(furthestKm * RADIUS_PADDING, MIN_RADIUS_KM);
+  const zoom = chooseTerrainZoom(origin, radiusKm, furthestKm);
 
   return {
     origin,
-    radiusKm: Math.max(furthestKm * RADIUS_PADDING, MIN_RADIUS_KM),
-    zoom: chooseTerrainZoom(furthestKm),
+    radiusKm,
+    zoom,
     unitsSide: TERRAIN_UNITS_SIDE,
+    estimatedSatelliteTiles: estimateSatelliteTileCount(origin, radiusKm, zoom),
   };
 }
 
@@ -122,9 +128,75 @@ function degToRad(deg: number) {
   return (deg * Math.PI) / 180;
 }
 
-function chooseTerrainZoom(radiusKm: number) {
+function chooseTerrainZoom(origin: [number, number], radiusKm: number, furthestKm: number) {
+  const baseZoom = chooseRegionalTerrainZoom(furthestKm);
+  if (baseZoom < 12) return baseZoom;
+
+  for (const zoom of HIGH_DETAIL_ZOOMS) {
+    if (estimateSatelliteTileCount(origin, radiusKm, zoom) <= MAX_HIGH_DETAIL_SATELLITE_TILES) {
+      return zoom;
+    }
+  }
+
+  return baseZoom;
+}
+
+function chooseRegionalTerrainZoom(radiusKm: number) {
   if (radiusKm > 1000) return 5;
   if (radiusKm > 250) return 7;
   if (radiusKm > 75) return 9;
   return 12;
+}
+
+function estimateSatelliteTileCount(origin: [number, number], radiusKm: number, zoom: number) {
+  const [west, south, east, north] = originRadiusToBbox(origin, radiusKm);
+  const scale = 2 ** zoom;
+  const westTile = longitudeToTileX(west, zoom);
+  const eastTile = longitudeToTileX(east, zoom);
+  const northTile = latitudeToTileY(north, zoom);
+  const southTile = latitudeToTileY(south, zoom);
+  const xCount =
+    westTile <= eastTile
+      ? eastTile - westTile + 1
+      : scale - westTile + eastTile + 1;
+  const yCount = Math.abs(southTile - northTile) + 1;
+
+  return xCount * yCount;
+}
+
+function originRadiusToBbox(origin: [number, number], radiusKm: number) {
+  const [lat, lng] = origin;
+  const latDelta = radiusKm / 111.32;
+  const lngDelta = radiusKm / (111.32 * Math.cos(degToRad(lat)));
+
+  return [
+    normalizeLongitude(lng - lngDelta),
+    clampLatitude(lat - latDelta),
+    normalizeLongitude(lng + lngDelta),
+    clampLatitude(lat + latDelta),
+  ] as const;
+}
+
+function longitudeToTileX(lng: number, zoom: number) {
+  const scale = 2 ** zoom;
+  return clamp(Math.floor(((lng + 180) / 360) * scale), 0, scale - 1);
+}
+
+function latitudeToTileY(lat: number, zoom: number) {
+  const scale = 2 ** zoom;
+  const rad = degToRad(clampLatitude(lat));
+  const y = ((1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2) * scale;
+  return clamp(Math.floor(y), 0, scale - 1);
+}
+
+function normalizeLongitude(lng: number) {
+  return ((((lng + 180) % 360) + 360) % 360) - 180;
+}
+
+function clampLatitude(lat: number) {
+  return clamp(lat, -85.05112878, 85.05112878);
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
 }
