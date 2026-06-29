@@ -75,7 +75,7 @@ function artasia_post_type_contexts(): array
                     artasia_context_post_type_link('artasia_place', 'place')
                 ),
                 sprintf(
-                    'Use this record to connect the %s, %s, %s, program context, section, and participant details.',
+                    'Use this record to name the placement and connect the %s, %s, %s, program context, section, and participant details.',
                     artasia_context_post_type_link('artasia_project', 'project'),
                     artasia_context_post_type_link('artasia_place', 'place'),
                     artasia_context_post_type_link('artasia_partner', 'Artasia Partner')
@@ -452,30 +452,8 @@ function artasia_save_placement_meta(int $post_id): void
     update_post_meta($post_id, 'artasia_participant_count', intval($_POST['artasia_participant_count'] ?? 0));
     update_post_meta($post_id, 'artasia_participant_age', sanitize_text_field($_POST['artasia_participant_age'] ?? ''));
 
-    artasia_update_placement_title($post_id);
 }
 add_action('save_post_artasia_placement', 'artasia_save_placement_meta');
-
-function artasia_update_placement_title(int $post_id): void
-{
-    $team_member_id = intval(get_post_meta($post_id, 'artasia_team_member_id', true));
-    $place_id = intval(get_post_meta($post_id, 'artasia_place_id', true));
-    $partner_id = intval(get_post_meta($post_id, 'artasia_partner_id', true));
-    $title_parts = array_filter([
-        $team_member_id ? get_the_title($team_member_id) : '',
-        $place_id ? get_the_title($place_id) : '',
-        $partner_id ? get_the_title($partner_id) : '',
-    ]);
-    $generated_title = !empty($title_parts) ? implode(' - ', $title_parts) : 'Artasia Placement';
-
-    remove_action('save_post_artasia_placement', 'artasia_save_placement_meta');
-    wp_update_post([
-        'ID' => $post_id,
-        'post_title' => $generated_title,
-        'post_name' => sanitize_title($generated_title),
-    ]);
-    add_action('save_post_artasia_placement', 'artasia_save_placement_meta');
-}
 
 // --- Project Details meta box ---
 

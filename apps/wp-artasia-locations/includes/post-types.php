@@ -43,7 +43,7 @@ function artasia_register_post_types(): void
         'show_in_rest' => true,
         'rest_base'    => 'artasia_placement',
         'menu_icon'    => 'dashicons-art',
-        'supports'     => false,
+        'supports'     => ['title'],
     ]);
 
     register_post_type('artasia_project', [
@@ -112,7 +112,6 @@ add_action('init', 'artasia_register_post_types');
 
 function artasia_remove_placement_editor_support(): void
 {
-    remove_post_type_support('artasia_placement', 'title');
     remove_post_type_support('artasia_placement', 'editor');
 }
 add_action('init', 'artasia_remove_placement_editor_support', 11);
@@ -209,3 +208,13 @@ function artasia_use_block_editor_for_post_type(bool $use_block_editor, string $
     return $use_block_editor;
 }
 add_filter('use_block_editor_for_post_type', 'artasia_use_block_editor_for_post_type', 10, 2);
+
+function artasia_enter_title_here(string $title, WP_Post $post): string
+{
+    if ($post->post_type === 'artasia_placement') {
+        return 'Add short placement name';
+    }
+
+    return $title;
+}
+add_filter('enter_title_here', 'artasia_enter_title_here', 10, 2);
