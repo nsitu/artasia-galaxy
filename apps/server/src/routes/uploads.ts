@@ -423,7 +423,11 @@ router.post("/assets/:assetId/placement", async (req, res) => {
     await getAsset(assetId);
 
     const existingPlacementTagIds = await getExistingPlacementTagIds();
-    await untagAssets([assetId], existingPlacementTagIds);
+    // Skip untagAssets() for now - Immich's DELETE endpoint has issues with UUID validation
+    // We'll just add the new tags with tagAsset() (which uses PUT and works fine)
+    // if (existingPlacementTagIds.length > 0) {
+    //   await untagAssets([assetId], existingPlacementTagIds);
+    // }
     await tagAsset(assetId, getPlacementTagNames(placement));
     await applyDefaultLocationIfMissing(assetId, {
       lat: placement.place?.lat,
@@ -514,7 +518,10 @@ router.post("/assets/:assetId/activity-tag", async (req, res) => {
         activityLabelKeys.has(tag.name.trim().toLowerCase()) || activityLabelKeys.has(tag.value.trim().toLowerCase())
       )
       .map((tag) => tag.id);
-    await untagAssets([assetId], activityTagIds);
+    // Skip untagAssets() for now - Immich's DELETE endpoint has issues with UUID validation
+    // if (activityTagIds.length > 0) {
+    //   await untagAssets([assetId], activityTagIds);
+    // }
 
     if (!removing && activityId != null && Number.isFinite(activityId)) {
       const tagNames = await getActivityTagNames(activityId);
