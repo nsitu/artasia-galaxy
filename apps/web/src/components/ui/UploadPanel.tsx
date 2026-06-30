@@ -33,7 +33,6 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [uploaderKey, setUploaderKey] = useState("");
   const [placementKey, setPlacementKey] = useState("");
-  const [selectedTag, setSelectedTag] = useState("");
   const [activityTagFilter, setActivityTagFilter] = useState("");
   const [items, setItems] = useState<UploadItem[]>([]);
   const [placementAssets, setPlacementAssets] = useState<PlacementAsset[]>([]);
@@ -69,7 +68,6 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
         if (matchedUploaderId) {
           setUploaderKey(String(matchedUploaderId));
         }
-        setSelectedTag(String(data.activities[0]?.id ?? ""));
       })
       .catch((err) => setError((err as Error).message));
   }, [options]);
@@ -212,7 +210,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
     const hasQueued = items.some((item) => item.status === "queued");
     if (!hasQueued || uploadInProgressRef.current) return;
     void uploadQueued();
-  }, [items, selectedUploader, selectedPlacement, selectedTag]);
+  }, [items, selectedUploader, selectedPlacement]);
 
   async function uploadQueued() {
     if (uploadInProgressRef.current) return;
@@ -247,7 +245,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
             files: [item.file],
             uploader: selectedUploader,
             location: selectedPlacement,
-            activityId: selectedTag ? parseInt(selectedTag, 10) : undefined,
+            activityId: activityTagFilter ? parseInt(activityTagFilter, 10) : undefined,
             onProgress: (progress) => {
               setItems((current) =>
                 current.map((entry) =>
@@ -546,10 +544,8 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
           <div style={headerBrandStyle}>
             <img src="/artasia.svg" alt="Artasia" style={logoStyle} />
             <div>
-              <h1 style={titleStyle}>Admin</h1>
-              <p style={introStyle}>
-                Review placement uploads and add new documentation.
-              </p>
+              <h1 style={titleStyle}>Asset Management</h1>
+               
             </div>
           </div>
           <a href="/" style={secondaryLinkButtonStyle}>
@@ -644,7 +640,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
             </label>
 
             <div style={menuHeaderStyle}>
-              <span>Placements</span>
+              <span>Artasia Sites</span>
               <span>{filteredPlacements.length}</span>
             </div>
 
@@ -663,10 +659,8 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
                   <span style={placementMetaStyle}>
                     {placement.team_member_name ?? "Unassigned"}
                     {placement.secondary_team_member_name ? ` + ${placement.secondary_team_member_name}` : ""}
+                    {placement.delivery_schedule ? ` · ${placement.delivery_schedule}` : ""}
                   </span>
-                  {placement.delivery_schedule && (
-                    <span style={placementMetaStyle}>{placement.delivery_schedule}</span>
-                  )}
                 </button>
               ))}
             </div>
@@ -693,22 +687,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
                   </div>
                 </div>
 
-                <div style={uploadControlsStyle}>
-                  <label style={compactLabelStyle}>
-                    Program Week / Activity
-                    <select
-                      value={selectedTag}
-                      onChange={(e) => setSelectedTag(e.target.value)}
-                      style={inputStyle}
-                    >
-                      {(options?.activities ?? []).map((activity) => (
-                        <option key={activity.id} value={String(activity.id)}>
-                          {activity.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <div
+                <div
                     style={dropzoneStyle}
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={(e) => {
@@ -735,7 +714,6 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
                       onChange={(e) => e.target.files && addFiles(e.target.files)}
                     />
                   </div>
-                </div>
 
                 {items.length > 0 && (
                   <div style={listStyle}>
@@ -803,18 +781,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
             ) : (
               <>
                 <div style={detailHeaderStyle}>
-                  <div>
-                    <h2 style={detailTitleStyle}>
-                      {assetMode === "untagged" ? "Uploads Needing Placement"
-                        : assetMode === "all" ? "All Uploads"
-                        : "Tagged Placement Uploads"}
-                    </h2>
-                    <div style={detailMetaStyle}>
-                      {assetMode === "untagged" ? "Uploads with no placement tag assigned."
-                        : assetMode === "all" ? "All uploads across visible placements and untagged."
-                        : "Select a placement to upload or narrow this gallery."}
-                    </div>
-                  </div>
+                  <h2 style={detailTitleStyle}>Uploaded Assets</h2>
                   <div style={countBadgeStyle}>
                     {assetsLoading ? "..." : placementAssets.length} upload{placementAssets.length === 1 ? "" : "s"}
                   </div>
@@ -963,10 +930,8 @@ const placementMenuStyle: React.CSSProperties = {
   display: "grid",
   gap: 12,
   minWidth: 0,
-  position: "sticky",
-  top: 18,
-  maxHeight: "calc(100vh - 36px)",
-  overflow: "hidden",
+  maxHeight: "calc(100vh - 200px)",
+  overflow: "auto",
 };
 
 const menuHeaderStyle: React.CSSProperties = {
