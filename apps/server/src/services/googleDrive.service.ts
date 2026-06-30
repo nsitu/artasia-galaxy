@@ -77,6 +77,7 @@ export class GoogleDriveClient {
     if (driveId) {
       listParams.corpora = "drive";
       listParams.driveId = driveId;
+      listParams.includeItemsFromAllDrives = true;
     } else {
       listParams.spaces = "drive";
     }
@@ -124,6 +125,7 @@ export class GoogleDriveClient {
     if (driveId) {
       listParams.corpora = "drive";
       listParams.driveId = driveId;
+      listParams.includeItemsFromAllDrives = true;
     } else {
       listParams.spaces = "drive";
     }
