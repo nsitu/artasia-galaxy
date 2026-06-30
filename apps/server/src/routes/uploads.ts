@@ -445,6 +445,37 @@ router.post("/assets/:assetId/uploader", async (req, res) => {
   }
 });
 
+router.post("/assets/:assetId/activity-tag", async (req, res) => {
+  try {
+    const tagName = typeof req.body?.tag_name === "string" ? req.body.tag_name.trim() : "";
+
+    const assetId = req.params.assetId;
+    await getAsset(assetId);
+
+    const config = await getUploadConfig();
+    const allTags = await listTags();
+    const activityTagNormalized = new Set(config.tags.map((t) => t.trim().toLowerCase()));
+    const activityTagIds = allTags
+      .filter((tag) => activityTagNormalized.has(tag.name.trim().toLowerCase()) || activityTagNormalized.has(tag.value.trim().toLowerCase()))
+      .map((tag) => tag.id);
+
+    await untagAssets([assetId], activityTagIds);
+
+    if (tagName) {
+      const allowed = await getAllowedTagNames([tagName]);
+      if (!allowed.length) {
+        res.status(400).json({ error: "Unrecognised activity tag." });
+        return;
+      }
+      await tagAsset(assetId, allowed);
+    }
+
+    res.json({ ok: true, asset_id: assetId, tag_name: tagName || null });
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
+});
+
 router.get("/placements/:id/assets", async (req, res) => {
   try {
     const placementId = parseInt(req.params.id, 10);

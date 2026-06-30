@@ -235,6 +235,21 @@ export async function assignAssetUploader(params: {
   }
 }
 
+export async function assignAssetActivityTag(params: {
+  assetId: string;
+  tagName: string;
+}): Promise<void> {
+  const res = await fetch(`/api/v1/uploads/assets/${params.assetId}/activity-tag`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tag_name: params.tagName }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+}
+
 export async function fetchMapPlacements(): Promise<MapPlacement[]> {
   const res = await fetch("/api/v1/placements");
   if (!res.ok) {

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  assignAssetActivityTag,
   assignAssetPlacement,
   assignAssetUploader,
   fetchAuthUser,
@@ -40,6 +41,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
   const [selectedAsset, setSelectedAsset] = useState<PlacementAsset | null>(null);
   const [managePlacementKey, setManagePlacementKey] = useState("");
   const [manageUploaderKey, setManageUploaderKey] = useState("");
+  const [manageActivityTag, setManageActivityTag] = useState("");
   const [savingAsset, setSavingAsset] = useState(false);
   const [assetsLoading, setAssetsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -294,6 +296,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
     setSelectedAsset(asset);
     setManagePlacementKey(selectedPlacement ? String(selectedPlacement.placement_id) : "");
     setManageUploaderKey(asset.uploader_id ? String(asset.uploader_id) : "");
+    setManageActivityTag("");
     setError(null);
   }
 
@@ -301,6 +304,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
     setSelectedAsset(null);
     setManagePlacementKey("");
     setManageUploaderKey("");
+    setManageActivityTag("");
   }
 
   async function saveSelectedAssetChanges() {
@@ -311,9 +315,10 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
       && managePlacementKey !== (selectedPlacement ? String(selectedPlacement.placement_id) : "");
     const uploaderChanged = Boolean(manageUploaderKey)
       && manageUploaderKey !== (selectedAsset.uploader_id ? String(selectedAsset.uploader_id) : "");
+    const activityTagChanged = Boolean(manageActivityTag);
 
-    if (!placementChanged && !uploaderChanged) {
-      setError("Choose a placement or team member album to save.");
+    if (!placementChanged && !uploaderChanged && !activityTagChanged) {
+      setError("Choose a placement, team member album, or program week to save.");
       return;
     }
     if (placementChanged && (!placementId || !Number.isFinite(placementId))) {
@@ -337,6 +342,12 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
         await assignAssetUploader({
           assetId: selectedAsset.id,
           uploaderId,
+        });
+      }
+      if (activityTagChanged) {
+        await assignAssetActivityTag({
+          assetId: selectedAsset.id,
+          tagName: manageActivityTag === "__remove__" ? "" : manageActivityTag,
         });
       }
       closeAssetManager();
@@ -432,6 +443,22 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
               {(options?.uploaders ?? []).map((uploader) => (
                 <option key={uploader.id} value={String(uploader.id)}>
                   {uploader.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label style={labelStyle}>
+            Program Week / Activity
+            <select
+              value={manageActivityTag}
+              onChange={(e) => setManageActivityTag(e.target.value)}
+              style={inputStyle}
+            >
+              <option value="">— No change —</option>
+              <option value="__remove__">Remove activity tag</option>
+              {(options?.tags ?? []).map((tag) => (
+                <option key={tag} value={tag}>
+                  {tag}
                 </option>
               ))}
             </select>
