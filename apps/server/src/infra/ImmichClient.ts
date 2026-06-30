@@ -408,7 +408,8 @@ export async function uploadAssetStream(params: {
   });
 
   const checksum = hash.digest("hex");
-  const blob = new Blob(chunks, { type: params.mimeType });
+  const uint8Arrays = chunks.map((chunk) => new Uint8Array(chunk));
+  const blob = new Blob(uint8Arrays, { type: params.mimeType });
 
   const form = new FormData();
   form.append("assetData", blob, params.filename);

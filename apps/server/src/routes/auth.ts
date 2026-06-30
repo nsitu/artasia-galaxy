@@ -44,7 +44,11 @@ router.get("/google/callback", async (req, res) => {
     }
 
     const profile = await exchangeGoogleCode(code, oauthState.nonce);
-    setAuthSession(res, profile);
+    const sessionPayload = {
+      ...profile,
+      refreshToken: profile.refreshToken || undefined,
+    };
+    setAuthSession(res, sessionPayload);
     res.redirect("/admin?auth=success");
   } catch (err) {
     redirectWithError(res, (err as Error).message);

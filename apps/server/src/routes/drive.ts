@@ -92,7 +92,7 @@ router.get("/files", async (req: Request, res: Response) => {
         id: file.id,
         name: file.name,
         mimeType: file.mimeType,
-        size: file.size,
+        size: file.size ? String(file.size) : undefined,
         modifiedTime: file.modifiedTime,
         isFolder: GoogleDriveClient.isFolder(file.mimeType),
         isImage: GoogleDriveClient.isImage(file.mimeType),
@@ -165,7 +165,7 @@ router.post("/sync", async (req: Request, res: Response) => {
       }
       placementTags = [
         `placement:${placementId}`,
-        placementConfig.placement_label,
+        placementConfig.placement_name,
       ];
     }
 
