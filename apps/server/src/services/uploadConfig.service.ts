@@ -1,10 +1,20 @@
 import {
   getArtasiaPlacements,
   getArtasiaUploaders,
-  getUploadTags,
+  getUploadActivities,
+  activityAnchorTag,
+  isActivityAnchorTagName,
   type WpArtasiaPlacement,
   type WpPerson,
+  type WpActivityInfo,
 } from "../infra/WordPressClient.js";
+
+export { activityAnchorTag, isActivityAnchorTagName };
+
+export interface ActivityConfig {
+  id: number;
+  label: string;
+}
 
 export interface ArtasiaPlacement {
   placement_id: number;
@@ -43,7 +53,7 @@ export interface UploadUploader {
 
 export interface UploadConfig {
   placements: ArtasiaPlacement[];
-  tags: string[];
+  activities: ActivityConfig[];
   uploaders: UploadUploader[];
 }
 
@@ -113,17 +123,27 @@ function mapWpPlacement(wp: WpArtasiaPlacement): ArtasiaPlacement {
 }
 
 export async function getUploadConfig(): Promise<UploadConfig> {
-  const [wpPlacements, wpUploaders] = await Promise.all([
+  const [wpPlacements, wpUploaders, wpActivities] = await Promise.all([
     getArtasiaPlacements(),
     getArtasiaUploaders(),
+    getUploadActivities(),
   ]);
   const placements = wpPlacements.map(mapWpPlacement);
-  const tags = cleanStringList(await getUploadTags());
+  const activities: ActivityConfig[] = wpActivities
+    .filter((a): a is WpActivityInfo => Boolean(a.label))
+    .map((a) => ({ id: a.id, label: a.label }));
   const uploaders = wpUploaders
     .map(mapWpUploader)
     .filter((uploader) => uploader.name && !RESERVED_ALBUMS.has(normalizeKey(uploader.name)));
 
-  return { placements, tags, uploaders };
+  return { placements, activities, uploaders };
+}
+
+export async function getActivityTagNames(activityId: number): Promise<string[]> {
+  const config = await getUploadConfig();
+  const activity = config.activities.find((a) => a.id === activityId);
+  if (!activity) return [];
+  return [activityAnchorTag(activityId), activity.label];
 }
 
 export async function getMapPlacements(): Promise<ArtasiaMapPlacement[]> {
@@ -156,7 +176,7 @@ export async function findConfiguredPlacement(placement_id: number): Promise<WpA
 export async function getAllowedTagNames(requestedTags: unknown): Promise<string[]> {
   const requested = cleanStringList(requestedTags);
   const config = await getUploadConfig();
-  const allowedByKey = new Map(config.tags.map((tag) => [normalizeKey(tag), tag]));
+  const allowedByKey = new Map(config.activities.map((a) => [normalizeKey(a.label), a.label]));
   return requested
     .map((tag) => allowedByKey.get(normalizeKey(tag)))
     .filter((tag): tag is string => Boolean(tag));

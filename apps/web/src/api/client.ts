@@ -99,9 +99,14 @@ export interface MapPlacement {
   lng: number;
 }
 
+export interface ActivityOption {
+  id: number;
+  label: string;
+}
+
 export interface UploadOptions {
   placements: UploadPlacement[];
-  tags: string[];
+  activities: ActivityOption[];
   uploaders: UploadUploader[];
   currentUser: AuthUser | null;
   limits: {
@@ -180,12 +185,12 @@ export async function fetchPlacementAssets(placementId: number): Promise<Placeme
   return body.assets ?? [];
 }
 
-export async function fetchPlacementAssetSet(placementIds: number[], activityTag?: string): Promise<PlacementAsset[]> {
+export async function fetchPlacementAssetSet(placementIds: number[], activityId?: number): Promise<PlacementAsset[]> {
   if (placementIds.length === 0) return [];
   const params = new URLSearchParams({
     placement_ids: placementIds.join(","),
   });
-  if (activityTag) params.set("activity_tag", activityTag);
+  if (activityId != null) params.set("activity_id", String(activityId));
   const res = await fetch(`/api/v1/uploads/assets?${params.toString()}`);
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
@@ -237,12 +242,12 @@ export async function assignAssetUploader(params: {
 
 export async function assignAssetActivityTag(params: {
   assetId: string;
-  tagName: string;
+  activityId: number | null;
 }): Promise<void> {
   const res = await fetch(`/api/v1/uploads/assets/${params.assetId}/activity-tag`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ tag_name: params.tagName }),
+    body: JSON.stringify({ activity_id: params.activityId }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
@@ -263,7 +268,7 @@ export function uploadFiles(params: {
   files: File[];
   uploader: UploadUploader;
   location: UploadPlacement;
-  tags: string[];
+  activityId?: number;
   onProgress?: (percent: number) => void;
 }): Promise<UploadResult[]> {
   return new Promise((resolve, reject) => {
@@ -272,7 +277,7 @@ export function uploadFiles(params: {
     form.append("uploader", params.uploader.name);
     form.append("uploader_id", String(params.uploader.id));
     form.append("placement_id", String(params.location.placement_id));
-    form.append("tags", JSON.stringify(params.tags));
+    if (params.activityId != null) form.append("activity_id", String(params.activityId));
 
     const xhr = new XMLHttpRequest();
     xhr.open("POST", "/api/v1/uploads");

@@ -69,7 +69,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
         if (matchedUploaderId) {
           setUploaderKey(String(matchedUploaderId));
         }
-        setSelectedTag(data.tags[0] ?? "");
+        setSelectedTag(String(data.activities[0]?.id ?? ""));
       })
       .catch((err) => setError((err as Error).message));
   }, [options]);
@@ -136,7 +136,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
 
     let cancelled = false;
     setAssetsLoading(true);
-    fetchPlacementAssetSet(visiblePlacementIds, activityTagFilter || undefined)
+    fetchPlacementAssetSet(visiblePlacementIds, activityTagFilter ? parseInt(activityTagFilter, 10) : undefined)
       .then((assets) => {
         if (!cancelled) setPlacementAssets(assets);
       })
@@ -214,7 +214,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
             files: [item.file],
             uploader: selectedUploader,
             location: selectedPlacement,
-            tags: selectedTag ? [selectedTag] : [],
+            activityId: selectedTag ? parseInt(selectedTag, 10) : undefined,
             onProgress: (progress) => {
               setItems((current) =>
                 current.map((entry) =>
@@ -279,7 +279,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
     setAssetsLoading(true);
     const request = assetMode === "untagged"
       ? fetchUntaggedPlacementAssets()
-      : fetchPlacementAssetSet(visiblePlacementIds, activityTagFilter || undefined);
+      : fetchPlacementAssetSet(visiblePlacementIds, activityTagFilter ? parseInt(activityTagFilter, 10) : undefined);
 
     request
       .then(setPlacementAssets)
@@ -347,7 +347,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
       if (activityTagChanged) {
         await assignAssetActivityTag({
           assetId: selectedAsset.id,
-          tagName: manageActivityTag === "__remove__" ? "" : manageActivityTag,
+          activityId: manageActivityTag === "__remove__" ? null : parseInt(manageActivityTag, 10),
         });
       }
       closeAssetManager();
@@ -391,7 +391,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
       && managePlacementKey !== (selectedPlacement ? String(selectedPlacement.placement_id) : "");
     const uploaderChanged = Boolean(manageUploaderKey)
       && manageUploaderKey !== (selectedAsset.uploader_id ? String(selectedAsset.uploader_id) : "");
-    const canSaveAsset = placementChanged || uploaderChanged;
+    const canSaveAsset = placementChanged || uploaderChanged || Boolean(manageActivityTag);
 
     return (
       <div style={managePanelStyle}>
@@ -456,9 +456,9 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
             >
               <option value="">— No change —</option>
               <option value="__remove__">Remove activity tag</option>
-              {(options?.tags ?? []).map((tag) => (
-                <option key={tag} value={tag}>
-                  {tag}
+              {(options?.activities ?? []).map((activity) => (
+                <option key={activity.id} value={String(activity.id)}>
+                  {activity.label}
                 </option>
               ))}
             </select>
@@ -485,11 +485,14 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
     <main style={pageStyle}>
       <section style={panelStyle}>
         <div style={headerStyle}>
-          <div>
-            <h1 style={titleStyle}>Admin</h1>
-            <p style={introStyle}>
-              Review placement uploads and add new documentation.
-            </p>
+          <div style={headerBrandStyle}>
+            <img src="/artasia.svg" alt="Artasia" style={logoStyle} />
+            <div>
+              <h1 style={titleStyle}>Admin</h1>
+              <p style={introStyle}>
+                Review placement uploads and add new documentation.
+              </p>
+            </div>
           </div>
           <a href="/" style={secondaryLinkButtonStyle}>
             Viewer
@@ -556,9 +559,9 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
                 style={inputStyle}
               >
                 <option value="">All Activities</option>
-                {(options?.tags ?? []).map((tag) => (
-                  <option key={tag} value={tag}>
-                    {tag}
+                {(options?.activities ?? []).map((activity) => (
+                  <option key={activity.id} value={String(activity.id)}>
+                    {activity.label}
                   </option>
                 ))}
               </select>
@@ -657,9 +660,9 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
                       onChange={(e) => setSelectedTag(e.target.value)}
                       style={inputStyle}
                     >
-                      {(options?.tags ?? []).map((tag) => (
-                        <option key={tag} value={tag}>
-                          {tag}
+                      {(options?.activities ?? []).map((activity) => (
+                        <option key={activity.id} value={String(activity.id)}>
+                          {activity.label}
                         </option>
                       ))}
                     </select>
@@ -818,6 +821,18 @@ const headerStyle: React.CSSProperties = {
   alignItems: "flex-start",
   gap: 16,
   marginBottom: 16,
+};
+
+const headerBrandStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 14,
+};
+
+const logoStyle: React.CSSProperties = {
+  height: 40,
+  width: "auto",
+  flexShrink: 0,
 };
 
 const titleStyle: React.CSSProperties = {

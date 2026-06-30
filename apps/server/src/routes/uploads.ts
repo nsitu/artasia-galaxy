@@ -23,9 +23,11 @@ import {
   findConfiguredPlacement,
   findConfiguredUploader,
   getPlacementTagNames,
-  getAllowedTagNames,
+  getActivityTagNames,
   getUploadConfig,
   placementAnchorTag,
+  activityAnchorTag,
+  isActivityAnchorTagName,
 } from "../services/uploadConfig.service.js";
 import {
   ALLOWED_UPLOAD_EXTENSIONS,
@@ -304,7 +306,8 @@ router.get("/assets", async (req, res) => {
       return;
     }
 
-    const activityTagName = typeof req.query.activity_tag === "string" ? req.query.activity_tag.trim() : "";
+    const rawActivityId = typeof req.query.activity_id === "string" ? req.query.activity_id : "";
+    const activityId = rawActivityId ? parseInt(rawActivityId, 10) : null;
 
     const config = await getUploadConfig();
     const knownPlacementIds = new Set(config.placements.map((placement) => placement.placement_id));
@@ -323,17 +326,32 @@ router.get("/assets", async (req, res) => {
 
     let assets = await getAssetsForPlacementTagIds(tagIds);
 
-    if (activityTagName) {
-      const normalized = activityTagName.toLowerCase();
+    if (activityId != null && Number.isFinite(activityId)) {
+      const activity = config.activities.find((a) => a.id === activityId);
+      if (!activity) {
+        res.json({ assets: [] });
+        return;
+      }
+      // Match by anchor tag (new) OR label tag (legacy), union of both
       const allTags = await listTags();
-      const activityTagId = allTags.find(
-        (tag) => tag.name.trim().toLowerCase() === normalized || tag.value.trim().toLowerCase() === normalized
-      )?.id ?? null;
-      if (activityTagId) {
-        const activityAssetIds = new Set(await searchAssetIdsByTag(activityTagId));
-        assets = assets.filter((asset) => activityAssetIds.has(asset.id));
-      } else {
+      const anchorTagName = activityAnchorTag(activityId);
+      const labelNorm = activity.label.trim().toLowerCase();
+      const activityImmichTagIds = allTags
+        .filter((tag) =>
+          tag.name.trim().toLowerCase() === anchorTagName ||
+          tag.value.trim().toLowerCase() === anchorTagName ||
+          tag.name.trim().toLowerCase() === labelNorm ||
+          tag.value.trim().toLowerCase() === labelNorm
+        )
+        .map((tag) => tag.id);
+
+      if (activityImmichTagIds.length === 0) {
         assets = [];
+      } else {
+        const activityAssetIds = new Set(
+          (await Promise.all(activityImmichTagIds.map(searchAssetIdsByTag))).flat()
+        );
+        assets = assets.filter((asset) => activityAssetIds.has(asset.id));
       }
     }
 
@@ -447,30 +465,37 @@ router.post("/assets/:assetId/uploader", async (req, res) => {
 
 router.post("/assets/:assetId/activity-tag", async (req, res) => {
   try {
-    const tagName = typeof req.body?.tag_name === "string" ? req.body.tag_name.trim() : "";
+    const rawActivityId = req.body?.activity_id;
+    const activityId = rawActivityId != null && rawActivityId !== ""
+      ? parseInt(String(rawActivityId), 10)
+      : null;
+    const removing = rawActivityId === null || rawActivityId === "" || rawActivityId === 0;
 
     const assetId = req.params.assetId;
     await getAsset(assetId);
 
+    // Remove all existing activity tags (both anchor-style and label-style)
     const config = await getUploadConfig();
     const allTags = await listTags();
-    const activityTagNormalized = new Set(config.tags.map((t) => t.trim().toLowerCase()));
+    const activityLabelKeys = new Set(config.activities.map((a) => a.label.trim().toLowerCase()));
     const activityTagIds = allTags
-      .filter((tag) => activityTagNormalized.has(tag.name.trim().toLowerCase()) || activityTagNormalized.has(tag.value.trim().toLowerCase()))
+      .filter((tag) =>
+        isActivityAnchorTagName(tag.name) || isActivityAnchorTagName(tag.value) ||
+        activityLabelKeys.has(tag.name.trim().toLowerCase()) || activityLabelKeys.has(tag.value.trim().toLowerCase())
+      )
       .map((tag) => tag.id);
-
     await untagAssets([assetId], activityTagIds);
 
-    if (tagName) {
-      const allowed = await getAllowedTagNames([tagName]);
-      if (!allowed.length) {
-        res.status(400).json({ error: "Unrecognised activity tag." });
+    if (!removing && activityId != null && Number.isFinite(activityId)) {
+      const tagNames = await getActivityTagNames(activityId);
+      if (!tagNames.length) {
+        res.status(400).json({ error: "Unrecognised activity." });
         return;
       }
-      await tagAsset(assetId, allowed);
+      await tagAsset(assetId, tagNames);
     }
 
-    res.json({ ok: true, asset_id: assetId, tag_name: tagName || null });
+    res.json({ ok: true, asset_id: assetId, activity_id: activityId });
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });
   }
@@ -524,7 +549,8 @@ router.post(
           name: uploader,
         }),
       ]);
-      const selectedTags = await getAllowedTagNames(parseTags(req.body.tags));
+      const rawActivityId = parseInt(typeof req.body.activity_id === "string" ? req.body.activity_id : "", 10);
+      const selectedTags = Number.isFinite(rawActivityId) ? await getActivityTagNames(rawActivityId) : [];
 
       if (!selectedUploader) {
         res.status(400).json({ error: "Select a valid uploader." });

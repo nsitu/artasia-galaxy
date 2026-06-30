@@ -61,8 +61,8 @@ const CACHE_TTL_MS = 60_000;
 let cache: { data: WpArtasiaPlacement[]; timestamp: number } | null = null;
 let lastKnownGood: WpArtasiaPlacement[] | null = null;
 
-let uploadTagCache: { data: string[]; timestamp: number } | null = null;
-let uploadTagLastKnownGood: string[] | null = null;
+let uploadTagCache: { data: WpActivityInfo[]; timestamp: number } | null = null;
+let uploadTagLastKnownGood: WpActivityInfo[] | null = null;
 
 let uploaderCache: { data: WpPerson[]; timestamp: number } | null = null;
 let uploaderLastKnownGood: WpPerson[] | null = null;
@@ -127,6 +127,21 @@ interface WpActivity {
   description?: string;
 }
 
+export interface WpActivityInfo {
+  id: number;
+  label: string;
+}
+
+export const ACTIVITY_ANCHOR_TAG_PREFIX = "activity:";
+
+export function activityAnchorTag(activityId: number): string {
+  return `${ACTIVITY_ANCHOR_TAG_PREFIX}${activityId}`;
+}
+
+export function isActivityAnchorTagName(value: string): boolean {
+  return /^activity:\d+$/.test(value.trim().toLowerCase());
+}
+
 function activityUploadTagName(activity: WpActivity): string {
   const name = activity.name?.trim();
   if (!name) return "";
@@ -140,9 +155,9 @@ function compareActivitiesByWeek(a: WpActivity, b: WpActivity): number {
   return a.name.localeCompare(b.name);
 }
 
-export async function getUploadTags({
+export async function getUploadActivities({
   forceFresh = false,
-}: { forceFresh?: boolean } = {}): Promise<string[]> {
+}: { forceFresh?: boolean } = {}): Promise<WpActivityInfo[]> {
   if (!forceFresh && uploadTagCache && Date.now() - uploadTagCache.timestamp < CACHE_TTL_MS) {
     return uploadTagCache.data;
   }
@@ -150,17 +165,17 @@ export async function getUploadTags({
   try {
     const res = await wpRequest("/wp-json/artasia/v1/activities");
     const activities = (await res.json()) as WpActivity[];
-    const tags = Array.from(
-      new Set(
-        activities
-          .sort(compareActivitiesByWeek)
-          .map(activityUploadTagName)
-          .filter((name): name is string => Boolean(name))
-      )
-    );
-    uploadTagCache = { data: tags, timestamp: Date.now() };
-    uploadTagLastKnownGood = tags;
-    return tags;
+    const seen = new Set<number>();
+    const result: WpActivityInfo[] = [];
+    for (const activity of activities.sort(compareActivitiesByWeek)) {
+      const label = activityUploadTagName(activity);
+      if (!label || seen.has(activity.id)) continue;
+      seen.add(activity.id);
+      result.push({ id: activity.id, label });
+    }
+    uploadTagCache = { data: result, timestamp: Date.now() };
+    uploadTagLastKnownGood = result;
+    return result;
   } catch (err) {
     console.warn(`[WordPress] failed to fetch activity upload tags: ${(err as Error).message}`);
     if (!forceFresh && uploadTagLastKnownGood) {
