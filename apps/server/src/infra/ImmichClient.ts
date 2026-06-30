@@ -337,11 +337,20 @@ export async function tagAssets(assetIds: string[], tagIds: string[]) {
   if (assetIds.length === 0 || tagIds.length === 0) return;
   
   // Validate all assetIds are UUID format
-  const invalidIds = assetIds.filter(id => !isValidUUID(id));
-  if (invalidIds.length > 0) {
-    throw new Error(`Invalid asset ID format(s): ${invalidIds.join(", ")}. Expected UUID format.`);
+  const invalidAssetIds = assetIds.filter(id => !isValidUUID(id));
+  if (invalidAssetIds.length > 0) {
+    throw new Error(`Invalid asset ID format(s): ${invalidAssetIds.join(", ")}. Expected UUID format.`);
   }
 
+  // Validate all tagIds are UUID format
+  const invalidTagIds = tagIds.filter(id => !isValidUUID(id));
+  if (invalidTagIds.length > 0) {
+    console.error(`[tagAssets] Invalid tag IDs: ${JSON.stringify(invalidTagIds)}`);
+    throw new Error(`Invalid tag ID format(s): ${invalidTagIds.join(", ")}. Expected UUID format. Tags received: ${JSON.stringify(tagIds)}`);
+  }
+
+  console.log(`[tagAssets] Tagging ${assetIds.length} asset(s) with ${tagIds.length} tag(s)`);
+  
   await immichRequest("/tags/assets", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -356,11 +365,20 @@ export async function untagAssets(assetIds: string[], tagIds: string[]) {
   if (assetIds.length === 0 || tagIds.length === 0) return;
   
   // Validate all assetIds are UUID format
-  const invalidIds = assetIds.filter(id => !isValidUUID(id));
-  if (invalidIds.length > 0) {
-    throw new Error(`Invalid asset ID format(s): ${invalidIds.join(", ")}. Expected UUID format.`);
+  const invalidAssetIds = assetIds.filter(id => !isValidUUID(id));
+  if (invalidAssetIds.length > 0) {
+    throw new Error(`Invalid asset ID format(s): ${invalidAssetIds.join(", ")}. Expected UUID format.`);
   }
 
+  // Validate all tagIds are UUID format
+  const invalidTagIds = tagIds.filter(id => !isValidUUID(id));
+  if (invalidTagIds.length > 0) {
+    console.error(`[untagAssets] Invalid tag IDs to delete: ${JSON.stringify(invalidTagIds)}`);
+    throw new Error(`Invalid tag ID format(s): ${invalidTagIds.join(", ")}. Expected UUID format. Tags received: ${JSON.stringify(tagIds)}`);
+  }
+
+  console.log(`[untagAssets] Removing ${tagIds.length} tag(s) from ${assetIds.length} asset(s)`);
+  
   await immichRequest("/tags/assets", {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },

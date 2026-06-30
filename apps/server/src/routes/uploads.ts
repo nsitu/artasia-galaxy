@@ -145,9 +145,15 @@ function isPlacementAnchorTagName(value: string) {
 
 async function getExistingPlacementTagIds() {
   const tags = await listTags();
-  return tags
-    .filter((tag) => isPlacementAnchorTagName(tag.name) || isPlacementAnchorTagName(tag.value))
-    .map((tag) => tag.id);
+  const placementTags = tags
+    .filter((tag) => isPlacementAnchorTagName(tag.name) || isPlacementAnchorTagName(tag.value));
+  
+  const tagIds = placementTags.map((tag) => tag.id);
+  if (tagIds.length > 0) {
+    console.log(`[getExistingPlacementTagIds] Found ${tagIds.length} placement tags: ${JSON.stringify(tagIds)}`);
+  }
+  
+  return tagIds;
 }
 
 async function getAssetsForPlacementTagIds(tagIds: string[]) {
