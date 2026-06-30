@@ -25,6 +25,11 @@ export default function App() {
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
+  useEffect(() => {
+    document.documentElement.classList.toggle("admin-page", path === "/admin");
+    return () => document.documentElement.classList.remove("admin-page");
+  }, [path]);
+
   if (path === "/admin") {
     return <UploadPanel initialError={adminAuthError} />;
   }

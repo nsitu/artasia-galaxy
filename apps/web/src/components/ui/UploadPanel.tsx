@@ -39,8 +39,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
   const [selectedAsset, setSelectedAsset] = useState<PlacementAsset | null>(null);
   const [managePlacementKey, setManagePlacementKey] = useState("");
   const [manageUploaderKey, setManageUploaderKey] = useState("");
-  const [assigningPlacement, setAssigningPlacement] = useState(false);
-  const [assigningUploader, setAssigningUploader] = useState(false);
+  const [savingAsset, setSavingAsset] = useState(false);
   const [assetsLoading, setAssetsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -297,54 +296,48 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
     setError(null);
   }
 
-  async function assignSelectedAssetPlacement() {
+  async function saveSelectedAssetChanges() {
     if (!selectedAsset) return;
-    const placementId = parseInt(managePlacementKey, 10);
-    if (!Number.isFinite(placementId)) {
+    const placementId = managePlacementKey ? parseInt(managePlacementKey, 10) : null;
+    const uploaderId = manageUploaderKey ? parseInt(manageUploaderKey, 10) : null;
+    const placementChanged = Boolean(managePlacementKey)
+      && managePlacementKey !== (selectedPlacement ? String(selectedPlacement.placement_id) : "");
+    const uploaderChanged = Boolean(manageUploaderKey)
+      && manageUploaderKey !== (selectedAsset.uploader_id ? String(selectedAsset.uploader_id) : "");
+
+    if (!placementChanged && !uploaderChanged) {
+      setError("Choose a placement or team member album to save.");
+      return;
+    }
+    if (placementChanged && (!placementId || !Number.isFinite(placementId))) {
       setError("Select a placement to assign this upload.");
       return;
     }
+    if (uploaderChanged && (!uploaderId || !Number.isFinite(uploaderId))) {
+      setError("Select a team member album for this upload.");
+      return;
+    }
 
-    setAssigningPlacement(true);
+    setSavingAsset(true);
     try {
-      await assignAssetPlacement({
-        assetId: selectedAsset.id,
-        placementId,
-      });
+      if (placementChanged && placementId) {
+        await assignAssetPlacement({
+          assetId: selectedAsset.id,
+          placementId,
+        });
+      }
+      if (uploaderChanged && uploaderId) {
+        await assignAssetUploader({
+          assetId: selectedAsset.id,
+          uploaderId,
+        });
+      }
       setSelectedAsset(null);
       refreshVisibleAssets();
     } catch (err) {
       setError((err as Error).message);
     } finally {
-      setAssigningPlacement(false);
-    }
-  }
-
-  async function assignSelectedAssetUploader() {
-    if (!selectedAsset) return;
-    const uploaderId = parseInt(manageUploaderKey, 10);
-    if (!Number.isFinite(uploaderId)) {
-      setError("Select a team member album for this upload.");
-      return;
-    }
-
-    setAssigningUploader(true);
-    try {
-      await assignAssetUploader({
-        assetId: selectedAsset.id,
-        uploaderId,
-      });
-      const uploader = options?.uploaders.find((entry) => entry.id === uploaderId);
-      setSelectedAsset({
-        ...selectedAsset,
-        uploader_id: uploaderId,
-        uploader_name: uploader?.name ?? null,
-      });
-      refreshVisibleAssets();
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setAssigningUploader(false);
+      setSavingAsset(false);
     }
   }
 
@@ -376,6 +369,11 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
 
   function renderAssetManager() {
     if (!selectedAsset) return null;
+    const placementChanged = Boolean(managePlacementKey)
+      && managePlacementKey !== (selectedPlacement ? String(selectedPlacement.placement_id) : "");
+    const uploaderChanged = Boolean(manageUploaderKey)
+      && manageUploaderKey !== (selectedAsset.uploader_id ? String(selectedAsset.uploader_id) : "");
+    const canSaveAsset = placementChanged || uploaderChanged;
 
     return (
       <div style={managePanelStyle}>
@@ -434,19 +432,11 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
           <div style={manageActionsStyle}>
             <button
               type="button"
-              onClick={assignSelectedAssetPlacement}
-              disabled={assigningPlacement || !managePlacementKey}
+              onClick={saveSelectedAssetChanges}
+              disabled={savingAsset || !canSaveAsset}
               style={primaryActionButtonStyle}
             >
-              {assigningPlacement ? "Assigning..." : "Assign Placement"}
-            </button>
-            <button
-              type="button"
-              onClick={assignSelectedAssetUploader}
-              disabled={assigningUploader || !manageUploaderKey}
-              style={primaryActionButtonStyle}
-            >
-              {assigningUploader ? "Assigning..." : "Assign Team Member"}
+              {savingAsset ? "Saving..." : "Save"}
             </button>
             <a href={selectedAsset.previewUrl} target="_blank" rel="noreferrer" style={secondaryLinkButtonStyle}>
               Open Preview
@@ -760,7 +750,7 @@ const pageStyle: React.CSSProperties = {
 };
 
 const panelStyle: React.CSSProperties = {
-  width: "min(1120px, 100%)",
+  width: "min(1680px, 100%)",
   margin: "0 auto",
   background: "#11131a",
   border: "1px solid rgba(255,255,255,0.16)",
