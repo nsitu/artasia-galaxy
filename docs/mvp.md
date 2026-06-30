@@ -18,7 +18,7 @@ The MVP includes:
 - GitHub Actions build, publish, and deploy pipeline.
 - nginx HTTPS reverse proxy on the existing Bitnami VM.
 
-WordPress provides the Artasia placement metadata, activity-backed upload tags, and uploader names used by the public upload companion.
+WordPress provides the Artasia placement metadata, activity-backed upload tags, and uploader names used by the `/admin` companion.
 
 ## Local Development
 
@@ -192,6 +192,8 @@ SESSION_SECRET=...
 ```dotenv
 WORDPRESS_URL=https://artsforall.co
 ```
+
+The viewer runs at `/`. The authenticated admin area starts at `/admin`; the upload experience is currently the first tool there.
 
 Google sign-in is handled by the Node app through `/api/v1/auth/google/start` and `/api/v1/auth/google/callback`. The Google OAuth client must allow this redirect URI:
 

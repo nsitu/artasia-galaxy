@@ -18,12 +18,10 @@ interface UploadItem {
 }
 
 interface UploadPanelProps {
-  visible: boolean;
-  onClose: () => void;
   initialError?: string | null;
 }
 
-export default function UploadPanel({ visible, onClose, initialError }: UploadPanelProps) {
+export default function UploadPanel({ initialError }: UploadPanelProps) {
   const [options, setOptions] = useState<UploadOptions | null>(null);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [uploaderKey, setUploaderKey] = useState("");
@@ -41,7 +39,7 @@ export default function UploadPanel({ visible, onClose, initialError }: UploadPa
   }
 
   useEffect(() => {
-    if (!visible || options) return;
+    if (options) return;
     const authFallback: AuthUser = { authenticated: false };
     Promise.all([
       fetchUploadOptions(),
@@ -58,11 +56,11 @@ export default function UploadPanel({ visible, onClose, initialError }: UploadPa
         setSelectedTag(data.tags[0] ?? "");
       })
       .catch((err) => setError((err as Error).message));
-  }, [visible, options]);
+  }, [options]);
 
   useEffect(() => {
-    if (visible && initialError) setError(initialError);
-  }, [visible, initialError]);
+    if (initialError) setError(initialError);
+  }, [initialError]);
 
   const selectedUploader = useMemo(() => {
     if (!options) return null;
@@ -109,11 +107,10 @@ export default function UploadPanel({ visible, onClose, initialError }: UploadPa
   }
 
   useEffect(() => {
-    if (!visible) return;
     const hasQueued = items.some((item) => item.status === "queued");
     if (!hasQueued || uploadInProgressRef.current) return;
     void uploadQueued();
-  }, [items, visible, selectedUploader, selectedPlacement, selectedTag]);
+  }, [items, selectedUploader, selectedPlacement, selectedTag]);
 
   async function uploadQueued() {
     if (uploadInProgressRef.current) return;
@@ -203,21 +200,20 @@ export default function UploadPanel({ visible, onClose, initialError }: UploadPa
     }
   }
 
-  if (!visible) return null;
-
   return (
-    <div style={backdropStyle}>
-      <div style={panelStyle}>
+    <main style={pageStyle}>
+      <section style={panelStyle}>
         <div style={headerStyle}>
-          <h2 style={titleStyle}>Upload</h2>
-          <button onClick={onClose} style={iconButtonStyle} aria-label="Close upload panel">
-            X
-          </button>
+          <div>
+            <h1 style={titleStyle}>Upload</h1>
+            <p style={introStyle}>
+              Choose your name, site, and delivery week, then add documentation.
+            </p>
+          </div>
+          <a href="/" style={secondaryLinkButtonStyle}>
+            Viewer
+          </a>
         </div>
-
-        <p style={introStyle}>
-          To upload documentation for your site, choose your name, site, and delivery week.
-        </p>
 
         <div style={authBarStyle}>
           {authUser?.authenticated ? (
@@ -391,38 +387,35 @@ export default function UploadPanel({ visible, onClose, initialError }: UploadPa
             </div>
           ))}
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }
 
-const backdropStyle: React.CSSProperties = {
-  position: "absolute",
-  inset: 0,
-  zIndex: 50,
-  background: "rgba(0,0,0,0.72)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: 16,
+const pageStyle: React.CSSProperties = {
+  minHeight: "100vh",
+  background: "#0b0d12",
+  color: "#ddd",
+  padding: 18,
+  boxSizing: "border-box",
+  fontFamily: "system-ui, sans-serif",
 };
 
 const panelStyle: React.CSSProperties = {
-  width: "min(980px, 100%)",
-  maxHeight: "90vh",
-  overflowY: "auto",
+  width: "min(1120px, 100%)",
+  margin: "0 auto",
   background: "#11131a",
   border: "1px solid rgba(255,255,255,0.16)",
   borderRadius: 8,
   padding: 18,
-  color: "#ddd",
-  fontFamily: "system-ui, sans-serif",
+  boxSizing: "border-box",
 };
 
 const headerStyle: React.CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
-  alignItems: "center",
+  alignItems: "flex-start",
+  gap: 16,
   marginBottom: 16,
 };
 
@@ -433,7 +426,7 @@ const titleStyle: React.CSSProperties = {
 };
 
 const introStyle: React.CSSProperties = {
-  margin: "0 0 14px",
+  margin: "6px 0 0",
   color: "#b9bfcc",
   fontSize: 14,
   lineHeight: 1.45,
@@ -475,14 +468,12 @@ const secondaryButtonStyle: React.CSSProperties = {
   whiteSpace: "nowrap",
 };
 
-const iconButtonStyle: React.CSSProperties = {
-  background: "transparent",
-  border: "1px solid rgba(255,255,255,0.22)",
+const secondaryLinkButtonStyle: React.CSSProperties = {
+  ...secondaryButtonStyle,
+  display: "inline-flex",
+  alignItems: "center",
+  textDecoration: "none",
   color: "#ddd",
-  width: 32,
-  height: 32,
-  borderRadius: 4,
-  cursor: "pointer",
 };
 
 const fieldGridStyle: React.CSSProperties = {

@@ -7,7 +7,6 @@ import GalleryWall from "./GalleryWall";
 import CameraRig from "./CameraRig";
 import TerrainGallery from "./TerrainGallery";
 import SettingsPanel from "../ui/SettingsPanel";
-import UploadPanel from "../ui/UploadPanel";
 
 export default function ArtScene() {
   const fetchPhotos = useGalleryStore((s) => s.fetchPhotos);
@@ -30,8 +29,6 @@ export default function ArtScene() {
 
   const [showAlbums, setShowAlbums] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [showUpload, setShowUpload] = useState(false);
-  const [uploadAuthError, setUploadAuthError] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const autoAdvance = useCallback(() => {
@@ -43,18 +40,6 @@ export default function ArtScene() {
     fetchAlbumList();
     fetchPhotos();
   }, [loadSettings, fetchPhotos, fetchAlbumList]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const authResult = params.get("auth");
-    if (!authResult) return;
-
-    if (authResult === "error") {
-      setUploadAuthError(params.get("message") ?? "Google sign-in failed.");
-    }
-    setShowUpload(true);
-    window.history.replaceState(null, "", window.location.pathname + window.location.hash);
-  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -136,12 +121,12 @@ export default function ArtScene() {
           >
             ⚙
           </button>
-          <button
-            onClick={() => setShowUpload(true)}
+          <a
+            href="/admin"
             style={btnStyle}
           >
-            Upload
-          </button>
+            Admin
+          </a>
         </div>
 
         <div style={{ display: "flex", gap: 12 }}>
@@ -269,15 +254,6 @@ export default function ArtScene() {
         onClose={() => setShowSettings(false)}
       />
 
-      <UploadPanel
-        visible={showUpload}
-        initialError={uploadAuthError}
-        onClose={() => {
-          setShowUpload(false);
-          setUploadAuthError(null);
-        }}
-      />
-
       <Canvas
         camera={{ position: [0, 0, 16], fov: 50 }}
         dpr={[1, 1.5]}
@@ -319,6 +295,7 @@ const btnStyle: React.CSSProperties = {
   cursor: "pointer",
   fontSize: 13,
   fontFamily: "monospace",
+  textDecoration: "none",
 };
 
 const dropdownStyle: React.CSSProperties = {

@@ -13,7 +13,7 @@ const router = Router();
 
 function redirectWithError(res: Response, message: string) {
   const params = new URLSearchParams({ auth: "error", message });
-  res.redirect(`/?${params.toString()}`);
+  res.redirect(`/admin?${params.toString()}`);
 }
 
 router.get("/google/start", (_req, res) => {
@@ -45,7 +45,7 @@ router.get("/google/callback", async (req, res) => {
 
     const profile = await exchangeGoogleCode(code, oauthState.nonce);
     setAuthSession(res, profile);
-    res.redirect("/?auth=success");
+    res.redirect("/admin?auth=success");
   } catch (err) {
     redirectWithError(res, (err as Error).message);
   }
