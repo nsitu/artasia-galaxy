@@ -42,7 +42,7 @@ export class GoogleDriveClient {
       refresh_token: refreshToken,
     });
 
-    this.drive = google.drive({ version: "v3", auth });
+    this.drive = google.drive({ version: "v3", auth: auth as any });
   }
 
   /**
@@ -74,7 +74,7 @@ export class GoogleDriveClient {
 
     return {
       files: (res.data.files ?? []) as DriveFile[],
-      nextPageToken: res.data.nextPageToken,
+      nextPageToken: res.data.nextPageToken || undefined,
     };
   }
 

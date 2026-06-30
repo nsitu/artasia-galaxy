@@ -6,6 +6,6 @@
     "packages/*"
   ],
   "dependencies": {
-    "puppeteer-core": "^25.1.0"
+    "puppeteer-core": "^25.2.1"
   }
 }
