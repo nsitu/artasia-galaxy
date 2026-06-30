@@ -71,6 +71,9 @@ async function immichRequest(
   headers.set("x-api-key", IMMICH_API_KEY);
 
   console.log(`[Immich] → ${init?.method ?? "GET"} ${url}`);
+  if (init?.body && init.method !== "GET") {
+    console.log(`[Immich] Request body: ${init.body}`);
+  }
 
   let res: Response;
   try {
@@ -293,14 +296,26 @@ export async function ensureTag(name: string): Promise<ImmichTag> {
       tag.name.trim().toLowerCase() === normalized ||
       tag.value.trim().toLowerCase() === normalized
   );
-  if (existing) return existing;
+  
+  if (existing) {
+    console.log(`[ensureTag] Found existing tag: id="${existing.id}", name="${existing.name}"`);
+    if (!isValidUUID(existing.id)) {
+      console.error(`[ensureTag] INVALID UUID: existing tag id is not a UUID: "${existing.id}"`);
+    }
+    return existing;
+  }
 
   const res = await immichRequest("/tags", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
   });
-  return res.json();
+  const tag = await res.json();
+  console.log(`[ensureTag] Created new tag: id="${tag.id}", name="${tag.name}"`);
+  if (!isValidUUID(tag.id)) {
+    console.error(`[ensureTag] INVALID UUID: new tag id is not a UUID: "${tag.id}"`);
+  }
+  return tag;
 }
 
 export async function tagAsset(assetId: string, tagNames: string[]) {
@@ -388,10 +403,22 @@ export async function untagAssets(assetIds: string[], tagIds: string[]) {
     throw new Error(`Invalid tag ID format(s): ${invalidTagIds.join(", ")}. Expected UUID format. Tags received: ${JSON.stringify(tagIds)}`);
   }
 
+  // Log detailed info about each ID
+  console.log(`[untagAssets] Validating ${assetIds.length} asset ID(s):`);
+  assetIds.forEach((id, i) => {
+    console.log(`  [${i}] "${id}" (length: ${id.length})`);
+  });
+  
+  console.log(`[untagAssets] Validating ${tagIds.length} tag ID(s):`);
+  tagIds.forEach((id, i) => {
+    console.log(`  [${i}] "${id}" (length: ${id.length})`);
+  });
+
   const payload = { assetIds, tagIds };
-  console.log(`[untagAssets] Removing ${tagIds.length} tag(s) from ${assetIds.length} asset(s). Payload: ${JSON.stringify(payload)}`);
+  console.log(`[untagAssets] Batch DELETE payload: ${JSON.stringify(payload)}`);
   
   try {
+    // Try standard body-based DELETE
     const response = await immichRequest("/tags/assets", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
@@ -399,8 +426,30 @@ export async function untagAssets(assetIds: string[], tagIds: string[]) {
     });
     console.log(`[untagAssets] DELETE successful, status: ${response.status}`);
   } catch (err) {
-    console.error(`[untagAssets] DELETE failed:`, (err as Error).message);
-    throw err;
+    const errMsg = (err as Error).message;
+    console.error(`[untagAssets] Batch DELETE failed: ${errMsg}`);
+    
+    if (errMsg.includes("Bad Request") && errMsg.includes("id must be a UUID")) {
+      console.log(`[untagAssets] Attempting individual DELETE operations...`);
+      
+      for (const assetId of assetIds) {
+        for (const tagId of tagIds) {
+          try {
+            console.log(`[untagAssets] DELETE tag ${tagId} from asset ${assetId}`);
+            const response = await immichRequest(`/tags/assets`, {
+              method: "DELETE",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ assetIds: [assetId], tagIds: [tagId] }),
+            });
+            console.log(`[untagAssets] Individual DELETE successful, status: ${response.status}`);
+          } catch (indivErr) {
+            console.error(`[untagAssets] Individual DELETE failed for ${tagId}/${assetId}: ${(indivErr as Error).message}`);
+          }
+        }
+      }
+    } else {
+      throw err;
+    }
   }
 }
 

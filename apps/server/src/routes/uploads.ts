@@ -148,9 +148,16 @@ async function getExistingPlacementTagIds() {
   const placementTags = tags
     .filter((tag) => isPlacementAnchorTagName(tag.name) || isPlacementAnchorTagName(tag.value));
   
-  const tagIds = placementTags.map((tag) => tag.id);
+  console.log(`[getExistingPlacementTagIds] Found ${placementTags.length} placement tag objects:`, 
+    JSON.stringify(placementTags));
+  
+  const tagIds = placementTags.map((tag) => {
+    console.log(`[getExistingPlacementTagIds] Tag object: id="${tag.id}" (type: ${typeof tag.id}), name="${tag.name}"`);
+    return tag.id;
+  });
+  
   if (tagIds.length > 0) {
-    console.log(`[getExistingPlacementTagIds] Found ${tagIds.length} placement tags: ${JSON.stringify(tagIds)}`);
+    console.log(`[getExistingPlacementTagIds] Extracted ${tagIds.length} tag IDs: ${JSON.stringify(tagIds)}`);
   }
   
   return tagIds;
