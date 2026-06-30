@@ -19,6 +19,7 @@ export interface ImmichAsset {
   updatedAt: string;
   isFavorite: boolean;
   isArchived: boolean;
+  isTrashed?: boolean;
   duration: string;
   exifInfo?: {
     make?: string;

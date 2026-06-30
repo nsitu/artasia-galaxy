@@ -7,9 +7,11 @@ import {
   ensureAlbum,
   getAsset,
   getServerStatistics,
+  listAlbums,
   listTags,
   searchAssets,
   tagAsset,
+  untagAssets,
   updateAssetLocation,
   uploadAsset,
 } from "../infra/ImmichClient.js";
@@ -133,6 +135,17 @@ async function findExistingPlacementTagId(placementId: number) {
   )?.id ?? null;
 }
 
+function isPlacementAnchorTagName(value: string) {
+  return /^placement:\d+$/.test(value.trim().toLowerCase());
+}
+
+async function getExistingPlacementTagIds() {
+  const tags = await listTags();
+  return tags
+    .filter((tag) => isPlacementAnchorTagName(tag.name) || isPlacementAnchorTagName(tag.value))
+    .map((tag) => tag.id);
+}
+
 async function getAssetsForPlacementTagIds(tagIds: string[]) {
   const byId = new Map<string, Awaited<ReturnType<typeof searchAssets>>["assets"]["items"][number]>();
   const size = 100;
@@ -158,9 +171,38 @@ function mapPlacementAsset(asset: Awaited<ReturnType<typeof getAssetsForPlacemen
     fileName: asset.originalFileName,
     createdAt: asset.fileCreatedAt,
     updatedAt: asset.updatedAt,
+    archived: asset.isArchived,
+    trashed: Boolean(asset.isTrashed),
     thumbnailUrl: `/api/v1/assets/${asset.id}/thumbnail`,
     previewUrl: `/api/v1/assets/${asset.id}/preview`,
   };
+}
+
+async function searchAssetsByAlbumIds(albumIds: string[]) {
+  const byId = new Map<string, Awaited<ReturnType<typeof searchAssets>>["assets"]["items"][number]>();
+  const size = 100;
+  for (const albumId of albumIds) {
+    for (const type of ["IMAGE", "VIDEO"] as const) {
+      let page = 1;
+      for (;;) {
+        const result = await searchAssets({ albumIds: [albumId], page, size, type });
+        for (const asset of result.assets.items) byId.set(asset.id, asset);
+        if (!result.assets.nextPage || result.assets.items.length < size) break;
+        page += 1;
+      }
+    }
+  }
+
+  return Array.from(byId.values()).sort((a, b) => b.fileCreatedAt.localeCompare(a.fileCreatedAt));
+}
+
+async function getUploaderAlbumIds() {
+  const config = await getUploadConfig();
+  const uploaderNames = new Set(config.uploaders.map((uploader) => uploader.name.trim().toLowerCase()));
+  const albums = await listAlbums();
+  return albums
+    .filter((album) => uploaderNames.has(album.albumName.trim().toLowerCase()))
+    .map((album) => album.id);
 }
 
 router.get("/options", async (req, res) => {
@@ -218,6 +260,67 @@ router.get("/assets", async (req, res) => {
 
     const assets = await getAssetsForPlacementTagIds(tagIds);
     res.json({ assets: assets.map(mapPlacementAsset) });
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
+});
+
+router.get("/assets/untagged", async (_req, res) => {
+  try {
+    const [albumIds, placementTagIds] = await Promise.all([
+      getUploaderAlbumIds(),
+      getExistingPlacementTagIds(),
+    ]);
+
+    if (albumIds.length === 0) {
+      res.json({ assets: [] });
+      return;
+    }
+
+    const [albumAssets, taggedAssets] = await Promise.all([
+      searchAssetsByAlbumIds(albumIds),
+      getAssetsForPlacementTagIds(placementTagIds),
+    ]);
+    const taggedAssetIds = new Set(taggedAssets.map((asset) => asset.id));
+    const untaggedAssets = albumAssets.filter((asset) => !taggedAssetIds.has(asset.id));
+
+    res.json({ assets: untaggedAssets.map(mapPlacementAsset) });
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
+});
+
+router.post("/assets/:assetId/placement", async (req, res) => {
+  try {
+    const placementId = parseInt(String(req.body?.placement_id ?? ""), 10);
+    if (!Number.isFinite(placementId)) {
+      res.status(400).json({ error: "Select a valid placement." });
+      return;
+    }
+
+    const placement = await findConfiguredPlacement(placementId);
+    if (!placement) {
+      res.status(404).json({ error: "Placement was not found." });
+      return;
+    }
+
+    const assetId = req.params.assetId;
+    await getAsset(assetId);
+
+    const existingPlacementTagIds = await getExistingPlacementTagIds();
+    await untagAssets([assetId], existingPlacementTagIds);
+    await tagAsset(assetId, getPlacementTagNames(placement));
+    await applyDefaultLocationIfMissing(assetId, {
+      lat: placement.place?.lat,
+      lng: placement.place?.lng,
+    });
+
+    res.json({
+      ok: true,
+      asset_id: assetId,
+      placement_id: placementId,
+      tags: getPlacementTagNames(placement),
+    });
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });
   }

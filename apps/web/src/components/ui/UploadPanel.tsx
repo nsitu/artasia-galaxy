@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  assignAssetPlacement,
   fetchAuthUser,
   fetchPlacementAssetSet,
   fetchPlacementAssets,
   fetchUploadOptions,
+  fetchUntaggedPlacementAssets,
   logoutAuthUser,
   uploadFiles,
   type AuthUser,
@@ -32,6 +34,10 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
   const [selectedTag, setSelectedTag] = useState("");
   const [items, setItems] = useState<UploadItem[]>([]);
   const [placementAssets, setPlacementAssets] = useState<PlacementAsset[]>([]);
+  const [assetMode, setAssetMode] = useState<"placements" | "untagged">("placements");
+  const [selectedAsset, setSelectedAsset] = useState<PlacementAsset | null>(null);
+  const [managePlacementKey, setManagePlacementKey] = useState("");
+  const [assigningPlacement, setAssigningPlacement] = useState(false);
   const [assetsLoading, setAssetsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -99,6 +105,25 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
   }, [filteredPlacements]);
 
   useEffect(() => {
+    if (assetMode === "untagged") {
+      let cancelled = false;
+      setAssetsLoading(true);
+      fetchUntaggedPlacementAssets()
+        .then((assets) => {
+          if (!cancelled) setPlacementAssets(assets);
+        })
+        .catch((err) => {
+          if (!cancelled) setError((err as Error).message);
+        })
+        .finally(() => {
+          if (!cancelled) setAssetsLoading(false);
+        });
+
+      return () => {
+        cancelled = true;
+      };
+    }
+
     if (visiblePlacementIds.length === 0) {
       setPlacementAssets([]);
       return;
@@ -120,7 +145,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
     return () => {
       cancelled = true;
     };
-  }, [visiblePlacementIds]);
+  }, [assetMode, visiblePlacementIds]);
 
   function addFiles(fileList: FileList | File[]) {
     if (!selectedUploader) {
@@ -237,6 +262,8 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
 
   function selectPlacement(placement: UploadOptions["placements"][number]) {
     setPlacementKey(String(placement.placement_id));
+    setAssetMode("placements");
+    setSelectedAsset(null);
     setItems([]);
     setError(null);
     if (selectedUploader && placementIncludesUploader(placement, selectedUploader.id)) return;
@@ -245,14 +272,48 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
 
   function refreshVisibleAssets() {
     setAssetsLoading(true);
-    fetchPlacementAssetSet(visiblePlacementIds)
+    const request = assetMode === "untagged"
+      ? fetchUntaggedPlacementAssets()
+      : fetchPlacementAssetSet(visiblePlacementIds);
+
+    request
       .then(setPlacementAssets)
       .catch((err) => setError((err as Error).message))
       .finally(() => setAssetsLoading(false));
   }
 
   function assetGalleryTitle() {
+    if (assetMode === "untagged") return "Uploads Needing Placement";
     return selectedPlacement ? "Existing Uploads" : "Existing Uploads for Visible Placements";
+  }
+
+  function openAssetManager(asset: PlacementAsset) {
+    setSelectedAsset(asset);
+    setManagePlacementKey(selectedPlacement ? String(selectedPlacement.placement_id) : "");
+    setError(null);
+  }
+
+  async function assignSelectedAssetPlacement() {
+    if (!selectedAsset) return;
+    const placementId = parseInt(managePlacementKey, 10);
+    if (!Number.isFinite(placementId)) {
+      setError("Select a placement to assign this upload.");
+      return;
+    }
+
+    setAssigningPlacement(true);
+    try {
+      await assignAssetPlacement({
+        assetId: selectedAsset.id,
+        placementId,
+      });
+      setSelectedAsset(null);
+      refreshVisibleAssets();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setAssigningPlacement(false);
+    }
   }
 
   async function signOut() {
@@ -262,6 +323,79 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
     } catch (err) {
       setError((err as Error).message);
     }
+  }
+
+  function renderAssetCard(asset: PlacementAsset) {
+    return (
+      <button key={asset.id} type="button" onClick={() => openAssetManager(asset)} style={assetCardStyle}>
+        <img src={asset.thumbnailUrl} alt="" style={assetImageStyle} />
+        <span style={assetNameStyle}>{asset.fileName}</span>
+        <span style={assetDateStyle}>{new Date(asset.createdAt).toLocaleDateString()}</span>
+      </button>
+    );
+  }
+
+  function renderAssetGrid(emptyMessage: string) {
+    if (assetsLoading) return <div style={emptyStateStyle}>Loading uploads...</div>;
+    if (placementAssets.length === 0) return <div style={emptyStateStyle}>{emptyMessage}</div>;
+    return <div style={assetGridStyle}>{placementAssets.map(renderAssetCard)}</div>;
+  }
+
+  function renderAssetManager() {
+    if (!selectedAsset) return null;
+
+    return (
+      <div style={managePanelStyle}>
+        <div style={managePreviewStyle}>
+          {selectedAsset.type === "VIDEO" ? (
+            <video src={selectedAsset.previewUrl} controls style={manageMediaStyle} />
+          ) : (
+            <img src={selectedAsset.previewUrl} alt="" style={manageMediaStyle} />
+          )}
+        </div>
+        <div style={manageDetailsStyle}>
+          <div style={manageHeaderStyle}>
+            <div>
+              <h3 style={sectionTitleStyle}>Manage Upload</h3>
+              <div style={assetNameStyle}>{selectedAsset.fileName}</div>
+              <div style={assetDateStyle}>{new Date(selectedAsset.createdAt).toLocaleString()}</div>
+            </div>
+            <button type="button" onClick={() => setSelectedAsset(null)} style={secondaryButtonStyle}>
+              Close
+            </button>
+          </div>
+
+          <label style={labelStyle}>
+            Placement
+            <select
+              value={managePlacementKey}
+              onChange={(e) => setManagePlacementKey(e.target.value)}
+              style={inputStyle}
+            >
+              <option value="">Select a placement</option>
+              {(options?.placements ?? []).map((placement) => (
+                <option key={placement.placement_id} value={String(placement.placement_id)}>
+                  {placementLabel(placement)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div style={manageActionsStyle}>
+            <button
+              type="button"
+              onClick={assignSelectedAssetPlacement}
+              disabled={assigningPlacement || !managePlacementKey}
+              style={primaryActionButtonStyle}
+            >
+              {assigningPlacement ? "Assigning..." : "Assign Placement"}
+            </button>
+            <a href={selectedAsset.previewUrl} target="_blank" rel="noreferrer" style={secondaryLinkButtonStyle}>
+              Open Preview
+            </a>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -313,6 +447,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
                 onChange={(e) => {
                   setUploaderKey(e.target.value);
                   setPlacementKey("");
+                  setSelectedAsset(null);
                   setItems([]);
                   setError(null);
                 }}
@@ -330,6 +465,41 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
             <div style={menuHeaderStyle}>
               <span>Placements</span>
               <span>{filteredPlacements.length}</span>
+            </div>
+
+            <div style={placementListStyle}>
+              <button
+                type="button"
+                onClick={() => {
+                  setPlacementKey("");
+                  setAssetMode("placements");
+                  setSelectedAsset(null);
+                  setItems([]);
+                }}
+                style={{
+                  ...placementButtonStyle,
+                  ...(!selectedPlacement && assetMode === "placements" ? selectedPlacementButtonStyle : {}),
+                }}
+              >
+                <span style={placementNameStyle}>All Visible Placements</span>
+                <span style={placementMetaStyle}>Browse uploads across this menu</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPlacementKey("");
+                  setAssetMode("untagged");
+                  setSelectedAsset(null);
+                  setItems([]);
+                }}
+                style={{
+                  ...placementButtonStyle,
+                  ...(assetMode === "untagged" ? selectedPlacementButtonStyle : {}),
+                }}
+              >
+                <span style={placementNameStyle}>Needs Placement</span>
+                <span style={placementMetaStyle}>Uploads without a placement tag</span>
+              </button>
             </div>
 
             <div style={placementListStyle}>
@@ -481,21 +651,8 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
                   </button>
                 </div>
 
-                {assetsLoading ? (
-                  <div style={emptyStateStyle}>Loading uploads...</div>
-                ) : placementAssets.length > 0 ? (
-                  <div style={assetGridStyle}>
-                    {placementAssets.map((asset) => (
-                      <a key={asset.id} href={asset.previewUrl} target="_blank" rel="noreferrer" style={assetCardStyle}>
-                        <img src={asset.thumbnailUrl} alt="" style={assetImageStyle} />
-                        <span style={assetNameStyle}>{asset.fileName}</span>
-                        <span style={assetDateStyle}>{new Date(asset.createdAt).toLocaleDateString()}</span>
-                      </a>
-                    ))}
-                  </div>
-                ) : (
-                  <div style={emptyStateStyle}>No uploads tagged to this placement yet.</div>
-                )}
+                {renderAssetManager()}
+                {renderAssetGrid("No uploads tagged to this placement yet.")}
               </>
             ) : (
               <>
@@ -518,20 +675,11 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
                     Refresh
                   </button>
                 </div>
-                {assetsLoading ? (
-                  <div style={emptyStateStyle}>Loading uploads...</div>
-                ) : placementAssets.length > 0 ? (
-                  <div style={assetGridStyle}>
-                    {placementAssets.map((asset) => (
-                      <a key={asset.id} href={asset.previewUrl} target="_blank" rel="noreferrer" style={assetCardStyle}>
-                        <img src={asset.thumbnailUrl} alt="" style={assetImageStyle} />
-                        <span style={assetNameStyle}>{asset.fileName}</span>
-                        <span style={assetDateStyle}>{new Date(asset.createdAt).toLocaleDateString()}</span>
-                      </a>
-                    ))}
-                  </div>
-                ) : (
-                  <div style={emptyStateStyle}>No uploads tagged to the visible placements yet.</div>
+                {renderAssetManager()}
+                {renderAssetGrid(
+                  assetMode === "untagged"
+                    ? "No uploads need placement right now."
+                    : "No uploads tagged to the visible placements yet."
                 )}
               </>
             )}
@@ -625,6 +773,16 @@ const secondaryLinkButtonStyle: React.CSSProperties = {
   alignItems: "center",
   textDecoration: "none",
   color: "#ddd",
+};
+
+const primaryActionButtonStyle: React.CSSProperties = {
+  color: "#0b0d12",
+  background: "#e8edf8",
+  border: "1px solid rgba(255,255,255,0.3)",
+  borderRadius: 4,
+  padding: "7px 10px",
+  cursor: "pointer",
+  whiteSpace: "nowrap",
 };
 
 const adminLayoutStyle: React.CSSProperties = {
@@ -803,6 +961,49 @@ const sectionTitleStyle: React.CSSProperties = {
   fontSize: 15,
 };
 
+const managePanelStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(180px, 280px) 1fr",
+  gap: 14,
+  background: "#171a22",
+  border: "1px solid rgba(232,237,248,0.28)",
+  borderRadius: 6,
+  padding: 12,
+  marginBottom: 12,
+};
+
+const managePreviewStyle: React.CSSProperties = {
+  minWidth: 0,
+};
+
+const manageMediaStyle: React.CSSProperties = {
+  width: "100%",
+  maxHeight: 280,
+  objectFit: "contain",
+  borderRadius: 4,
+  background: "#0c0e13",
+};
+
+const manageDetailsStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 12,
+  alignContent: "start",
+  minWidth: 0,
+};
+
+const manageHeaderStyle: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "flex-start",
+  gap: 12,
+};
+
+const manageActionsStyle: React.CSSProperties = {
+  display: "flex",
+  gap: 8,
+  flexWrap: "wrap",
+};
+
 const assetGridStyle: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fill, minmax(132px, 1fr))",
@@ -813,12 +1014,14 @@ const assetCardStyle: React.CSSProperties = {
   display: "grid",
   gap: 6,
   color: "#ddd",
-  textDecoration: "none",
   background: "#171a22",
   border: "1px solid rgba(255,255,255,0.1)",
   borderRadius: 6,
   padding: 8,
   minWidth: 0,
+  cursor: "pointer",
+  textAlign: "left",
+  font: "inherit",
 };
 
 const assetImageStyle: React.CSSProperties = {

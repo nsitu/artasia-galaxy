@@ -152,6 +152,8 @@ export interface PlacementAsset {
   fileName: string;
   createdAt: string;
   updatedAt: string;
+  archived?: boolean;
+  trashed?: boolean;
   thumbnailUrl: string;
   previewUrl: string;
 }
@@ -187,6 +189,31 @@ export async function fetchPlacementAssetSet(placementIds: number[]): Promise<Pl
   }
   const body = await res.json() as { assets?: PlacementAsset[] };
   return body.assets ?? [];
+}
+
+export async function fetchUntaggedPlacementAssets(): Promise<PlacementAsset[]> {
+  const res = await fetch("/api/v1/uploads/assets/untagged");
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  const body = await res.json() as { assets?: PlacementAsset[] };
+  return body.assets ?? [];
+}
+
+export async function assignAssetPlacement(params: {
+  assetId: string;
+  placementId: number;
+}): Promise<void> {
+  const res = await fetch(`/api/v1/uploads/assets/${params.assetId}/placement`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ placement_id: params.placementId }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
 }
 
 export async function fetchMapPlacements(): Promise<MapPlacement[]> {
