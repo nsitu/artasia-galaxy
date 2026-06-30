@@ -159,6 +159,10 @@ export interface PlacementAsset {
   updatedAt: string;
   archived?: boolean;
   trashed?: boolean;
+  placement_id?: number | null;
+  placement_name?: string | null;
+  activity_id?: number | null;
+  activity_label?: string | null;
   uploader_id?: number | null;
   uploader_name?: string | null;
   uploader_album_id?: string | null;
@@ -415,4 +419,3 @@ export async function syncDriveFiles(params: {
   const data = await res.json() as { results?: DriveSyncResult[] };
   return data.results ?? [];
 }
-

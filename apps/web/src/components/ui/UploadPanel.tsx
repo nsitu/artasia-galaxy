@@ -401,9 +401,9 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
 
   function openAssetManager(asset: PlacementAsset) {
     setSelectedAsset(asset);
-    setManagePlacementKey(selectedPlacement ? String(selectedPlacement.placement_id) : "");
+    setManagePlacementKey(asset.placement_id ? String(asset.placement_id) : "");
     setManageUploaderKey(asset.uploader_id ? String(asset.uploader_id) : "");
-    setManageActivityTag("");
+    setManageActivityTag(asset.activity_id ? String(asset.activity_id) : "");
     setError(null);
   }
 
@@ -419,10 +419,10 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
     const placementId = managePlacementKey ? parseInt(managePlacementKey, 10) : null;
     const uploaderId = manageUploaderKey ? parseInt(manageUploaderKey, 10) : null;
     const placementChanged = Boolean(managePlacementKey)
-      && managePlacementKey !== (selectedPlacement ? String(selectedPlacement.placement_id) : "");
+      && managePlacementKey !== (selectedAsset.placement_id ? String(selectedAsset.placement_id) : "");
     const uploaderChanged = Boolean(manageUploaderKey)
       && manageUploaderKey !== (selectedAsset.uploader_id ? String(selectedAsset.uploader_id) : "");
-    const activityTagChanged = Boolean(manageActivityTag);
+    const activityTagChanged = manageActivityTag !== (selectedAsset.activity_id ? String(selectedAsset.activity_id) : "");
 
     if (!placementChanged && !uploaderChanged && !activityTagChanged) {
       setError("Choose a placement, team member album, or program week to save.");
@@ -454,7 +454,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
       if (activityTagChanged) {
         await assignAssetActivityTag({
           assetId: selectedAsset.id,
-          activityId: manageActivityTag === "__remove__" ? null : parseInt(manageActivityTag, 10),
+          activityId: manageActivityTag ? parseInt(manageActivityTag, 10) : null,
         });
       }
       closeAssetManager();
@@ -715,10 +715,11 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
   function renderAssetManager() {
     if (!selectedAsset) return null;
     const placementChanged = Boolean(managePlacementKey)
-      && managePlacementKey !== (selectedPlacement ? String(selectedPlacement.placement_id) : "");
+      && managePlacementKey !== (selectedAsset.placement_id ? String(selectedAsset.placement_id) : "");
     const uploaderChanged = Boolean(manageUploaderKey)
       && manageUploaderKey !== (selectedAsset.uploader_id ? String(selectedAsset.uploader_id) : "");
-    const canSaveAsset = placementChanged || uploaderChanged || Boolean(manageActivityTag);
+    const activityChanged = manageActivityTag !== (selectedAsset.activity_id ? String(selectedAsset.activity_id) : "");
+    const canSaveAsset = placementChanged || uploaderChanged || activityChanged;
 
     return (
       <div style={managePanelStyle}>
@@ -736,7 +737,13 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
               <div style={assetNameStyle}>{selectedAsset.fileName}</div>
               <div style={assetDateStyle}>{new Date(selectedAsset.createdAt).toLocaleString()}</div>
               <div style={assetDateStyle}>
+                Site: {selectedAsset.placement_name ?? "No Artasia site"}
+              </div>
+              <div style={assetDateStyle}>
                 Album: {selectedAsset.uploader_name ?? "No team member album"}
+              </div>
+              <div style={assetDateStyle}>
+                Program Week: {selectedAsset.activity_label ?? "No activity tag"}
               </div>
             </div>
             <button type="button" onClick={closeAssetManager} style={secondaryButtonStyle}>
@@ -781,8 +788,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
               onChange={(e) => setManageActivityTag(e.target.value)}
               style={inputStyle}
             >
-              <option value="">— No change —</option>
-              <option value="__remove__">Remove activity tag</option>
+              <option value="">No activity tag</option>
               {(options?.activities ?? []).map((activity) => (
                 <option key={activity.id} value={String(activity.id)}>
                   {activity.label}

@@ -194,9 +194,17 @@ interface UploaderAlbum {
   uploaderName: string;
 }
 
+interface AssetManagementAssignment {
+  placementId?: number;
+  placementName?: string;
+  activityId?: number;
+  activityLabel?: string;
+}
+
 function mapAdminAsset(
   asset: Awaited<ReturnType<typeof getAssetsForPlacementTagIds>>[number],
-  uploaderAlbum?: UploaderAlbum
+  uploaderAlbum?: UploaderAlbum,
+  assignment?: AssetManagementAssignment
 ) {
   return {
     id: asset.id,
@@ -206,6 +214,10 @@ function mapAdminAsset(
     updatedAt: asset.updatedAt,
     archived: asset.isArchived,
     trashed: Boolean(asset.isTrashed),
+    placement_id: assignment?.placementId ?? null,
+    placement_name: assignment?.placementName ?? null,
+    activity_id: assignment?.activityId ?? null,
+    activity_label: assignment?.activityLabel ?? null,
     uploader_id: uploaderAlbum?.uploaderId ?? null,
     uploader_name: uploaderAlbum?.uploaderName ?? null,
     uploader_album_id: uploaderAlbum?.id ?? null,
@@ -282,10 +294,89 @@ async function getUploaderAlbumMemberships(assetId: string, uploaderAlbums: Uplo
   return memberships;
 }
 
+async function getManagementAssignments(assetIds: string[]) {
+  const assignments = new Map<string, AssetManagementAssignment>();
+  if (assetIds.length === 0) return assignments;
+
+  const assetIdSet = new Set(assetIds);
+  const config = await getUploadConfig();
+  const tags = await listTags();
+
+  const placementByTagId = new Map<string, { id: number; name: string }>();
+  for (const placement of config.placements) {
+    const anchor = placementAnchorTag(placement.placement_id);
+    const normalizedAnchor = anchor.trim().toLowerCase();
+    const tag = tags.find(
+      (candidate) =>
+        candidate.name.trim().toLowerCase() === normalizedAnchor ||
+        candidate.value.trim().toLowerCase() === normalizedAnchor
+    );
+    if (tag) {
+      placementByTagId.set(tag.id, {
+        id: placement.placement_id,
+        name: placement.placement_name,
+      });
+    }
+  }
+
+  const activityByTagId = new Map<string, { id: number; label: string }>();
+  for (const activity of config.activities) {
+    const anchor = activityAnchorTag(activity.id);
+    const normalizedAnchor = anchor.trim().toLowerCase();
+    const normalizedLabel = activity.label.trim().toLowerCase();
+    for (const tag of tags) {
+      const tagName = tag.name.trim().toLowerCase();
+      const tagValue = tag.value.trim().toLowerCase();
+      if (
+        tagName === normalizedAnchor ||
+        tagValue === normalizedAnchor ||
+        tagName === normalizedLabel ||
+        tagValue === normalizedLabel
+      ) {
+        activityByTagId.set(tag.id, {
+          id: activity.id,
+          label: activity.label,
+        });
+      }
+    }
+  }
+
+  for (const [tagId, placement] of placementByTagId) {
+    const taggedAssetIds = await searchAssetIdsByTag(tagId);
+    for (const assetId of taggedAssetIds) {
+      if (!assetIdSet.has(assetId)) continue;
+      const current = assignments.get(assetId) ?? {};
+      current.placementId = placement.id;
+      current.placementName = placement.name;
+      assignments.set(assetId, current);
+    }
+  }
+
+  for (const [tagId, activity] of activityByTagId) {
+    const taggedAssetIds = await searchAssetIdsByTag(tagId);
+    for (const assetId of taggedAssetIds) {
+      if (!assetIdSet.has(assetId)) continue;
+      const current = assignments.get(assetId) ?? {};
+      current.activityId = activity.id;
+      current.activityLabel = activity.label;
+      assignments.set(assetId, current);
+    }
+  }
+
+  return assignments;
+}
+
 async function mapAssetsWithUploaderAlbums(assets: Awaited<ReturnType<typeof getAssetsForPlacementTagIds>>) {
   const uploaderAlbums = await getUploaderAlbums();
-  const assignments = await getUploaderAlbumAssignments(uploaderAlbums);
-  return assets.map((asset) => mapAdminAsset(asset, assignments.get(asset.id)));
+  const [albumAssignments, managementAssignments] = await Promise.all([
+    getUploaderAlbumAssignments(uploaderAlbums),
+    getManagementAssignments(assets.map((asset) => asset.id)),
+  ]);
+  return assets.map((asset) => mapAdminAsset(
+    asset,
+    albumAssignments.get(asset.id),
+    managementAssignments.get(asset.id)
+  ));
 }
 
 router.get("/options", async (req, res) => {
@@ -383,10 +474,7 @@ router.get("/assets", async (req, res) => {
 
 router.get("/assets/untagged", async (_req, res) => {
   try {
-    const [uploaderAlbums, placementTagIds] = await Promise.all([
-      getUploaderAlbums(),
-      getExistingPlacementTagIds(),
-    ]);
+    const placementTagIds = await getExistingPlacementTagIds();
 
     const [allAssets, taggedAssets] = await Promise.all([
       searchAllImmichAssets(),
@@ -398,8 +486,7 @@ router.get("/assets/untagged", async (_req, res) => {
       .filter((asset) => !taggedAssetIds.has(asset.id))
       .sort((a, b) => b.fileCreatedAt.localeCompare(a.fileCreatedAt));
 
-    const assignments = await getUploaderAlbumAssignments(uploaderAlbums);
-    res.json({ assets: untaggedAssets.map((asset) => mapAdminAsset(asset, assignments.get(asset.id))) });
+    res.json({ assets: await mapAssetsWithUploaderAlbums(untaggedAssets) });
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });
   }
