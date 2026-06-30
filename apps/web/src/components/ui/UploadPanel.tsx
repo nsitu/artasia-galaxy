@@ -296,6 +296,12 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
     setError(null);
   }
 
+  function closeAssetManager() {
+    setSelectedAsset(null);
+    setManagePlacementKey("");
+    setManageUploaderKey("");
+  }
+
   async function saveSelectedAssetChanges() {
     if (!selectedAsset) return;
     const placementId = managePlacementKey ? parseInt(managePlacementKey, 10) : null;
@@ -332,7 +338,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
           uploaderId,
         });
       }
-      setSelectedAsset(null);
+      closeAssetManager();
       refreshVisibleAssets();
     } catch (err) {
       setError((err as Error).message);
@@ -394,13 +400,13 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
                 Album: {selectedAsset.uploader_name ?? "No team member album"}
               </div>
             </div>
-            <button type="button" onClick={() => setSelectedAsset(null)} style={secondaryButtonStyle}>
+            <button type="button" onClick={closeAssetManager} style={secondaryButtonStyle}>
               Close
             </button>
           </div>
 
           <label style={labelStyle}>
-            Placement
+            Artasia Site
             <select
               value={managePlacementKey}
               onChange={(e) => setManagePlacementKey(e.target.value)}
@@ -415,7 +421,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
             </select>
           </label>
           <label style={labelStyle}>
-            Team Member Album
+            Asset Owner
             <select
               value={manageUploaderKey}
               onChange={(e) => setManageUploaderKey(e.target.value)}
