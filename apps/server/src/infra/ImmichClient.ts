@@ -321,16 +321,27 @@ export async function tagAsset(assetId: string, tagNames: string[]) {
     tags.push(await ensureTag(name));
   }
 
-  console.log(`[tagAsset] Tagging asset ${assetId} with tags: ${uniqueNames.join(", ")}`);
+  const tagIds = tags.map((tag) => tag.id);
+  console.log(`[tagAsset] Creating tags: ${JSON.stringify(tags)}`);
+  console.log(`[tagAsset] Tagging asset ${assetId} with tag IDs: ${JSON.stringify(tagIds)}`);
   
-  await immichRequest("/tags/assets", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      assetIds: [assetId],
-      tagIds: tags.map((tag) => tag.id),
-    }),
-  });
+  const payload = {
+    assetIds: [assetId],
+    tagIds,
+  };
+  console.log(`[tagAsset] Sending PUT payload: ${JSON.stringify(payload)}`);
+
+  try {
+    const response = await immichRequest("/tags/assets", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    console.log(`[tagAsset] PUT successful, status: ${response.status}`);
+  } catch (err) {
+    console.error(`[tagAsset] PUT failed:`, (err as Error).message);
+    throw err;
+  }
 }
 
 export async function tagAssets(assetIds: string[], tagIds: string[]) {
@@ -377,16 +388,20 @@ export async function untagAssets(assetIds: string[], tagIds: string[]) {
     throw new Error(`Invalid tag ID format(s): ${invalidTagIds.join(", ")}. Expected UUID format. Tags received: ${JSON.stringify(tagIds)}`);
   }
 
-  console.log(`[untagAssets] Removing ${tagIds.length} tag(s) from ${assetIds.length} asset(s)`);
+  const payload = { assetIds, tagIds };
+  console.log(`[untagAssets] Removing ${tagIds.length} tag(s) from ${assetIds.length} asset(s). Payload: ${JSON.stringify(payload)}`);
   
-  await immichRequest("/tags/assets", {
-    method: "DELETE",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      assetIds,
-      tagIds,
-    }),
-  });
+  try {
+    const response = await immichRequest("/tags/assets", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    console.log(`[untagAssets] DELETE successful, status: ${response.status}`);
+  } catch (err) {
+    console.error(`[untagAssets] DELETE failed:`, (err as Error).message);
+    throw err;
+  }
 }
 
 export async function renameTag(tagId: string, newName: string): Promise<ImmichTag> {
