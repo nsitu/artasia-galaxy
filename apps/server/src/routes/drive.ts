@@ -35,38 +35,49 @@ function getDriveClient(req: Request): GoogleDriveClient {
 }
 
 /**
- * GET /api/v1/drive/folders?driveType=myDrive&parentId=root
+ * GET /api/v1/drive/folders?driveType=myDrive&parentId=root&driveId=...
  * List folders with support for hierarchy and Shared Drives
  * Query params:
  *   - driveType: "myDrive" (default) or "sharedDrives"
  *   - parentId: folder ID to list children from (default "root")
+ *   - driveId: Shared Drive ID (when navigating within a Shared Drive)
  */
 router.get("/folders", async (req: Request, res: Response) => {
   try {
     const client = getDriveClient(req);
     const driveType = typeof req.query.driveType === "string" ? req.query.driveType : "myDrive";
     const parentId = typeof req.query.parentId === "string" ? req.query.parentId : "root";
+    const driveId = typeof req.query.driveId === "string" ? req.query.driveId : undefined;
 
     let folders;
 
-    if (driveType === "sharedDrives") {
-      // Get all Shared Drives
+    if (driveType === "sharedDrives" && !driveId) {
+      // Get all Shared Drives (first level)
       folders = await client.getSharedDrives();
-    } else {
-      // Get My Drive root or subfolders
-      if (parentId === "root") {
-        // Return "My Drive" as the root with its immediate children as subfolders
-        const myDrive = await client.getMyDriveInfo();
-        const subfolders = await client.getFoldersInFolder("root");
-        res.json({ myDrive, subfolders });
-        return;
-      } else {
-        // Get subfolders of a specific folder in My Drive
-        folders = await client.getFoldersInFolder(parentId);
-      }
+      res.json({ folders });
+      return;
     }
 
-    res.json({ folders });
+    if (driveType === "sharedDrives" && driveId) {
+      // Get subfolders within a Shared Drive
+      folders = await client.getFoldersInFolder(parentId, driveId);
+      res.json({ folders, driveId });
+      return;
+    }
+
+    // My Drive navigation
+    if (parentId === "root") {
+      // Return "My Drive" as the root with its immediate children as subfolders
+      const myDrive = await client.getMyDriveInfo();
+      const subfolders = await client.getFoldersInFolder("root");
+      res.json({ myDrive, subfolders });
+      return;
+    } else {
+      // Get subfolders of a specific folder in My Drive
+      folders = await client.getFoldersInFolder(parentId);
+      res.json({ folders });
+      return;
+    }
   } catch (err) {
     res
       .status(err instanceof Error && err.message.includes("Not authenticated") ? 401 : 500)
@@ -91,8 +102,12 @@ interface DriveListResponse {
 }
 
 /**
- * GET /api/v1/drive/files?folderId=...&pageToken=...
+ * GET /api/v1/drive/files?folderId=...&pageToken=...&driveId=...
  * List files/folders in a specific folder
+ * Query params:
+ *   - folderId: folder ID (default "root")
+ *   - pageToken: for pagination
+ *   - driveId: Shared Drive ID (when querying within a Shared Drive)
  */
 router.get("/files", async (req: Request, res: Response) => {
   try {
@@ -105,10 +120,15 @@ router.get("/files", async (req: Request, res: Response) => {
       typeof req.query.pageToken === "string"
         ? req.query.pageToken
         : undefined;
+    const driveId =
+      typeof req.query.driveId === "string"
+        ? req.query.driveId
+        : undefined;
 
     const { files, nextPageToken } = await client.listFiles(
       folderId,
-      pageToken
+      pageToken,
+      driveId
     );
 
     const result: DriveListResponse = {

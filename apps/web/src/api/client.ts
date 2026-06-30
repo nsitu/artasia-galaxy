@@ -343,13 +343,16 @@ export interface DriveFoldersResponse {
  * Fetch folders for navigation (supports hierarchy and Shared Drives)
  * @param driveType "myDrive" or "sharedDrives"
  * @param parentId folder ID to list children from (for myDrive)
+ * @param driveId Shared Drive ID (when navigating within a Shared Drive)
  */
 export async function fetchDriveFolders(
   driveType: "myDrive" | "sharedDrives" = "myDrive",
-  parentId: string = "root"
+  parentId: string = "root",
+  driveId?: string
 ): Promise<DriveFoldersResponse> {
   const params = new URLSearchParams({ driveType });
   if (parentId !== "root") params.set("parentId", parentId);
+  if (driveId) params.set("driveId", driveId);
 
   const res = await fetch(`/api/v1/drive/folders?${params.toString()}`);
   if (!res.ok) {
@@ -364,10 +367,12 @@ export async function fetchDriveFolders(
 
 export async function fetchDriveFiles(
   folderId: string = "root",
-  pageToken?: string
+  pageToken?: string,
+  driveId?: string
 ): Promise<{ files: DriveFile[]; nextPageToken?: string }> {
   const params = new URLSearchParams({ folderId });
   if (pageToken) params.set("pageToken", pageToken);
+  if (driveId) params.set("driveId", driveId);
 
   const res = await fetch(`/api/v1/drive/files?${params.toString()}`);
   if (!res.ok) {

@@ -47,31 +47,41 @@ export class GoogleDriveClient {
   }
 
   /**
-   * List files in a folder, supporting pagination
+   * List files in a folder, supporting pagination and Shared Drives
    */
   async listFiles(
     folderId: string = "root",
-    pageToken?: string
+    pageToken?: string,
+    driveId?: string
   ): Promise<{
     files: DriveFile[];
     nextPageToken?: string;
   }> {
     const query = folderId === "root" 
-      ? `'root' in parents and trashed = false and (${SUPPORTED_MIME_TYPES.map(
+      ? `trashed = false and (${SUPPORTED_MIME_TYPES.map(
           (mime) => `mimeType = '${mime}'`
         ).join(" or ")} or mimeType = '${GOOGLE_MIME_TYPE_FOLDER}')`
       : `'${folderId}' in parents and trashed = false and (${SUPPORTED_MIME_TYPES.map(
           (mime) => `mimeType = '${mime}'`
         ).join(" or ")} or mimeType = '${GOOGLE_MIME_TYPE_FOLDER}')`;
 
-    const res = await this.drive.files.list({
-      q: query,
-      spaces: "drive",
+    const listParams: any = {
+      q: driveId && folderId === "root" ? query : `'${folderId}' in parents and ${query}`,
       pageSize: 100,
       pageToken,
       fields: "files(id,name,mimeType,size,modifiedTime,parents,webViewLink)",
       orderBy: "name",
-    });
+    };
+
+    // For Shared Drives, use corpora and driveId instead of spaces
+    if (driveId) {
+      listParams.corpora = "drive";
+      listParams.driveId = driveId;
+    } else {
+      listParams.spaces = "drive";
+    }
+
+    const res = await this.drive.files.list(listParams);
 
     return {
       files: (res.data.files ?? []) as DriveFile[],
@@ -98,14 +108,27 @@ export class GoogleDriveClient {
   /**
    * Get subfolders in a specific folder (hierarchical browsing)
    */
-  async getFoldersInFolder(parentId: string = "root"): Promise<DriveFolder[]> {
-    const res = await this.drive.files.list({
-      q: `mimeType = '${GOOGLE_MIME_TYPE_FOLDER}' and trashed = false and '${parentId}' in parents`,
-      spaces: "drive",
+  async getFoldersInFolder(parentId: string = "root", driveId?: string): Promise<DriveFolder[]> {
+    const query = parentId === "root"
+      ? `mimeType = '${GOOGLE_MIME_TYPE_FOLDER}' and trashed = false`
+      : `mimeType = '${GOOGLE_MIME_TYPE_FOLDER}' and trashed = false and '${parentId}' in parents`;
+
+    const listParams: any = {
+      q: query,
       pageSize: 100,
       fields: "files(id,name,mimeType,parents)",
       orderBy: "name",
-    });
+    };
+
+    // For Shared Drives, use corpora and driveId instead of spaces
+    if (driveId) {
+      listParams.corpora = "drive";
+      listParams.driveId = driveId;
+    } else {
+      listParams.spaces = "drive";
+    }
+
+    const res = await this.drive.files.list(listParams);
 
     return (res.data.files ?? []) as DriveFolder[];
   }
