@@ -11,6 +11,8 @@ export interface ArtasiaPlacement {
   placement_name: string;
   team_member_id?: number;
   team_member_name?: string;
+  secondary_team_member_id?: number;
+  secondary_team_member_name?: string;
   partner_name: string;
   delivery_weekday?: string;
   delivery_start_time?: string;
@@ -96,6 +98,8 @@ function mapWpPlacement(wp: WpArtasiaPlacement): ArtasiaPlacement {
     placement_name: wp.placement_name,
     ...(wp.team_member?.id ? { team_member_id: wp.team_member.id } : {}),
     ...(wp.team_member?.name ? { team_member_name: wp.team_member.name } : {}),
+    ...(wp.secondary_team_member?.id ? { secondary_team_member_id: wp.secondary_team_member.id } : {}),
+    ...(wp.secondary_team_member?.name ? { secondary_team_member_name: wp.secondary_team_member.name } : {}),
     partner_name: wp.partner?.name ?? "",
     ...(wp.delivery_weekday ? { delivery_weekday: wp.delivery_weekday } : {}),
     ...(wp.delivery_start_time ? { delivery_start_time: wp.delivery_start_time } : {}),

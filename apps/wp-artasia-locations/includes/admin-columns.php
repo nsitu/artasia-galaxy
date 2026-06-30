@@ -15,7 +15,8 @@ function artasia_placement_columns(array $columns): array
             $new['artasia_project']  = 'Project';
             $new['artasia_place']    = 'Place';
             $new['artasia_partner']  = 'Artasia Partner';
-            $new['artasia_team_member'] = 'Artasia Team Member';
+            $new['artasia_team_member'] = 'Lead Team Member';
+            $new['artasia_secondary_team_member'] = 'Secondary Team Member';
             $new['artasia_program_context'] = 'Program / Context';
             $new['artasia_is_earlyon'] = 'EarlyON';
             $new['artasia_section']  = 'Section';
@@ -45,6 +46,10 @@ function artasia_placement_column(string $column, int $post_id): void
         case 'artasia_team_member':
             $team_member_id = intval(get_post_meta($post_id, 'artasia_team_member_id', true));
             echo $team_member_id ? esc_html(get_the_title($team_member_id)) : '—';
+            break;
+        case 'artasia_secondary_team_member':
+            $secondary_team_member_id = intval(get_post_meta($post_id, 'artasia_secondary_team_member_id', true));
+            echo $secondary_team_member_id ? esc_html(get_the_title($secondary_team_member_id)) : '-';
             break;
         case 'artasia_program_context':
             echo esc_html(get_post_meta($post_id, 'artasia_program_context', true) ?: '—');
@@ -262,8 +267,17 @@ function artasia_people_column(string $column, int $post_id): void
             $placements = get_posts([
                 'post_type'   => 'artasia_placement',
                 'numberposts' => -1,
-                'meta_key'    => 'artasia_team_member_id',
-                'meta_value'  => $post_id,
+                'meta_query'  => [
+                    'relation' => 'OR',
+                    [
+                        'key'   => 'artasia_team_member_id',
+                        'value' => $post_id,
+                    ],
+                    [
+                        'key'   => 'artasia_secondary_team_member_id',
+                        'value' => $post_id,
+                    ],
+                ],
                 'fields'      => 'ids',
             ]);
 

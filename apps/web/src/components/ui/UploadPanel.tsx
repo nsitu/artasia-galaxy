@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   fetchAuthUser,
+  fetchPlacementAssets,
   fetchUploadOptions,
   logoutAuthUser,
   uploadFiles,
   type AuthUser,
   type UploadOptions,
+  type PlacementAsset,
 } from "../../api/client";
 
 interface UploadItem {
@@ -28,6 +30,8 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
   const [placementKey, setPlacementKey] = useState("");
   const [selectedTag, setSelectedTag] = useState("");
   const [items, setItems] = useState<UploadItem[]>([]);
+  const [placementAssets, setPlacementAssets] = useState<PlacementAsset[]>([]);
+  const [assetsLoading, setAssetsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const uploadInProgressRef = useRef(false);
@@ -67,10 +71,14 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
     return options.uploaders.find((uploader) => String(uploader.id) === uploaderKey) ?? null;
   }, [options, uploaderKey]);
 
+  function placementIncludesUploader(placement: UploadOptions["placements"][number], uploaderId: number) {
+    return placement.team_member_id === uploaderId || placement.secondary_team_member_id === uploaderId;
+  }
+
   const filteredPlacements = useMemo(() => {
     if (!options) return [];
     if (!selectedUploader) return options.placements;
-    return options.placements.filter((placement) => placement.team_member_id === selectedUploader.id);
+    return options.placements.filter((placement) => placementIncludesUploader(placement, selectedUploader.id));
   }, [options, selectedUploader]);
 
   const selectedPlacement = useMemo(() => {
@@ -83,13 +91,37 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
     );
   }, [filteredPlacements]);
 
+  useEffect(() => {
+    if (!selectedPlacement) {
+      setPlacementAssets([]);
+      return;
+    }
+
+    let cancelled = false;
+    setAssetsLoading(true);
+    fetchPlacementAssets(selectedPlacement.placement_id)
+      .then((assets) => {
+        if (!cancelled) setPlacementAssets(assets);
+      })
+      .catch((err) => {
+        if (!cancelled) setError((err as Error).message);
+      })
+      .finally(() => {
+        if (!cancelled) setAssetsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedPlacement]);
+
   function addFiles(fileList: FileList | File[]) {
     if (!selectedUploader) {
       setError("Select an Artasia Team Member before adding files.");
       return;
     }
     if (!selectedPlacement) {
-      setError("Select an Artasia Site before adding files.");
+      setError("Select a placement before adding files.");
       return;
     }
 
@@ -119,7 +151,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
       return;
     }
     if (!selectedPlacement) {
-      setError("Select an Artasia Site.");
+      setError("Select a placement.");
       return;
     }
 
@@ -188,7 +220,20 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
       }
     } finally {
       uploadInProgressRef.current = false;
+      if (selectedPlacement) {
+        fetchPlacementAssets(selectedPlacement.placement_id)
+          .then(setPlacementAssets)
+          .catch((err) => setError((err as Error).message));
+      }
     }
+  }
+
+  function selectPlacement(placement: UploadOptions["placements"][number]) {
+    setPlacementKey(String(placement.placement_id));
+    setItems([]);
+    setError(null);
+    if (selectedUploader && placementIncludesUploader(placement, selectedUploader.id)) return;
+    if (placement.team_member_id) setUploaderKey(String(placement.team_member_id));
   }
 
   async function signOut() {
@@ -205,9 +250,9 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
       <section style={panelStyle}>
         <div style={headerStyle}>
           <div>
-            <h1 style={titleStyle}>Upload</h1>
+            <h1 style={titleStyle}>Admin</h1>
             <p style={introStyle}>
-              Choose your name, site, and delivery week, then add documentation.
+              Review placement uploads and add new documentation.
             </p>
           </div>
           <a href="/" style={secondaryLinkButtonStyle}>
@@ -240,152 +285,209 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
 
         {error && <div style={errorStyle}>{error}</div>}
 
-        <div style={fieldGridStyle}>
-          <label style={compactLabelStyle}>
-            Artasia Team Member
-            <select
-              value={uploaderKey}
-              onChange={(e) => {
-                setUploaderKey(e.target.value);
-                setPlacementKey("");
-                setError(null);
-              }}
-              style={inputStyle}
-              required
-            >
-              <option value="">Select an Artasia Team Member</option>
-              {(options?.uploaders ?? []).map((uploader) => (
-                <option key={uploader.id} value={String(uploader.id)}>
-                  {uploader.name}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div style={adminLayoutStyle}>
+          <aside style={placementMenuStyle}>
+            <label style={labelStyle}>
+              Team Member
+              <select
+                value={uploaderKey}
+                onChange={(e) => {
+                  setUploaderKey(e.target.value);
+                  setPlacementKey("");
+                  setItems([]);
+                  setError(null);
+                }}
+                style={inputStyle}
+              >
+                <option value="">All Team Members</option>
+                {(options?.uploaders ?? []).map((uploader) => (
+                  <option key={uploader.id} value={String(uploader.id)}>
+                    {uploader.name}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          <label style={siteLabelStyle}>
-            Artasia Site
-            <select
-              value={placementKey}
-              onChange={(e) => {
-                const nextPlacementKey = e.target.value;
-                setPlacementKey(nextPlacementKey);
-                if (options && nextPlacementKey) {
-                  const placement = options.placements.find(
-                    (entry) => String(entry.placement_id) === nextPlacementKey
-                  );
-                  if (placement?.team_member_id) {
-                    setUploaderKey(String(placement.team_member_id));
-                  }
-                }
-                setError(null);
-              }}
-              style={inputStyle}
-              required
-            >
-              <option value="">Select an Artasia Site</option>
-              {filteredPlacements.map((placement) => (
-                <option key={placement.placement_id} value={String(placement.placement_id)}>
-                  {placementLabel(placement)}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label style={compactLabelStyle}>
-            Program Week / Activity
-            <select
-              value={selectedTag}
-              onChange={(e) => setSelectedTag(e.target.value)}
-              style={inputStyle}
-            >
-              {(options?.tags ?? []).map((tag) => (
-                <option key={tag} value={tag}>
-                  {tag}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <div
-          style={dropzoneStyle}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => {
-            e.preventDefault();
-            addFiles(e.dataTransfer.files);
-          }}
-          onClick={() => {
-            if (!selectedUploader) {
-              setError("Select an Artasia Team Member before adding files.");
-              return;
-            }
-            if (!selectedPlacement) {
-              setError("Select an Artasia Site before adding files.");
-              return;
-            }
-            inputRef.current?.click();
-          }}
-        >
-          {selectedPlacement ? "Drop images or videos here" : "Select an Artasia Team Member and Artasia Site first"}
-          <span style={{ color: "#777", marginTop: 6 }}>
-            {selectedPlacement ? "or click to choose files" : "then drop files or click to choose"}
-          </span>
-          <input
-            ref={inputRef}
-            type="file"
-            multiple
-            accept="image/*,video/*"
-            style={{ display: "none" }}
-            disabled={!selectedUploader || !selectedPlacement}
-            onChange={(e) => e.target.files && addFiles(e.target.files)}
-          />
-        </div>
-
-        <div style={listStyle}>
-          {items.map((item) => (
-            <div key={item.id} style={itemStyle}>
-              <div style={thumbStyle}>
-                {item.assetId ? (
-                  <img
-                    src={`/api/v1/assets/${item.assetId}/thumbnail`}
-                    alt=""
-                    style={thumbImageStyle}
-                  />
-                ) : (
-                  <span style={{ color: "#666", fontSize: 11 }}>
-                    {item.status === "failed" ? "failed" : "uploading"}
-                  </span>
-                )}
-              </div>
-              <div>
-                <div style={{ color: "#eee" }}>{item.file.name}</div>
-                <div style={{ color: item.status === "failed" ? "#f88" : "#888", fontSize: 12 }}>
-                  {item.status}
-                  {item.error ? ` - ${item.error}` : ""}
-                </div>
-              </div>
-              {item.status === "failed" ? (
-                <button
-                  onClick={() => {
-                    setItems((current) =>
-                      current.map((entry) =>
-                        entry.id === item.id
-                          ? { ...entry, status: "queued", progress: 0, error: undefined }
-                          : entry
-                      )
-                    );
-                  }}
-                  style={retryButtonStyle}
-                >
-                  Retry
-                </button>
-              ) : (
-                <div style={progressTrackStyle}>
-                  <div style={{ ...progressBarStyle, width: `${item.progress}%` }} />
-                </div>
-              )}
+            <div style={menuHeaderStyle}>
+              <span>Placements</span>
+              <span>{filteredPlacements.length}</span>
             </div>
-          ))}
+
+            <div style={placementListStyle}>
+              {filteredPlacements.map((placement) => (
+                <button
+                  key={placement.placement_id}
+                  type="button"
+                  onClick={() => selectPlacement(placement)}
+                  style={{
+                    ...placementButtonStyle,
+                    ...(selectedPlacement?.placement_id === placement.placement_id ? selectedPlacementButtonStyle : {}),
+                  }}
+                >
+                  <span style={placementNameStyle}>{placementLabel(placement)}</span>
+                  <span style={placementMetaStyle}>
+                    {placement.team_member_name ?? "Unassigned"}
+                    {placement.secondary_team_member_name ? ` + ${placement.secondary_team_member_name}` : ""}
+                  </span>
+                  {placement.delivery_schedule && (
+                    <span style={placementMetaStyle}>{placement.delivery_schedule}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </aside>
+
+          <section style={detailStyle}>
+            {selectedPlacement ? (
+              <>
+                <div style={detailHeaderStyle}>
+                  <div>
+                    <h2 style={detailTitleStyle}>{placementLabel(selectedPlacement)}</h2>
+                    <div style={detailMetaStyle}>
+                      Lead: {selectedPlacement.team_member_name ?? "Unassigned"}
+                      {selectedPlacement.secondary_team_member_name
+                        ? ` | Secondary: ${selectedPlacement.secondary_team_member_name}`
+                        : ""}
+                    </div>
+                    {selectedPlacement.delivery_schedule && (
+                      <div style={detailMetaStyle}>{selectedPlacement.delivery_schedule}</div>
+                    )}
+                  </div>
+                  <div style={countBadgeStyle}>
+                    {assetsLoading ? "..." : placementAssets.length} upload{placementAssets.length === 1 ? "" : "s"}
+                  </div>
+                </div>
+
+                <div style={uploadControlsStyle}>
+                  <label style={compactLabelStyle}>
+                    Program Week / Activity
+                    <select
+                      value={selectedTag}
+                      onChange={(e) => setSelectedTag(e.target.value)}
+                      style={inputStyle}
+                    >
+                      {(options?.tags ?? []).map((tag) => (
+                        <option key={tag} value={tag}>
+                          {tag}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div
+                    style={dropzoneStyle}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      addFiles(e.dataTransfer.files);
+                    }}
+                    onClick={() => {
+                      if (!selectedUploader) {
+                        setError("Select an Artasia Team Member before adding files.");
+                        return;
+                      }
+                      inputRef.current?.click();
+                    }}
+                  >
+                    Drop images or videos here
+                    <span style={{ color: "#777", marginTop: 6 }}>or click to choose files</span>
+                    <input
+                      ref={inputRef}
+                      type="file"
+                      multiple
+                      accept="image/*,video/*"
+                      style={{ display: "none" }}
+                      disabled={!selectedUploader}
+                      onChange={(e) => e.target.files && addFiles(e.target.files)}
+                    />
+                  </div>
+                </div>
+
+                {items.length > 0 && (
+                  <div style={listStyle}>
+                    {items.map((item) => (
+                      <div key={item.id} style={itemStyle}>
+                        <div style={thumbStyle}>
+                          {item.assetId ? (
+                            <img
+                              src={`/api/v1/assets/${item.assetId}/thumbnail`}
+                              alt=""
+                              style={thumbImageStyle}
+                            />
+                          ) : (
+                            <span style={{ color: "#666", fontSize: 11 }}>
+                              {item.status === "failed" ? "failed" : "uploading"}
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          <div style={{ color: "#eee" }}>{item.file.name}</div>
+                          <div style={{ color: item.status === "failed" ? "#f88" : "#888", fontSize: 12 }}>
+                            {item.status}
+                            {item.error ? ` - ${item.error}` : ""}
+                          </div>
+                        </div>
+                        {item.status === "failed" ? (
+                          <button
+                            onClick={() => {
+                              setItems((current) =>
+                                current.map((entry) =>
+                                  entry.id === item.id
+                                    ? { ...entry, status: "queued", progress: 0, error: undefined }
+                                    : entry
+                                )
+                              );
+                            }}
+                            style={retryButtonStyle}
+                          >
+                            Retry
+                          </button>
+                        ) : (
+                          <div style={progressTrackStyle}>
+                            <div style={{ ...progressBarStyle, width: `${item.progress}%` }} />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div style={assetGridHeaderStyle}>
+                  <h3 style={sectionTitleStyle}>Existing Uploads</h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAssetsLoading(true);
+                      fetchPlacementAssets(selectedPlacement.placement_id)
+                        .then(setPlacementAssets)
+                        .catch((err) => setError((err as Error).message))
+                        .finally(() => setAssetsLoading(false));
+                    }}
+                    style={secondaryButtonStyle}
+                  >
+                    Refresh
+                  </button>
+                </div>
+
+                {assetsLoading ? (
+                  <div style={emptyStateStyle}>Loading uploads...</div>
+                ) : placementAssets.length > 0 ? (
+                  <div style={assetGridStyle}>
+                    {placementAssets.map((asset) => (
+                      <a key={asset.id} href={asset.previewUrl} target="_blank" rel="noreferrer" style={assetCardStyle}>
+                        <img src={asset.thumbnailUrl} alt="" style={assetImageStyle} />
+                        <span style={assetNameStyle}>{asset.fileName}</span>
+                        <span style={assetDateStyle}>{new Date(asset.createdAt).toLocaleDateString()}</span>
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={emptyStateStyle}>No uploads tagged to this placement yet.</div>
+                )}
+              </>
+            ) : (
+              <div style={emptyStateStyle}>Select a placement.</div>
+            )}
+          </section>
         </div>
       </section>
     </main>
@@ -476,6 +578,108 @@ const secondaryLinkButtonStyle: React.CSSProperties = {
   color: "#ddd",
 };
 
+const adminLayoutStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(260px, 340px) 1fr",
+  gap: 16,
+  alignItems: "start",
+};
+
+const placementMenuStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 12,
+  minWidth: 0,
+};
+
+const menuHeaderStyle: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  color: "#b9bfcc",
+  fontSize: 13,
+};
+
+const placementListStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 8,
+  maxHeight: "calc(100vh - 210px)",
+  overflowY: "auto",
+  paddingRight: 4,
+};
+
+const placementButtonStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 4,
+  textAlign: "left",
+  background: "#171a22",
+  color: "#ddd",
+  border: "1px solid rgba(255,255,255,0.1)",
+  borderRadius: 6,
+  padding: 10,
+  cursor: "pointer",
+};
+
+const selectedPlacementButtonStyle: React.CSSProperties = {
+  borderColor: "rgba(232,237,248,0.65)",
+  background: "#202431",
+};
+
+const placementNameStyle: React.CSSProperties = {
+  color: "#f2f2f2",
+  fontSize: 13,
+  lineHeight: 1.35,
+};
+
+const placementMetaStyle: React.CSSProperties = {
+  color: "#8f98a8",
+  fontSize: 12,
+  lineHeight: 1.3,
+};
+
+const detailStyle: React.CSSProperties = {
+  minWidth: 0,
+  background: "#0f1118",
+  border: "1px solid rgba(255,255,255,0.12)",
+  borderRadius: 6,
+  padding: 14,
+};
+
+const detailHeaderStyle: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: 14,
+  alignItems: "flex-start",
+  marginBottom: 14,
+};
+
+const detailTitleStyle: React.CSSProperties = {
+  margin: 0,
+  color: "#f2f2f2",
+  fontSize: 18,
+  lineHeight: 1.3,
+};
+
+const detailMetaStyle: React.CSSProperties = {
+  color: "#9aa3b3",
+  fontSize: 12,
+  marginTop: 5,
+};
+
+const countBadgeStyle: React.CSSProperties = {
+  color: "#0b0d12",
+  background: "#e8edf8",
+  borderRadius: 4,
+  padding: "6px 8px",
+  fontSize: 12,
+  whiteSpace: "nowrap",
+};
+
+const uploadControlsStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(180px, 260px) 1fr",
+  gap: 12,
+  alignItems: "end",
+};
+
 const fieldGridStyle: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "minmax(150px, 0.85fr) minmax(260px, 1.4fr) minmax(150px, 0.85fr)",
@@ -511,8 +715,7 @@ const inputStyle: React.CSSProperties = {
 };
 
 const dropzoneStyle: React.CSSProperties = {
-  marginTop: 16,
-  minHeight: 150,
+  minHeight: 94,
   border: "1px dashed rgba(255,255,255,0.35)",
   borderRadius: 6,
   display: "flex",
@@ -527,6 +730,68 @@ const listStyle: React.CSSProperties = {
   display: "grid",
   gap: 8,
   marginTop: 14,
+};
+
+const assetGridHeaderStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+  marginTop: 18,
+  marginBottom: 10,
+};
+
+const sectionTitleStyle: React.CSSProperties = {
+  margin: 0,
+  color: "#f2f2f2",
+  fontSize: 15,
+};
+
+const assetGridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fill, minmax(132px, 1fr))",
+  gap: 10,
+};
+
+const assetCardStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 6,
+  color: "#ddd",
+  textDecoration: "none",
+  background: "#171a22",
+  border: "1px solid rgba(255,255,255,0.1)",
+  borderRadius: 6,
+  padding: 8,
+  minWidth: 0,
+};
+
+const assetImageStyle: React.CSSProperties = {
+  width: "100%",
+  aspectRatio: "1 / 1",
+  objectFit: "cover",
+  borderRadius: 4,
+  background: "#0c0e13",
+};
+
+const assetNameStyle: React.CSSProperties = {
+  color: "#eee",
+  fontSize: 12,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+
+const assetDateStyle: React.CSSProperties = {
+  color: "#8f98a8",
+  fontSize: 11,
+};
+
+const emptyStateStyle: React.CSSProperties = {
+  color: "#8f98a8",
+  background: "#171a22",
+  border: "1px solid rgba(255,255,255,0.1)",
+  borderRadius: 6,
+  padding: 16,
 };
 
 const itemStyle: React.CSSProperties = {

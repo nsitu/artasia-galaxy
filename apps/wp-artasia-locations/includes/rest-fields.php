@@ -92,10 +92,12 @@ function artasia_get_expanded_placements(): WP_REST_Response
         $vid = intval(get_post_meta($placement->ID, 'artasia_place_id', true));
         $partner_id = intval(get_post_meta($placement->ID, 'artasia_partner_id', true));
         $team_member_id = intval(get_post_meta($placement->ID, 'artasia_team_member_id', true));
+        $secondary_team_member_id = intval(get_post_meta($placement->ID, 'artasia_secondary_team_member_id', true));
         if ($project_id) $project_ids[$project_id] = $project_id;
         if ($vid) $place_ids[$vid] = $vid;
         if ($partner_id) $partner_ids[$partner_id] = $partner_id;
         if ($team_member_id) $team_member_ids[$team_member_id] = $team_member_id;
+        if ($secondary_team_member_id) $team_member_ids[$secondary_team_member_id] = $secondary_team_member_id;
     }
 
     $project_lookup = [];
@@ -182,6 +184,7 @@ function artasia_get_expanded_placements(): WP_REST_Response
         $vid = intval(get_post_meta($placement->ID, 'artasia_place_id', true));
         $partner_id = intval(get_post_meta($placement->ID, 'artasia_partner_id', true));
         $team_member_id = intval(get_post_meta($placement->ID, 'artasia_team_member_id', true));
+        $secondary_team_member_id = intval(get_post_meta($placement->ID, 'artasia_secondary_team_member_id', true));
 
         $results[] = [
             'placement_id' => $placement->ID,
@@ -199,6 +202,7 @@ function artasia_get_expanded_placements(): WP_REST_Response
             'place'              => $place_lookup[$vid] ?? null,
             'partner'            => $partner_lookup[$partner_id] ?? null,
             'team_member'        => $team_member_lookup[$team_member_id] ?? null,
+            'secondary_team_member' => $team_member_lookup[$secondary_team_member_id] ?? null,
         ];
     }
 

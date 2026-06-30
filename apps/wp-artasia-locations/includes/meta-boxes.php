@@ -238,6 +238,7 @@ function artasia_placement_meta_box_html(WP_Post $post): void
     $place_id       = get_post_meta($post->ID, 'artasia_place_id', true);
     $partner_id     = get_post_meta($post->ID, 'artasia_partner_id', true);
     $team_member_id = get_post_meta($post->ID, 'artasia_team_member_id', true);
+    $secondary_team_member_id = get_post_meta($post->ID, 'artasia_secondary_team_member_id', true);
     $program_context = get_post_meta($post->ID, 'artasia_program_context', true);
     $is_earlyon     = (bool) get_post_meta($post->ID, 'artasia_is_earlyon', true);
     $section        = get_post_meta($post->ID, 'artasia_section', true);
@@ -271,17 +272,31 @@ function artasia_placement_meta_box_html(WP_Post $post): void
             </td>
         </tr>
         <tr>
-            <th><label for="artasia_team_member_id">Artasia Team Member</label></th>
+            <th><label for="artasia_team_member_id">Lead Artasia Team Member</label></th>
             <td>
                 <select id="artasia_team_member_id" name="artasia_team_member_id">
-                    <option value="0">&mdash; Select Artasia Team Member &mdash;</option>
+                    <option value="0">&mdash; Select Lead Artasia Team Member &mdash;</option>
                     <?php foreach ($people as $person) : ?>
                         <option value="<?php echo esc_attr($person->ID); ?>" <?php selected($team_member_id, $person->ID); ?>>
                             <?php echo esc_html($person->post_title); ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
-                <p class="description">Select an Artasia team member for this placement.</p>
+                <p class="description">Select the lead Artasia team member responsible for this placement.</p>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_secondary_team_member_id">Secondary Artasia Team Member</label></th>
+            <td>
+                <select id="artasia_secondary_team_member_id" name="artasia_secondary_team_member_id">
+                    <option value="0">&mdash; Select Secondary Artasia Team Member &mdash;</option>
+                    <?php foreach ($people as $person) : ?>
+                        <option value="<?php echo esc_attr($person->ID); ?>" <?php selected($secondary_team_member_id, $person->ID); ?>>
+                            <?php echo esc_html($person->post_title); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <p class="description">Optional supporting Artasia team member for placements delivered by two people.</p>
             </td>
         </tr>
         <tr>
@@ -457,6 +472,7 @@ function artasia_save_placement_meta(int $post_id): void
     update_post_meta($post_id, 'artasia_place_id', intval($_POST['artasia_place_id'] ?? 0));
     update_post_meta($post_id, 'artasia_partner_id', intval($_POST['artasia_partner_id'] ?? 0));
     update_post_meta($post_id, 'artasia_team_member_id', intval($_POST['artasia_team_member_id'] ?? 0));
+    update_post_meta($post_id, 'artasia_secondary_team_member_id', intval($_POST['artasia_secondary_team_member_id'] ?? 0));
     update_post_meta($post_id, 'artasia_section', sanitize_text_field($_POST['artasia_section'] ?? ''));
     update_post_meta($post_id, 'artasia_delivery_weekday', artasia_sanitize_placement_weekday($_POST['artasia_delivery_weekday'] ?? ''));
     update_post_meta($post_id, 'artasia_delivery_start_time', artasia_sanitize_placement_time($_POST['artasia_delivery_start_time'] ?? ''));

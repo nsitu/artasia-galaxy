@@ -69,6 +69,8 @@ export interface UploadPlacement {
   placement_name: string;
   team_member_id?: number;
   team_member_name?: string;
+  secondary_team_member_id?: number;
+  secondary_team_member_name?: string;
   partner_name: string;
   delivery_weekday?: string;
   delivery_start_time?: string;
@@ -144,6 +146,16 @@ export interface UploadResult {
   error?: string;
 }
 
+export interface PlacementAsset {
+  id: string;
+  type: "IMAGE" | "VIDEO";
+  fileName: string;
+  createdAt: string;
+  updatedAt: string;
+  thumbnailUrl: string;
+  previewUrl: string;
+}
+
 export async function fetchUploadOptions(): Promise<UploadOptions> {
   const res = await fetch("/api/v1/uploads/options");
   if (!res.ok) {
@@ -151,6 +163,16 @@ export async function fetchUploadOptions(): Promise<UploadOptions> {
     throw new Error(body.error ?? `HTTP ${res.status}`);
   }
   return res.json();
+}
+
+export async function fetchPlacementAssets(placementId: number): Promise<PlacementAsset[]> {
+  const res = await fetch(`/api/v1/uploads/placements/${placementId}/assets`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  const body = await res.json() as { assets?: PlacementAsset[] };
+  return body.assets ?? [];
 }
 
 export async function fetchMapPlacements(): Promise<MapPlacement[]> {

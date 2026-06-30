@@ -52,6 +52,7 @@ export interface WpArtasiaPlacement {
   place: WpPlace | null;
   partner: WpPartner | null;
   team_member: WpPerson | null;
+  secondary_team_member: WpPerson | null;
 }
 
 const WORDPRESS_URL = process.env.WORDPRESS_URL ?? "https://artsforall.co";

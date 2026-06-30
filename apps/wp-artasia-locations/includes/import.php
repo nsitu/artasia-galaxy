@@ -143,7 +143,7 @@ function artasia_render_tools_page(): void
 
         <h3>Headers</h3>
         <p>Required headers: <code>placement_name</code>, <code>project_name</code>, <code>place_name</code>, <code>partner_name</code>.</p>
-        <p>Optional headers: <code>project_year</code>, <code>project_description</code>, <code>program_context</code>, <code>earlyon</code>, <code>section</code>, <code>delivery_weekday</code>, <code>delivery_start_time</code>, <code>delivery_end_time</code>, <code>participants</code>, <code>age_range</code>, <code>place_street_address</code>, <code>place_city</code>, <code>place_postal_code</code>, <code>place_shared_with</code>, <code>place_latitude</code>, <code>place_longitude</code>, <code>place_notes</code>, <code>partner_type</code>, <code>partner_website</code>, <code>partner_notes</code>, <code>team_member_name</code>, <code>team_member_role</code>, <code>team_member_email</code>, <code>team_member_notes</code>.</p>
+        <p>Optional headers: <code>project_year</code>, <code>project_description</code>, <code>program_context</code>, <code>earlyon</code>, <code>section</code>, <code>delivery_weekday</code>, <code>delivery_start_time</code>, <code>delivery_end_time</code>, <code>participants</code>, <code>age_range</code>, <code>place_street_address</code>, <code>place_city</code>, <code>place_postal_code</code>, <code>place_shared_with</code>, <code>place_latitude</code>, <code>place_longitude</code>, <code>place_notes</code>, <code>partner_type</code>, <code>partner_website</code>, <code>partner_notes</code>, <code>team_member_name</code>, <code>team_member_role</code>, <code>team_member_email</code>, <code>team_member_notes</code>, <code>secondary_team_member_name</code>, <code>secondary_team_member_role</code>, <code>secondary_team_member_email</code>, <code>secondary_team_member_notes</code>.</p>
         <p>For <code>earlyon</code>, use values like <code>yes</code>, <code>no</code>, <code>true</code>, <code>false</code>, <code>1</code>, or <code>0</code>.</p>
         <p>For delivery times, use 24-hour values like <code>09:00</code>, <code>09:30</code>, or <code>20:00</code>.</p>
 
@@ -268,6 +268,10 @@ function artasia_download_import_template(): void
         'team_member_role' => 'Artist Educator',
         'team_member_email' => 'taylor@example.org',
         'team_member_notes' => 'Team member notes for this placement',
+        'secondary_team_member_name' => 'Jordan Lee',
+        'secondary_team_member_role' => 'Artist Educator',
+        'secondary_team_member_email' => 'jordan@example.org',
+        'secondary_team_member_notes' => 'Supporting team member notes for this placement',
         'program_context' => 'Beyond the Bell',
         'earlyon' => 'no',
         'section' => 'Room 3',
@@ -384,8 +388,13 @@ function artasia_import_location_record(array $record): string
     if ($team_member_name) {
         $team_member_id = artasia_import_find_or_create_post('artasia_people', $team_member_name);
     }
+    $secondary_team_member_id = 0;
+    $secondary_team_member_name = artasia_import_value($record, 'secondary_team_member_name');
+    if ($secondary_team_member_name) {
+        $secondary_team_member_id = artasia_import_find_or_create_post('artasia_people', $secondary_team_member_name);
+    }
 
-    if (!$project_id || !$place_id || !$partner_id || ($team_member_name && !$team_member_id)) {
+    if (!$project_id || !$place_id || !$partner_id || ($team_member_name && !$team_member_id) || ($secondary_team_member_name && !$secondary_team_member_id)) {
         return 'error';
     }
 
@@ -409,6 +418,11 @@ function artasia_import_location_record(array $record): string
         artasia_import_update_meta_if_present($team_member_id, 'artasia_email', $record, 'team_member_email', 'sanitize_email');
         artasia_import_update_meta_if_present($team_member_id, 'artasia_notes', $record, 'team_member_notes', 'sanitize_textarea_field');
     }
+    if ($secondary_team_member_id) {
+        update_post_meta($secondary_team_member_id, 'artasia_role', sanitize_text_field(artasia_import_value($record, 'secondary_team_member_role') ?: 'Artist Educator'));
+        artasia_import_update_meta_if_present($secondary_team_member_id, 'artasia_email', $record, 'secondary_team_member_email', 'sanitize_email');
+        artasia_import_update_meta_if_present($secondary_team_member_id, 'artasia_notes', $record, 'secondary_team_member_notes', 'sanitize_textarea_field');
+    }
 
     $section = artasia_import_value($record, 'section');
 
@@ -430,6 +444,9 @@ function artasia_import_location_record(array $record): string
     update_post_meta($placement_id, 'artasia_partner_id', $partner_id);
     if ($team_member_id) {
         update_post_meta($placement_id, 'artasia_team_member_id', $team_member_id);
+    }
+    if ($secondary_team_member_id) {
+        update_post_meta($placement_id, 'artasia_secondary_team_member_id', $secondary_team_member_id);
     }
     update_post_meta($placement_id, 'artasia_program_context', sanitize_text_field(artasia_import_value($record, 'program_context')));
     update_post_meta($placement_id, 'artasia_is_earlyon', artasia_import_boolean(artasia_import_value($record, 'earlyon')));
@@ -466,6 +483,10 @@ function artasia_import_csv_headers(): array
         'team_member_role',
         'team_member_email',
         'team_member_notes',
+        'secondary_team_member_name',
+        'secondary_team_member_role',
+        'secondary_team_member_email',
+        'secondary_team_member_notes',
         'program_context',
         'earlyon',
         'section',

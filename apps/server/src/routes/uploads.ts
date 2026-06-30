@@ -7,6 +7,8 @@ import {
   ensureAlbum,
   getAsset,
   getServerStatistics,
+  listTags,
+  searchAssets,
   tagAsset,
   updateAssetLocation,
   uploadAsset,
@@ -19,6 +21,7 @@ import {
   getPlacementTagNames,
   getAllowedTagNames,
   getUploadConfig,
+  placementAnchorTag,
 } from "../services/uploadConfig.service.js";
 import {
   ALLOWED_UPLOAD_EXTENSIONS,
@@ -84,6 +87,10 @@ function hasGps(asset: Awaited<ReturnType<typeof getAsset>>) {
   return asset.exifInfo?.latitude != null && asset.exifInfo?.longitude != null;
 }
 
+function placementIncludesUploader(location: Awaited<ReturnType<typeof findConfiguredPlacement>>, uploaderId: number) {
+  return location?.team_member?.id === uploaderId || location?.secondary_team_member?.id === uploaderId;
+}
+
 async function applyDefaultLocationIfMissing(assetId: string, location: {
   lat?: number;
   lng?: number;
@@ -117,6 +124,15 @@ async function processWithConcurrency<T, R>(
   return results;
 }
 
+async function findExistingPlacementTagId(placementId: number) {
+  const tagName = placementAnchorTag(placementId);
+  const normalized = tagName.toLowerCase();
+  const tags = await listTags();
+  return tags.find(
+    (tag) => tag.name.trim().toLowerCase() === normalized || tag.value.trim().toLowerCase() === normalized
+  )?.id ?? null;
+}
+
 router.get("/options", async (req, res) => {
   try {
     const [config, auth] = await Promise.all([getUploadConfig(), getAuthContext(req)]);
@@ -136,6 +152,56 @@ router.get("/options", async (req, res) => {
         maxFileBytes: UPLOAD_LIMITS.maxFileBytes,
         maxBatchBytes: UPLOAD_LIMITS.maxBatchBytes,
       },
+    });
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
+});
+
+router.get("/placements/:id/assets", async (req, res) => {
+  try {
+    const placementId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(placementId)) {
+      res.status(400).json({ error: "Select a valid placement." });
+      return;
+    }
+
+    const placement = await findConfiguredPlacement(placementId);
+    if (!placement) {
+      res.status(404).json({ error: "Placement was not found." });
+      return;
+    }
+
+    const tagId = await findExistingPlacementTagId(placementId);
+    if (!tagId) {
+      res.json({ placement_id: placementId, assets: [] });
+      return;
+    }
+
+    const assets = [];
+    const size = 100;
+    for (const type of ["IMAGE", "VIDEO"] as const) {
+      let page = 1;
+      for (;;) {
+        const result = await searchAssets({ tagId, page, size, type });
+        assets.push(...result.assets.items);
+        if (!result.assets.nextPage || result.assets.items.length < size) break;
+        page += 1;
+      }
+    }
+
+    assets.sort((a, b) => b.fileCreatedAt.localeCompare(a.fileCreatedAt));
+    res.json({
+      placement_id: placementId,
+      assets: assets.map((asset) => ({
+        id: asset.id,
+        type: asset.type,
+        fileName: asset.originalFileName,
+        createdAt: asset.fileCreatedAt,
+        updatedAt: asset.updatedAt,
+        thumbnailUrl: `/api/v1/assets/${asset.id}/thumbnail`,
+        previewUrl: `/api/v1/assets/${asset.id}/preview`,
+      })),
     });
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });
@@ -172,7 +238,7 @@ router.post(
         return;
       }
 
-      if (location.team_member?.id !== selectedUploader.id) {
+      if (!placementIncludesUploader(location, selectedUploader.id)) {
         res.status(400).json({ error: "Select a placement assigned to the selected uploader." });
         return;
       }
