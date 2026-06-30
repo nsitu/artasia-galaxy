@@ -11,6 +11,7 @@ import {
   listTags,
   removeAssetsFromAlbum,
   searchAssets,
+  searchAssetIdsByTag,
   tagAsset,
   untagAssets,
   updateAssetLocation,
@@ -303,6 +304,8 @@ router.get("/assets", async (req, res) => {
       return;
     }
 
+    const activityTagName = typeof req.query.activity_tag === "string" ? req.query.activity_tag.trim() : "";
+
     const config = await getUploadConfig();
     const knownPlacementIds = new Set(config.placements.map((placement) => placement.placement_id));
     const tagIds = (
@@ -318,7 +321,22 @@ router.get("/assets", async (req, res) => {
       return;
     }
 
-    const assets = await getAssetsForPlacementTagIds(tagIds);
+    let assets = await getAssetsForPlacementTagIds(tagIds);
+
+    if (activityTagName) {
+      const normalized = activityTagName.toLowerCase();
+      const allTags = await listTags();
+      const activityTagId = allTags.find(
+        (tag) => tag.name.trim().toLowerCase() === normalized || tag.value.trim().toLowerCase() === normalized
+      )?.id ?? null;
+      if (activityTagId) {
+        const activityAssetIds = new Set(await searchAssetIdsByTag(activityTagId));
+        assets = assets.filter((asset) => activityAssetIds.has(asset.id));
+      } else {
+        assets = [];
+      }
+    }
+
     res.json({ assets: await mapAssetsWithUploaderAlbums(assets) });
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });

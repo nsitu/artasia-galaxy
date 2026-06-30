@@ -33,6 +33,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
   const [uploaderKey, setUploaderKey] = useState("");
   const [placementKey, setPlacementKey] = useState("");
   const [selectedTag, setSelectedTag] = useState("");
+  const [activityTagFilter, setActivityTagFilter] = useState("");
   const [items, setItems] = useState<UploadItem[]>([]);
   const [placementAssets, setPlacementAssets] = useState<PlacementAsset[]>([]);
   const [assetMode, setAssetMode] = useState<"placements" | "untagged">("placements");
@@ -133,7 +134,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
 
     let cancelled = false;
     setAssetsLoading(true);
-    fetchPlacementAssetSet(visiblePlacementIds)
+    fetchPlacementAssetSet(visiblePlacementIds, activityTagFilter || undefined)
       .then((assets) => {
         if (!cancelled) setPlacementAssets(assets);
       })
@@ -147,7 +148,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
     return () => {
       cancelled = true;
     };
-  }, [assetMode, visiblePlacementIds]);
+  }, [assetMode, visiblePlacementIds, activityTagFilter]);
 
   function addFiles(fileList: FileList | File[]) {
     if (!selectedUploader) {
@@ -276,7 +277,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
     setAssetsLoading(true);
     const request = assetMode === "untagged"
       ? fetchUntaggedPlacementAssets()
-      : fetchPlacementAssetSet(visiblePlacementIds);
+      : fetchPlacementAssetSet(visiblePlacementIds, activityTagFilter || undefined);
 
     request
       .then(setPlacementAssets)
@@ -512,6 +513,25 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
                 {(options?.uploaders ?? []).map((uploader) => (
                   <option key={uploader.id} value={String(uploader.id)}>
                     {uploader.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label style={labelStyle}>
+              Program Week / Activity
+              <select
+                value={activityTagFilter}
+                onChange={(e) => {
+                  setActivityTagFilter(e.target.value);
+                  setSelectedAsset(null);
+                }}
+                style={inputStyle}
+              >
+                <option value="">All Activities</option>
+                {(options?.tags ?? []).map((tag) => (
+                  <option key={tag} value={tag}>
+                    {tag}
                   </option>
                 ))}
               </select>

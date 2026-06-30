@@ -180,11 +180,12 @@ export async function fetchPlacementAssets(placementId: number): Promise<Placeme
   return body.assets ?? [];
 }
 
-export async function fetchPlacementAssetSet(placementIds: number[]): Promise<PlacementAsset[]> {
+export async function fetchPlacementAssetSet(placementIds: number[], activityTag?: string): Promise<PlacementAsset[]> {
   if (placementIds.length === 0) return [];
   const params = new URLSearchParams({
     placement_ids: placementIds.join(","),
   });
+  if (activityTag) params.set("activity_tag", activityTag);
   const res = await fetch(`/api/v1/uploads/assets?${params.toString()}`);
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
