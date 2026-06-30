@@ -134,9 +134,8 @@ export async function searchAssets(params: {
   albumId?: string;
   albumIds?: string[];
   personIds?: string[];
-  tagId?: string;
   tagIds?: string[];
-  type?: "IMAGE" | "VIDEO" | "ALL";
+  type?: "IMAGE" | "VIDEO";
   page?: number;
   size?: number;
   takenAfter?: string;
@@ -153,7 +152,6 @@ export async function searchAssets(params: {
   if (params.albumId) body.albumId = params.albumId;
   if (params.albumIds?.length) body.albumIds = params.albumIds;
   if (params.personIds?.length) body.personIds = params.personIds;
-  if (params.tagId) body.tagId = params.tagId;
   if (params.tagIds?.length) body.tagIds = params.tagIds;
   if (params.takenAfter) body.takenAfter = params.takenAfter;
   if (params.takenBefore) body.takenBefore = params.takenBefore;
@@ -169,13 +167,15 @@ export async function searchAssets(params: {
 
 export async function searchAssetIdsByTag(tagId: string): Promise<string[]> {
   const assetIds: string[] = [];
-  let page = 1;
   const size = 100;
-  for (;;) {
-    const res = await searchAssets({ tagId, page, size, type: "ALL" });
-    for (const item of res.assets.items) assetIds.push(item.id);
-    if (!res.assets.nextPage || res.assets.items.length < size) break;
-    page += 1;
+  for (const type of ["IMAGE", "VIDEO"] as const) {
+    let page = 1;
+    for (;;) {
+      const res = await searchAssets({ tagIds: [tagId], page, size, type });
+      for (const item of res.assets.items) assetIds.push(item.id);
+      if (!res.assets.nextPage || res.assets.items.length < size) break;
+      page += 1;
+    }
   }
   return assetIds;
 }

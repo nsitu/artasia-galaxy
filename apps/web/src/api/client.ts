@@ -175,6 +175,20 @@ export async function fetchPlacementAssets(placementId: number): Promise<Placeme
   return body.assets ?? [];
 }
 
+export async function fetchPlacementAssetSet(placementIds: number[]): Promise<PlacementAsset[]> {
+  if (placementIds.length === 0) return [];
+  const params = new URLSearchParams({
+    placement_ids: placementIds.join(","),
+  });
+  const res = await fetch(`/api/v1/uploads/assets?${params.toString()}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  const body = await res.json() as { assets?: PlacementAsset[] };
+  return body.assets ?? [];
+}
+
 export async function fetchMapPlacements(): Promise<MapPlacement[]> {
   const res = await fetch("/api/v1/placements");
   if (!res.ok) {

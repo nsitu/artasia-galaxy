@@ -133,6 +133,36 @@ async function findExistingPlacementTagId(placementId: number) {
   )?.id ?? null;
 }
 
+async function getAssetsForPlacementTagIds(tagIds: string[]) {
+  const byId = new Map<string, Awaited<ReturnType<typeof searchAssets>>["assets"]["items"][number]>();
+  const size = 100;
+  for (const tagId of tagIds) {
+    for (const type of ["IMAGE", "VIDEO"] as const) {
+      let page = 1;
+      for (;;) {
+        const result = await searchAssets({ tagIds: [tagId], page, size, type });
+        for (const asset of result.assets.items) byId.set(asset.id, asset);
+        if (!result.assets.nextPage || result.assets.items.length < size) break;
+        page += 1;
+      }
+    }
+  }
+
+  return Array.from(byId.values()).sort((a, b) => b.fileCreatedAt.localeCompare(a.fileCreatedAt));
+}
+
+function mapPlacementAsset(asset: Awaited<ReturnType<typeof getAssetsForPlacementTagIds>>[number]) {
+  return {
+    id: asset.id,
+    type: asset.type,
+    fileName: asset.originalFileName,
+    createdAt: asset.fileCreatedAt,
+    updatedAt: asset.updatedAt,
+    thumbnailUrl: `/api/v1/assets/${asset.id}/thumbnail`,
+    previewUrl: `/api/v1/assets/${asset.id}/preview`,
+  };
+}
+
 router.get("/options", async (req, res) => {
   try {
     const [config, auth] = await Promise.all([getUploadConfig(), getAuthContext(req)]);
@@ -158,6 +188,41 @@ router.get("/options", async (req, res) => {
   }
 });
 
+router.get("/assets", async (req, res) => {
+  try {
+    const rawPlacementIds = typeof req.query.placement_ids === "string" ? req.query.placement_ids : "";
+    const placementIds = rawPlacementIds
+      .split(",")
+      .map((value) => parseInt(value.trim(), 10))
+      .filter((value) => Number.isFinite(value));
+
+    if (placementIds.length === 0) {
+      res.json({ assets: [] });
+      return;
+    }
+
+    const config = await getUploadConfig();
+    const knownPlacementIds = new Set(config.placements.map((placement) => placement.placement_id));
+    const tagIds = (
+      await Promise.all(
+        placementIds
+          .filter((placementId) => knownPlacementIds.has(placementId))
+          .map((placementId) => findExistingPlacementTagId(placementId))
+      )
+    ).filter((tagId): tagId is string => Boolean(tagId));
+
+    if (tagIds.length === 0) {
+      res.json({ assets: [] });
+      return;
+    }
+
+    const assets = await getAssetsForPlacementTagIds(tagIds);
+    res.json({ assets: assets.map(mapPlacementAsset) });
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
+});
+
 router.get("/placements/:id/assets", async (req, res) => {
   try {
     const placementId = parseInt(req.params.id, 10);
@@ -178,30 +243,10 @@ router.get("/placements/:id/assets", async (req, res) => {
       return;
     }
 
-    const assets = [];
-    const size = 100;
-    for (const type of ["IMAGE", "VIDEO"] as const) {
-      let page = 1;
-      for (;;) {
-        const result = await searchAssets({ tagId, page, size, type });
-        assets.push(...result.assets.items);
-        if (!result.assets.nextPage || result.assets.items.length < size) break;
-        page += 1;
-      }
-    }
-
-    assets.sort((a, b) => b.fileCreatedAt.localeCompare(a.fileCreatedAt));
+    const assets = await getAssetsForPlacementTagIds([tagId]);
     res.json({
       placement_id: placementId,
-      assets: assets.map((asset) => ({
-        id: asset.id,
-        type: asset.type,
-        fileName: asset.originalFileName,
-        createdAt: asset.fileCreatedAt,
-        updatedAt: asset.updatedAt,
-        thumbnailUrl: `/api/v1/assets/${asset.id}/thumbnail`,
-        previewUrl: `/api/v1/assets/${asset.id}/preview`,
-      })),
+      assets: assets.map(mapPlacementAsset),
     });
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });

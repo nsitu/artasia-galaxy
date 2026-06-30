@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   fetchAuthUser,
+  fetchPlacementAssetSet,
   fetchPlacementAssets,
   fetchUploadOptions,
   logoutAuthUser,
@@ -85,6 +86,12 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
     return filteredPlacements.find((placement) => String(placement.placement_id) === placementKey) ?? null;
   }, [filteredPlacements, placementKey]);
 
+  const visiblePlacementIds = useMemo(() => {
+    return selectedPlacement
+      ? [selectedPlacement.placement_id]
+      : filteredPlacements.map((placement) => placement.placement_id);
+  }, [filteredPlacements, selectedPlacement]);
+
   useEffect(() => {
     setPlacementKey((current) =>
       filteredPlacements.some((placement) => String(placement.placement_id) === current) ? current : ""
@@ -92,14 +99,14 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
   }, [filteredPlacements]);
 
   useEffect(() => {
-    if (!selectedPlacement) {
+    if (visiblePlacementIds.length === 0) {
       setPlacementAssets([]);
       return;
     }
 
     let cancelled = false;
     setAssetsLoading(true);
-    fetchPlacementAssets(selectedPlacement.placement_id)
+    fetchPlacementAssetSet(visiblePlacementIds)
       .then((assets) => {
         if (!cancelled) setPlacementAssets(assets);
       })
@@ -113,7 +120,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
     return () => {
       cancelled = true;
     };
-  }, [selectedPlacement]);
+  }, [visiblePlacementIds]);
 
   function addFiles(fileList: FileList | File[]) {
     if (!selectedUploader) {
@@ -234,6 +241,18 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
     setError(null);
     if (selectedUploader && placementIncludesUploader(placement, selectedUploader.id)) return;
     if (placement.team_member_id) setUploaderKey(String(placement.team_member_id));
+  }
+
+  function refreshVisibleAssets() {
+    setAssetsLoading(true);
+    fetchPlacementAssetSet(visiblePlacementIds)
+      .then(setPlacementAssets)
+      .catch((err) => setError((err as Error).message))
+      .finally(() => setAssetsLoading(false));
+  }
+
+  function assetGalleryTitle() {
+    return selectedPlacement ? "Existing Uploads" : "Existing Uploads for Visible Placements";
   }
 
   async function signOut() {
@@ -452,16 +471,10 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
                 )}
 
                 <div style={assetGridHeaderStyle}>
-                  <h3 style={sectionTitleStyle}>Existing Uploads</h3>
+                  <h3 style={sectionTitleStyle}>{assetGalleryTitle()}</h3>
                   <button
                     type="button"
-                    onClick={() => {
-                      setAssetsLoading(true);
-                      fetchPlacementAssets(selectedPlacement.placement_id)
-                        .then(setPlacementAssets)
-                        .catch((err) => setError((err as Error).message))
-                        .finally(() => setAssetsLoading(false));
-                    }}
+                    onClick={refreshVisibleAssets}
                     style={secondaryButtonStyle}
                   >
                     Refresh
@@ -485,7 +498,42 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
                 )}
               </>
             ) : (
-              <div style={emptyStateStyle}>Select a placement.</div>
+              <>
+                <div style={detailHeaderStyle}>
+                  <div>
+                    <h2 style={detailTitleStyle}>All Visible Placement Uploads</h2>
+                    <div style={detailMetaStyle}>Select a placement to upload or narrow this gallery.</div>
+                  </div>
+                  <div style={countBadgeStyle}>
+                    {assetsLoading ? "..." : placementAssets.length} upload{placementAssets.length === 1 ? "" : "s"}
+                  </div>
+                </div>
+                <div style={assetGridHeaderStyle}>
+                  <h3 style={sectionTitleStyle}>{assetGalleryTitle()}</h3>
+                  <button
+                    type="button"
+                    onClick={refreshVisibleAssets}
+                    style={secondaryButtonStyle}
+                  >
+                    Refresh
+                  </button>
+                </div>
+                {assetsLoading ? (
+                  <div style={emptyStateStyle}>Loading uploads...</div>
+                ) : placementAssets.length > 0 ? (
+                  <div style={assetGridStyle}>
+                    {placementAssets.map((asset) => (
+                      <a key={asset.id} href={asset.previewUrl} target="_blank" rel="noreferrer" style={assetCardStyle}>
+                        <img src={asset.thumbnailUrl} alt="" style={assetImageStyle} />
+                        <span style={assetNameStyle}>{asset.fileName}</span>
+                        <span style={assetDateStyle}>{new Date(asset.createdAt).toLocaleDateString()}</span>
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={emptyStateStyle}>No uploads tagged to the visible placements yet.</div>
+                )}
+              </>
             )}
           </section>
         </div>
@@ -501,6 +549,7 @@ const pageStyle: React.CSSProperties = {
   padding: 18,
   boxSizing: "border-box",
   fontFamily: "system-ui, sans-serif",
+  overflowY: "auto",
 };
 
 const panelStyle: React.CSSProperties = {
@@ -583,12 +632,17 @@ const adminLayoutStyle: React.CSSProperties = {
   gridTemplateColumns: "minmax(260px, 340px) 1fr",
   gap: 16,
   alignItems: "start",
+  minHeight: 0,
 };
 
 const placementMenuStyle: React.CSSProperties = {
   display: "grid",
   gap: 12,
   minWidth: 0,
+  position: "sticky",
+  top: 18,
+  maxHeight: "calc(100vh - 36px)",
+  overflow: "hidden",
 };
 
 const menuHeaderStyle: React.CSSProperties = {
@@ -601,7 +655,7 @@ const menuHeaderStyle: React.CSSProperties = {
 const placementListStyle: React.CSSProperties = {
   display: "grid",
   gap: 8,
-  maxHeight: "calc(100vh - 210px)",
+  maxHeight: "calc(100vh - 128px)",
   overflowY: "auto",
   paddingRight: 4,
 };
@@ -637,10 +691,12 @@ const placementMetaStyle: React.CSSProperties = {
 
 const detailStyle: React.CSSProperties = {
   minWidth: 0,
+  minHeight: "calc(100vh - 154px)",
   background: "#0f1118",
   border: "1px solid rgba(255,255,255,0.12)",
   borderRadius: 6,
   padding: 14,
+  overflow: "visible",
 };
 
 const detailHeaderStyle: React.CSSProperties = {
