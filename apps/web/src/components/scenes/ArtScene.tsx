@@ -31,6 +31,7 @@ export default function ArtScene() {
   const [showAlbums, setShowAlbums] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
+  const [uploadAuthError, setUploadAuthError] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const autoAdvance = useCallback(() => {
@@ -42,6 +43,18 @@ export default function ArtScene() {
     fetchAlbumList();
     fetchPhotos();
   }, [loadSettings, fetchPhotos, fetchAlbumList]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const authResult = params.get("auth");
+    if (!authResult) return;
+
+    if (authResult === "error") {
+      setUploadAuthError(params.get("message") ?? "Google sign-in failed.");
+    }
+    setShowUpload(true);
+    window.history.replaceState(null, "", window.location.pathname + window.location.hash);
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -258,7 +271,11 @@ export default function ArtScene() {
 
       <UploadPanel
         visible={showUpload}
-        onClose={() => setShowUpload(false)}
+        initialError={uploadAuthError}
+        onClose={() => {
+          setShowUpload(false);
+          setUploadAuthError(null);
+        }}
       />
 
       <Canvas

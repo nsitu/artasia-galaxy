@@ -101,11 +101,40 @@ export interface UploadOptions {
   placements: UploadPlacement[];
   tags: string[];
   uploaders: UploadUploader[];
+  currentUser: AuthUser | null;
   limits: {
     maxFiles: number;
     maxFileBytes: number;
     maxBatchBytes: number;
   };
+}
+
+export interface AuthUser {
+  authenticated: boolean;
+  email?: string;
+  name?: string;
+  picture?: string;
+  hostedDomain?: string;
+  uploader?: UploadUploader | null;
+  uploader_id?: number | null;
+  uploader_name?: string | null;
+}
+
+export async function fetchAuthUser(): Promise<AuthUser> {
+  const res = await fetch("/api/v1/auth/me");
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function logoutAuthUser(): Promise<void> {
+  const res = await fetch("/api/v1/auth/logout", { method: "POST" });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
 }
 
 export interface UploadResult {

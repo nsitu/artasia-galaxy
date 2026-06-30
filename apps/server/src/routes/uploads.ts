@@ -12,6 +12,7 @@ import {
   uploadAsset,
 } from "../infra/ImmichClient.js";
 import { uploadRateLimit } from "../middleware/uploadRateLimit.js";
+import { getAuthContext } from "../services/auth.service.js";
 import {
   findConfiguredPlacement,
   findConfiguredUploader,
@@ -116,11 +117,20 @@ async function processWithConcurrency<T, R>(
   return results;
 }
 
-router.get("/options", async (_req, res) => {
+router.get("/options", async (req, res) => {
   try {
-    const config = await getUploadConfig();
+    const [config, auth] = await Promise.all([getUploadConfig(), getAuthContext(req)]);
     res.json({
       ...config,
+      currentUser: auth.authenticated
+        ? {
+            authenticated: true,
+            email: auth.email,
+            name: auth.name,
+            uploader_id: auth.uploader?.id ?? null,
+            uploader_name: auth.uploader?.name ?? null,
+          }
+        : null,
       limits: {
         maxFiles: UPLOAD_LIMITS.maxFiles,
         maxFileBytes: UPLOAD_LIMITS.maxFileBytes,

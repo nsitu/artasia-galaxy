@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  fetchAuthUser,
   fetchUploadOptions,
+  logoutAuthUser,
   uploadFiles,
+  type AuthUser,
   type UploadOptions,
 } from "../../api/client";
 
@@ -17,10 +20,12 @@ interface UploadItem {
 interface UploadPanelProps {
   visible: boolean;
   onClose: () => void;
+  initialError?: string | null;
 }
 
-export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
+export default function UploadPanel({ visible, onClose, initialError }: UploadPanelProps) {
   const [options, setOptions] = useState<UploadOptions | null>(null);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [uploaderKey, setUploaderKey] = useState("");
   const [placementKey, setPlacementKey] = useState("");
   const [selectedTag, setSelectedTag] = useState("");
@@ -37,13 +42,27 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
 
   useEffect(() => {
     if (!visible || options) return;
-    fetchUploadOptions()
-      .then((data) => {
+    const authFallback: AuthUser = { authenticated: false };
+    Promise.all([
+      fetchUploadOptions(),
+      fetchAuthUser().catch(() => authFallback),
+    ])
+      .then(([data, auth]) => {
         setOptions(data);
+        const currentUser = data.currentUser ?? auth;
+        setAuthUser(currentUser);
+        const matchedUploaderId = data.currentUser?.uploader_id ?? auth.uploader?.id ?? null;
+        if (matchedUploaderId) {
+          setUploaderKey(String(matchedUploaderId));
+        }
         setSelectedTag(data.tags[0] ?? "");
       })
       .catch((err) => setError((err as Error).message));
   }, [visible, options]);
+
+  useEffect(() => {
+    if (visible && initialError) setError(initialError);
+  }, [visible, initialError]);
 
   const selectedUploader = useMemo(() => {
     if (!options) return null;
@@ -175,6 +194,15 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
     }
   }
 
+  async function signOut() {
+    try {
+      await logoutAuthUser();
+      setAuthUser({ authenticated: false });
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
   if (!visible) return null;
 
   return (
@@ -190,6 +218,29 @@ export default function UploadPanel({ visible, onClose }: UploadPanelProps) {
         <p style={introStyle}>
           To upload documentation for your site, choose your name, site, and delivery week.
         </p>
+
+        <div style={authBarStyle}>
+          {authUser?.authenticated ? (
+            <>
+              <span>
+                Signed in as {authUser.email}
+                {authUser.uploader_name || authUser.uploader?.name
+                  ? ` - matched to ${authUser.uploader_name ?? authUser.uploader?.name}`
+                  : " - no matching Artasia Team Member email"}
+              </span>
+              <button type="button" onClick={signOut} style={secondaryButtonStyle}>
+                Sign out
+              </button>
+            </>
+          ) : (
+            <>
+              <span>Sign in with Google to preselect your Artasia Team Member.</span>
+              <a href="/api/v1/auth/google/start" style={primaryLinkButtonStyle}>
+                Sign in with Google
+              </a>
+            </>
+          )}
+        </div>
 
         {error && <div style={errorStyle}>{error}</div>}
 
@@ -386,6 +437,42 @@ const introStyle: React.CSSProperties = {
   color: "#b9bfcc",
   fontSize: 14,
   lineHeight: 1.45,
+};
+
+const authBarStyle: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 12,
+  color: "#b9bfcc",
+  background: "#171a22",
+  border: "1px solid rgba(255,255,255,0.12)",
+  borderRadius: 4,
+  padding: "9px 10px",
+  marginBottom: 12,
+  fontSize: 13,
+  flexWrap: "wrap",
+};
+
+const primaryLinkButtonStyle: React.CSSProperties = {
+  color: "#0b0d12",
+  background: "#e8edf8",
+  border: "1px solid rgba(255,255,255,0.3)",
+  borderRadius: 4,
+  padding: "7px 10px",
+  textDecoration: "none",
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+};
+
+const secondaryButtonStyle: React.CSSProperties = {
+  background: "transparent",
+  color: "#ddd",
+  border: "1px solid rgba(255,255,255,0.22)",
+  borderRadius: 4,
+  padding: "7px 10px",
+  cursor: "pointer",
+  whiteSpace: "nowrap",
 };
 
 const iconButtonStyle: React.CSSProperties = {

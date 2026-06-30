@@ -178,6 +178,11 @@ ARTASIA_IMAGE=ghcr.io/nsitu/artasia-galaxy:latest
 IMMICH_URL=https://photos.artsforall.co
 IMMICH_API_KEY=...
 WORDPRESS_URL=http://host.docker.internal
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+GOOGLE_REDIRECT_URI=https://galaxy.artsforall.co/api/v1/auth/google/callback
+GOOGLE_ALLOWED_DOMAIN=artsforall.co
+SESSION_SECRET=...
 ```
 
 `IMMICH_URL` uses the public Immich HTTPS URL because the Galaxy app runs inside Docker. Inside the container, `127.0.0.1` refers to the Galaxy container, not the VM host.
@@ -187,6 +192,14 @@ WORDPRESS_URL=http://host.docker.internal
 ```dotenv
 WORDPRESS_URL=https://artsforall.co
 ```
+
+Google sign-in is handled by the Node app through `/api/v1/auth/google/start` and `/api/v1/auth/google/callback`. The Google OAuth client must allow this redirect URI:
+
+```text
+https://galaxy.artsforall.co/api/v1/auth/google/callback
+```
+
+The auth session is an HTTP-only signed cookie. `GOOGLE_ALLOWED_DOMAIN` restricts accepted Google Workspace accounts, and `SESSION_SECRET` signs both the OAuth state cookie and the app session cookie. Changing `SESSION_SECRET` logs current browser sessions out.
 
 ## nginx
 

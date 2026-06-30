@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "express": "^5.1.0",
+    "google-auth-library": "^10.9.0",
     "multer": "^2.2.0"
   },
   "devDependencies": {
