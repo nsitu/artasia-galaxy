@@ -53,6 +53,11 @@ export function getImmichConfig() {
   return { url: IMMICH_URL, keyPrefix: IMMICH_API_KEY.slice(0, 6) + "..." };
 }
 
+function isValidUUID(id: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(id);
+}
+
 async function immichRequest(
   path: string,
   init?: RequestInit
@@ -295,6 +300,11 @@ export async function ensureTag(name: string): Promise<ImmichTag> {
 }
 
 export async function tagAsset(assetId: string, tagNames: string[]) {
+  // Validate assetId is a UUID format
+  if (!isValidUUID(assetId)) {
+    throw new Error(`Invalid asset ID format: ${assetId}. Expected UUID format.`);
+  }
+
   const uniqueNames = Array.from(
     new Set(tagNames.map((tag) => tag.trim()).filter(Boolean))
   );
@@ -317,6 +327,13 @@ export async function tagAsset(assetId: string, tagNames: string[]) {
 
 export async function tagAssets(assetIds: string[], tagIds: string[]) {
   if (assetIds.length === 0 || tagIds.length === 0) return;
+  
+  // Validate all assetIds are UUID format
+  const invalidIds = assetIds.filter(id => !isValidUUID(id));
+  if (invalidIds.length > 0) {
+    throw new Error(`Invalid asset ID format(s): ${invalidIds.join(", ")}. Expected UUID format.`);
+  }
+
   await immichRequest("/tags/assets", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -329,6 +346,13 @@ export async function tagAssets(assetIds: string[], tagIds: string[]) {
 
 export async function untagAssets(assetIds: string[], tagIds: string[]) {
   if (assetIds.length === 0 || tagIds.length === 0) return;
+  
+  // Validate all assetIds are UUID format
+  const invalidIds = assetIds.filter(id => !isValidUUID(id));
+  if (invalidIds.length > 0) {
+    throw new Error(`Invalid asset ID format(s): ${invalidIds.join(", ")}. Expected UUID format.`);
+  }
+
   await immichRequest("/tags/assets", {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },

@@ -399,7 +399,12 @@ router.post("/assets/:assetId/placement", async (req, res) => {
       return;
     }
 
-    const assetId = req.params.assetId;
+    const assetId = req.params.assetId.trim();
+    if (!assetId) {
+      res.status(400).json({ error: "Asset ID is required." });
+      return;
+    }
+
     await getAsset(assetId);
 
     const existingPlacementTagIds = await getExistingPlacementTagIds();
@@ -435,7 +440,12 @@ router.post("/assets/:assetId/uploader", async (req, res) => {
       return;
     }
 
-    const assetId = req.params.assetId;
+    const assetId = req.params.assetId.trim();
+    if (!assetId) {
+      res.status(400).json({ error: "Asset ID is required." });
+      return;
+    }
+
     await getAsset(assetId);
 
     const [uploaderAlbums, destinationAlbum] = await Promise.all([
@@ -471,7 +481,12 @@ router.post("/assets/:assetId/activity-tag", async (req, res) => {
       : null;
     const removing = rawActivityId === null || rawActivityId === "" || rawActivityId === 0;
 
-    const assetId = req.params.assetId;
+    const assetId = req.params.assetId.trim();
+    if (!assetId) {
+      res.status(400).json({ error: "Asset ID is required." });
+      return;
+    }
+
     await getAsset(assetId);
 
     // Remove all existing activity tags (both anchor-style and label-style)
