@@ -319,6 +319,7 @@ export interface DriveFolder {
   name: string;
   mimeType: string;
   parents?: string[];
+  driveId?: string;
 }
 
 export interface DriveFile {
@@ -332,8 +333,25 @@ export interface DriveFile {
   isVideo: boolean;
 }
 
-export async function fetchDriveFolders(): Promise<DriveFolder[]> {
-  const res = await fetch("/api/v1/drive/folders");
+export interface DriveFoldersResponse {
+  myDrive?: DriveFolder;
+  subfolders?: DriveFolder[];
+  folders?: DriveFolder[];
+}
+
+/**
+ * Fetch folders for navigation (supports hierarchy and Shared Drives)
+ * @param driveType "myDrive" or "sharedDrives"
+ * @param parentId folder ID to list children from (for myDrive)
+ */
+export async function fetchDriveFolders(
+  driveType: "myDrive" | "sharedDrives" = "myDrive",
+  parentId: string = "root"
+): Promise<DriveFoldersResponse> {
+  const params = new URLSearchParams({ driveType });
+  if (parentId !== "root") params.set("parentId", parentId);
+
+  const res = await fetch(`/api/v1/drive/folders?${params.toString()}`);
   if (!res.ok) {
     if (res.status === 401) {
       throw new Error("Please sign in with Google to access Drive");

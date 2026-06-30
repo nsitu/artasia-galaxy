@@ -35,14 +35,38 @@ function getDriveClient(req: Request): GoogleDriveClient {
 }
 
 /**
- * GET /api/v1/drive/folders
- * List top-level folders in user's Google Drive
+ * GET /api/v1/drive/folders?driveType=myDrive&parentId=root
+ * List folders with support for hierarchy and Shared Drives
+ * Query params:
+ *   - driveType: "myDrive" (default) or "sharedDrives"
+ *   - parentId: folder ID to list children from (default "root")
  */
 router.get("/folders", async (req: Request, res: Response) => {
   try {
     const client = getDriveClient(req);
-    const folders = await client.getFolders();
-    res.json(folders);
+    const driveType = typeof req.query.driveType === "string" ? req.query.driveType : "myDrive";
+    const parentId = typeof req.query.parentId === "string" ? req.query.parentId : "root";
+
+    let folders;
+
+    if (driveType === "sharedDrives") {
+      // Get all Shared Drives
+      folders = await client.getSharedDrives();
+    } else {
+      // Get My Drive root or subfolders
+      if (parentId === "root") {
+        // Return "My Drive" as the root with its immediate children as subfolders
+        const myDrive = await client.getMyDriveInfo();
+        const subfolders = await client.getFoldersInFolder("root");
+        res.json({ myDrive, subfolders });
+        return;
+      } else {
+        // Get subfolders of a specific folder in My Drive
+        folders = await client.getFoldersInFolder(parentId);
+      }
+    }
+
+    res.json({ folders });
   } catch (err) {
     res
       .status(err instanceof Error && err.message.includes("Not authenticated") ? 401 : 500)

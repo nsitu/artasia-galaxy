@@ -27,6 +27,7 @@ interface DriveFolder {
   name: string;
   mimeType: string;
   parents?: string[];
+  driveId?: string;
 }
 
 export class GoogleDriveClient {
@@ -95,11 +96,11 @@ export class GoogleDriveClient {
   }
 
   /**
-   * Get folder structure starting from root
+   * Get subfolders in a specific folder (hierarchical browsing)
    */
-  async getFolders(): Promise<DriveFolder[]> {
+  async getFoldersInFolder(parentId: string = "root"): Promise<DriveFolder[]> {
     const res = await this.drive.files.list({
-      q: `mimeType = '${GOOGLE_MIME_TYPE_FOLDER}' and trashed = false and 'root' in parents`,
+      q: `mimeType = '${GOOGLE_MIME_TYPE_FOLDER}' and trashed = false and '${parentId}' in parents`,
       spaces: "drive",
       pageSize: 100,
       fields: "files(id,name,mimeType,parents)",
@@ -107,6 +108,41 @@ export class GoogleDriveClient {
     });
 
     return (res.data.files ?? []) as DriveFolder[];
+  }
+
+  /**
+   * Get all Shared Drives
+   */
+  async getSharedDrives(): Promise<DriveFolder[]> {
+    const res = await this.drive.drives.list({
+      pageSize: 100,
+      fields: "drives(id,name)",
+    });
+
+    return (res.data.drives ?? []).map((drive: any) => ({
+      id: drive.id,
+      name: drive.name,
+      mimeType: GOOGLE_MIME_TYPE_FOLDER,
+      driveId: drive.id,
+    }));
+  }
+
+  /**
+   * Get root folder info for My Drive
+   */
+  async getMyDriveInfo(): Promise<DriveFolder> {
+    return {
+      id: "root",
+      name: "My Drive",
+      mimeType: GOOGLE_MIME_TYPE_FOLDER,
+    };
+  }
+
+  /**
+   * Get folder structure starting from root (legacy, returns immediate children)
+   */
+  async getFolders(): Promise<DriveFolder[]> {
+    return this.getFoldersInFolder("root");
   }
 
   /**
