@@ -1250,8 +1250,6 @@ const menuHeaderStyle: React.CSSProperties = {
 const placementListStyle: React.CSSProperties = {
   display: "grid",
   gap: 8,
-  maxHeight: "calc(100vh - 128px)",
-  overflowY: "auto",
   paddingRight: 4,
 };
 

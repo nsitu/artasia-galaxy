@@ -145,22 +145,29 @@ function isPlacementAnchorTagName(value: string) {
 
 async function getExistingPlacementTagIds() {
   const tags = await listTags();
-  const placementTags = tags
-    .filter((tag) => isPlacementAnchorTagName(tag.name) || isPlacementAnchorTagName(tag.value));
-  
-  console.log(`[getExistingPlacementTagIds] Found ${placementTags.length} placement tag objects:`, 
-    JSON.stringify(placementTags));
-  
-  const tagIds = placementTags.map((tag) => {
-    console.log(`[getExistingPlacementTagIds] Tag object: id="${tag.id}" (type: ${typeof tag.id}), name="${tag.name}"`);
-    return tag.id;
-  });
-  
-  if (tagIds.length > 0) {
-    console.log(`[getExistingPlacementTagIds] Extracted ${tagIds.length} tag IDs: ${JSON.stringify(tagIds)}`);
-  }
-  
-  return tagIds;
+  return tags
+    .filter((tag) => isPlacementAnchorTagName(tag.name) || isPlacementAnchorTagName(tag.value))
+    .map((tag) => tag.id);
+}
+
+async function getConfiguredPlacementAssignmentTagIds() {
+  const config = await getUploadConfig();
+  const placementTagNames = new Set(
+    config.placements.flatMap((placement) => [
+      placementAnchorTag(placement.placement_id),
+      placement.partner_name,
+      placement.placement_name,
+    ])
+      .map((name) => name.trim().toLowerCase())
+      .filter(Boolean)
+  );
+  const tags = await listTags();
+  return tags
+    .filter((tag) =>
+      placementTagNames.has(tag.name.trim().toLowerCase()) ||
+      placementTagNames.has(tag.value.trim().toLowerCase())
+    )
+    .map((tag) => tag.id);
 }
 
 async function getAssetsForPlacementTagIds(tagIds: string[]) {
@@ -413,8 +420,6 @@ router.post("/assets/:assetId/placement", async (req, res) => {
     }
 
     const assetId = req.params.assetId.trim();
-    console.log(`[POST /assets/:assetId/placement] Received assetId: "${assetId}" (length: ${assetId.length})`);
-    
     if (!assetId) {
       res.status(400).json({ error: "Asset ID is required." });
       return;
@@ -422,12 +427,10 @@ router.post("/assets/:assetId/placement", async (req, res) => {
 
     await getAsset(assetId);
 
-    const existingPlacementTagIds = await getExistingPlacementTagIds();
-    // Skip untagAssets() for now - Immich's DELETE endpoint has issues with UUID validation
-    // We'll just add the new tags with tagAsset() (which uses PUT and works fine)
-    // if (existingPlacementTagIds.length > 0) {
-    //   await untagAssets([assetId], existingPlacementTagIds);
-    // }
+    const existingPlacementTagIds = await getConfiguredPlacementAssignmentTagIds();
+    if (existingPlacementTagIds.length > 0) {
+      await untagAssets([assetId], existingPlacementTagIds);
+    }
     await tagAsset(assetId, getPlacementTagNames(placement));
     await applyDefaultLocationIfMissing(assetId, {
       lat: placement.place?.lat,
@@ -518,10 +521,9 @@ router.post("/assets/:assetId/activity-tag", async (req, res) => {
         activityLabelKeys.has(tag.name.trim().toLowerCase()) || activityLabelKeys.has(tag.value.trim().toLowerCase())
       )
       .map((tag) => tag.id);
-    // Skip untagAssets() for now - Immich's DELETE endpoint has issues with UUID validation
-    // if (activityTagIds.length > 0) {
-    //   await untagAssets([assetId], activityTagIds);
-    // }
+    if (activityTagIds.length > 0) {
+      await untagAssets([assetId], activityTagIds);
+    }
 
     if (!removing && activityId != null && Number.isFinite(activityId)) {
       const tagNames = await getActivityTagNames(activityId);
