@@ -55,7 +55,11 @@ export function getImmichConfig() {
 
 function isValidUUID(id: string): boolean {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  return uuidRegex.test(id);
+  const isValid = uuidRegex.test(id);
+  if (!isValid) {
+    console.error(`[ImmichClient] Invalid UUID format: "${id}" (length: ${id.length})`);
+  }
+  return isValid;
 }
 
 async function immichRequest(
@@ -302,7 +306,9 @@ export async function ensureTag(name: string): Promise<ImmichTag> {
 export async function tagAsset(assetId: string, tagNames: string[]) {
   // Validate assetId is a UUID format
   if (!isValidUUID(assetId)) {
-    throw new Error(`Invalid asset ID format: ${assetId}. Expected UUID format.`);
+    const errorMsg = `Invalid asset ID format: "${assetId}" (length: ${assetId.length}). Expected UUID format (36 chars with hyphens).`;
+    console.error(`[tagAsset] ${errorMsg}`);
+    throw new Error(errorMsg);
   }
 
   const uniqueNames = Array.from(
@@ -315,6 +321,8 @@ export async function tagAsset(assetId: string, tagNames: string[]) {
     tags.push(await ensureTag(name));
   }
 
+  console.log(`[tagAsset] Tagging asset ${assetId} with tags: ${uniqueNames.join(", ")}`);
+  
   await immichRequest("/tags/assets", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },

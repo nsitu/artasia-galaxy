@@ -400,6 +400,8 @@ router.post("/assets/:assetId/placement", async (req, res) => {
     }
 
     const assetId = req.params.assetId.trim();
+    console.log(`[POST /assets/:assetId/placement] Received assetId: "${assetId}" (length: ${assetId.length})`);
+    
     if (!assetId) {
       res.status(400).json({ error: "Asset ID is required." });
       return;
