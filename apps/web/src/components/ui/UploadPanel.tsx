@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   assignAssetPlacement,
+  assignAssetUploader,
   fetchAuthUser,
   fetchPlacementAssetSet,
   fetchPlacementAssets,
@@ -37,7 +38,9 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
   const [assetMode, setAssetMode] = useState<"placements" | "untagged">("placements");
   const [selectedAsset, setSelectedAsset] = useState<PlacementAsset | null>(null);
   const [managePlacementKey, setManagePlacementKey] = useState("");
+  const [manageUploaderKey, setManageUploaderKey] = useState("");
   const [assigningPlacement, setAssigningPlacement] = useState(false);
+  const [assigningUploader, setAssigningUploader] = useState(false);
   const [assetsLoading, setAssetsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -290,6 +293,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
   function openAssetManager(asset: PlacementAsset) {
     setSelectedAsset(asset);
     setManagePlacementKey(selectedPlacement ? String(selectedPlacement.placement_id) : "");
+    setManageUploaderKey(asset.uploader_id ? String(asset.uploader_id) : "");
     setError(null);
   }
 
@@ -316,6 +320,34 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
     }
   }
 
+  async function assignSelectedAssetUploader() {
+    if (!selectedAsset) return;
+    const uploaderId = parseInt(manageUploaderKey, 10);
+    if (!Number.isFinite(uploaderId)) {
+      setError("Select a team member album for this upload.");
+      return;
+    }
+
+    setAssigningUploader(true);
+    try {
+      await assignAssetUploader({
+        assetId: selectedAsset.id,
+        uploaderId,
+      });
+      const uploader = options?.uploaders.find((entry) => entry.id === uploaderId);
+      setSelectedAsset({
+        ...selectedAsset,
+        uploader_id: uploaderId,
+        uploader_name: uploader?.name ?? null,
+      });
+      refreshVisibleAssets();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setAssigningUploader(false);
+    }
+  }
+
   async function signOut() {
     try {
       await logoutAuthUser();
@@ -330,6 +362,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
       <button key={asset.id} type="button" onClick={() => openAssetManager(asset)} style={assetCardStyle}>
         <img src={asset.thumbnailUrl} alt="" style={assetImageStyle} />
         <span style={assetNameStyle}>{asset.fileName}</span>
+        <span style={assetDateStyle}>{asset.uploader_name ?? "No team member album"}</span>
         <span style={assetDateStyle}>{new Date(asset.createdAt).toLocaleDateString()}</span>
       </button>
     );
@@ -359,6 +392,9 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
               <h3 style={sectionTitleStyle}>Manage Upload</h3>
               <div style={assetNameStyle}>{selectedAsset.fileName}</div>
               <div style={assetDateStyle}>{new Date(selectedAsset.createdAt).toLocaleString()}</div>
+              <div style={assetDateStyle}>
+                Album: {selectedAsset.uploader_name ?? "No team member album"}
+              </div>
             </div>
             <button type="button" onClick={() => setSelectedAsset(null)} style={secondaryButtonStyle}>
               Close
@@ -380,6 +416,21 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
               ))}
             </select>
           </label>
+          <label style={labelStyle}>
+            Team Member Album
+            <select
+              value={manageUploaderKey}
+              onChange={(e) => setManageUploaderKey(e.target.value)}
+              style={inputStyle}
+            >
+              <option value="">Select a team member</option>
+              {(options?.uploaders ?? []).map((uploader) => (
+                <option key={uploader.id} value={String(uploader.id)}>
+                  {uploader.name}
+                </option>
+              ))}
+            </select>
+          </label>
           <div style={manageActionsStyle}>
             <button
               type="button"
@@ -388,6 +439,14 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
               style={primaryActionButtonStyle}
             >
               {assigningPlacement ? "Assigning..." : "Assign Placement"}
+            </button>
+            <button
+              type="button"
+              onClick={assignSelectedAssetUploader}
+              disabled={assigningUploader || !manageUploaderKey}
+              style={primaryActionButtonStyle}
+            >
+              {assigningUploader ? "Assigning..." : "Assign Team Member"}
             </button>
             <a href={selectedAsset.previewUrl} target="_blank" rel="noreferrer" style={secondaryLinkButtonStyle}>
               Open Preview

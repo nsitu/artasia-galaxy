@@ -157,6 +157,7 @@ The Artasia server-side Immich API key must have these Immich permissions:
 | `album.read` | Find the `Published` album and uploader albums. |
 | `album.create` | Create the `Published` album and uploader albums when missing. |
 | `albumAsset.create` | Add uploaded assets to uploader albums. |
+| `albumAsset.delete` | Move managed uploads out of the wrong uploader album. |
 | `asset.upload` | Upload images and videos to Immich. |
 | `asset.update` | Attach default GPS coordinates when uploaded media lacks GPS metadata. |
 | `asset.read` | Query assets from the `Published` album for the public gallery. |
@@ -167,7 +168,7 @@ The Artasia server-side Immich API key must have these Immich permissions:
 | `tag.asset` | Attach tags to uploaded assets. |
 | `server.statistics` | Read Immich storage usage and disable uploads above 50 GB. |
 
-These permissions are needed for the public upload companion, uploader albums, the `Published` album, upload tagging, and the 50 GB storage usage cutoff.
+These permissions are needed for the public upload companion, uploader albums, the `Published` album, upload tagging, admin reassignment, and the 50 GB storage usage cutoff.
 
 ## Environment
 

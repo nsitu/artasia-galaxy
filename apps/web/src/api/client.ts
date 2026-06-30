@@ -154,6 +154,9 @@ export interface PlacementAsset {
   updatedAt: string;
   archived?: boolean;
   trashed?: boolean;
+  uploader_id?: number | null;
+  uploader_name?: string | null;
+  uploader_album_id?: string | null;
   thumbnailUrl: string;
   previewUrl: string;
 }
@@ -209,6 +212,21 @@ export async function assignAssetPlacement(params: {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ placement_id: params.placementId }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+}
+
+export async function assignAssetUploader(params: {
+  assetId: string;
+  uploaderId: number;
+}): Promise<void> {
+  const res = await fetch(`/api/v1/uploads/assets/${params.assetId}/uploader`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ uploader_id: params.uploaderId }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));

@@ -262,6 +262,15 @@ export async function addAssetsToAlbum(albumId: string, assetIds: string[]) {
   });
 }
 
+export async function removeAssetsFromAlbum(albumId: string, assetIds: string[]) {
+  if (assetIds.length === 0) return;
+  await immichRequest(`/albums/${albumId}/assets`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids: assetIds }),
+  });
+}
+
 export async function listTags(): Promise<ImmichTag[]> {
   const res = await immichRequest("/tags");
   return res.json();

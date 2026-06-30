@@ -9,6 +9,7 @@ import {
   getServerStatistics,
   listAlbums,
   listTags,
+  removeAssetsFromAlbum,
   searchAssets,
   tagAsset,
   untagAssets,
@@ -164,7 +165,16 @@ async function getAssetsForPlacementTagIds(tagIds: string[]) {
   return Array.from(byId.values()).sort((a, b) => b.fileCreatedAt.localeCompare(a.fileCreatedAt));
 }
 
-function mapPlacementAsset(asset: Awaited<ReturnType<typeof getAssetsForPlacementTagIds>>[number]) {
+interface UploaderAlbum {
+  id: string;
+  uploaderId: number;
+  uploaderName: string;
+}
+
+function mapAdminAsset(
+  asset: Awaited<ReturnType<typeof getAssetsForPlacementTagIds>>[number],
+  uploaderAlbum?: UploaderAlbum
+) {
   return {
     id: asset.id,
     type: asset.type,
@@ -173,36 +183,97 @@ function mapPlacementAsset(asset: Awaited<ReturnType<typeof getAssetsForPlacemen
     updatedAt: asset.updatedAt,
     archived: asset.isArchived,
     trashed: Boolean(asset.isTrashed),
+    uploader_id: uploaderAlbum?.uploaderId ?? null,
+    uploader_name: uploaderAlbum?.uploaderName ?? null,
+    uploader_album_id: uploaderAlbum?.id ?? null,
     thumbnailUrl: `/api/v1/assets/${asset.id}/thumbnail`,
     previewUrl: `/api/v1/assets/${asset.id}/preview`,
   };
 }
 
-async function searchAssetsByAlbumIds(albumIds: string[]) {
+async function searchAssetsByAlbumId(albumId: string) {
   const byId = new Map<string, Awaited<ReturnType<typeof searchAssets>>["assets"]["items"][number]>();
   const size = 100;
-  for (const albumId of albumIds) {
-    for (const type of ["IMAGE", "VIDEO"] as const) {
-      let page = 1;
-      for (;;) {
-        const result = await searchAssets({ albumIds: [albumId], page, size, type });
-        for (const asset of result.assets.items) byId.set(asset.id, asset);
-        if (!result.assets.nextPage || result.assets.items.length < size) break;
-        page += 1;
-      }
+  for (const type of ["IMAGE", "VIDEO"] as const) {
+    let page = 1;
+    for (;;) {
+      const result = await searchAssets({ albumIds: [albumId], page, size, type });
+      for (const asset of result.assets.items) byId.set(asset.id, asset);
+      if (!result.assets.nextPage || result.assets.items.length < size) break;
+      page += 1;
     }
   }
 
   return Array.from(byId.values()).sort((a, b) => b.fileCreatedAt.localeCompare(a.fileCreatedAt));
 }
 
-async function getUploaderAlbumIds() {
+async function searchAssetsByAlbumIds(albumIds: string[]) {
+  const byId = new Map<string, Awaited<ReturnType<typeof searchAssets>>["assets"]["items"][number]>();
+  for (const albumId of albumIds) {
+    const assets = await searchAssetsByAlbumId(albumId);
+    for (const asset of assets) byId.set(asset.id, asset);
+  }
+  return Array.from(byId.values()).sort((a, b) => b.fileCreatedAt.localeCompare(a.fileCreatedAt));
+}
+
+async function searchGalaxyUploadedAssets() {
+  const byId = new Map<string, Awaited<ReturnType<typeof searchAssets>>["assets"]["items"][number]>();
+  const size = 100;
+  for (const type of ["IMAGE", "VIDEO"] as const) {
+    let page = 1;
+    for (;;) {
+      const result = await searchAssets({ page, size, type });
+      for (const asset of result.assets.items) {
+        if (asset.deviceId === "artasia-galaxy") byId.set(asset.id, asset);
+      }
+      if (!result.assets.nextPage || result.assets.items.length < size) break;
+      page += 1;
+    }
+  }
+
+  return Array.from(byId.values()).sort((a, b) => b.fileCreatedAt.localeCompare(a.fileCreatedAt));
+}
+
+async function getUploaderAlbums(): Promise<UploaderAlbum[]> {
   const config = await getUploadConfig();
-  const uploaderNames = new Set(config.uploaders.map((uploader) => uploader.name.trim().toLowerCase()));
+  const uploadersByName = new Map(config.uploaders.map((uploader) => [uploader.name.trim().toLowerCase(), uploader]));
   const albums = await listAlbums();
   return albums
-    .filter((album) => uploaderNames.has(album.albumName.trim().toLowerCase()))
-    .map((album) => album.id);
+    .map((album) => {
+      const uploader = uploadersByName.get(album.albumName.trim().toLowerCase());
+      return uploader
+        ? {
+            id: album.id,
+            uploaderId: uploader.id,
+            uploaderName: uploader.name,
+          }
+        : null;
+    })
+    .filter((album): album is UploaderAlbum => Boolean(album));
+}
+
+async function getUploaderAlbumAssignments(uploaderAlbums: UploaderAlbum[]) {
+  const assignments = new Map<string, UploaderAlbum>();
+  for (const album of uploaderAlbums) {
+    const assets = await searchAssetsByAlbumId(album.id);
+    for (const asset of assets) assignments.set(asset.id, album);
+  }
+  return assignments;
+}
+
+async function getUploaderAlbumMemberships(assetId: string, uploaderAlbums: UploaderAlbum[]) {
+  const memberships: UploaderAlbum[] = [];
+  for (const album of uploaderAlbums) {
+    const assets = await searchAssetsByAlbumId(album.id);
+    if (assets.some((asset) => asset.id === assetId)) memberships.push(album);
+  }
+  return memberships;
+}
+
+async function mapAssetsWithUploaderAlbums(assets: Awaited<ReturnType<typeof getAssetsForPlacementTagIds>>) {
+  const uploaderAlbums = await getUploaderAlbums();
+  const assignments = await getUploaderAlbumAssignments(uploaderAlbums);
+  return assets.map((asset) => mapAdminAsset(asset, assignments.get(asset.id)));
 }
 
 router.get("/options", async (req, res) => {
@@ -259,7 +330,7 @@ router.get("/assets", async (req, res) => {
     }
 
     const assets = await getAssetsForPlacementTagIds(tagIds);
-    res.json({ assets: assets.map(mapPlacementAsset) });
+    res.json({ assets: await mapAssetsWithUploaderAlbums(assets) });
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });
   }
@@ -267,24 +338,27 @@ router.get("/assets", async (req, res) => {
 
 router.get("/assets/untagged", async (_req, res) => {
   try {
-    const [albumIds, placementTagIds] = await Promise.all([
-      getUploaderAlbumIds(),
+    const [uploaderAlbums, placementTagIds] = await Promise.all([
+      getUploaderAlbums(),
       getExistingPlacementTagIds(),
     ]);
 
-    if (albumIds.length === 0) {
-      res.json({ assets: [] });
-      return;
-    }
-
-    const [albumAssets, taggedAssets] = await Promise.all([
-      searchAssetsByAlbumIds(albumIds),
+    const [albumAssets, galaxyAssets, taggedAssets] = await Promise.all([
+      searchAssetsByAlbumIds(uploaderAlbums.map((album) => album.id)),
+      searchGalaxyUploadedAssets(),
       getAssetsForPlacementTagIds(placementTagIds),
     ]);
-    const taggedAssetIds = new Set(taggedAssets.map((asset) => asset.id));
-    const untaggedAssets = albumAssets.filter((asset) => !taggedAssetIds.has(asset.id));
+    const candidateAssets = new Map<string, (typeof albumAssets)[number]>();
+    for (const asset of albumAssets) candidateAssets.set(asset.id, asset);
+    for (const asset of galaxyAssets) candidateAssets.set(asset.id, asset);
 
-    res.json({ assets: untaggedAssets.map(mapPlacementAsset) });
+    const taggedAssetIds = new Set(taggedAssets.map((asset) => asset.id));
+    const untaggedAssets = Array.from(candidateAssets.values())
+      .filter((asset) => !taggedAssetIds.has(asset.id))
+      .sort((a, b) => b.fileCreatedAt.localeCompare(a.fileCreatedAt));
+
+    const assignments = await getUploaderAlbumAssignments(uploaderAlbums);
+    res.json({ assets: untaggedAssets.map((asset) => mapAdminAsset(asset, assignments.get(asset.id))) });
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });
   }
@@ -326,6 +400,48 @@ router.post("/assets/:assetId/placement", async (req, res) => {
   }
 });
 
+router.post("/assets/:assetId/uploader", async (req, res) => {
+  try {
+    const uploaderId = parseInt(String(req.body?.uploader_id ?? ""), 10);
+    if (!Number.isFinite(uploaderId)) {
+      res.status(400).json({ error: "Select a valid team member." });
+      return;
+    }
+
+    const selectedUploader = await findConfiguredUploader({ id: uploaderId });
+    if (!selectedUploader) {
+      res.status(404).json({ error: "Team member was not found." });
+      return;
+    }
+
+    const assetId = req.params.assetId;
+    await getAsset(assetId);
+
+    const [uploaderAlbums, destinationAlbum] = await Promise.all([
+      getUploaderAlbums(),
+      ensureAlbum(selectedUploader.name),
+    ]);
+
+    const currentAlbums = await getUploaderAlbumMemberships(assetId, uploaderAlbums);
+    for (const currentAlbum of currentAlbums) {
+      if (currentAlbum.id !== destinationAlbum.id) {
+        await removeAssetsFromAlbum(currentAlbum.id, [assetId]);
+      }
+    }
+    await addAssetsToAlbum(destinationAlbum.id, [assetId]);
+
+    res.json({
+      ok: true,
+      asset_id: assetId,
+      uploader_id: selectedUploader.id,
+      uploader_name: selectedUploader.name,
+      uploader_album_id: destinationAlbum.id,
+    });
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
+});
+
 router.get("/placements/:id/assets", async (req, res) => {
   try {
     const placementId = parseInt(req.params.id, 10);
@@ -349,7 +465,7 @@ router.get("/placements/:id/assets", async (req, res) => {
     const assets = await getAssetsForPlacementTagIds([tagId]);
     res.json({
       placement_id: placementId,
-      assets: assets.map(mapPlacementAsset),
+      assets: await mapAssetsWithUploaderAlbums(assets),
     });
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });
