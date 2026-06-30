@@ -207,25 +207,14 @@ async function searchAssetsByAlbumId(albumId: string) {
   return Array.from(byId.values()).sort((a, b) => b.fileCreatedAt.localeCompare(a.fileCreatedAt));
 }
 
-async function searchAssetsByAlbumIds(albumIds: string[]) {
-  const byId = new Map<string, Awaited<ReturnType<typeof searchAssets>>["assets"]["items"][number]>();
-  for (const albumId of albumIds) {
-    const assets = await searchAssetsByAlbumId(albumId);
-    for (const asset of assets) byId.set(asset.id, asset);
-  }
-  return Array.from(byId.values()).sort((a, b) => b.fileCreatedAt.localeCompare(a.fileCreatedAt));
-}
-
-async function searchGalaxyUploadedAssets() {
+async function searchAllImmichAssets() {
   const byId = new Map<string, Awaited<ReturnType<typeof searchAssets>>["assets"]["items"][number]>();
   const size = 100;
   for (const type of ["IMAGE", "VIDEO"] as const) {
     let page = 1;
     for (;;) {
       const result = await searchAssets({ page, size, type });
-      for (const asset of result.assets.items) {
-        if (asset.deviceId === "artasia-galaxy") byId.set(asset.id, asset);
-      }
+      for (const asset of result.assets.items) byId.set(asset.id, asset);
       if (!result.assets.nextPage || result.assets.items.length < size) break;
       page += 1;
     }
@@ -343,17 +332,13 @@ router.get("/assets/untagged", async (_req, res) => {
       getExistingPlacementTagIds(),
     ]);
 
-    const [albumAssets, galaxyAssets, taggedAssets] = await Promise.all([
-      searchAssetsByAlbumIds(uploaderAlbums.map((album) => album.id)),
-      searchGalaxyUploadedAssets(),
+    const [allAssets, taggedAssets] = await Promise.all([
+      searchAllImmichAssets(),
       getAssetsForPlacementTagIds(placementTagIds),
     ]);
-    const candidateAssets = new Map<string, (typeof albumAssets)[number]>();
-    for (const asset of albumAssets) candidateAssets.set(asset.id, asset);
-    for (const asset of galaxyAssets) candidateAssets.set(asset.id, asset);
 
     const taggedAssetIds = new Set(taggedAssets.map((asset) => asset.id));
-    const untaggedAssets = Array.from(candidateAssets.values())
+    const untaggedAssets = allAssets
       .filter((asset) => !taggedAssetIds.has(asset.id))
       .sort((a, b) => b.fileCreatedAt.localeCompare(a.fileCreatedAt));
 
