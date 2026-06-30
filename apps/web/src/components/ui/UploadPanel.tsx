@@ -37,7 +37,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
   const [activityTagFilter, setActivityTagFilter] = useState("");
   const [items, setItems] = useState<UploadItem[]>([]);
   const [placementAssets, setPlacementAssets] = useState<PlacementAsset[]>([]);
-  const [assetMode, setAssetMode] = useState<"placements" | "untagged">("placements");
+  const [assetMode, setAssetMode] = useState<"placements" | "untagged" | "all">("placements");
   const [selectedAsset, setSelectedAsset] = useState<PlacementAsset | null>(null);
   const [managePlacementKey, setManagePlacementKey] = useState("");
   const [manageUploaderKey, setManageUploaderKey] = useState("");
@@ -116,6 +116,39 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
       fetchUntaggedPlacementAssets()
         .then((assets) => {
           if (!cancelled) setPlacementAssets(assets);
+        })
+        .catch((err) => {
+          if (!cancelled) setError((err as Error).message);
+        })
+        .finally(() => {
+          if (!cancelled) setAssetsLoading(false);
+        });
+
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (assetMode === "all") {
+      let cancelled = false;
+      setAssetsLoading(true);
+      const activityId = activityTagFilter ? parseInt(activityTagFilter, 10) : undefined;
+      const taggedFetch = visiblePlacementIds.length > 0
+        ? fetchPlacementAssetSet(visiblePlacementIds, activityId)
+        : Promise.resolve<PlacementAsset[]>([]);
+      const untaggedFetch = activityId == null
+        ? fetchUntaggedPlacementAssets()
+        : Promise.resolve<PlacementAsset[]>([]);
+      Promise.all([taggedFetch, untaggedFetch])
+        .then(([tagged, untagged]) => {
+          if (cancelled) return;
+          const seen = new Set<string>();
+          const combined = [...tagged, ...untagged].filter((a) => {
+            if (seen.has(a.id)) return false;
+            seen.add(a.id);
+            return true;
+          });
+          setPlacementAssets(combined);
         })
         .catch((err) => {
           if (!cancelled) setError((err as Error).message);
@@ -277,9 +310,33 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
 
   function refreshVisibleAssets() {
     setAssetsLoading(true);
+    const activityId = activityTagFilter ? parseInt(activityTagFilter, 10) : undefined;
+
+    if (assetMode === "all") {
+      const taggedFetch = visiblePlacementIds.length > 0
+        ? fetchPlacementAssetSet(visiblePlacementIds, activityId)
+        : Promise.resolve<PlacementAsset[]>([]);
+      const untaggedFetch = activityId == null
+        ? fetchUntaggedPlacementAssets()
+        : Promise.resolve<PlacementAsset[]>([]);
+      Promise.all([taggedFetch, untaggedFetch])
+        .then(([tagged, untagged]) => {
+          const seen = new Set<string>();
+          const combined = [...tagged, ...untagged].filter((a) => {
+            if (seen.has(a.id)) return false;
+            seen.add(a.id);
+            return true;
+          });
+          setPlacementAssets(combined);
+        })
+        .catch((err) => setError((err as Error).message))
+        .finally(() => setAssetsLoading(false));
+      return;
+    }
+
     const request = assetMode === "untagged"
       ? fetchUntaggedPlacementAssets()
-      : fetchPlacementAssetSet(visiblePlacementIds, activityTagFilter ? parseInt(activityTagFilter, 10) : undefined);
+      : fetchPlacementAssetSet(visiblePlacementIds, activityId);
 
     request
       .then(setPlacementAssets)
@@ -289,7 +346,8 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
 
   function assetGalleryTitle() {
     if (assetMode === "untagged") return "Uploads Needing Placement";
-    return selectedPlacement ? "Existing Uploads" : "Existing Uploads for Visible Placements";
+    if (assetMode === "all") return selectedPlacement ? "Existing Uploads" : "All Uploads";
+    return selectedPlacement ? "Existing Uploads" : "Tagged Uploads for Visible Placements";
   }
 
   function openAssetManager(asset: PlacementAsset) {
@@ -567,44 +625,27 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
               </select>
             </label>
 
+            <label style={labelStyle}>
+              Assets
+              <select
+                value={assetMode}
+                onChange={(e) => {
+                  setAssetMode(e.target.value as "placements" | "untagged" | "all");
+                  setPlacementKey("");
+                  setSelectedAsset(null);
+                  setItems([]);
+                }}
+                style={inputStyle}
+              >
+                <option value="placements">Tagged assets</option>
+                <option value="untagged">Untagged assets</option>
+                <option value="all">All assets</option>
+              </select>
+            </label>
+
             <div style={menuHeaderStyle}>
               <span>Placements</span>
               <span>{filteredPlacements.length}</span>
-            </div>
-
-            <div style={placementListStyle}>
-              <button
-                type="button"
-                onClick={() => {
-                  setPlacementKey("");
-                  setAssetMode("placements");
-                  setSelectedAsset(null);
-                  setItems([]);
-                }}
-                style={{
-                  ...placementButtonStyle,
-                  ...(!selectedPlacement && assetMode === "placements" ? selectedPlacementButtonStyle : {}),
-                }}
-              >
-                <span style={placementNameStyle}>All Visible Placements</span>
-                <span style={placementMetaStyle}>Browse uploads across this menu</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setPlacementKey("");
-                  setAssetMode("untagged");
-                  setSelectedAsset(null);
-                  setItems([]);
-                }}
-                style={{
-                  ...placementButtonStyle,
-                  ...(assetMode === "untagged" ? selectedPlacementButtonStyle : {}),
-                }}
-              >
-                <span style={placementNameStyle}>Needs Placement</span>
-                <span style={placementMetaStyle}>Uploads without a placement tag</span>
-              </button>
             </div>
 
             <div style={placementListStyle}>
@@ -763,8 +804,16 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
               <>
                 <div style={detailHeaderStyle}>
                   <div>
-                    <h2 style={detailTitleStyle}>All Visible Placement Uploads</h2>
-                    <div style={detailMetaStyle}>Select a placement to upload or narrow this gallery.</div>
+                    <h2 style={detailTitleStyle}>
+                      {assetMode === "untagged" ? "Uploads Needing Placement"
+                        : assetMode === "all" ? "All Uploads"
+                        : "Tagged Placement Uploads"}
+                    </h2>
+                    <div style={detailMetaStyle}>
+                      {assetMode === "untagged" ? "Uploads with no placement tag assigned."
+                        : assetMode === "all" ? "All uploads across visible placements and untagged."
+                        : "Select a placement to upload or narrow this gallery."}
+                    </div>
                   </div>
                   <div style={countBadgeStyle}>
                     {assetsLoading ? "..." : placementAssets.length} upload{placementAssets.length === 1 ? "" : "s"}
