@@ -4,13 +4,18 @@ import {
   assignAssetPlacement,
   assignAssetUploader,
   fetchAuthUser,
+  fetchDriveFiles,
+  fetchDriveFolders,
   fetchPlacementAssetSet,
   fetchPlacementAssets,
   fetchUploadOptions,
   fetchUntaggedPlacementAssets,
   logoutAuthUser,
+  syncDriveFiles,
   uploadFiles,
   type AuthUser,
+  type DriveFile,
+  type DriveFolder,
   type UploadOptions,
   type PlacementAsset,
 } from "../../api/client";
@@ -47,6 +52,15 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const uploadInProgressRef = useRef(false);
 
+  // Drive sync state
+  const [uploadMode, setUploadMode] = useState<"files" | "drive">("files");
+  const [driveFolders, setDriveFolders] = useState<DriveFolder[]>([]);
+  const [driveFiles, setDriveFiles] = useState<DriveFile[]>([]);
+  const [selectedDriveFolder, setSelectedDriveFolder] = useState("root");
+  const [selectedDriveFiles, setSelectedDriveFiles] = useState<Set<string>>(new Set());
+  const [driveSyncing, setDriveSyncing] = useState(false);
+  const [driveLoading, setDriveLoading] = useState(false);
+
   function placementLabel(location: UploadOptions["placements"][number]) {
     return location.partner_name
       ? `${location.partner_name} - ${location.placement_name}`
@@ -75,6 +89,28 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
   useEffect(() => {
     if (initialError) setError(initialError);
   }, [initialError]);
+
+  // Load Drive folders when switching to Drive tab
+  useEffect(() => {
+    if (uploadMode !== "drive" || driveFolders.length > 0) return;
+    
+    setDriveLoading(true);
+    fetchDriveFolders()
+      .then(setDriveFolders)
+      .catch((err) => setError((err as Error).message))
+      .finally(() => setDriveLoading(false));
+  }, [uploadMode, driveFolders.length]);
+
+  // Load files for current Drive folder
+  useEffect(() => {
+    if (uploadMode !== "drive") return;
+    
+    setDriveLoading(true);
+    fetchDriveFiles(selectedDriveFolder)
+      .then(({ files }) => setDriveFiles(files))
+      .catch((err) => setError((err as Error).message))
+      .finally(() => setDriveLoading(false));
+  }, [uploadMode, selectedDriveFolder]);
 
   const selectedUploader = useMemo(() => {
     if (!options) return null;
@@ -424,6 +460,60 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
     }
   }
 
+  async function syncSelectedDriveFiles() {
+    if (selectedDriveFiles.size === 0) {
+      setError("Select files to sync from Google Drive");
+      return;
+    }
+
+    setDriveSyncing(true);
+    setError(null);
+
+    try {
+      const results = await syncDriveFiles({
+        fileIds: Array.from(selectedDriveFiles),
+        placementId: placementKey ? parseInt(placementKey, 10) : null,
+        activityId: activityTagFilter ? parseInt(activityTagFilter, 10) : null,
+      });
+
+      const succeeded = results.filter((r) => r.status === "success").length;
+      const failed = results.filter((r) => r.status === "failed").length;
+
+      if (succeeded > 0) {
+        setError(
+          `Synced ${succeeded} file${succeeded === 1 ? "" : "s"}${
+            failed > 0 ? ` (${failed} failed)` : ""
+          }`
+        );
+        setSelectedDriveFiles(new Set());
+        setUploadMode("files");
+        if (selectedPlacement) {
+          fetchPlacementAssets(selectedPlacement.placement_id)
+            .then(setPlacementAssets)
+            .catch((err) => setError((err as Error).message));
+        }
+      } else {
+        setError(
+          `Failed to sync files: ${results.map((r) => `${r.fileName}: ${r.error}`).join(", ")}`
+        );
+      }
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setDriveSyncing(false);
+    }
+  }
+
+  function toggleDriveFileSelection(fileId: string) {
+    const newSelection = new Set(selectedDriveFiles);
+    if (newSelection.has(fileId)) {
+      newSelection.delete(fileId);
+    } else {
+      newSelection.add(fileId);
+    }
+    setSelectedDriveFiles(newSelection);
+  }
+
   function renderAssetCard(asset: PlacementAsset) {
     return (
       <button key={asset.id} type="button" onClick={() => openAssetManager(asset)} style={assetCardStyle}>
@@ -439,6 +529,71 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
     if (assetsLoading) return <div style={emptyStateStyle}>Loading uploads...</div>;
     if (placementAssets.length === 0) return <div style={emptyStateStyle}>{emptyMessage}</div>;
     return <div style={assetGridStyle}>{placementAssets.map(renderAssetCard)}</div>;
+  }
+
+  function renderDriveBrowser() {
+    return (
+      <div style={driveBrowserStyle}>
+        <div style={driveBrowserHeaderStyle}>
+          <label style={labelStyle}>
+            Select Folder
+            <select
+              value={selectedDriveFolder}
+              onChange={(e) => setSelectedDriveFolder(e.target.value)}
+              style={inputStyle}
+              disabled={driveLoading}
+            >
+              <option value="root">My Drive (Root)</option>
+              {driveFolders.map((folder) => (
+                <option key={folder.id} value={folder.id}>
+                  {folder.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        {driveLoading ? (
+          <div style={emptyStateStyle}>Loading files...</div>
+        ) : driveFiles.length === 0 ? (
+          <div style={emptyStateStyle}>No images or videos in this folder</div>
+        ) : (
+          <div style={driveFileListStyle}>
+            {driveFiles.map((file) => (
+              <div key={file.id} style={driveFileItemStyle}>
+                <input
+                  type="checkbox"
+                  checked={selectedDriveFiles.has(file.id)}
+                  onChange={() => toggleDriveFileSelection(file.id)}
+                  style={{ marginRight: 8, cursor: "pointer" }}
+                />
+                <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {file.name}
+                </span>
+                <span style={assetDateStyle}>
+                  {file.isVideo ? "🎬" : "🖼"}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {driveFiles.length > 0 && (
+          <div style={driveActionsStyle}>
+            <button
+              type="button"
+              onClick={syncSelectedDriveFiles}
+              disabled={selectedDriveFiles.size === 0 || driveSyncing || !authUser?.authenticated}
+              style={primaryActionButtonStyle}
+            >
+              {driveSyncing
+                ? `Syncing ${selectedDriveFiles.size} file${selectedDriveFiles.size === 1 ? "" : "s"}...`
+                : `Sync ${selectedDriveFiles.size} file${selectedDriveFiles.size === 1 ? "" : "s"}`}
+            </button>
+          </div>
+        )}
+      </div>
+    );
   }
 
   function renderAssetManager() {
@@ -687,62 +842,93 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
                   </div>
                 </div>
 
-                <div
-                    style={dropzoneStyle}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      addFiles(e.dataTransfer.files);
-                    }}
+                <div style={uploadModeTabsStyle}>
+                  <button
+                    type="button"
                     onClick={() => {
-                      if (!selectedUploader) {
-                        setError("Select an Artasia Team Member before adding files.");
-                        return;
-                      }
-                      inputRef.current?.click();
+                      setUploadMode("files");
+                      setSelectedDriveFiles(new Set());
+                    }}
+                    style={{
+                      ...uploadModeTabStyle,
+                      ...(uploadMode === "files" ? uploadModeTabActiveStyle : {}),
                     }}
                   >
-                    Drop images or videos here
-                    <span style={{ color: "#777", marginTop: 6 }}>or click to choose files</span>
-                    <input
-                      ref={inputRef}
-                      type="file"
-                      multiple
-                      accept="image/*,video/*"
-                      style={{ display: "none" }}
-                      disabled={!selectedUploader}
-                      onChange={(e) => e.target.files && addFiles(e.target.files)}
-                    />
-                  </div>
+                    Upload Files
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUploadMode("drive")}
+                    disabled={!authUser?.authenticated}
+                    style={{
+                      ...uploadModeTabStyle,
+                      ...(uploadMode === "drive" ? uploadModeTabActiveStyle : {}),
+                      opacity: authUser?.authenticated ? 1 : 0.5,
+                      cursor: authUser?.authenticated ? "pointer" : "not-allowed",
+                    }}
+                  >
+                    Sync from Drive
+                  </button>
+                </div>
 
-                {items.length > 0 && (
-                  <div style={listStyle}>
-                    {items.map((item) => (
-                      <div key={item.id} style={itemStyle}>
-                        <div style={thumbStyle}>
-                          {item.assetId ? (
-                            <img
-                              src={`/api/v1/assets/${item.assetId}/thumbnail`}
-                              alt=""
-                              style={thumbImageStyle}
-                            />
-                          ) : (
-                            <span style={{ color: "#666", fontSize: 11 }}>
-                              {item.status === "failed" ? "failed" : "uploading"}
-                            </span>
-                          )}
-                        </div>
-                        <div>
-                          <div style={{ color: "#eee" }}>{item.file.name}</div>
-                          <div style={{ color: item.status === "failed" ? "#f88" : "#888", fontSize: 12 }}>
-                            {item.status}
-                            {item.error ? ` - ${item.error}` : ""}
-                          </div>
-                        </div>
-                        {item.status === "failed" ? (
-                          <button
-                            onClick={() => {
-                              setItems((current) =>
+                {uploadMode === "files" ? (
+                  <>
+                    <div
+                      style={dropzoneStyle}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        addFiles(e.dataTransfer.files);
+                      }}
+                      onClick={() => {
+                        if (!selectedUploader) {
+                          setError("Select an Artasia Team Member before adding files.");
+                          return;
+                        }
+                        inputRef.current?.click();
+                      }}
+                    >
+                      Drop images or videos here
+                      <span style={{ color: "#777", marginTop: 6 }}>or click to choose files</span>
+                      <input
+                        ref={inputRef}
+                        type="file"
+                        multiple
+                        accept="image/*,video/*"
+                        style={{ display: "none" }}
+                        disabled={!selectedUploader}
+                        onChange={(e) => e.target.files && addFiles(e.target.files)}
+                      />
+                    </div>
+
+                    {items.length > 0 && (
+                      <div style={listStyle}>
+                        {items.map((item) => (
+                          <div key={item.id} style={itemStyle}>
+                            <div style={thumbStyle}>
+                              {item.assetId ? (
+                                <img
+                                  src={`/api/v1/assets/${item.assetId}/thumbnail`}
+                                  alt=""
+                                  style={thumbImageStyle}
+                                />
+                              ) : (
+                                <span style={{ color: "#666", fontSize: 11 }}>
+                                  {item.status === "failed" ? "failed" : "uploading"}
+                                </span>
+                              )}
+                            </div>
+                            <div>
+                              <div style={{ color: "#eee" }}>{item.file.name}</div>
+                              <div style={{ color: item.status === "failed" ? "#f88" : "#888", fontSize: 12 }}>
+                                {item.status}
+                                {item.error ? ` - ${item.error}` : ""}
+                              </div>
+                            </div>
+                            {item.status === "failed" ? (
+                              <button
+                                onClick={() => {
+                                  setItems((current) =>
                                 current.map((entry) =>
                                   entry.id === item.id
                                     ? { ...entry, status: "queued", progress: 0, error: undefined }
@@ -762,6 +948,10 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
                       </div>
                     ))}
                   </div>
+                )}
+                  </>
+                ) : (
+                  <>{renderDriveBrowser()}</>
                 )}
 
                 <div style={assetGridHeaderStyle}>
@@ -1240,4 +1430,66 @@ const errorStyle: React.CSSProperties = {
   padding: 10,
   borderRadius: 4,
   marginBottom: 12,
+};
+
+const uploadModeTabsStyle: React.CSSProperties = {
+  display: "flex",
+  gap: 8,
+  marginBottom: 12,
+  borderBottom: "1px solid rgba(255,255,255,0.12)",
+};
+
+const uploadModeTabStyle: React.CSSProperties = {
+  background: "transparent",
+  color: "#9aa3b3",
+  border: "none",
+  borderBottom: "2px solid transparent",
+  padding: "8px 12px",
+  cursor: "pointer",
+  fontSize: 14,
+  fontWeight: 500,
+};
+
+const uploadModeTabActiveStyle: React.CSSProperties = {
+  color: "#d8e7ff",
+  borderBottomColor: "#d8e7ff",
+};
+
+const driveBrowserStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 12,
+  marginBottom: 12,
+};
+
+const driveBrowserHeaderStyle: React.CSSProperties = {
+  display: "flex",
+  gap: 8,
+  alignItems: "flex-start",
+};
+
+const driveFileListStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 8,
+  maxHeight: 400,
+  overflow: "auto",
+  border: "1px solid rgba(255,255,255,0.12)",
+  borderRadius: 4,
+  padding: 8,
+};
+
+const driveFileItemStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  padding: 8,
+  background: "rgba(255,255,255,0.05)",
+  borderRadius: 4,
+  cursor: "pointer",
+  fontSize: 13,
+  color: "#d8e7ff",
+};
+
+const driveActionsStyle: React.CSSProperties = {
+  display: "flex",
+  gap: 8,
 };

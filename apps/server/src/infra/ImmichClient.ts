@@ -383,6 +383,50 @@ export async function uploadAsset(params: {
   return res.json();
 }
 
+export async function uploadAssetStream(params: {
+  stream: NodeJS.ReadableStream;
+  filename: string;
+  mimeType: string;
+  deviceAssetId: string;
+  createdAt?: Date;
+  modifiedAt?: Date;
+}): Promise<ImmichUploadResponse> {
+  const createdAt = params.createdAt ?? new Date();
+  const modifiedAt = params.modifiedAt ?? createdAt;
+  
+  // Hash the stream while reading it
+  const hash = createHash("sha1");
+  const chunks: Buffer[] = [];
+  
+  await new Promise<void>((resolve, reject) => {
+    params.stream.on("data", (chunk) => {
+      hash.update(chunk);
+      chunks.push(chunk);
+    });
+    params.stream.on("error", reject);
+    params.stream.on("end", () => resolve());
+  });
+
+  const checksum = hash.digest("hex");
+  const blob = new Blob(chunks, { type: params.mimeType });
+
+  const form = new FormData();
+  form.append("assetData", blob, params.filename);
+  form.append("deviceAssetId", params.deviceAssetId);
+  form.append("deviceId", "artasia-galaxy");
+  form.append("filename", params.filename);
+  form.append("fileCreatedAt", createdAt.toISOString());
+  form.append("fileModifiedAt", modifiedAt.toISOString());
+
+  const res = await immichRequest("/assets", {
+    method: "POST",
+    headers: { "x-immich-checksum": checksum },
+    body: form,
+  });
+
+  return res.json();
+}
+
 async function sha1File(path: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const hash = createHash("sha1");

@@ -309,3 +309,87 @@ export function uploadFiles(params: {
     xhr.send(form);
   });
 }
+
+/**
+ * Google Drive integration
+ */
+
+export interface DriveFolder {
+  id: string;
+  name: string;
+  mimeType: string;
+  parents?: string[];
+}
+
+export interface DriveFile {
+  id: string;
+  name: string;
+  mimeType: string;
+  size?: string;
+  modifiedTime?: string;
+  isFolder: boolean;
+  isImage: boolean;
+  isVideo: boolean;
+}
+
+export async function fetchDriveFolders(): Promise<DriveFolder[]> {
+  const res = await fetch("/api/v1/drive/folders");
+  if (!res.ok) {
+    if (res.status === 401) {
+      throw new Error("Please sign in with Google to access Drive");
+    }
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function fetchDriveFiles(
+  folderId: string = "root",
+  pageToken?: string
+): Promise<{ files: DriveFile[]; nextPageToken?: string }> {
+  const params = new URLSearchParams({ folderId });
+  if (pageToken) params.set("pageToken", pageToken);
+
+  const res = await fetch(`/api/v1/drive/files?${params.toString()}`);
+  if (!res.ok) {
+    if (res.status === 401) {
+      throw new Error("Please sign in with Google to access Drive");
+    }
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export interface DriveSyncResult {
+  fileId: string;
+  fileName: string;
+  status: "success" | "failed";
+  assetId?: string;
+  error?: string;
+}
+
+export async function syncDriveFiles(params: {
+  fileIds: string[];
+  placementId?: number | null;
+  activityId?: number | null;
+}): Promise<DriveSyncResult[]> {
+  const res = await fetch("/api/v1/drive/sync", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+
+  if (!res.ok) {
+    if (res.status === 401) {
+      throw new Error("Please sign in with Google to access Drive");
+    }
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+
+  const data = await res.json() as { results?: DriveSyncResult[] };
+  return data.results ?? [];
+}
+

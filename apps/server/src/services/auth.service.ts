@@ -14,6 +14,7 @@ interface AuthSessionPayload {
   name?: string;
   picture?: string;
   hd?: string;
+  refreshToken?: string;
   exp: number;
 }
 
@@ -197,9 +198,14 @@ export function createGoogleAuthUrl() {
     state,
     nonce,
     url: client.generateAuthUrl({
-      access_type: "online",
-      prompt: "select_account",
-      scope: ["openid", "email", "profile"],
+      access_type: "offline",
+      prompt: "consent",
+      scope: [
+        "openid",
+        "email",
+        "profile",
+        "https://www.googleapis.com/auth/drive.readonly",
+      ],
       state,
       nonce,
       hd: config.allowedDomain,
@@ -239,5 +245,6 @@ export async function exchangeGoogleCode(code: string, nonce: string) {
     name: payload.name,
     picture: payload.picture,
     hd: payload.hd,
+    refreshToken: tokens.refresh_token,
   };
 }
