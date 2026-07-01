@@ -513,6 +513,7 @@ export default function TerrainGallery({ onOverlayChange }: { onOverlayChange: (
         <PlaceMarker
           key={placement.placement_id}
           position={position}
+          logoUrl={placement.partner_logo?.url}
           onClick={focusedPlacement ? undefined : () => focusPlacement(placement)}
         />
       ))}

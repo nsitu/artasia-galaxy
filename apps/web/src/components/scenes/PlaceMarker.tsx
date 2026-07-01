@@ -1,8 +1,10 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
+import { useLoader } from "@react-three/fiber";
 import * as THREE from "three";
 
 interface Props {
   position: [number, number, number];
+  logoUrl?: string;
   onClick?: () => void;
   onPointerEnter?: () => void;
   onPointerLeave?: () => void;
@@ -10,13 +12,14 @@ interface Props {
 
 export default function PlaceMarker({
   position,
+  logoUrl,
   onClick,
   onPointerEnter,
   onPointerLeave,
 }: Props) {
   const geometry = useMemo(() => {
     const shape = new THREE.Shape();
-    const scale = 0.055;
+    const scale = 0.0385;
 
     // Scaled from the provided 24x24 SVG path. The bottom point is kept at
     // local origin so the marker's pin aligns with the placement coordinate.
@@ -125,8 +128,8 @@ export default function PlaceMarker({
           : undefined}
       >
         <meshStandardMaterial
-          color="#1f1f1f"
-          emissive="#050505"
+          color="#ffffff"
+          emissive="#141414"
           roughness={0.55}
           metalness={0.05}
           transparent
@@ -136,6 +139,33 @@ export default function PlaceMarker({
           polygonOffsetUnits={-2}
         />
       </mesh>
+      {logoUrl && <PartnerLogoTexture url={logoUrl} />}
     </group>
+  );
+}
+
+function PartnerLogoTexture({ url }: { url: string }) {
+  const texture = useLoader(THREE.TextureLoader, url);
+
+  useEffect(() => {
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.needsUpdate = true;
+  }, [texture]);
+
+  return (
+    <mesh position={[0, -0.026, 0.48]} rotation={[Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[0.36, 0.18]} />
+      <meshBasicMaterial
+        map={texture}
+        transparent
+        opacity={0.95}
+        toneMapped={false}
+        polygonOffset
+        polygonOffsetFactor={-4}
+        polygonOffsetUnits={-4}
+      />
+    </mesh>
   );
 }
