@@ -57,16 +57,13 @@ export class GoogleDriveClient {
     files: DriveFile[];
     nextPageToken?: string;
   }> {
-    const query = folderId === "root" 
-      ? `trashed = false and (${SUPPORTED_MIME_TYPES.map(
-          (mime) => `mimeType = '${mime}'`
-        ).join(" or ")} or mimeType = '${GOOGLE_MIME_TYPE_FOLDER}')`
-      : `'${folderId}' in parents and trashed = false and (${SUPPORTED_MIME_TYPES.map(
-          (mime) => `mimeType = '${mime}'`
-        ).join(" or ")} or mimeType = '${GOOGLE_MIME_TYPE_FOLDER}')`;
+    const parentId = folderId === "root" ? driveId ?? "root" : folderId;
+    const supportedTypesQuery = `(${SUPPORTED_MIME_TYPES.map(
+      (mime) => `mimeType = '${mime}'`
+    ).join(" or ")} or mimeType = '${GOOGLE_MIME_TYPE_FOLDER}')`;
 
     const listParams: any = {
-      q: driveId && folderId === "root" ? query : `'${folderId}' in parents and ${query}`,
+      q: `'${parentId}' in parents and trashed = false and ${supportedTypesQuery}`,
       pageSize: 100,
       pageToken,
       fields: "files(id,name,mimeType,size,modifiedTime,parents,webViewLink)",
@@ -112,9 +109,8 @@ export class GoogleDriveClient {
    * Get subfolders in a specific folder (hierarchical browsing)
    */
   async getFoldersInFolder(parentId: string = "root", driveId?: string): Promise<DriveFolder[]> {
-    const query = parentId === "root"
-      ? `mimeType = '${GOOGLE_MIME_TYPE_FOLDER}' and trashed = false`
-      : `mimeType = '${GOOGLE_MIME_TYPE_FOLDER}' and trashed = false and '${parentId}' in parents`;
+    const resolvedParentId = parentId === "root" ? driveId ?? "root" : parentId;
+    const query = `'${resolvedParentId}' in parents and mimeType = '${GOOGLE_MIME_TYPE_FOLDER}' and trashed = false`;
 
     const listParams: any = {
       q: query,

@@ -119,13 +119,17 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
   // Load files for current Drive folder
   useEffect(() => {
     if (uploadMode !== "drive") return;
+    if (driveType === "sharedDrives" && !currentDriveId) {
+      setDriveFiles([]);
+      return;
+    }
 
     setDriveLoading(true);
     fetchDriveFiles(selectedDriveFolder, undefined, currentDriveId)
       .then(({ files }) => setDriveFiles(files))
       .catch((err) => setError((err as Error).message))
       .finally(() => setDriveLoading(false));
-  }, [uploadMode, selectedDriveFolder, currentDriveId]);
+  }, [uploadMode, driveType, selectedDriveFolder, currentDriveId]);
 
   const selectedUploader = useMemo(() => {
     if (!options) return null;
