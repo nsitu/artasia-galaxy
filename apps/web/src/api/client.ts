@@ -332,6 +332,7 @@ export interface DriveFile {
   mimeType: string;
   size?: string;
   modifiedTime?: string;
+  thumbnailLink?: string;
   isFolder: boolean;
   isImage: boolean;
   isVideo: boolean;

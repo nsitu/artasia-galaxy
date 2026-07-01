@@ -678,10 +678,17 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
                   onChange={() => toggleDriveFileSelection(file.id)}
                   style={{ marginRight: 8, cursor: "pointer" }}
                 />
+                <div style={driveFileThumbStyle}>
+                  {file.thumbnailLink ? (
+                    <img src={file.thumbnailLink} alt="" style={driveFileThumbImageStyle} loading="lazy" />
+                  ) : (
+                    <span style={driveFileTypeStyle}>{file.isVideo ? "VID" : "IMG"}</span>
+                  )}
+                </div>
                 <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {file.name}
                 </span>
-                <span style={assetDateStyle}>{file.isVideo ? "🎬" : "🖼"}</span>
+                <span style={assetDateStyle}>{file.isVideo ? "Video" : "Image"}</span>
               </div>
             ))}
           </div>
@@ -1588,7 +1595,7 @@ const driveBrowserStyle: React.CSSProperties = {
 const driveBrowserHeaderStyle: React.CSSProperties = {
   display: "flex",
   gap: 8,
-  alignItems: "flex-start",
+  alignItems: "center",
 };
 
 const driveFileListStyle: React.CSSProperties = {
@@ -1611,6 +1618,31 @@ const driveFileItemStyle: React.CSSProperties = {
   cursor: "pointer",
   fontSize: 13,
   color: "#d8e7ff",
+};
+
+const driveFileThumbStyle: React.CSSProperties = {
+  width: 44,
+  height: 44,
+  flex: "0 0 44px",
+  display: "grid",
+  placeItems: "center",
+  overflow: "hidden",
+  borderRadius: 4,
+  background: "rgba(255,255,255,0.08)",
+  border: "1px solid rgba(255,255,255,0.12)",
+};
+
+const driveFileThumbImageStyle: React.CSSProperties = {
+  width: "100%",
+  height: "100%",
+  objectFit: "cover",
+  display: "block",
+};
+
+const driveFileTypeStyle: React.CSSProperties = {
+  fontSize: 10,
+  fontWeight: 700,
+  color: "#9aa3b3",
 };
 
 const driveActionsStyle: React.CSSProperties = {

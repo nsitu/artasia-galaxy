@@ -20,6 +20,7 @@ interface DriveFile {
   modifiedTime?: string;
   parents?: string[];
   webViewLink?: string;
+  thumbnailLink?: string;
 }
 
 interface DriveFolder {
@@ -66,7 +67,7 @@ export class GoogleDriveClient {
       q: `'${parentId}' in parents and trashed = false and ${supportedTypesQuery}`,
       pageSize: 100,
       pageToken,
-      fields: "files(id,name,mimeType,size,modifiedTime,parents,webViewLink)",
+      fields: "files(id,name,mimeType,size,modifiedTime,parents,webViewLink,thumbnailLink)",
       orderBy: "name",
     };
 
@@ -94,7 +95,7 @@ export class GoogleDriveClient {
   async getFile(fileId: string): Promise<DriveFile> {
     const res = await this.drive.files.get({
       fileId,
-      fields: "id,name,mimeType,size,modifiedTime,parents,webViewLink",
+      fields: "id,name,mimeType,size,modifiedTime,parents,webViewLink,thumbnailLink",
       supportsAllDrives: true,
     });
 

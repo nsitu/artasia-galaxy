@@ -91,6 +91,7 @@ interface DriveFileInfo {
   mimeType: string;
   size?: string;
   modifiedTime?: string;
+  thumbnailLink?: string;
   isFolder: boolean;
   isImage: boolean;
   isVideo: boolean;
@@ -138,6 +139,7 @@ router.get("/files", async (req: Request, res: Response) => {
         mimeType: file.mimeType,
         size: file.size ? String(file.size) : undefined,
         modifiedTime: file.modifiedTime,
+        thumbnailLink: file.thumbnailLink,
         isFolder: GoogleDriveClient.isFolder(file.mimeType),
         isImage: GoogleDriveClient.isImage(file.mimeType),
         isVideo: GoogleDriveClient.isVideo(file.mimeType),
