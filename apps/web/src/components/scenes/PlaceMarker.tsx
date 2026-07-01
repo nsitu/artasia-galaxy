@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useMemo } from "react";
 import * as THREE from "three";
 
 interface Props {
@@ -14,56 +14,95 @@ export default function PlaceMarker({
   onPointerEnter,
   onPointerLeave,
 }: Props) {
-  const meshRef = useRef<THREE.Mesh>(null);
-
-  // Create an extruded 3D place marker shape (coin-like with a pin point)
   const geometry = useMemo(() => {
-    // Create a 2D teardrop shape (location pin)
     const shape = new THREE.Shape();
+    const scale = 0.055;
 
-    // Create a teardrop/pin shape
-    const radius = 0.12;
-    const height = 0.25;
+    // Scaled from the provided 24x24 SVG path. The bottom point is kept at
+    // local origin so the marker's pin aligns with the placement coordinate.
+    const p = (x: number, y: number) => new THREE.Vector2((x - 12) * scale, (22 - y) * scale);
+    const start = p(12.0000002, 22);
+    shape.moveTo(start.x, start.y);
+    shape.bezierCurveTo(
+      p(9.3166666, 19.7166668).x,
+      p(9.3166666, 19.7166668).y,
+      p(7.3125001, 17.5958335).x,
+      p(7.3125001, 17.5958335).y,
+      p(5.9875001, 15.6374999).x,
+      p(5.9875001, 15.6374999).y
+    );
+    shape.bezierCurveTo(
+      p(4.6625001, 13.6791663).x,
+      p(4.6625001, 13.6791663).y,
+      p(4, 11.8666662).x,
+      p(4, 11.8666662).y,
+      p(4, 10.1999998).x,
+      p(4, 10.1999998).y
+    );
+    shape.bezierCurveTo(
+      p(4, 7.6999998).x,
+      p(4, 7.6999998).y,
+      p(4.8041668, 5.7083326).x,
+      p(4.8041668, 5.7083326).y,
+      p(6.4125, 4.2249997).x,
+      p(6.4125, 4.2249997).y
+    );
+    shape.bezierCurveTo(
+      p(8.0208336, 2.7416669).x,
+      p(8.0208336, 2.7416669).y,
+      p(9.8833336, 2).x,
+      p(9.8833336, 2).y,
+      p(12.0000002, 2).x,
+      p(12.0000002, 2).y
+    );
+    shape.bezierCurveTo(
+      p(14.1166674, 2).x,
+      p(14.1166674, 2).y,
+      p(15.9791674, 2.7416672).x,
+      p(15.9791674, 2.7416672).y,
+      p(17.5875003, 4.2250001).x,
+      p(17.5875003, 4.2250001).y
+    );
+    shape.bezierCurveTo(
+      p(19.1958333, 5.7083328).x,
+      p(19.1958333, 5.7083328).y,
+      p(20.0000003, 7.6999997).x,
+      p(20.0000003, 7.6999997).y,
+      p(20.0000003, 10.1999998).x,
+      p(20.0000003, 10.1999998).y
+    );
+    shape.bezierCurveTo(
+      p(20.0000003, 11.8666662).x,
+      p(20.0000003, 11.8666662).y,
+      p(19.3375003, 13.6791664).x,
+      p(19.3375003, 13.6791664).y,
+      p(18.0125003, 15.6374999).x,
+      p(18.0125003, 15.6374999).y
+    );
+    shape.bezierCurveTo(
+      p(16.6875003, 17.5958334).x,
+      p(16.6875003, 17.5958334).y,
+      p(14.6833332, 19.7166669).x,
+      p(14.6833332, 19.7166669).y,
+      start.x,
+      start.y
+    );
 
-    // Start at the pointed tip
-    shape.moveTo(0, -height);
-
-    // Right side of the bulbous top (using quadratic bezier)
-    shape.quadraticCurveTo(radius * 1.2, -height * 0.4, radius * 1.1, height * 0.3);
-
-    // Top right rounded corner
-    shape.quadraticCurveTo(radius * 1.15, radius * 1.1, 0, radius * 1.2);
-
-    // Top left rounded corner
-    shape.quadraticCurveTo(-radius * 1.15, radius * 1.1, -radius * 1.1, height * 0.3);
-
-    // Left side of the bulbous top
-    shape.quadraticCurveTo(-radius * 1.2, -height * 0.4, 0, -height);
-
-    // Extrude the shape to create thickness (coin-like)
-    const extrudeSettings = {
-      depth: 0.08,
+    const markerGeometry = new THREE.ExtrudeGeometry(shape, {
+      depth: 0.04,
       bevelEnabled: true,
-      bevelThickness: 0.01,
-      bevelSize: 0.01,
-      bevelSegments: 3,
-    };
-
-    const extruded = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-
-    // Center the geometry
-    extruded.center();
-
-    // Rotate to point downward (align pin to terrain)
-    extruded.rotateX(Math.PI / 2);
-
-    return extruded;
+      bevelThickness: 0.006,
+      bevelSize: 0.006,
+      bevelSegments: 2,
+    });
+    markerGeometry.translate(0, 0, 0.012);
+    return markerGeometry;
   }, []);
+  const [x, y, z] = position;
 
   return (
-    <group position={position}>
+    <group position={[x, y, z + 0.03]}>
       <mesh
-        ref={meshRef}
         geometry={geometry}
         onClick={onClick
           ? (event) => {
@@ -85,10 +124,13 @@ export default function PlaceMarker({
           : undefined}
       >
         <meshStandardMaterial
-          color="#ff2d2d"
-          emissive="#7a0808"
-          roughness={0.4}
-          metalness={0.15}
+          color="#1f1f1f"
+          emissive="#050505"
+          roughness={0.55}
+          metalness={0.05}
+          polygonOffset
+          polygonOffsetFactor={-2}
+          polygonOffsetUnits={-2}
         />
       </mesh>
     </group>
