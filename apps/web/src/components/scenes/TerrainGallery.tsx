@@ -5,6 +5,7 @@ import { fetchMapPlacements, type MapPlacement } from "../../api/client";
 import { useGalleryStore } from "../../stores/galleryStore";
 import LoadingIndicator from "../ui/LoadingIndicator";
 import TerrainPhotoPin from "./TerrainPhotoPin";
+import PlaceMarker from "./PlaceMarker";
 import {
   createTerrainPhotoLayout,
   createTerrainDetailRequest,
@@ -509,7 +510,7 @@ export default function TerrainGallery({ onOverlayChange }: { onOverlayChange: (
       ))}
 
       {sceneReadyForMarkers && placementLayout.map(({ placement, position }) => (
-        <TerrainPlaceMarker
+        <PlaceMarker
           key={placement.placement_id}
           position={position}
           onClick={focusedPlacement ? undefined : () => focusPlacement(placement)}
@@ -645,42 +646,6 @@ function SiteDetail({ label, value }: { label: string; value: string }) {
       <div style={siteDetailLabelStyle}>{label}</div>
       <div style={siteDetailValueStyle}>{value}</div>
     </div>
-  );
-}
-
-function TerrainPlaceMarker({
-  position,
-  onClick,
-}: {
-  position: [number, number, number];
-  onClick?: () => void;
-}) {
-  const [x, y, z] = position;
-
-  return (
-    <group position={[x, y, z + 0.08]}>
-      <mesh
-        onClick={onClick
-          ? (event) => {
-              event.stopPropagation();
-              onClick();
-            }
-          : undefined}
-        onPointerOver={onClick
-          ? () => {
-              document.body.style.cursor = "pointer";
-            }
-          : undefined}
-        onPointerOut={onClick
-          ? () => {
-              document.body.style.cursor = "";
-            }
-          : undefined}
-      >
-        <sphereGeometry args={[0.12, 18, 12]} />
-        <meshStandardMaterial color="#ff2d2d" emissive="#7a0808" roughness={0.5} />
-      </mesh>
-    </group>
   );
 }
 
