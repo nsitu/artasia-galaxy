@@ -135,6 +135,7 @@ export default function TerrainGallery() {
   }, [projection, terrain, visiblePlacements]);
 
   function focusPlacement(placement: MapPlacement) {
+    document.body.style.cursor = "";
     setFocusedPlacement(placement);
     setDetailFocus(null);
     setDetailTerrain((previous) => {
@@ -154,6 +155,7 @@ export default function TerrainGallery() {
   }
 
   function returnToRegional() {
+    document.body.style.cursor = "";
     setFocusedPlacement(null);
     setDetailFocus(null);
     setDetailTerrain((previous) => {
@@ -303,6 +305,7 @@ export default function TerrainGallery() {
 
   useEffect(() => {
     return () => {
+      document.body.style.cursor = "";
       if (terrain) disposeObject(terrain);
     };
   }, [terrain]);
@@ -478,10 +481,8 @@ function FocusedPlacementOverlay({ placement }: { placement: MapPlacement }) {
   const people = [placement.team_member, placement.secondary_team_member].filter(
     (person): person is NonNullable<MapPlacement["team_member"]> => Boolean(person?.name)
   );
-  const participantDetails = [
-    placement.participant_age ? `Ages ${placement.participant_age}` : "",
-    placement.participant_count ? `${placement.participant_count} children` : "",
-  ].filter(Boolean);
+  const participantDetails = formatParticipantDetails(placement);
+  const peopleLabel = people.length > 1 ? "Artist Educators" : "Artist Educator";
 
   return (
     <section style={siteDetailsStyle} aria-label="Placement details">
@@ -501,11 +502,23 @@ function FocusedPlacementOverlay({ placement }: { placement: MapPlacement }) {
 
       <div style={siteDetailsGridStyle}>
         <SiteDetail label="Site" value={placement.place_name || placement.address || "Not specified"} />
-        <SiteDetail label="People" value={people.map((person) => person.name).join(", ") || "Unassigned"} />
-        <SiteDetail label="Children" value={participantDetails.join(" | ") || "Not specified"} />
+        <SiteDetail label={peopleLabel} value={people.map((person) => person.name).join(", ") || "Unassigned"} />
+        <SiteDetail label="Children" value={participantDetails || "Not specified"} />
       </div>
     </section>
   );
+}
+
+function formatParticipantDetails(placement: MapPlacement) {
+  const details: string[] = [];
+  if (placement.participant_count != null) details.push(String(placement.participant_count));
+
+  const ageRange = placement.participant_age?.trim();
+  if (ageRange) {
+    details.push(/\d/.test(ageRange) ? `age ${ageRange}` : ageRange);
+  }
+
+  return details.join(", ");
 }
 
 function SiteDetail({ label, value }: { label: string; value: string }) {
