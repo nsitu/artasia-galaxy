@@ -16,41 +16,48 @@ export default function PlaceMarker({
 }: Props) {
   const meshRef = useRef<THREE.Mesh>(null);
 
-  // Create the lathe geometry using useMemo to avoid recreating on every render
+  // Create an extruded 3D place marker shape (coin-like with a pin point)
   const geometry = useMemo(() => {
-    // Define the 2D profile of the pin (to be revolved around Y axis)
-    // This creates a teardrop/pin shape similar to the place.svg marker
-    const points: THREE.Vector2[] = [];
+    // Create a 2D teardrop shape (location pin)
+    const shape = new THREE.Shape();
+
+    // Create a teardrop/pin shape
     const radius = 0.12;
-    const height = 0.35;
+    const height = 0.25;
 
-    // Bulbous top (circular)
-    for (let i = 0; i <= 8; i++) {
-      const angle = (i / 8) * Math.PI;
-      const x = Math.sin(angle) * radius * 1.1;
-      const y = Math.cos(angle) * radius + height * 0.6;
-      points.push(new THREE.Vector2(x, y));
-    }
+    // Start at the pointed tip
+    shape.moveTo(0, -height);
 
-    // Tapered middle
-    for (let i = 1; i <= 4; i++) {
-      const t = i / 4;
-      const x = radius * (1.1 - t * 1.05);
-      const y = height * 0.6 - t * height * 0.25;
-      points.push(new THREE.Vector2(x, y));
-    }
+    // Right side of the bulbous top (using quadratic bezier)
+    shape.quadraticCurveTo(radius * 1.2, -height * 0.4, radius * 1.1, height * 0.3);
 
-    // Sharp point at bottom
-    points.push(new THREE.Vector2(0, 0));
+    // Top right rounded corner
+    shape.quadraticCurveTo(radius * 1.15, radius * 1.1, 0, radius * 1.2);
 
-    // Create lathe geometry by revolving the profile around the Y axis
-    const lathe = new THREE.LatheGeometry(points, 32);
+    // Top left rounded corner
+    shape.quadraticCurveTo(-radius * 1.15, radius * 1.1, -radius * 1.1, height * 0.3);
 
-    // Center and rotate the geometry
-    lathe.center();
-    lathe.rotateZ(Math.PI / 2);
+    // Left side of the bulbous top
+    shape.quadraticCurveTo(-radius * 1.2, -height * 0.4, 0, -height);
 
-    return lathe;
+    // Extrude the shape to create thickness (coin-like)
+    const extrudeSettings = {
+      depth: 0.08,
+      bevelEnabled: true,
+      bevelThickness: 0.01,
+      bevelSize: 0.01,
+      bevelSegments: 3,
+    };
+
+    const extruded = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+
+    // Center the geometry
+    extruded.center();
+
+    // Rotate to point downward (align pin to terrain)
+    extruded.rotateX(Math.PI / 2);
+
+    return extruded;
   }, []);
 
   return (
@@ -80,8 +87,8 @@ export default function PlaceMarker({
         <meshStandardMaterial
           color="#ff2d2d"
           emissive="#7a0808"
-          roughness={0.5}
-          metalness={0.1}
+          roughness={0.4}
+          metalness={0.15}
         />
       </mesh>
     </group>
