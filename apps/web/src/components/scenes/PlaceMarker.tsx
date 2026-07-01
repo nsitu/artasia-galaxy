@@ -95,6 +95,7 @@ export default function PlaceMarker({
       bevelSize: 0.006,
       bevelSegments: 2,
     });
+    markerGeometry.rotateX(Math.PI / 2);
     markerGeometry.translate(0, 0, 0.012);
     return markerGeometry;
   }, []);
@@ -128,6 +129,8 @@ export default function PlaceMarker({
           emissive="#050505"
           roughness={0.55}
           metalness={0.05}
+          transparent
+          opacity={0.75}
           polygonOffset
           polygonOffsetFactor={-2}
           polygonOffsetUnits={-2}
