@@ -112,6 +112,15 @@ function mapWpUploader(uploader: WpPerson): UploadUploader {
   };
 }
 
+type PartnerLogo = NonNullable<NonNullable<WpArtasiaPlacement["partner"]>["logo"]>;
+
+function mapPartnerLogo(logo: PartnerLogo) {
+  return {
+    ...logo,
+    url: `/api/v1/assets/external-logo?url=${encodeURIComponent(logo.url)}`,
+  };
+}
+
 function mapWpPlacement(wp: WpArtasiaPlacement): ArtasiaPlacement {
   const lat = wp.place?.lat;
   const lng = wp.place?.lng;
@@ -173,7 +182,7 @@ export async function getMapPlacements(): Promise<ArtasiaMapPlacement[]> {
       placement_id: wp.placement_id,
       placement_name: wp.placement_name,
       ...(wp.partner?.name ? { partner_name: wp.partner.name } : {}),
-      ...(wp.partner?.logo ? { partner_logo: wp.partner.logo } : {}),
+      ...(wp.partner?.logo ? { partner_logo: mapPartnerLogo(wp.partner.logo) } : {}),
       ...(wp.team_member ? { team_member: mapWpUploader(wp.team_member) } : {}),
       ...(wp.secondary_team_member ? { secondary_team_member: mapWpUploader(wp.secondary_team_member) } : {}),
       ...(wp.participant_count ? { participant_count: wp.participant_count } : {}),
