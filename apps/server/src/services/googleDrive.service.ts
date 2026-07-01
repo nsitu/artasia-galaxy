@@ -78,6 +78,7 @@ export class GoogleDriveClient {
       listParams.corpora = "drive";
       listParams.driveId = driveId;
       listParams.includeItemsFromAllDrives = true;
+      listParams.supportsAllDrives = true;
     } else {
       listParams.spaces = "drive";
     }
@@ -97,6 +98,7 @@ export class GoogleDriveClient {
     const res = await this.drive.files.get({
       fileId,
       fields: "id,name,mimeType,size,modifiedTime,parents,webViewLink",
+      supportsAllDrives: true,
     });
 
     if (!res.data.id) {
@@ -126,6 +128,7 @@ export class GoogleDriveClient {
       listParams.corpora = "drive";
       listParams.driveId = driveId;
       listParams.includeItemsFromAllDrives = true;
+      listParams.supportsAllDrives = true;
     } else {
       listParams.spaces = "drive";
     }
@@ -175,7 +178,7 @@ export class GoogleDriveClient {
    */
   async downloadFile(fileId: string): Promise<NodeJS.ReadableStream> {
     const res = await this.drive.files.get(
-      { fileId, alt: "media" },
+      { fileId, alt: "media", supportsAllDrives: true },
       { responseType: "stream" }
     );
     return res.data as NodeJS.ReadableStream;
