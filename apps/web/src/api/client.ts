@@ -160,6 +160,7 @@ export interface PlacementAsset {
   updatedAt: string;
   archived?: boolean;
   trashed?: boolean;
+  published?: boolean;
   placement_id?: number | null;
   placement_name?: string | null;
   activity_id?: number | null;
@@ -253,6 +254,21 @@ export async function assignAssetActivityTag(params: {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ activity_id: params.activityId }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+}
+
+export async function setAssetPublished(params: {
+  assetId: string;
+  published: boolean;
+}): Promise<void> {
+  const res = await fetch(`/api/v1/uploads/assets/${params.assetId}/published`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ published: params.published }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));

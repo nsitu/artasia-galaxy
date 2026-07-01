@@ -11,6 +11,7 @@ import {
   fetchUploadOptions,
   fetchUntaggedPlacementAssets,
   logoutAuthUser,
+  setAssetPublished,
   syncDriveFiles,
   uploadFiles,
   type AuthUser,
@@ -47,6 +48,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
   const [managePlacementKey, setManagePlacementKey] = useState("");
   const [manageUploaderKey, setManageUploaderKey] = useState("");
   const [manageActivityTag, setManageActivityTag] = useState("");
+  const [managePublished, setManagePublished] = useState(false);
   const [savingAsset, setSavingAsset] = useState(false);
   const [assetsLoading, setAssetsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -441,6 +443,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
     setManagePlacementKey(asset.placement_id ? String(asset.placement_id) : "");
     setManageUploaderKey(asset.uploader_id ? String(asset.uploader_id) : "");
     setManageActivityTag(asset.activity_id ? String(asset.activity_id) : "");
+    setManagePublished(Boolean(asset.published));
     setError(null);
   }
 
@@ -449,6 +452,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
     setManagePlacementKey("");
     setManageUploaderKey("");
     setManageActivityTag("");
+    setManagePublished(false);
   }
 
   async function saveSelectedAssetChanges() {
@@ -460,9 +464,10 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
     const uploaderChanged = Boolean(manageUploaderKey)
       && manageUploaderKey !== (selectedAsset.uploader_id ? String(selectedAsset.uploader_id) : "");
     const activityTagChanged = manageActivityTag !== (selectedAsset.activity_id ? String(selectedAsset.activity_id) : "");
+    const publishedChanged = managePublished !== Boolean(selectedAsset.published);
 
-    if (!placementChanged && !uploaderChanged && !activityTagChanged) {
-      setError("Choose a placement, team member album, or program week to save.");
+    if (!placementChanged && !uploaderChanged && !activityTagChanged && !publishedChanged) {
+      setError("Choose a placement, team member album, program week, or publication status to save.");
       return;
     }
     if (placementChanged && (!placementId || !Number.isFinite(placementId))) {
@@ -492,6 +497,12 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
         await assignAssetActivityTag({
           assetId: selectedAsset.id,
           activityId: manageActivityTag ? parseInt(manageActivityTag, 10) : null,
+        });
+      }
+      if (publishedChanged) {
+        await setAssetPublished({
+          assetId: selectedAsset.id,
+          published: managePublished,
         });
       }
       closeAssetManager();
@@ -771,7 +782,8 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
     const uploaderChanged = Boolean(manageUploaderKey)
       && manageUploaderKey !== (selectedAsset.uploader_id ? String(selectedAsset.uploader_id) : "");
     const activityChanged = manageActivityTag !== (selectedAsset.activity_id ? String(selectedAsset.activity_id) : "");
-    const canSaveAsset = placementChanged || uploaderChanged || activityChanged;
+    const publishedChanged = managePublished !== Boolean(selectedAsset.published);
+    const canSaveAsset = placementChanged || uploaderChanged || activityChanged || publishedChanged;
 
     return (
       <div style={managePanelStyle}>
@@ -844,6 +856,15 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
                 </option>
               ))}
             </select>
+          </label>
+          <label style={checkboxLabelStyle}>
+            <input
+              type="checkbox"
+              checked={managePublished}
+              disabled={!authUser?.authenticated}
+              onChange={(e) => setManagePublished(e.target.checked)}
+            />
+            Published
           </label>
           <div style={manageActionsStyle}>
             <button
@@ -1449,6 +1470,14 @@ const labelStyle: React.CSSProperties = {
   fontSize: 13,
   color: "#aaa",
   minWidth: 0,
+};
+
+const checkboxLabelStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  color: "#d8e7ff",
+  fontSize: 13,
 };
 
 const compactLabelStyle: React.CSSProperties = {

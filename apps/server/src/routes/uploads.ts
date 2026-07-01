@@ -6,6 +6,7 @@ import {
   addAssetsToAlbum,
   ensureAlbum,
   getAsset,
+  getPublishedAlbum,
   getServerStatistics,
   listAlbums,
   listTags,
@@ -199,6 +200,7 @@ interface AssetManagementAssignment {
   placementName?: string;
   activityId?: number;
   activityLabel?: string;
+  published?: boolean;
 }
 
 function mapAdminAsset(
@@ -214,6 +216,7 @@ function mapAdminAsset(
     updatedAt: asset.updatedAt,
     archived: asset.isArchived,
     trashed: Boolean(asset.isTrashed),
+    published: assignment?.published ?? false,
     placement_id: assignment?.placementId ?? null,
     placement_name: assignment?.placementName ?? null,
     activity_id: assignment?.activityId ?? null,
@@ -368,14 +371,20 @@ async function getManagementAssignments(assetIds: string[]) {
 
 async function mapAssetsWithUploaderAlbums(assets: Awaited<ReturnType<typeof getAssetsForPlacementTagIds>>) {
   const uploaderAlbums = await getUploaderAlbums();
-  const [albumAssignments, managementAssignments] = await Promise.all([
+  const publishedAlbum = await getPublishedAlbum();
+  const [albumAssignments, managementAssignments, publishedAssets] = await Promise.all([
     getUploaderAlbumAssignments(uploaderAlbums),
     getManagementAssignments(assets.map((asset) => asset.id)),
+    searchAssetsByAlbumId(publishedAlbum.id),
   ]);
+  const publishedAssetIds = new Set(publishedAssets.map((asset) => asset.id));
   return assets.map((asset) => mapAdminAsset(
     asset,
     albumAssignments.get(asset.id),
-    managementAssignments.get(asset.id)
+    {
+      ...(managementAssignments.get(asset.id) ?? {}),
+      published: publishedAssetIds.has(asset.id),
+    }
   ));
 }
 
@@ -622,6 +631,41 @@ router.post("/assets/:assetId/activity-tag", async (req, res) => {
     }
 
     res.json({ ok: true, asset_id: assetId, activity_id: activityId });
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
+});
+
+router.post("/assets/:assetId/published", async (req, res) => {
+  try {
+    const auth = await getAuthContext(req);
+    if (!auth.authenticated) {
+      res.status(401).json({ error: "Sign in to publish uploads." });
+      return;
+    }
+
+    const assetId = req.params.assetId.trim();
+    if (!assetId) {
+      res.status(400).json({ error: "Asset ID is required." });
+      return;
+    }
+
+    const published = Boolean(req.body?.published);
+    await getAsset(assetId);
+
+    const album = await getPublishedAlbum();
+    if (published) {
+      await addAssetsToAlbum(album.id, [assetId]);
+    } else {
+      await removeAssetsFromAlbum(album.id, [assetId]);
+    }
+
+    res.json({
+      ok: true,
+      asset_id: assetId,
+      published,
+      published_album_id: album.id,
+    });
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });
   }
