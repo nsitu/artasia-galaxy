@@ -73,6 +73,17 @@ export function createTerrainRequest(points: TerrainCoordinate[]): TerrainReques
   };
 }
 
+export function createFixedTerrainRequest(origin: [number, number], radiusKm: number): TerrainRequest {
+  const zoom = chooseTerrainZoom(origin, radiusKm, radiusKm);
+  return {
+    origin,
+    radiusKm,
+    zoom,
+    unitsSide: TERRAIN_UNITS_SIDE,
+    estimatedSatelliteTiles: estimateSatelliteTileCount(origin, radiusKm, zoom),
+  };
+}
+
 export function createTerrainPhotoLayout(
   geoPhotos: GeoPhoto[],
   project: (latlng: [number, number]) => [number, number] | [number, number, number]

@@ -38,6 +38,12 @@ export async function fetchSlideshow(params: {
   albumIds?: string[];
   seed?: number;
   limit?: number;
+  placementFocus?: {
+    placementId: number;
+    lat: number;
+    lng: number;
+    radiusKm: number;
+  };
 }): Promise<{ photos: Photo[]; total: number }> {
   const res = await fetch("/api/v1/slideshow/query", {
     method: "POST",
@@ -47,6 +53,7 @@ export async function fetchSlideshow(params: {
       shuffle: true,
       seed: params.seed ?? Date.now(),
       limit: params.limit ?? 100,
+      placementFocus: params.placementFocus,
     }),
   });
 

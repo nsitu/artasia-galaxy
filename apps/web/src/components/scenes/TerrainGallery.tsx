@@ -8,6 +8,7 @@ import TerrainPhotoPin from "./TerrainPhotoPin";
 import {
   createTerrainPhotoLayout,
   createTerrainDetailRequest,
+  createFixedTerrainRequest,
   createTerrainRequest,
   getGeoPhotos,
   type TerrainDetailRequest,
@@ -25,8 +26,11 @@ type DetailFocus = { x: number; y: number; distance: number };
 export default function TerrainGallery() {
   const { camera } = useThree();
   const photos = useGalleryStore((s) => s.photos);
+  const selectedAlbumId = useGalleryStore((s) => s.selectedAlbumId);
   const selectedIndex = useGalleryStore((s) => s.selectedPhotoIndex);
   const selectPhoto = useGalleryStore((s) => s.selectPhoto);
+  const fetchPhotos = useGalleryStore((s) => s.fetchPhotos);
+  const fetchPlacementFocus = useGalleryStore((s) => s.fetchPlacementFocus);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [terrain, setTerrain] = useState<THREE.Group | null>(null);
   const [projection, setProjection] = useState<ThreeGeoProjection | null>(null);
@@ -39,16 +43,35 @@ export default function TerrainGallery() {
   const [detailTerrain, setDetailTerrain] = useState<THREE.Group | null>(null);
   const [detailPhase, setDetailPhase] = useState<TerrainPhase>("idle");
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [focusedPlacement, setFocusedPlacement] = useState<MapPlacement | null>(null);
 
-  const geoPhotos = useMemo(() => getGeoPhotos(photos), [photos]);
+  const geoPhotos = useMemo(() => {
+    if (!focusedPlacement) return getGeoPhotos(photos);
+    return photos.flatMap((photo, index) => {
+      const lat = photo.exifInfo?.latitude;
+      const lng = photo.exifInfo?.longitude;
+      return [{
+        photo,
+        index,
+        lat: Number.isFinite(lat) ? lat as number : focusedPlacement.lat,
+        lng: Number.isFinite(lng) ? lng as number : focusedPlacement.lng,
+      }];
+    });
+  }, [focusedPlacement, photos]);
   const geoPlacements = useMemo(
     () =>
-      placements
+      (focusedPlacement ? [focusedPlacement] : placements)
         .filter((placement) => Number.isFinite(placement.lat) && Number.isFinite(placement.lng))
         .map((placement) => ({ lat: placement.lat, lng: placement.lng })),
-    [placements]
+    [focusedPlacement, placements]
   );
-  const request = useMemo(() => createTerrainRequest([...geoPhotos, ...geoPlacements]), [geoPhotos, geoPlacements]);
+  const visiblePlacements = useMemo(() => focusedPlacement ? [focusedPlacement] : placements, [focusedPlacement, placements]);
+  const request = useMemo(() => {
+    if (focusedPlacement) {
+      return createFixedTerrainRequest([focusedPlacement.lat, focusedPlacement.lng], 10);
+    }
+    return createTerrainRequest([...geoPhotos, ...geoPlacements]);
+  }, [focusedPlacement, geoPhotos, geoPlacements]);
   const detailRequest = useMemo(() => {
     if (!request || !projection || !detailFocus || detailFocus.distance > DETAIL_TRIGGER_DISTANCE) return null;
 
@@ -84,7 +107,7 @@ export default function TerrainGallery() {
   }, [geoPhotos, projection, terrain]);
   const placementLayout = useMemo(() => {
     if (!projection) return [];
-    return placements.flatMap((placement) => {
+    return visiblePlacements.flatMap((placement) => {
       if (!Number.isFinite(placement.lat) || !Number.isFinite(placement.lng)) return [];
       const [x, y, z = 0] = projection.proj([placement.lat, placement.lng]);
       return [{
@@ -96,7 +119,38 @@ export default function TerrainGallery() {
         ] as [number, number, number],
       }];
     });
-  }, [placements, projection, terrain]);
+  }, [projection, terrain, visiblePlacements]);
+
+  function focusPlacement(placement: MapPlacement) {
+    setFocusedPlacement(placement);
+    setDetailFocus(null);
+    setDetailTerrain((previous) => {
+      if (previous) disposeObject(previous);
+      return null;
+    });
+    setDetailPhase("idle");
+    setDetailError(null);
+    selectPhoto(null);
+    void fetchPlacementFocus({
+      placementId: placement.placement_id,
+      lat: placement.lat,
+      lng: placement.lng,
+      radiusKm: 10,
+    });
+  }
+
+  function returnToRegional() {
+    setFocusedPlacement(null);
+    setDetailFocus(null);
+    setDetailTerrain((previous) => {
+      if (previous) disposeObject(previous);
+      return null;
+    });
+    setDetailPhase("idle");
+    setDetailError(null);
+    selectPhoto(null);
+    void fetchPhotos(selectedAlbumId ?? undefined);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -345,6 +399,13 @@ export default function TerrainGallery() {
           </div>
         </Html>
       )}
+      {focusedPlacement && (
+        <Html fullscreen style={focusOverlayRootStyle}>
+          <button type="button" onClick={returnToRegional} style={backButtonStyle}>
+            Back to regional view
+          </button>
+        </Html>
+      )}
 
       {terrain && <primitive object={terrain} />}
       {detailTerrain && <primitive object={detailTerrain} />}
@@ -369,6 +430,7 @@ export default function TerrainGallery() {
         <TerrainPlaceMarker
           key={placement.placement_id}
           position={position}
+          onClick={() => focusPlacement(placement)}
         />
       ))}
 
@@ -381,18 +443,31 @@ export default function TerrainGallery() {
   );
 }
 
-function TerrainPlaceMarker({ position }: { position: [number, number, number] }) {
+function TerrainPlaceMarker({
+  position,
+  onClick,
+}: {
+  position: [number, number, number];
+  onClick: () => void;
+}) {
   const [x, y, z] = position;
 
   return (
     <group position={[x, y, z + 0.08]}>
-      <mesh>
+      <mesh
+        onClick={(event) => {
+          event.stopPropagation();
+          onClick();
+        }}
+        onPointerOver={() => {
+          document.body.style.cursor = "pointer";
+        }}
+        onPointerOut={() => {
+          document.body.style.cursor = "";
+        }}
+      >
         <sphereGeometry args={[0.12, 18, 12]} />
         <meshStandardMaterial color="#ff2d2d" emissive="#7a0808" roughness={0.5} />
-      </mesh>
-      <mesh position={[0, 0, -0.08]} rotation={[Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.14, 0.22, 28]} />
-        <meshBasicMaterial color="#ff2d2d" transparent opacity={0.42} side={THREE.DoubleSide} />
       </mesh>
     </group>
   );
@@ -411,6 +486,25 @@ const messageStyle: React.CSSProperties = {
 
 const overlayRootStyle: React.CSSProperties = {
   pointerEvents: "none",
+};
+
+const focusOverlayRootStyle: React.CSSProperties = {
+  pointerEvents: "none",
+};
+
+const backButtonStyle: React.CSSProperties = {
+  position: "absolute",
+  top: 56,
+  left: 16,
+  pointerEvents: "auto",
+  background: "rgba(255,255,255,0.08)",
+  color: "#ddd",
+  border: "1px solid rgba(255,255,255,0.18)",
+  borderRadius: 4,
+  padding: "7px 12px",
+  cursor: "pointer",
+  fontFamily: "monospace",
+  fontSize: 12,
 };
 
 const tileStatusStyle: React.CSSProperties = {

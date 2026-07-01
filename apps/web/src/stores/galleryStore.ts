@@ -11,6 +11,12 @@ interface GalleryState {
   error: string | null;
 
   fetchPhotos: (albumId?: string) => Promise<void>;
+  fetchPlacementFocus: (params: {
+    placementId: number;
+    lat: number;
+    lng: number;
+    radiusKm: number;
+  }) => Promise<void>;
   fetchAlbumList: () => Promise<void>;
   selectPhoto: (index: number | null) => void;
   nextPhoto: () => void;
@@ -31,6 +37,19 @@ export const useGalleryStore = create<GalleryState>((set, get) => ({
     try {
       const albumIds = albumId ? [albumId] : undefined;
       const result = await fetchSlideshow({ albumIds });
+      set({ photos: result.photos, loading: false });
+    } catch (err) {
+      set({ error: (err as Error).message, loading: false });
+    }
+  },
+
+  fetchPlacementFocus: async (params) => {
+    set({ loading: true, error: null, selectedPhotoIndex: null });
+    try {
+      const result = await fetchSlideshow({
+        placementFocus: params,
+        limit: 500,
+      });
       set({ photos: result.photos, loading: false });
     } catch (err) {
       set({ error: (err as Error).message, loading: false });
