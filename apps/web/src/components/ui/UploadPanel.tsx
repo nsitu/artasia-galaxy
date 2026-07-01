@@ -42,6 +42,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
   const [items, setItems] = useState<UploadItem[]>([]);
   const [placementAssets, setPlacementAssets] = useState<PlacementAsset[]>([]);
   const [assetMode, setAssetMode] = useState<"placements" | "untagged" | "all">("placements");
+  const [workspaceMode, setWorkspaceMode] = useState<"browse" | "upload">("browse");
   const [selectedAsset, setSelectedAsset] = useState<PlacementAsset | null>(null);
   const [managePlacementKey, setManagePlacementKey] = useState("");
   const [manageUploaderKey, setManageUploaderKey] = useState("");
@@ -419,8 +420,8 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
 
   function assetGalleryTitle() {
     if (assetMode === "untagged") return "Uploads Needing Placement";
-    if (assetMode === "all") return selectedPlacement ? "Existing Uploads" : "All Uploads";
-    return selectedPlacement ? "Existing Uploads" : "Tagged Uploads for Visible Placements";
+    if (assetMode === "all") return selectedPlacement ? "Uploads" : "All Uploads";
+    return selectedPlacement ? "Uploads" : "Tagged Uploads for Visible Placements";
   }
 
   function openAssetManager(asset: PlacementAsset) {
@@ -894,10 +895,40 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
 
         {error && <div style={errorStyle}>{error}</div>}
 
+        <div style={workspaceTabsStyle}>
+          <button
+            type="button"
+            onClick={() => {
+              setWorkspaceMode("browse");
+              setSelectedAsset(null);
+            }}
+            style={{
+              ...workspaceTabStyle,
+              ...(workspaceMode === "browse" ? workspaceTabActiveStyle : {}),
+            }}
+          >
+            Browse
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setWorkspaceMode("upload");
+              setSelectedAsset(null);
+              setAssetMode("placements");
+            }}
+            style={{
+              ...workspaceTabStyle,
+              ...(workspaceMode === "upload" ? workspaceTabActiveStyle : {}),
+            }}
+          >
+            Upload
+          </button>
+        </div>
+
         <div style={adminLayoutStyle}>
           <aside style={placementMenuStyle}>
             <label style={labelStyle}>
-              Team Member
+              {workspaceMode === "upload" ? "Asset Owner" : "Team Member"}
               <select
                 value={uploaderKey}
                 onChange={(e) => {
@@ -909,7 +940,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
                 }}
                 style={inputStyle}
               >
-                <option value="">All Team Members</option>
+                <option value="">{workspaceMode === "upload" ? "Select a team member" : "All Team Members"}</option>
                 {(options?.uploaders ?? []).map((uploader) => (
                   <option key={uploader.id} value={String(uploader.id)}>
                     {uploader.name}
@@ -919,7 +950,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
             </label>
 
             <label style={labelStyle}>
-              Program Week / Activity
+              {workspaceMode === "upload" ? "Program Week / Activity Tag" : "Program Week / Activity"}
               <select
                 value={activityTagFilter}
                 onChange={(e) => {
@@ -928,7 +959,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
                 }}
                 style={inputStyle}
               >
-                <option value="">All Activities</option>
+                <option value="">{workspaceMode === "upload" ? "No activity tag" : "All Activities"}</option>
                 {(options?.activities ?? []).map((activity) => (
                   <option key={activity.id} value={String(activity.id)}>
                     {activity.label}
@@ -937,26 +968,28 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
               </select>
             </label>
 
-            <label style={labelStyle}>
-              Assets
-              <select
-                value={assetMode}
-                onChange={(e) => {
-                  setAssetMode(e.target.value as "placements" | "untagged" | "all");
-                  setPlacementKey("");
-                  setSelectedAsset(null);
-                  setItems([]);
-                }}
-                style={inputStyle}
-              >
-                <option value="placements">Tagged assets</option>
-                <option value="untagged">Untagged assets</option>
-                <option value="all">All assets</option>
-              </select>
-            </label>
+            {workspaceMode === "browse" && (
+              <label style={labelStyle}>
+                Assets
+                <select
+                  value={assetMode}
+                  onChange={(e) => {
+                    setAssetMode(e.target.value as "placements" | "untagged" | "all");
+                    setPlacementKey("");
+                    setSelectedAsset(null);
+                    setItems([]);
+                  }}
+                  style={inputStyle}
+                >
+                  <option value="placements">Tagged assets</option>
+                  <option value="untagged">Untagged assets</option>
+                  <option value="all">All assets</option>
+                </select>
+              </label>
+            )}
 
             <div style={menuHeaderStyle}>
-              <span>Artasia Sites</span>
+              <span>{workspaceMode === "upload" ? "Destination Site" : "Artasia Sites"}</span>
               <span>{filteredPlacements.length}</span>
             </div>
 
@@ -983,7 +1016,140 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
           </aside>
 
           <section style={detailStyle}>
-            {selectedPlacement ? (
+            {workspaceMode === "upload" ? (
+              selectedPlacement ? (
+                <>
+                  <div style={detailHeaderStyle}>
+                    <div>
+                      <h2 style={detailTitleStyle}>Upload to {placementLabel(selectedPlacement)}</h2>
+                      <div style={detailMetaStyle}>
+                        Owner: {selectedUploader?.name ?? "Select a team member"}
+                        {activityTagFilter
+                          ? ` | Activity: ${options?.activities.find((activity) => String(activity.id) === activityTagFilter)?.label ?? "Selected activity"}`
+                          : " | No activity tag"}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={uploadModeTabsStyle}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUploadMode("files");
+                        setSelectedDriveFiles(new Set());
+                      }}
+                      style={{
+                        ...uploadModeTabStyle,
+                        ...(uploadMode === "files" ? uploadModeTabActiveStyle : {}),
+                      }}
+                    >
+                      Upload Files
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUploadMode("drive");
+                        resetDriveFolderPath();
+                      }}
+                      disabled={!authUser?.authenticated}
+                      style={{
+                        ...uploadModeTabStyle,
+                        ...(uploadMode === "drive" ? uploadModeTabActiveStyle : {}),
+                        opacity: authUser?.authenticated ? 1 : 0.5,
+                        cursor: authUser?.authenticated ? "pointer" : "not-allowed",
+                      }}
+                    >
+                      Import from Drive
+                    </button>
+                  </div>
+
+                  {uploadMode === "files" ? (
+                    <>
+                      <div
+                        style={dropzoneStyle}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          addFiles(e.dataTransfer.files);
+                        }}
+                        onClick={() => {
+                          if (!selectedUploader) {
+                            setError("Select an Artasia Team Member before adding files.");
+                            return;
+                          }
+                          inputRef.current?.click();
+                        }}
+                      >
+                        Drop images or videos here
+                        <span style={{ color: "#777", marginTop: 6 }}>or click to choose files</span>
+                        <input
+                          ref={inputRef}
+                          type="file"
+                          multiple
+                          accept="image/*,video/*"
+                          style={{ display: "none" }}
+                          disabled={!selectedUploader}
+                          onChange={(e) => e.target.files && addFiles(e.target.files)}
+                        />
+                      </div>
+
+                      {items.length > 0 && (
+                        <div style={listStyle}>
+                          {items.map((item) => (
+                            <div key={item.id} style={itemStyle}>
+                              <div style={thumbStyle}>
+                                {item.assetId ? (
+                                  <img
+                                    src={`/api/v1/assets/${item.assetId}/thumbnail`}
+                                    alt=""
+                                    style={thumbImageStyle}
+                                  />
+                                ) : (
+                                  <span style={{ color: "#666", fontSize: 11 }}>
+                                    {item.status === "failed" ? "failed" : "uploading"}
+                                  </span>
+                                )}
+                              </div>
+                              <div>
+                                <div style={{ color: "#eee" }}>{item.file.name}</div>
+                                <div style={{ color: item.status === "failed" ? "#f88" : "#888", fontSize: 12 }}>
+                                  {item.status}
+                                  {item.error ? ` - ${item.error}` : ""}
+                                </div>
+                              </div>
+                              {item.status === "failed" ? (
+                                <button
+                                  onClick={() => {
+                                    setItems((current) =>
+                                      current.map((entry) =>
+                                        entry.id === item.id
+                                          ? { ...entry, status: "queued", progress: 0, error: undefined }
+                                          : entry
+                                      )
+                                    );
+                                  }}
+                                  style={retryButtonStyle}
+                                >
+                                  Retry
+                                </button>
+                              ) : (
+                                <div style={progressTrackStyle}>
+                                  <div style={{ ...progressBarStyle, width: `${item.progress}%` }} />
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>{renderDriveBrowser()}</>
+                  )}
+                </>
+              ) : (
+                <div style={emptyStateStyle}>Select a destination site before uploading.</div>
+              )
+            ) : selectedPlacement ? (
               <>
                 <div style={detailHeaderStyle}>
                   <div>
@@ -1003,123 +1169,8 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
                   </div>
                 </div>
 
-                <div style={uploadModeTabsStyle}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUploadMode("files");
-                      setSelectedDriveFiles(new Set());
-                    }}
-                    style={{
-                      ...uploadModeTabStyle,
-                      ...(uploadMode === "files" ? uploadModeTabActiveStyle : {}),
-                    }}
-                  >
-                    Upload Files
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUploadMode("drive");
-                      resetDriveFolderPath();
-                    }}
-                    disabled={!authUser?.authenticated}
-                    style={{
-                      ...uploadModeTabStyle,
-                      ...(uploadMode === "drive" ? uploadModeTabActiveStyle : {}),
-                      opacity: authUser?.authenticated ? 1 : 0.5,
-                      cursor: authUser?.authenticated ? "pointer" : "not-allowed",
-                    }}
-                  >
-                    Import from Drive
-                  </button>
-                </div>
-
-                {uploadMode === "files" ? (
-                  <>
-                    <div
-                      style={dropzoneStyle}
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        addFiles(e.dataTransfer.files);
-                      }}
-                      onClick={() => {
-                        if (!selectedUploader) {
-                          setError("Select an Artasia Team Member before adding files.");
-                          return;
-                        }
-                        inputRef.current?.click();
-                      }}
-                    >
-                      Drop images or videos here
-                      <span style={{ color: "#777", marginTop: 6 }}>or click to choose files</span>
-                      <input
-                        ref={inputRef}
-                        type="file"
-                        multiple
-                        accept="image/*,video/*"
-                        style={{ display: "none" }}
-                        disabled={!selectedUploader}
-                        onChange={(e) => e.target.files && addFiles(e.target.files)}
-                      />
-                    </div>
-
-                    {items.length > 0 && (
-                      <div style={listStyle}>
-                        {items.map((item) => (
-                          <div key={item.id} style={itemStyle}>
-                            <div style={thumbStyle}>
-                              {item.assetId ? (
-                                <img
-                                  src={`/api/v1/assets/${item.assetId}/thumbnail`}
-                                  alt=""
-                                  style={thumbImageStyle}
-                                />
-                              ) : (
-                                <span style={{ color: "#666", fontSize: 11 }}>
-                                  {item.status === "failed" ? "failed" : "uploading"}
-                                </span>
-                              )}
-                            </div>
-                            <div>
-                              <div style={{ color: "#eee" }}>{item.file.name}</div>
-                              <div style={{ color: item.status === "failed" ? "#f88" : "#888", fontSize: 12 }}>
-                                {item.status}
-                                {item.error ? ` - ${item.error}` : ""}
-                              </div>
-                            </div>
-                            {item.status === "failed" ? (
-                              <button
-                                onClick={() => {
-                                  setItems((current) =>
-                                current.map((entry) =>
-                                  entry.id === item.id
-                                    ? { ...entry, status: "queued", progress: 0, error: undefined }
-                                    : entry
-                                )
-                              );
-                            }}
-                            style={retryButtonStyle}
-                          >
-                            Retry
-                          </button>
-                        ) : (
-                          <div style={progressTrackStyle}>
-                            <div style={{ ...progressBarStyle, width: `${item.progress}%` }} />
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-                  </>
-                ) : (
-                  <>{renderDriveBrowser()}</>
-                )}
-
                 <div style={assetGridHeaderStyle}>
-                  <h3 style={sectionTitleStyle}>{assetGalleryTitle()}</h3>
+                  <h3 style={sectionTitleStyle}>Uploads</h3>
                   <button
                     type="button"
                     onClick={refreshVisibleAssets}
@@ -1592,6 +1643,29 @@ const errorStyle: React.CSSProperties = {
   padding: 10,
   borderRadius: 4,
   marginBottom: 12,
+};
+
+const workspaceTabsStyle: React.CSSProperties = {
+  display: "flex",
+  gap: 8,
+  marginBottom: 16,
+  borderBottom: "1px solid rgba(255,255,255,0.14)",
+};
+
+const workspaceTabStyle: React.CSSProperties = {
+  background: "transparent",
+  color: "#9aa3b3",
+  border: "none",
+  borderBottom: "2px solid transparent",
+  padding: "10px 14px",
+  cursor: "pointer",
+  fontSize: 15,
+  fontWeight: 600,
+};
+
+const workspaceTabActiveStyle: React.CSSProperties = {
+  color: "#d8e7ff",
+  borderBottomColor: "#d8e7ff",
 };
 
 const uploadModeTabsStyle: React.CSSProperties = {
