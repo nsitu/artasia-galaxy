@@ -71,6 +71,18 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
       : location.placement_name;
   }
 
+  function placementMetaLabel(placement: UploadOptions["placements"][number]) {
+    const people = [
+      placement.team_member_name ?? "Unassigned",
+      placement.secondary_team_member_name,
+    ].filter(Boolean).join(" + ");
+    return [
+      people,
+      placement.delivery_schedule,
+      placement.participant_age ? `(${placement.participant_age})` : undefined,
+    ].filter(Boolean).join(" · ");
+  }
+
   useEffect(() => {
     if (options) return;
     const authFallback: AuthUser = { authenticated: false };
@@ -786,9 +798,6 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
                 Program Week: {selectedAsset.activity_label ?? "No activity tag"}
               </div>
             </div>
-            <button type="button" onClick={closeAssetManager} style={secondaryButtonStyle}>
-              Close
-            </button>
           </div>
 
           <label style={labelStyle}>
@@ -846,8 +855,11 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
               {savingAsset ? "Saving..." : "Save"}
             </button>
             <a href={selectedAsset.previewUrl} target="_blank" rel="noreferrer" style={secondaryLinkButtonStyle}>
-              Open Preview
+              Preview
             </a>
+            <button type="button" onClick={closeAssetManager} style={secondaryButtonStyle}>
+              Close
+            </button>
           </div>
         </div>
       </div>
@@ -1005,11 +1017,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
                   }}
                 >
                   <span style={placementNameStyle}>{placementLabel(placement)}</span>
-                  <span style={placementMetaStyle}>
-                    {placement.team_member_name ?? "Unassigned"}
-                    {placement.secondary_team_member_name ? ` + ${placement.secondary_team_member_name}` : ""}
-                    {placement.delivery_schedule ? ` · ${placement.delivery_schedule}` : ""}
-                  </span>
+                  <span style={placementMetaStyle}>{placementMetaLabel(placement)}</span>
                 </button>
               ))}
             </div>

@@ -76,6 +76,7 @@ export interface UploadPlacement {
   delivery_start_time?: string;
   delivery_end_time?: string;
   delivery_schedule?: string;
+  participant_age?: string;
   address?: string;
   shared_with?: string;
   lat?: number;

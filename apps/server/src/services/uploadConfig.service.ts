@@ -28,6 +28,7 @@ export interface ArtasiaPlacement {
   delivery_start_time?: string;
   delivery_end_time?: string;
   delivery_schedule?: string;
+  participant_age?: string;
   address?: string;
   shared_with?: string;
   lat?: number;
@@ -115,6 +116,7 @@ function mapWpPlacement(wp: WpArtasiaPlacement): ArtasiaPlacement {
     ...(wp.delivery_start_time ? { delivery_start_time: wp.delivery_start_time } : {}),
     ...(wp.delivery_end_time ? { delivery_end_time: wp.delivery_end_time } : {}),
     ...(wp.delivery_schedule ? { delivery_schedule: wp.delivery_schedule } : {}),
+    ...(wp.participant_age ? { participant_age: wp.participant_age } : {}),
     ...(wp.place?.address ? { address: wp.place.address } : {}),
     ...(wp.place?.shared_with ? { shared_with: wp.place.shared_with } : {}),
     ...(lat != null && lat !== 0 ? { lat } : {}),
