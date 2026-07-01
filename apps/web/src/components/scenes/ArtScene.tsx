@@ -5,7 +5,7 @@ import { useGalleryStore } from "../../stores/galleryStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import GalleryWall from "./GalleryWall";
 import CameraRig from "./CameraRig";
-import TerrainGallery from "./TerrainGallery";
+import TerrainGallery, { TerrainOverlay, type TerrainOverlayState } from "./TerrainGallery";
 import SettingsPanel from "../ui/SettingsPanel";
 import LoadingIndicator from "../ui/LoadingIndicator";
 
@@ -30,7 +30,7 @@ export default function ArtScene() {
 
   const [showAlbums, setShowAlbums] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [terrainOverlayRoot, setTerrainOverlayRoot] = useState<HTMLDivElement | null>(null);
+  const [terrainOverlay, setTerrainOverlay] = useState<TerrainOverlayState | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const autoAdvance = useCallback(() => {
@@ -72,6 +72,10 @@ export default function ArtScene() {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [playback.autoplay, playback.intervalSec, photos.length, autoAdvance]);
+
+  useEffect(() => {
+    if (display.mode !== "terrain") setTerrainOverlay(null);
+  }, [display.mode]);
 
   const albumLabel = selectedAlbumId
     ? albums.find((a) => a.id === selectedAlbumId)?.name ?? "Album"
@@ -254,7 +258,7 @@ export default function ArtScene() {
         onClose={() => setShowSettings(false)}
       />
 
-      <div ref={setTerrainOverlayRoot} style={terrainOverlayRootStyle} />
+      {display.mode === "terrain" && <TerrainOverlay state={terrainOverlay} />}
 
       <Canvas
         camera={{ position: [0, 0, 16], fov: 50 }}
@@ -264,7 +268,7 @@ export default function ArtScene() {
         <ambientLight intensity={0.8} />
         <Suspense fallback={null}>
           {display.mode === "wall" && <GalleryWall columns={display.columns} />}
-          {display.mode === "terrain" && <TerrainGallery overlayRoot={terrainOverlayRoot} />}
+          {display.mode === "terrain" && <TerrainGallery onOverlayChange={setTerrainOverlay} />}
           {display.mode === "wall" && (
             <CameraRig columns={display.columns} mode={display.mode} />
           )}
@@ -298,13 +302,6 @@ const btnStyle: React.CSSProperties = {
   fontSize: 13,
   fontFamily: "monospace",
   textDecoration: "none",
-};
-
-const terrainOverlayRootStyle: React.CSSProperties = {
-  position: "absolute",
-  inset: 0,
-  zIndex: 12,
-  pointerEvents: "none",
 };
 
 const dropdownStyle: React.CSSProperties = {

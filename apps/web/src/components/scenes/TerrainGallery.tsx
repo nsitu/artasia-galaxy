@@ -1,6 +1,5 @@
-import { Html } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import * as THREE from "three";
 import { fetchMapPlacements, type MapPlacement } from "../../api/client";
 import { useGalleryStore } from "../../stores/galleryStore";
@@ -27,8 +26,32 @@ type TerrainOrbitControls = {
   target?: THREE.Vector3;
   update?: () => void;
 };
+type TerrainNotice = {
+  label: string;
+  detail?: string;
+  tone?: "loading" | "error" | "muted";
+  busy?: boolean;
+};
 
-export default function TerrainGallery({ overlayRoot }: { overlayRoot: HTMLDivElement | null }) {
+export interface TerrainOverlayState {
+  notice?: TerrainNotice;
+  request?: {
+    zoom: number;
+    estimatedSatelliteTiles: number;
+    radiusKm: number;
+  };
+  basePhase?: TerrainPhase;
+  detail?: {
+    status: string;
+    zoom?: number;
+    estimatedSatelliteTiles?: number;
+    radiusKm?: number;
+  };
+  focusedPlacement?: MapPlacement | null;
+  onBack?: () => void;
+}
+
+export default function TerrainGallery({ onOverlayChange }: { onOverlayChange: (state: TerrainOverlayState | null) => void }) {
   const camera = useThree((state) => state.camera);
   const controls = useThree((state) => (state as unknown as { controls?: TerrainOrbitControls }).controls);
   const photos = useGalleryStore((s) => s.photos);
@@ -52,7 +75,6 @@ export default function TerrainGallery({ overlayRoot }: { overlayRoot: HTMLDivEl
   const [detailPhase, setDetailPhase] = useState<TerrainPhase>("idle");
   const [detailError, setDetailError] = useState<string | null>(null);
   const [focusedPlacement, setFocusedPlacement] = useState<MapPlacement | null>(null);
-  const overlayPortal = useMemo(() => overlayRoot ? { current: overlayRoot } : undefined, [overlayRoot]);
 
   const geoPhotos = useMemo(() => {
     if (!focusedPlacement) return getGeoPhotos(photos);
@@ -142,7 +164,7 @@ export default function TerrainGallery({ overlayRoot }: { overlayRoot: HTMLDivEl
     });
   }, [projection, terrain, visiblePlacements]);
 
-  function focusPlacement(placement: MapPlacement) {
+  const focusPlacement = useCallback((placement: MapPlacement) => {
     document.body.style.cursor = "";
     resetTerrainCamera(camera, controls);
     setFocusedPlacement(placement);
@@ -161,9 +183,9 @@ export default function TerrainGallery({ overlayRoot }: { overlayRoot: HTMLDivEl
       lng: placement.lng,
       radiusKm: 10,
     });
-  }
+  }, [camera, controls, fetchPlacementFocus, selectPhoto]);
 
-  function returnToRegional() {
+  const returnToRegional = useCallback(() => {
     document.body.style.cursor = "";
     setFocusedPlacement(null);
     setDetailFocus(null);
@@ -176,7 +198,7 @@ export default function TerrainGallery({ overlayRoot }: { overlayRoot: HTMLDivEl
     setRenderedTerrainKey(null);
     selectPhoto(null);
     void fetchPhotos(selectedAlbumId ?? undefined);
-  }
+  }, [fetchPhotos, selectPhoto, selectedAlbumId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -385,82 +407,89 @@ export default function TerrainGallery({ overlayRoot }: { overlayRoot: HTMLDivEl
     };
   }, [detailTerrain]);
 
-  if (photos.length === 0 && placements.length === 0 && !placementError) {
-    return (
-      <Html fullscreen portal={overlayPortal} style={overlayRootStyle}>
-        <LoadingIndicator label={galleryLoading ? "Loading gallery" : "Preparing terrain"} />
-      </Html>
-    );
-  }
-
-  if (geoPhotos.length === 0 && geoPlacements.length === 0) {
-    return (
-      <Html fullscreen portal={overlayPortal} style={overlayRootStyle}>
-        <LoadingIndicator
-          label={placementError ? "Placement locations failed" : "No terrain locations"}
-          detail={placementError ?? "No GPS photos or placements for terrain mode."}
-          tone={placementError ? "error" : "muted"}
-          busy={false}
-        />
-      </Html>
-    );
-  }
-
   const terrainMatchesRequest = Boolean(request && requestKey && renderedTerrainKey === requestKey);
   const sceneReadyForMarkers = terrainMatchesRequest || phase === "flat";
+  const isPreparingTerrain = photos.length === 0 && placements.length === 0 && !placementError;
+  const hasNoTerrainLocations = !isPreparingTerrain && geoPhotos.length === 0 && geoPlacements.length === 0;
+  const terrainOverlay = useMemo<TerrainOverlayState>(() => {
+    if (isPreparingTerrain) {
+      return {
+        notice: {
+          label: galleryLoading ? "Loading gallery" : "Preparing terrain",
+        },
+      };
+    }
+
+    if (hasNoTerrainLocations) {
+      return {
+        notice: {
+          label: placementError ? "Placement locations failed" : "No terrain locations",
+          detail: placementError ?? "No GPS photos or placements for terrain mode.",
+          tone: placementError ? "error" : "muted",
+          busy: false,
+        },
+      };
+    }
+
+    return {
+      ...(request
+        ? {
+            request: {
+              zoom: request.zoom,
+              estimatedSatelliteTiles: request.estimatedSatelliteTiles,
+              radiusKm: request.radiusKm,
+            },
+            basePhase: phase,
+            detail: {
+              status: detailStatusLabel(detailRequest, detailPhase, detailError),
+              ...(detailRequest ? { zoom: detailRequest.zoom } : {}),
+              ...(detailRequest ? { estimatedSatelliteTiles: detailRequest.estimatedSatelliteTiles } : {}),
+              ...(detailRequest ? { radiusKm: detailRequest.radiusKm } : {}),
+            },
+          }
+        : {}),
+      ...(focusedPlacement ? { focusedPlacement, onBack: returnToRegional } : {}),
+      ...(loading || error
+        ? {
+            notice: {
+              label: loading ? "Loading terrain" : "Terrain failed",
+              detail: error ?? undefined,
+              tone: error ? "error" : "loading",
+              busy: loading,
+            },
+          }
+        : {}),
+    };
+  }, [
+    detailError,
+    detailPhase,
+    detailRequest,
+    error,
+    focusedPlacement,
+    galleryLoading,
+    geoPhotos.length,
+    geoPlacements.length,
+    hasNoTerrainLocations,
+    isPreparingTerrain,
+    loading,
+    phase,
+    placementError,
+    request,
+    returnToRegional,
+  ]);
+
+  useEffect(() => {
+    onOverlayChange(terrainOverlay);
+  }, [onOverlayChange, terrainOverlay]);
+
+  useEffect(() => {
+    return () => onOverlayChange(null);
+  }, [onOverlayChange]);
+
+  if (isPreparingTerrain || hasNoTerrainLocations) return null;
 
   return (
     <group>
-      {request && (
-        <Html fullscreen portal={overlayPortal} style={overlayRootStyle}>
-          <div style={tileStatusStyle}>
-            <div style={tileStatusHeaderStyle}>Terrain tiles</div>
-            <div style={tileStatusSubheaderStyle}>Base</div>
-            <div style={tileStatusRowStyle}>
-              <span>Status</span>
-              <strong style={tileStatusValueStyle}>{terrainPhaseLabel(phase)}</strong>
-            </div>
-            <div style={tileStatusRowStyle}>
-              <span>Resolution</span>
-              <strong style={tileStatusValueStyle}>z{request.zoom}</strong>
-            </div>
-            <div style={tileStatusRowStyle}>
-              <span>Estimated tiles</span>
-              <strong style={tileStatusValueStyle}>{request.estimatedSatelliteTiles}</strong>
-            </div>
-            <div style={tileStatusRowStyle}>
-              <span>Radius</span>
-              <strong style={tileStatusValueStyle}>{formatRadius(request.radiusKm)}</strong>
-            </div>
-            <div style={tileStatusSubheaderStyle}>Detail</div>
-            <div style={tileStatusRowStyle}>
-              <span>Status</span>
-              <strong style={tileStatusValueStyle}>{detailStatusLabel(detailRequest, detailPhase, detailError)}</strong>
-            </div>
-            <div style={tileStatusRowStyle}>
-              <span>Resolution</span>
-              <strong style={tileStatusValueStyle}>{detailRequest ? `z${detailRequest.zoom}` : "-"}</strong>
-            </div>
-            <div style={tileStatusRowStyle}>
-              <span>Estimated tiles</span>
-              <strong style={tileStatusValueStyle}>{detailRequest?.estimatedSatelliteTiles ?? "-"}</strong>
-            </div>
-            <div style={tileStatusRowStyle}>
-              <span>Radius</span>
-              <strong style={tileStatusValueStyle}>{detailRequest ? formatRadius(detailRequest.radiusKm) : "-"}</strong>
-            </div>
-          </div>
-        </Html>
-      )}
-      {focusedPlacement && (
-        <Html fullscreen portal={overlayPortal} style={focusOverlayRootStyle}>
-          <button type="button" onClick={returnToRegional} style={backButtonStyle}>
-            Back to regional view
-          </button>
-          <FocusedPlacementOverlay placement={focusedPlacement} />
-        </Html>
-      )}
-
       {terrain && terrainMatchesRequest && <primitive object={terrain} />}
       {detailTerrain && terrainMatchesRequest && <primitive object={detailTerrain} />}
 
@@ -488,17 +517,64 @@ export default function TerrainGallery({ overlayRoot }: { overlayRoot: HTMLDivEl
         />
       ))}
 
-      {(loading || error) && (
-        <Html fullscreen portal={overlayPortal} style={overlayRootStyle}>
-          <LoadingIndicator
-            label={loading ? "Loading terrain" : "Terrain failed"}
-            detail={error ?? undefined}
-            tone={error ? "error" : "loading"}
-            busy={loading}
-          />
-        </Html>
-      )}
     </group>
+  );
+}
+
+export function TerrainOverlay({ state }: { state: TerrainOverlayState | null }) {
+  if (!state) return null;
+
+  return (
+    <div style={terrainOverlayRootStyle}>
+      {state.request && (
+        <div style={tileStatusStyle}>
+          <div style={tileStatusHeaderStyle}>Terrain tiles</div>
+          <div style={tileStatusSubheaderStyle}>Base</div>
+          <div style={tileStatusRowStyle}>
+            <span>Status</span>
+            <strong style={tileStatusValueStyle}>{terrainPhaseLabel(state.basePhase ?? "idle")}</strong>
+          </div>
+          <div style={tileStatusRowStyle}>
+            <span>Resolution</span>
+            <strong style={tileStatusValueStyle}>z{state.request.zoom}</strong>
+          </div>
+          <div style={tileStatusRowStyle}>
+            <span>Estimated tiles</span>
+            <strong style={tileStatusValueStyle}>{state.request.estimatedSatelliteTiles}</strong>
+          </div>
+          <div style={tileStatusRowStyle}>
+            <span>Radius</span>
+            <strong style={tileStatusValueStyle}>{formatRadius(state.request.radiusKm)}</strong>
+          </div>
+          <div style={tileStatusSubheaderStyle}>Detail</div>
+          <div style={tileStatusRowStyle}>
+            <span>Status</span>
+            <strong style={tileStatusValueStyle}>{state.detail?.status ?? "Inactive"}</strong>
+          </div>
+          <div style={tileStatusRowStyle}>
+            <span>Resolution</span>
+            <strong style={tileStatusValueStyle}>{state.detail?.zoom ? `z${state.detail.zoom}` : "-"}</strong>
+          </div>
+          <div style={tileStatusRowStyle}>
+            <span>Estimated tiles</span>
+            <strong style={tileStatusValueStyle}>{state.detail?.estimatedSatelliteTiles ?? "-"}</strong>
+          </div>
+          <div style={tileStatusRowStyle}>
+            <span>Radius</span>
+            <strong style={tileStatusValueStyle}>{state.detail?.radiusKm ? formatRadius(state.detail.radiusKm) : "-"}</strong>
+          </div>
+        </div>
+      )}
+      {state.focusedPlacement && state.onBack && (
+        <>
+          <button type="button" onClick={state.onBack} style={backButtonStyle}>
+            Back to regional view
+          </button>
+          <FocusedPlacementOverlay placement={state.focusedPlacement} />
+        </>
+      )}
+      {state.notice && <LoadingIndicator {...state.notice} />}
+    </div>
   );
 }
 
@@ -609,11 +685,10 @@ function TerrainPlaceMarker({
   );
 }
 
-const overlayRootStyle: React.CSSProperties = {
-  pointerEvents: "none",
-};
-
-const focusOverlayRootStyle: React.CSSProperties = {
+const terrainOverlayRootStyle: React.CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  zIndex: 12,
   pointerEvents: "none",
 };
 

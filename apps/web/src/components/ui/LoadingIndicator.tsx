@@ -22,11 +22,6 @@ export default function LoadingIndicator({
           <span style={{ ...labelStyle, ...(tone === "error" ? errorLabelStyle : {}) }}>{label}</span>
         </div>
         {detail && <div style={detailStyle}>{detail}</div>}
-        {busy && (
-          <div style={trackStyle}>
-            <div style={barStyle} />
-          </div>
-        )}
       </div>
     </div>
   );
@@ -35,10 +30,6 @@ export default function LoadingIndicator({
 const loadingKeyframes = `
 @keyframes artasia-loading-spin {
   to { transform: rotate(360deg); }
-}
-@keyframes artasia-loading-sweep {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(260%); }
 }`;
 
 const overlayStyle: CSSProperties = {
@@ -98,21 +89,4 @@ const detailStyle: CSSProperties = {
   lineHeight: 1.35,
   marginTop: 7,
   overflowWrap: "anywhere",
-};
-
-const trackStyle: CSSProperties = {
-  position: "relative",
-  height: 3,
-  marginTop: 11,
-  overflow: "hidden",
-  background: "rgba(255,255,255,0.1)",
-  borderRadius: 999,
-};
-
-const barStyle: CSSProperties = {
-  width: "38%",
-  height: "100%",
-  background: "#f5f7fb",
-  borderRadius: 999,
-  animation: "artasia-loading-sweep 1.15s ease-in-out infinite",
 };
