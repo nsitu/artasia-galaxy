@@ -56,7 +56,6 @@ export default function TerrainGallery({ onOverlayChange }: { onOverlayChange: (
   const controls = useThree((state) => (state as unknown as { controls?: TerrainOrbitControls }).controls);
   const photos = useGalleryStore((s) => s.photos);
   const galleryLoading = useGalleryStore((s) => s.loading);
-  const selectedAlbumId = useGalleryStore((s) => s.selectedAlbumId);
   const selectedIndex = useGalleryStore((s) => s.selectedPhotoIndex);
   const selectPhoto = useGalleryStore((s) => s.selectPhoto);
   const fetchPhotos = useGalleryStore((s) => s.fetchPhotos);
@@ -197,8 +196,8 @@ export default function TerrainGallery({ onOverlayChange }: { onOverlayChange: (
     setDetailError(null);
     setRenderedTerrainKey(null);
     selectPhoto(null);
-    void fetchPhotos(selectedAlbumId ?? undefined);
-  }, [fetchPhotos, selectPhoto, selectedAlbumId]);
+    void fetchPhotos();
+  }, [fetchPhotos, selectPhoto]);
 
   useEffect(() => {
     let cancelled = false;

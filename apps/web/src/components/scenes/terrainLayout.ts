@@ -1,5 +1,6 @@
 import type { Photo } from "../../api/client";
-import type { PhotoPosition } from "./galleryLayout";
+
+export type PhotoPosition = [number, number, number];
 
 export interface GeoPhoto {
   photo: Photo;

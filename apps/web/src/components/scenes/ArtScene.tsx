@@ -1,222 +1,36 @@
-import { Suspense, useEffect, useState, useRef, useCallback } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Preload } from "@react-three/drei";
 import { useGalleryStore } from "../../stores/galleryStore";
-import { useSettingsStore } from "../../stores/settingsStore";
-import GalleryWall from "./GalleryWall";
-import CameraRig from "./CameraRig";
 import TerrainGallery, { TerrainOverlay, type TerrainOverlayState } from "./TerrainGallery";
-import SettingsPanel from "../ui/SettingsPanel";
-import LoadingIndicator from "../ui/LoadingIndicator";
 
 export default function ArtScene() {
   const fetchPhotos = useGalleryStore((s) => s.fetchPhotos);
-  const fetchAlbumList = useGalleryStore((s) => s.fetchAlbumList);
   const photos = useGalleryStore((s) => s.photos);
-  const albums = useGalleryStore((s) => s.albums);
-  const selectedAlbumId = useGalleryStore((s) => s.selectedAlbumId);
-  const setSelectedAlbum = useGalleryStore((s) => s.setSelectedAlbum);
   const selectedPhotoIndex = useGalleryStore((s) => s.selectedPhotoIndex);
-  const nextPhoto = useGalleryStore((s) => s.nextPhoto);
-  const prevPhoto = useGalleryStore((s) => s.prevPhoto);
   const selectPhoto = useGalleryStore((s) => s.selectPhoto);
-  const loading = useGalleryStore((s) => s.loading);
   const error = useGalleryStore((s) => s.error);
-
-  const playback = useSettingsStore((s) => s.playback);
-  const display = useSettingsStore((s) => s.display);
-  const loadSettings = useSettingsStore((s) => s.loadSettings);
-  const toggleAutoplay = useSettingsStore((s) => s.toggleAutoplay);
-
-  const [showAlbums, setShowAlbums] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [terrainOverlay, setTerrainOverlay] = useState<TerrainOverlayState | null>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const autoAdvance = useCallback(() => {
-    nextPhoto();
-  }, [nextPhoto]);
 
   useEffect(() => {
-    loadSettings();
-    fetchAlbumList();
     fetchPhotos();
-  }, [loadSettings, fetchPhotos, fetchAlbumList]);
+  }, [fetchPhotos]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement) return;
-      if (e.key === "ArrowRight") nextPhoto();
-      if (e.key === "ArrowLeft") prevPhoto();
-      if (e.key === "Escape") selectPhoto(null);
-      if (e.key === "a" || e.key === "A") setShowAlbums((v) => !v);
-      if (e.key === "s" || e.key === "S") setShowSettings((v) => !v);
-      if (e.key === " ") {
-        e.preventDefault();
-        toggleAutoplay();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [nextPhoto, prevPhoto, selectPhoto, toggleAutoplay]);
-
-  useEffect(() => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    if (playback.autoplay && photos.length > 0) {
-      timerRef.current = setInterval(autoAdvance, playback.intervalSec * 1000);
-    }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [playback.autoplay, playback.intervalSec, photos.length, autoAdvance]);
-
-  useEffect(() => {
-    if (display.mode !== "terrain") setTerrainOverlay(null);
-  }, [display.mode]);
-
-  const albumLabel = selectedAlbumId
-    ? albums.find((a) => a.id === selectedAlbumId)?.name ?? "Album"
-    : "All Photos";
-  const selectedPhoto =
-    selectedPhotoIndex !== null ? photos[selectedPhotoIndex] : null;
+  const selectedPhoto = selectedPhotoIndex !== null ? photos[selectedPhotoIndex] : null;
   const selectedDescription = selectedPhoto?.exifInfo?.description?.trim();
 
   return (
     <div style={{ width: "100vw", height: "100vh", position: "relative" }}>
-      {/* HUD overlay */}
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: showSettings ? 280 : 0,
-          zIndex: 10,
-          display: "flex",
-          justifyContent: "space-between",
-          padding: "12px 16px",
-          fontFamily: "monospace",
-          fontSize: 13,
-          color: "#aaa",
-          pointerEvents: "none",
-        }}
-      >
-        <div style={{ pointerEvents: "auto", display: "flex", gap: 8 }}>
-          <button
-            onClick={() => setShowAlbums((v) => !v)}
-            style={btnStyle}
-          >
-            {albumLabel} ▾
-          </button>
-          <button
-            onClick={() => toggleAutoplay()}
-            title="Space"
-            style={{
-              ...btnStyle,
-              color: playback.autoplay ? "#8d8" : "#888",
-            }}
-          >
-            {playback.autoplay ? "⏸" : "▶"}
-          </button>
-          <button
-            onClick={() => setShowSettings((v) => !v)}
-            title="S"
-            style={btnStyle}
-          >
-            ⚙
-          </button>
-          <a
-            href="/admin"
-            style={btnStyle}
-          >
-            Admin
-          </a>
-        </div>
-
-        <div style={{ display: "flex", gap: 12 }}>
-          {selectedPhotoIndex !== null && (
-            <>
-              <button onClick={prevPhoto} style={btnStyle}>
-                ◀ Prev
-              </button>
-              <button onClick={nextPhoto} style={btnStyle}>
-                Next ▶
-              </button>
-            </>
-          )}
-        </div>
-
-        <span>
-          {photos.length > 0 &&
-            `${photos.length} photo${photos.length !== 1 ? "s" : ""}`}
-          {selectedPhotoIndex !== null &&
-            ` · ${selectedPhotoIndex + 1} / ${photos.length}`}
+      <div style={hudStyle}>
+        <a href="/admin" style={btnStyle}>
+          Admin
+        </a>
+        <span style={photoCountStyle}>
+          {photos.length > 0 && `${photos.length} photo${photos.length !== 1 ? "s" : ""}`}
         </span>
       </div>
 
-      {/* Album picker dropdown */}
-      {showAlbums && (
-        <div style={dropdownStyle}>
-          <div
-            onClick={() => {
-              setSelectedAlbum(null);
-              setShowAlbums(false);
-            }}
-            style={{
-              ...dropdownItemStyle,
-              background: selectedAlbumId === null ? "rgba(255,255,255,0.1)" : "transparent",
-              color: selectedAlbumId === null ? "#fff" : "#999",
-            }}
-          >
-            All Photos
-          </div>
-          {albums.map((album) => (
-            <div
-              key={album.id}
-              onClick={() => {
-                setSelectedAlbum(album.id);
-                setShowAlbums(false);
-              }}
-              style={{
-                ...dropdownItemStyle,
-                background: selectedAlbumId === album.id ? "rgba(255,255,255,0.1)" : "transparent",
-                color: selectedAlbumId === album.id ? "#fff" : "#999",
-              }}
-            >
-              {album.name}
-              <span style={{ color: "#555", marginLeft: 8 }}>
-                ({album.assetCount})
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Loading / error */}
-      {loading && photos.length === 0 && display.mode !== "terrain" && (
-        <LoadingIndicator label="Loading gallery" />
-      )}
-      {error && (
-        <div
-          style={{
-            position: "absolute",
-            bottom: 20,
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 10,
-            color: "#f66",
-            fontFamily: "monospace",
-            fontSize: 13,
-            background: "rgba(0,0,0,0.7)",
-            padding: "8px 16px",
-            borderRadius: 4,
-          }}
-        >
-          {error}
-        </div>
-      )}
+      {error && <div style={errorStyle}>{error}</div>}
 
       {selectedPhoto && (
         <div style={metadataOverlayStyle}>
@@ -234,31 +48,7 @@ export default function ArtScene() {
         </div>
       )}
 
-      {/* Keyboard hints */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: 14,
-          left: "50%",
-          transform: "translateX(-50%)",
-          zIndex: 10,
-          color: "#555",
-          fontFamily: "monospace",
-          fontSize: 11,
-          pointerEvents: "none",
-        }}
-      >
-        ← → navigate · Space = autoplay ({playback.intervalSec}s) · S =
-        settings · A = albums
-      </div>
-
-      {/* Settings panel */}
-      <SettingsPanel
-        visible={showSettings}
-        onClose={() => setShowSettings(false)}
-      />
-
-      {display.mode === "terrain" && <TerrainOverlay state={terrainOverlay} />}
+      <TerrainOverlay state={terrainOverlay} />
 
       <Canvas
         camera={{ position: [0, 0, 16], fov: 50 }}
@@ -267,29 +57,38 @@ export default function ArtScene() {
       >
         <ambientLight intensity={0.8} />
         <Suspense fallback={null}>
-          {display.mode === "wall" && <GalleryWall columns={display.columns} />}
-          {display.mode === "terrain" && <TerrainGallery onOverlayChange={setTerrainOverlay} />}
-          {display.mode === "wall" && (
-            <CameraRig columns={display.columns} mode={display.mode} />
-          )}
-          {display.mode === "terrain" && (
-            <OrbitControls
-              makeDefault
-              enableDamping
-              dampingFactor={0.08}
-              enablePan
-              enableZoom
-              screenSpacePanning
-              minDistance={1.5}
-              maxDistance={80}
-            />
-          )}
+          <TerrainGallery onOverlayChange={setTerrainOverlay} />
+          <OrbitControls
+            makeDefault
+            enableDamping
+            dampingFactor={0.08}
+            enablePan
+            enableZoom
+            screenSpacePanning
+            minDistance={1.5}
+            maxDistance={80}
+          />
           <Preload all />
         </Suspense>
       </Canvas>
     </div>
   );
 }
+
+const hudStyle: React.CSSProperties = {
+  position: "absolute",
+  top: 0,
+  left: 0,
+  right: 0,
+  zIndex: 10,
+  display: "flex",
+  justifyContent: "space-between",
+  padding: "12px 16px",
+  fontFamily: "monospace",
+  fontSize: 13,
+  color: "#aaa",
+  pointerEvents: "none",
+};
 
 const btnStyle: React.CSSProperties = {
   pointerEvents: "auto",
@@ -304,26 +103,22 @@ const btnStyle: React.CSSProperties = {
   textDecoration: "none",
 };
 
-const dropdownStyle: React.CSSProperties = {
-  position: "absolute",
-  top: 46,
-  left: 16,
-  zIndex: 20,
-  background: "rgba(20,20,30,0.95)",
-  border: "1px solid rgba(255,255,255,0.15)",
-  borderRadius: 6,
-  padding: 8,
-  minWidth: 200,
-  maxHeight: 300,
-  overflowY: "auto",
-  fontFamily: "monospace",
-  fontSize: 13,
+const photoCountStyle: React.CSSProperties = {
+  color: "#aaa",
 };
 
-const dropdownItemStyle: React.CSSProperties = {
-  padding: "6px 12px",
-  cursor: "pointer",
-  borderRadius: 3,
+const errorStyle: React.CSSProperties = {
+  position: "absolute",
+  bottom: 20,
+  left: "50%",
+  transform: "translateX(-50%)",
+  zIndex: 10,
+  color: "#f66",
+  fontFamily: "monospace",
+  fontSize: 13,
+  background: "rgba(0,0,0,0.7)",
+  padding: "8px 16px",
+  borderRadius: 4,
 };
 
 const metadataOverlayStyle: React.CSSProperties = {
