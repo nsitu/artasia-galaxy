@@ -193,7 +193,7 @@ router.post("/sync", async (req: Request, res: Response) => {
     }
 
     if (fileIds.length > 20) {
-      res.status(400).json({ error: "Maximum 20 files per sync" });
+      res.status(400).json({ error: "Maximum 20 files per import" });
       return;
     }
 

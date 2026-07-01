@@ -52,14 +52,14 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const uploadInProgressRef = useRef(false);
 
-  // Drive sync state
+  // Drive import state
   const [uploadMode, setUploadMode] = useState<"files" | "drive">("files");
-  const [driveType, setDriveType] = useState<"myDrive" | "sharedDrives">("myDrive");
+  const [driveType, setDriveType] = useState<"chooser" | "myDrive" | "sharedDrives">("chooser");
   const [currentDriveId, setCurrentDriveId] = useState<string | undefined>();
   const [driveFolders, setDriveFolders] = useState<DriveFolder[]>([]);
   const [driveFiles, setDriveFiles] = useState<DriveFile[]>([]);
   const [selectedDriveFolder, setSelectedDriveFolder] = useState("root");
-  const [folderPath, setFolderPath] = useState<Array<{ id: string; name: string }>>([{ id: "root", name: "My Drive" }]);
+  const [folderPath, setFolderPath] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedDriveFiles, setSelectedDriveFiles] = useState<Set<string>>(new Set());
   const [driveSyncing, setDriveSyncing] = useState(false);
   const [driveLoading, setDriveLoading] = useState(false);
@@ -96,16 +96,30 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
   // Load Drive folders when switching to Drive tab or changing drive type
   useEffect(() => {
     if (uploadMode !== "drive") return;
+    if (driveType === "chooser") {
+      setDriveFolders([
+        {
+          id: "__my_drive__",
+          name: "My Drive",
+          mimeType: "application/vnd.google-apps.folder",
+        },
+        {
+          id: "__shared_drives__",
+          name: "Shared Drives",
+          mimeType: "application/vnd.google-apps.folder",
+        },
+      ]);
+      setDriveFiles([]);
+      setSelectedDriveFiles(new Set());
+      setDriveLoading(false);
+      return;
+    }
 
     setDriveLoading(true);
     fetchDriveFolders(driveType, selectedDriveFolder, currentDriveId)
       .then((response) => {
         if (driveType === "myDrive") {
           setDriveFolders(response.subfolders ?? []);
-          // Reset path when switching back to root
-          if (selectedDriveFolder === "root") {
-            setFolderPath([{ id: "root", name: "My Drive" }]);
-          }
         } else {
           // Shared Drives
           setDriveFolders(response.folders ?? []);
@@ -119,14 +133,20 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
   // Load files for current Drive folder
   useEffect(() => {
     if (uploadMode !== "drive") return;
+    if (driveType === "chooser") {
+      setDriveFiles([]);
+      setDriveLoading(false);
+      return;
+    }
     if (driveType === "sharedDrives" && !currentDriveId) {
       setDriveFiles([]);
+      setDriveLoading(false);
       return;
     }
 
     setDriveLoading(true);
     fetchDriveFiles(selectedDriveFolder, undefined, currentDriveId)
-      .then(({ files }) => setDriveFiles(files))
+      .then(({ files }) => setDriveFiles(files.filter((file) => !file.isFolder)))
       .catch((err) => setError((err as Error).message))
       .finally(() => setDriveLoading(false));
   }, [uploadMode, driveType, selectedDriveFolder, currentDriveId]);
@@ -481,7 +501,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
 
   async function syncSelectedDriveFiles() {
     if (selectedDriveFiles.size === 0) {
-      setError("Select files to sync from Google Drive");
+      setError("Select files to import from Google Drive");
       return;
     }
 
@@ -500,7 +520,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
 
       if (succeeded > 0) {
         setError(
-          `Synced ${succeeded} file${succeeded === 1 ? "" : "s"}${
+          `Imported ${succeeded} file${succeeded === 1 ? "" : "s"}${
             failed > 0 ? ` (${failed} failed)` : ""
           }`
         );
@@ -513,7 +533,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
         }
       } else {
         setError(
-          `Failed to sync files: ${results.map((r) => `${r.fileName}: ${r.error}`).join(", ")}`
+          `Failed to import files: ${results.map((r) => `${r.fileName}: ${r.error}`).join(", ")}`
         );
       }
     } catch (err) {
@@ -534,11 +554,25 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
   }
 
   function navigateToDriveFolder(folder: DriveFolder) {
+    if (folder.id === "__my_drive__") {
+      setDriveType("myDrive");
+      setCurrentDriveId(undefined);
+      setSelectedDriveFolder("root");
+      setFolderPath([{ id: "root", name: "My Drive" }]);
+      return;
+    }
+    if (folder.id === "__shared_drives__") {
+      setDriveType("sharedDrives");
+      setCurrentDriveId(undefined);
+      setSelectedDriveFolder("root");
+      setFolderPath([{ id: "__shared_drives__", name: "Shared Drives" }]);
+      return;
+    }
     if (folder.driveId) {
       // Clicking on a Shared Drive from the list
       setCurrentDriveId(folder.driveId);
       setSelectedDriveFolder("root");
-      setFolderPath([{ id: folder.id, name: folder.name }]);
+      setFolderPath((current) => [...current, { id: folder.id, name: folder.name }]);
     } else {
       // Clicking on a folder within My Drive or within a Shared Drive
       setSelectedDriveFolder(folder.id);
@@ -547,11 +581,13 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
   }
 
   function navigateUpDriveFolder() {
-    if (folderPath.length <= 1) return;
+    if (folderPath.length <= 1) {
+      resetDriveFolderPath();
+      return;
+    }
     const newPath = folderPath.slice(0, -1);
     setFolderPath(newPath);
-    if (newPath.length === 0) {
-      // Going back to root of Shared Drives
+    if (driveType === "sharedDrives" && newPath.length === 1) {
       setCurrentDriveId(undefined);
       setSelectedDriveFolder("root");
     } else {
@@ -560,7 +596,8 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
   }
 
   function resetDriveFolderPath() {
-    setFolderPath([{ id: "root", name: "My Drive" }]);
+    setDriveType("chooser");
+    setFolderPath([]);
     setSelectedDriveFolder("root");
     setCurrentDriveId(undefined);
   }
@@ -585,25 +622,6 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
   function renderDriveBrowser() {
     return (
       <div style={driveBrowserStyle}>
-        {/* Drive type selector */}
-        <div style={driveBrowserHeaderStyle}>
-          <label style={labelStyle}>
-            Browse
-            <select
-              value={driveType}
-              onChange={(e) => {
-                setDriveType(e.target.value as "myDrive" | "sharedDrives");
-                resetDriveFolderPath();
-              }}
-              style={inputStyle}
-              disabled={driveLoading}
-            >
-              <option value="myDrive">My Drive</option>
-              <option value="sharedDrives">Shared Drives</option>
-            </select>
-          </label>
-        </div>
-
         {/* Breadcrumb navigation */}
         {folderPath.length > 0 && (
           <div style={{ ...driveBrowserHeaderStyle, gap: 4, overflow: "auto" }}>
@@ -614,17 +632,22 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
                   onClick={() => {
                     if (index === 0) {
                       if (driveType === "myDrive") {
-                        resetDriveFolderPath();
+                        setSelectedDriveFolder("root");
+                        setFolderPath([{ id: "root", name: "My Drive" }]);
                       } else {
-                        // Going back to shared drives list
                         setCurrentDriveId(undefined);
                         setSelectedDriveFolder("root");
-                        setFolderPath([]);
+                        setFolderPath([{ id: "__shared_drives__", name: "Shared Drives" }]);
                       }
                     } else {
                       const newPath = folderPath.slice(0, index + 1);
                       setFolderPath(newPath);
-                      setSelectedDriveFolder(newPath[newPath.length - 1].id);
+                      if (driveType === "sharedDrives" && index === 1) {
+                        setCurrentDriveId(breadcrumb.id);
+                        setSelectedDriveFolder("root");
+                      } else {
+                        setSelectedDriveFolder(newPath[newPath.length - 1].id);
+                      }
                     }
                   }}
                   style={{
@@ -669,13 +692,18 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
               </div>
             ))}
 
-            {/* Files (selectable for sync) */}
+            {/* Files (selectable for import) */}
             {driveFiles.map((file) => (
-              <div key={file.id} style={driveFileItemStyle}>
+              <div
+                key={file.id}
+                style={driveFileItemStyle}
+                onClick={() => toggleDriveFileSelection(file.id)}
+              >
                 <input
                   type="checkbox"
                   checked={selectedDriveFiles.has(file.id)}
                   onChange={() => toggleDriveFileSelection(file.id)}
+                  onClick={(e) => e.stopPropagation()}
                   style={{ marginRight: 8, cursor: "pointer" }}
                 />
                 <div style={driveFileThumbStyle}>
@@ -694,7 +722,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
           </div>
         )}
 
-        {/* Navigation and sync actions */}
+        {/* Navigation and import actions */}
         <div style={driveActionsStyle}>
           {folderPath.length > 0 && (
             <button
@@ -706,7 +734,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
               ← Back
             </button>
           )}
-          {(driveFolders.length > 0 || driveFiles.length > 0) && (
+          {(driveFiles.length > 0 || selectedDriveFiles.size > 0) && (
             <button
               type="button"
               onClick={syncSelectedDriveFiles}
@@ -714,8 +742,8 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
               style={primaryActionButtonStyle}
             >
               {driveSyncing
-                ? `Syncing ${selectedDriveFiles.size} file${selectedDriveFiles.size === 1 ? "" : "s"}...`
-                : `Sync ${selectedDriveFiles.size} file${selectedDriveFiles.size === 1 ? "" : "s"}`}
+                ? `Importing ${selectedDriveFiles.size} file${selectedDriveFiles.size === 1 ? "" : "s"}...`
+                : `Import ${selectedDriveFiles.size} file${selectedDriveFiles.size === 1 ? "" : "s"}`}
             </button>
           )}
         </div>
@@ -991,7 +1019,10 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setUploadMode("drive")}
+                    onClick={() => {
+                      setUploadMode("drive");
+                      resetDriveFolderPath();
+                    }}
                     disabled={!authUser?.authenticated}
                     style={{
                       ...uploadModeTabStyle,
@@ -1000,7 +1031,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
                       cursor: authUser?.authenticated ? "pointer" : "not-allowed",
                     }}
                   >
-                    Sync from Drive
+                    Import from Drive
                   </button>
                 </div>
 
