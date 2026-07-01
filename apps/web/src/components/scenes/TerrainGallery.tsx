@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import * as THREE from "three";
 import { fetchMapPlacements, type MapPlacement } from "../../api/client";
 import { useGalleryStore } from "../../stores/galleryStore";
+import LoadingIndicator from "../ui/LoadingIndicator";
 import TerrainPhotoPin from "./TerrainPhotoPin";
 import {
   createTerrainPhotoLayout,
@@ -22,10 +23,16 @@ const DETAIL_MIN_RADIUS_KM = 0.8;
 const DETAIL_MAX_RADIUS_KM = 5;
 type TerrainPhase = "idle" | "projecting" | "fetching" | "rendering" | "ready" | "flat" | "error";
 type DetailFocus = { x: number; y: number; distance: number };
+type TerrainOrbitControls = {
+  target?: THREE.Vector3;
+  update?: () => void;
+};
 
 export default function TerrainGallery({ overlayRoot }: { overlayRoot: HTMLDivElement | null }) {
-  const { camera } = useThree();
+  const camera = useThree((state) => state.camera);
+  const controls = useThree((state) => (state as unknown as { controls?: TerrainOrbitControls }).controls);
   const photos = useGalleryStore((s) => s.photos);
+  const galleryLoading = useGalleryStore((s) => s.loading);
   const selectedAlbumId = useGalleryStore((s) => s.selectedAlbumId);
   const selectedIndex = useGalleryStore((s) => s.selectedPhotoIndex);
   const selectPhoto = useGalleryStore((s) => s.selectPhoto);
@@ -137,6 +144,7 @@ export default function TerrainGallery({ overlayRoot }: { overlayRoot: HTMLDivEl
 
   function focusPlacement(placement: MapPlacement) {
     document.body.style.cursor = "";
+    resetTerrainCamera(camera, controls);
     setFocusedPlacement(placement);
     setDetailFocus(null);
     setDetailTerrain((previous) => {
@@ -377,12 +385,23 @@ export default function TerrainGallery({ overlayRoot }: { overlayRoot: HTMLDivEl
     };
   }, [detailTerrain]);
 
-  if (photos.length === 0 && placements.length === 0 && !placementError) return null;
+  if (photos.length === 0 && placements.length === 0 && !placementError) {
+    return (
+      <Html fullscreen portal={overlayPortal} style={overlayRootStyle}>
+        <LoadingIndicator label={galleryLoading ? "Loading gallery" : "Preparing terrain"} />
+      </Html>
+    );
+  }
 
   if (geoPhotos.length === 0 && geoPlacements.length === 0) {
     return (
-      <Html center style={messageStyle}>
-        {placementError ? `Placement locations failed: ${placementError}` : "No GPS photos or placements for terrain mode."}
+      <Html fullscreen portal={overlayPortal} style={overlayRootStyle}>
+        <LoadingIndicator
+          label={placementError ? "Placement locations failed" : "No terrain locations"}
+          detail={placementError ?? "No GPS photos or placements for terrain mode."}
+          tone={placementError ? "error" : "muted"}
+          busy={false}
+        />
       </Html>
     );
   }
@@ -470,12 +489,25 @@ export default function TerrainGallery({ overlayRoot }: { overlayRoot: HTMLDivEl
       ))}
 
       {(loading || error) && (
-        <Html position={[0, 0, 2]} center style={messageStyle}>
-          {loading ? "Loading terrain..." : error}
+        <Html fullscreen portal={overlayPortal} style={overlayRootStyle}>
+          <LoadingIndicator
+            label={loading ? "Loading terrain" : "Terrain failed"}
+            detail={error ?? undefined}
+            tone={error ? "error" : "loading"}
+            busy={loading}
+          />
         </Html>
       )}
     </group>
   );
+}
+
+function resetTerrainCamera(camera: THREE.Camera, controls?: TerrainOrbitControls) {
+  camera.position.set(0, 0, 16);
+  camera.up.set(0, 1, 0);
+  camera.lookAt(0, 0, 0);
+  controls?.target?.set(0, 0, 0);
+  controls?.update?.();
 }
 
 function FocusedPlacementOverlay({ placement }: { placement: MapPlacement }) {
@@ -576,17 +608,6 @@ function TerrainPlaceMarker({
     </group>
   );
 }
-
-const messageStyle: React.CSSProperties = {
-  color: "#ccc",
-  background: "rgba(10,10,20,0.75)",
-  border: "1px solid rgba(255,255,255,0.15)",
-  borderRadius: 4,
-  padding: "8px 12px",
-  fontFamily: "monospace",
-  fontSize: 12,
-  whiteSpace: "nowrap",
-};
 
 const overlayRootStyle: React.CSSProperties = {
   pointerEvents: "none",

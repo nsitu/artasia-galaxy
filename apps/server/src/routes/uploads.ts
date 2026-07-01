@@ -224,9 +224,14 @@ function mapAdminAsset(
     uploader_id: uploaderAlbum?.uploaderId ?? null,
     uploader_name: uploaderAlbum?.uploaderName ?? null,
     uploader_album_id: uploaderAlbum?.id ?? null,
-    thumbnailUrl: `/api/v1/assets/${asset.id}/thumbnail`,
-    previewUrl: `/api/v1/assets/${asset.id}/preview`,
+    thumbnailUrl: assetMediaUrl(asset, "thumbnail"),
+    previewUrl: assetMediaUrl(asset, "preview"),
   };
+}
+
+function assetMediaUrl(asset: Awaited<ReturnType<typeof getAssetsForPlacementTagIds>>[number], kind: "thumbnail" | "preview") {
+  const version = encodeURIComponent(asset.updatedAt || asset.fileModifiedAt || asset.checksum || asset.id);
+  return `/api/v1/assets/${asset.id}/${kind}?v=${version}`;
 }
 
 async function searchAssetsByAlbumId(albumId: string) {

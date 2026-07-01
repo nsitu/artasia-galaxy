@@ -81,8 +81,8 @@ function assetToPhoto(asset: ImmichAsset): Photo {
 
   return {
     id: asset.id,
-    thumbnailUrl: `/api/v1/assets/${asset.id}/thumbnail`,
-    previewUrl: `/api/v1/assets/${asset.id}/preview`,
+    thumbnailUrl: assetMediaUrl(asset, "thumbnail"),
+    previewUrl: assetMediaUrl(asset, "preview"),
     width: imgW,
     height: imgH,
     orientation,
@@ -103,6 +103,11 @@ function assetToPhoto(asset: ImmichAsset): Photo {
     fileName: asset.originalFileName,
     isFavorite: asset.isFavorite ?? false,
   };
+}
+
+function assetMediaUrl(asset: ImmichAsset, kind: "thumbnail" | "preview") {
+  const version = encodeURIComponent(asset.updatedAt || asset.fileModifiedAt || asset.checksum || asset.id);
+  return `/api/v1/assets/${asset.id}/${kind}?v=${version}`;
 }
 
 function seededShuffle<T>(array: T[], seed: number): T[] {

@@ -1129,7 +1129,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
                               <div style={thumbStyle}>
                                 {item.assetId ? (
                                   <img
-                                    src={`/api/v1/assets/${item.assetId}/thumbnail`}
+                                    src={`/api/v1/assets/${item.assetId}/thumbnail?v=${encodeURIComponent(item.assetId)}`}
                                     alt=""
                                     style={thumbImageStyle}
                                   />

@@ -7,6 +7,7 @@ import GalleryWall from "./GalleryWall";
 import CameraRig from "./CameraRig";
 import TerrainGallery from "./TerrainGallery";
 import SettingsPanel from "../ui/SettingsPanel";
+import LoadingIndicator from "../ui/LoadingIndicator";
 
 export default function ArtScene() {
   const fetchPhotos = useGalleryStore((s) => s.fetchPhotos);
@@ -190,10 +191,8 @@ export default function ArtScene() {
       )}
 
       {/* Loading / error */}
-      {loading && photos.length === 0 && (
-        <div style={centeredStyle}>
-          Loading...
-        </div>
+      {loading && photos.length === 0 && display.mode !== "terrain" && (
+        <LoadingIndicator label="Loading gallery" />
       )}
       {error && (
         <div
@@ -328,18 +327,6 @@ const dropdownItemStyle: React.CSSProperties = {
   padding: "6px 12px",
   cursor: "pointer",
   borderRadius: 3,
-};
-
-const centeredStyle: React.CSSProperties = {
-  position: "absolute",
-  inset: 0,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  zIndex: 10,
-  color: "#888",
-  fontFamily: "monospace",
-  pointerEvents: "none",
 };
 
 const metadataOverlayStyle: React.CSSProperties = {
