@@ -434,6 +434,7 @@ export default function TerrainGallery() {
           <button type="button" onClick={returnToRegional} style={backButtonStyle}>
             Back to regional view
           </button>
+          <FocusedPlacementOverlay placement={focusedPlacement} />
         </Html>
       )}
 
@@ -460,7 +461,7 @@ export default function TerrainGallery() {
         <TerrainPlaceMarker
           key={placement.placement_id}
           position={position}
-          onClick={() => focusPlacement(placement)}
+          onClick={focusedPlacement ? undefined : () => focusPlacement(placement)}
         />
       ))}
 
@@ -473,28 +474,77 @@ export default function TerrainGallery() {
   );
 }
 
+function FocusedPlacementOverlay({ placement }: { placement: MapPlacement }) {
+  const people = [placement.team_member, placement.secondary_team_member].filter(
+    (person): person is NonNullable<MapPlacement["team_member"]> => Boolean(person?.name)
+  );
+  const participantDetails = [
+    placement.participant_age ? `Ages ${placement.participant_age}` : "",
+    placement.participant_count ? `${placement.participant_count} children` : "",
+  ].filter(Boolean);
+
+  return (
+    <section style={siteDetailsStyle} aria-label="Placement details">
+      <div style={siteDetailsHeaderStyle}>
+        {placement.partner_logo?.url && (
+          <img
+            src={placement.partner_logo.url}
+            alt={placement.partner_logo.alt || placement.partner_name || "Partner logo"}
+            style={partnerLogoStyle}
+          />
+        )}
+        <div>
+          <div style={sitePartnerStyle}>{placement.partner_name || "Partner organization"}</div>
+          <div style={siteNameStyle}>{placement.placement_name}</div>
+        </div>
+      </div>
+
+      <div style={siteDetailsGridStyle}>
+        <SiteDetail label="Site" value={placement.place_name || placement.address || "Not specified"} />
+        <SiteDetail label="People" value={people.map((person) => person.name).join(", ") || "Unassigned"} />
+        <SiteDetail label="Children" value={participantDetails.join(" | ") || "Not specified"} />
+      </div>
+    </section>
+  );
+}
+
+function SiteDetail({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div style={siteDetailLabelStyle}>{label}</div>
+      <div style={siteDetailValueStyle}>{value}</div>
+    </div>
+  );
+}
+
 function TerrainPlaceMarker({
   position,
   onClick,
 }: {
   position: [number, number, number];
-  onClick: () => void;
+  onClick?: () => void;
 }) {
   const [x, y, z] = position;
 
   return (
     <group position={[x, y, z + 0.08]}>
       <mesh
-        onClick={(event) => {
-          event.stopPropagation();
-          onClick();
-        }}
-        onPointerOver={() => {
-          document.body.style.cursor = "pointer";
-        }}
-        onPointerOut={() => {
-          document.body.style.cursor = "";
-        }}
+        onClick={onClick
+          ? (event) => {
+              event.stopPropagation();
+              onClick();
+            }
+          : undefined}
+        onPointerOver={onClick
+          ? () => {
+              document.body.style.cursor = "pointer";
+            }
+          : undefined}
+        onPointerOut={onClick
+          ? () => {
+              document.body.style.cursor = "";
+            }
+          : undefined}
       >
         <sphereGeometry args={[0.12, 18, 12]} />
         <meshStandardMaterial color="#ff2d2d" emissive="#7a0808" roughness={0.5} />
@@ -535,6 +585,75 @@ const backButtonStyle: React.CSSProperties = {
   cursor: "pointer",
   fontFamily: "monospace",
   fontSize: 12,
+};
+
+const siteDetailsStyle: React.CSSProperties = {
+  position: "absolute",
+  top: 96,
+  left: 16,
+  width: 300,
+  maxWidth: "calc(100vw - 32px)",
+  pointerEvents: "none",
+  background: "rgba(10,10,20,0.82)",
+  border: "1px solid rgba(255,255,255,0.18)",
+  borderRadius: 6,
+  padding: "12px",
+  color: "#d8dde7",
+  fontFamily: "monospace",
+  boxShadow: "0 12px 32px rgba(0,0,0,0.28)",
+};
+
+const siteDetailsHeaderStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  paddingBottom: 10,
+  borderBottom: "1px solid rgba(255,255,255,0.12)",
+};
+
+const partnerLogoStyle: React.CSSProperties = {
+  flex: "0 0 auto",
+  width: 54,
+  height: 40,
+  objectFit: "contain",
+  background: "rgba(255,255,255,0.9)",
+  borderRadius: 4,
+  padding: 5,
+};
+
+const sitePartnerStyle: React.CSSProperties = {
+  color: "#f4f7fb",
+  fontSize: 12,
+  fontWeight: 700,
+  lineHeight: 1.25,
+};
+
+const siteNameStyle: React.CSSProperties = {
+  color: "#aeb7c6",
+  fontSize: 11,
+  lineHeight: 1.35,
+  marginTop: 3,
+};
+
+const siteDetailsGridStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 9,
+  paddingTop: 10,
+};
+
+const siteDetailLabelStyle: React.CSSProperties = {
+  color: "#8490a3",
+  fontSize: 10,
+  textTransform: "uppercase",
+  letterSpacing: 0,
+  marginBottom: 3,
+};
+
+const siteDetailValueStyle: React.CSSProperties = {
+  color: "#eef2f8",
+  fontSize: 12,
+  lineHeight: 1.35,
+  overflowWrap: "anywhere",
 };
 
 const tileStatusStyle: React.CSSProperties = {

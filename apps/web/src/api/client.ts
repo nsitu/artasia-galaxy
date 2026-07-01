@@ -101,6 +101,16 @@ export interface MapPlacement {
   placement_id: number;
   placement_name: string;
   partner_name?: string;
+  partner_logo?: {
+    id: number;
+    url: string;
+    mime_type: string;
+    alt: string;
+  } | null;
+  team_member?: UploadUploader;
+  secondary_team_member?: UploadUploader;
+  participant_count?: number;
+  participant_age?: string;
   place_name?: string;
   address?: string;
   lat: number;

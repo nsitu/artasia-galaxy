@@ -39,6 +39,16 @@ export interface ArtasiaMapPlacement {
   placement_id: number;
   placement_name: string;
   partner_name?: string;
+  partner_logo?: {
+    id: number;
+    url: string;
+    mime_type: string;
+    alt: string;
+  } | null;
+  team_member?: UploadUploader;
+  secondary_team_member?: UploadUploader;
+  participant_count?: number;
+  participant_age?: string;
   place_name?: string;
   address?: string;
   lat: number;
@@ -162,6 +172,11 @@ export async function getMapPlacements(): Promise<ArtasiaMapPlacement[]> {
       placement_id: wp.placement_id,
       placement_name: wp.placement_name,
       ...(wp.partner?.name ? { partner_name: wp.partner.name } : {}),
+      ...(wp.partner?.logo ? { partner_logo: wp.partner.logo } : {}),
+      ...(wp.team_member ? { team_member: mapWpUploader(wp.team_member) } : {}),
+      ...(wp.secondary_team_member ? { secondary_team_member: mapWpUploader(wp.secondary_team_member) } : {}),
+      ...(wp.participant_count ? { participant_count: wp.participant_count } : {}),
+      ...(wp.participant_age ? { participant_age: wp.participant_age } : {}),
       ...(wp.place?.name ? { place_name: wp.place.name } : {}),
       ...(wp.place?.address ? { address: wp.place.address } : {}),
       lat: lat as number,
