@@ -112,6 +112,7 @@ export interface MapPlacement {
   participant_count?: number;
   participant_age?: string;
   place_name?: string;
+  place_city?: string;
   address?: string;
   lat: number;
   lng: number;

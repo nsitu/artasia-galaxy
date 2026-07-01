@@ -23,7 +23,7 @@ const DETAIL_MAX_RADIUS_KM = 5;
 type TerrainPhase = "idle" | "projecting" | "fetching" | "rendering" | "ready" | "flat" | "error";
 type DetailFocus = { x: number; y: number; distance: number };
 
-export default function TerrainGallery() {
+export default function TerrainGallery({ overlayRoot }: { overlayRoot: HTMLDivElement | null }) {
   const { camera } = useThree();
   const photos = useGalleryStore((s) => s.photos);
   const selectedAlbumId = useGalleryStore((s) => s.selectedAlbumId);
@@ -45,6 +45,7 @@ export default function TerrainGallery() {
   const [detailPhase, setDetailPhase] = useState<TerrainPhase>("idle");
   const [detailError, setDetailError] = useState<string | null>(null);
   const [focusedPlacement, setFocusedPlacement] = useState<MapPlacement | null>(null);
+  const overlayPortal = useMemo(() => overlayRoot ? { current: overlayRoot } : undefined, [overlayRoot]);
 
   const geoPhotos = useMemo(() => {
     if (!focusedPlacement) return getGeoPhotos(photos);
@@ -392,7 +393,7 @@ export default function TerrainGallery() {
   return (
     <group>
       {request && (
-        <Html fullscreen style={overlayRootStyle}>
+        <Html fullscreen portal={overlayPortal} style={overlayRootStyle}>
           <div style={tileStatusStyle}>
             <div style={tileStatusHeaderStyle}>Terrain tiles</div>
             <div style={tileStatusSubheaderStyle}>Base</div>
@@ -433,7 +434,7 @@ export default function TerrainGallery() {
         </Html>
       )}
       {focusedPlacement && (
-        <Html fullscreen style={focusOverlayRootStyle}>
+        <Html fullscreen portal={overlayPortal} style={focusOverlayRootStyle}>
           <button type="button" onClick={returnToRegional} style={backButtonStyle}>
             Back to regional view
           </button>
@@ -483,6 +484,7 @@ function FocusedPlacementOverlay({ placement }: { placement: MapPlacement }) {
   );
   const participantDetails = formatParticipantDetails(placement);
   const peopleLabel = people.length > 1 ? "Artist Educators" : "Artist Educator";
+  const siteDetails = formatSiteDetails(placement);
 
   return (
     <section style={siteDetailsStyle} aria-label="Placement details">
@@ -501,12 +503,21 @@ function FocusedPlacementOverlay({ placement }: { placement: MapPlacement }) {
       </div>
 
       <div style={siteDetailsGridStyle}>
-        <SiteDetail label="Site" value={placement.place_name || placement.address || "Not specified"} />
+        <SiteDetail label="Site" value={siteDetails || "Not specified"} />
         <SiteDetail label={peopleLabel} value={people.map((person) => person.name).join(", ") || "Unassigned"} />
         <SiteDetail label="Children" value={participantDetails || "Not specified"} />
       </div>
     </section>
   );
+}
+
+function formatSiteDetails(placement: MapPlacement) {
+  const details = [
+    placement.place_name?.trim(),
+    placement.place_city?.trim(),
+  ].filter(Boolean);
+
+  return details.join(", ") || placement.address || "";
 }
 
 function formatParticipantDetails(placement: MapPlacement) {

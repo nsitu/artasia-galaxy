@@ -50,6 +50,7 @@ export interface ArtasiaMapPlacement {
   participant_count?: number;
   participant_age?: string;
   place_name?: string;
+  place_city?: string;
   address?: string;
   lat: number;
   lng: number;
@@ -178,6 +179,7 @@ export async function getMapPlacements(): Promise<ArtasiaMapPlacement[]> {
       ...(wp.participant_count ? { participant_count: wp.participant_count } : {}),
       ...(wp.participant_age ? { participant_age: wp.participant_age } : {}),
       ...(wp.place?.name ? { place_name: wp.place.name } : {}),
+      ...(wp.place?.city ? { place_city: wp.place.city } : {}),
       ...(wp.place?.address ? { address: wp.place.address } : {}),
       lat: lat as number,
       lng: lng as number,
