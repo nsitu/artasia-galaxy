@@ -37,6 +37,7 @@ export default function TerrainGallery() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [phase, setPhase] = useState<TerrainPhase>("idle");
+  const [renderedTerrainKey, setRenderedTerrainKey] = useState<string | null>(null);
   const [placements, setPlacements] = useState<MapPlacement[]>([]);
   const [placementError, setPlacementError] = useState<string | null>(null);
   const [detailFocus, setDetailFocus] = useState<DetailFocus | null>(null);
@@ -72,6 +73,18 @@ export default function TerrainGallery() {
     }
     return createTerrainRequest([...geoPhotos, ...geoPlacements]);
   }, [focusedPlacement, geoPhotos, geoPlacements]);
+  const requestKey = useMemo(() => {
+    if (!request) return null;
+    const mode = focusedPlacement ? `placement:${focusedPlacement.placement_id}` : "regional";
+    return [
+      mode,
+      request.origin[0],
+      request.origin[1],
+      request.radiusKm,
+      request.zoom,
+      request.unitsSide,
+    ].join(":");
+  }, [focusedPlacement, request]);
   const detailRequest = useMemo(() => {
     if (!request || !projection || !detailFocus || detailFocus.distance > DETAIL_TRIGGER_DISTANCE) return null;
 
@@ -130,6 +143,7 @@ export default function TerrainGallery() {
     });
     setDetailPhase("idle");
     setDetailError(null);
+    setRenderedTerrainKey(null);
     selectPhoto(null);
     void fetchPlacementFocus({
       placementId: placement.placement_id,
@@ -148,6 +162,7 @@ export default function TerrainGallery() {
     });
     setDetailPhase("idle");
     setDetailError(null);
+    setRenderedTerrainKey(null);
     selectPhoto(null);
     void fetchPhotos(selectedAlbumId ?? undefined);
   }
@@ -210,6 +225,7 @@ export default function TerrainGallery() {
       setLoading(false);
       setError(null);
       setPhase("idle");
+      setRenderedTerrainKey(null);
       return;
     }
 
@@ -218,6 +234,12 @@ export default function TerrainGallery() {
     setLoading(Boolean(MAPBOX_TOKEN));
     setError(null);
     setPhase("projecting");
+    setRenderedTerrainKey(null);
+    setTerrain((previous) => {
+      if (previous) disposeObject(previous);
+      return null;
+    });
+    setProjection(null);
 
     loadThreeGeo()
       .then((ThreeGeo) => {
@@ -235,6 +257,7 @@ export default function TerrainGallery() {
           setTerrain(null);
           setError("Set VITE_MAPBOX_TOKEN to load terrain.");
           setPhase("flat");
+          setRenderedTerrainKey(requestKey);
           return null;
         }
         setPhase("fetching");
@@ -254,12 +277,16 @@ export default function TerrainGallery() {
           return group;
         });
         renderFrame = window.requestAnimationFrame(() => {
-          if (!cancelled) setPhase("ready");
+          if (!cancelled) {
+            setRenderedTerrainKey(requestKey);
+            setPhase("ready");
+          }
         });
       })
       .catch((err) => {
         if (!cancelled) {
           setTerrain(null);
+          setRenderedTerrainKey(null);
           setError((err as Error).message);
           setPhase("error");
         }
@@ -272,7 +299,7 @@ export default function TerrainGallery() {
       cancelled = true;
       if (renderFrame !== null) window.cancelAnimationFrame(renderFrame);
     };
-  }, [request]);
+  }, [requestKey]);
 
   useEffect(() => {
     return () => {
@@ -356,6 +383,9 @@ export default function TerrainGallery() {
     );
   }
 
+  const terrainMatchesRequest = Boolean(request && requestKey && renderedTerrainKey === requestKey);
+  const sceneReadyForMarkers = terrainMatchesRequest || phase === "flat";
+
   return (
     <group>
       {request && (
@@ -407,10 +437,10 @@ export default function TerrainGallery() {
         </Html>
       )}
 
-      {terrain && <primitive object={terrain} />}
-      {detailTerrain && <primitive object={detailTerrain} />}
+      {terrain && terrainMatchesRequest && <primitive object={terrain} />}
+      {detailTerrain && terrainMatchesRequest && <primitive object={detailTerrain} />}
 
-      {layout.map(({ photo, index, position }) => (
+      {sceneReadyForMarkers && layout.map(({ photo, index, position }) => (
         <TerrainPhotoPin
           key={photo.id}
           id={photo.id}
@@ -426,7 +456,7 @@ export default function TerrainGallery() {
         />
       ))}
 
-      {placementLayout.map(({ placement, position }) => (
+      {sceneReadyForMarkers && placementLayout.map(({ placement, position }) => (
         <TerrainPlaceMarker
           key={placement.placement_id}
           position={position}
