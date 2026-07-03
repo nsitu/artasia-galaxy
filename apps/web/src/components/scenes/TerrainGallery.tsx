@@ -1,4 +1,4 @@
-import { useFrame, useThree } from "@react-three/fiber";
+import { useThree } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import * as THREE from "three";
 import { fetchMapPlacements, type MapPlacement, type Photo } from "../../api/client";
@@ -7,26 +7,20 @@ import LoadingIndicator from "../ui/LoadingIndicator";
 import { OrbitingPhotoBanner, TerrainPhotoFlower } from "./TerrainPhotoMarker";
 import PlaceMarker from "./PlaceMarker";
 import {
-  createTerrainDetailRequest,
   createMaxDetailTerrainRequest,
   createTerrainRequest,
   getGeoPhotos,
-  type TerrainDetailRequest,
 } from "./terrainLayout";
 import { loadThreeGeo, type ThreeGeoProjection } from "./threeGeoRuntime";
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN ?? "";
 const REGIONAL_TERRAIN_ELEVATION_SCALE = 5;
 const LOCAL_TERRAIN_ELEVATION_SCALE = 2;
-const DETAIL_TRIGGER_DISTANCE = 6;
-const DETAIL_MIN_RADIUS_KM = 0.8;
-const DETAIL_MAX_RADIUS_KM = 5;
 const DEFAULT_TERRAIN_CAMERA_POSITION = new THREE.Vector3(0, -12, 10);
 const LOCAL_PLACEMENT_RADIUS_KM = 1;
 const SAME_LOCATION_THRESHOLD_METERS = 15;
 const REGIONAL_FLOWER_DENSITY_RADIUS = 0.62;
 type TerrainPhase = "idle" | "projecting" | "fetching" | "rendering" | "ready" | "flat" | "error";
-type DetailFocus = { x: number; y: number; distance: number };
 type LocalPhotoLayoutItem =
   | {
       kind: "flower";
@@ -59,12 +53,6 @@ export interface TerrainOverlayState {
     radiusKm: number;
   };
   basePhase?: TerrainPhase;
-  detail?: {
-    status: string;
-    zoom?: number;
-    estimatedSatelliteTiles?: number;
-    radiusKm?: number;
-  };
   focusedPlacement?: MapPlacement | null;
   hoveredPlacement?: MapPlacement | null;
   onBack?: () => void;
@@ -88,10 +76,6 @@ export default function TerrainGallery({ onOverlayChange }: { onOverlayChange: (
   const [renderedTerrainKey, setRenderedTerrainKey] = useState<string | null>(null);
   const [placements, setPlacements] = useState<MapPlacement[]>([]);
   const [placementError, setPlacementError] = useState<string | null>(null);
-  const [detailFocus, setDetailFocus] = useState<DetailFocus | null>(null);
-  const [detailTerrain, setDetailTerrain] = useState<THREE.Group | null>(null);
-  const [detailPhase, setDetailPhase] = useState<TerrainPhase>("idle");
-  const [detailError, setDetailError] = useState<string | null>(null);
   const [focusedPlacement, setFocusedPlacement] = useState<MapPlacement | null>(null);
   const [hoveredPlacement, setHoveredPlacement] = useState<MapPlacement | null>(null);
 
@@ -127,26 +111,6 @@ export default function TerrainGallery({ onOverlayChange }: { onOverlayChange: (
   const terrainElevationScale = focusedPlacement
     ? LOCAL_TERRAIN_ELEVATION_SCALE
     : REGIONAL_TERRAIN_ELEVATION_SCALE;
-  const detailRequest = useMemo(() => {
-    if (!request || !projection || !detailFocus || detailFocus.distance > DETAIL_TRIGGER_DISTANCE) return null;
-
-    const [lat, lng] = projection.projInv(detailFocus.x, detailFocus.y);
-    const fov = camera instanceof THREE.PerspectiveCamera ? camera.fov : 50;
-    const visibleRadiusUnits = detailFocus.distance * Math.tan(THREE.MathUtils.degToRad(fov / 2)) * 0.75;
-    const radiusKm = clamp(
-      visibleRadiusUnits / (projection.unitsPerMeter * 1000),
-      DETAIL_MIN_RADIUS_KM,
-      Math.min(DETAIL_MAX_RADIUS_KM, request.radiusKm / 2)
-    );
-
-    return createTerrainDetailRequest({
-      origin: [lat, lng],
-      center: [detailFocus.x, detailFocus.y],
-      radiusKm,
-      baseUnitsPerMeter: projection.unitsPerMeter,
-      baseZoom: request.zoom,
-    });
-  }, [camera, detailFocus, projection, request]);
   const localPhotoLayout = useMemo<LocalPhotoLayoutItem[]>(() => {
     if (!focusedPlacement || !projection) return [];
     const [placementX, placementY, placementZ = 0] = projection.proj([focusedPlacement.lat, focusedPlacement.lng]);
@@ -224,13 +188,6 @@ export default function TerrainGallery({ onOverlayChange }: { onOverlayChange: (
     document.body.style.cursor = "";
     setHoveredPlacement(null);
     setFocusedPlacement(placement);
-    setDetailFocus(null);
-    setDetailTerrain((previous) => {
-      if (previous) disposeObject(previous);
-      return null;
-    });
-    setDetailPhase("idle");
-    setDetailError(null);
     setRenderedTerrainKey(null);
     selectPhoto(null);
     void fetchPlacementFocus({
@@ -244,13 +201,6 @@ export default function TerrainGallery({ onOverlayChange }: { onOverlayChange: (
   const returnToRegional = useCallback(() => {
     document.body.style.cursor = "";
     setFocusedPlacement(null);
-    setDetailFocus(null);
-    setDetailTerrain((previous) => {
-      if (previous) disposeObject(previous);
-      return null;
-    });
-    setDetailPhase("idle");
-    setDetailError(null);
     setRenderedTerrainKey(null);
     selectPhoto(null);
     void fetchPhotos();
@@ -273,39 +223,6 @@ export default function TerrainGallery({ onOverlayChange }: { onOverlayChange: (
       cancelled = true;
     };
   }, []);
-
-  useFrame(() => {
-    if (!projection || !request) {
-      setDetailFocus((current) => (current ? null : current));
-      return;
-    }
-
-    const direction = new THREE.Vector3();
-    camera.getWorldDirection(direction);
-    if (Math.abs(direction.z) < 0.001) return;
-
-    const t = -camera.position.z / direction.z;
-    if (t <= 0) return;
-
-    const point = camera.position.clone().add(direction.multiplyScalar(t));
-    const distance = camera.position.distanceTo(point);
-    if (distance > DETAIL_TRIGGER_DISTANCE) {
-      setDetailFocus((current) => (current ? null : current));
-      return;
-    }
-
-    setDetailFocus((current) => {
-      if (
-        current &&
-        Math.hypot(current.x - point.x, current.y - point.y) < 0.55 &&
-        Math.abs(current.distance - distance) < 0.7
-      ) {
-        return current;
-      }
-
-      return { x: point.x, y: point.y, distance };
-    });
-  });
 
   useEffect(() => {
     if (!request) {
@@ -398,73 +315,6 @@ export default function TerrainGallery({ onOverlayChange }: { onOverlayChange: (
     };
   }, [terrain]);
 
-  useEffect(() => {
-    if (!detailRequest || !MAPBOX_TOKEN) {
-      setDetailPhase("idle");
-      setDetailError(null);
-      setDetailTerrain((previous) => {
-        if (previous) disposeObject(previous);
-        return null;
-      });
-      return;
-    }
-
-    let cancelled = false;
-    let renderFrame: number | null = null;
-    setDetailPhase("fetching");
-    setDetailError(null);
-
-    loadThreeGeo()
-      .then((ThreeGeo) => {
-        const tgeo = new ThreeGeo({
-          tokenMapbox: MAPBOX_TOKEN,
-          unitsSide: detailRequest.unitsSide,
-        });
-        console.info("Artasia terrain detail request", {
-          radiusKm: detailRequest.radiusKm,
-          zoom: detailRequest.zoom,
-          estimatedSatelliteTiles: detailRequest.estimatedSatelliteTiles,
-        });
-        return tgeo.getTerrainRgb(detailRequest.origin, detailRequest.radiusKm, detailRequest.zoom);
-      })
-      .then((group) => {
-        if (cancelled) {
-          disposeObject(group);
-          return;
-        }
-        setDetailPhase("rendering");
-        group.name = "artasia-terrain-detail";
-        group.position.set(detailRequest.center[0], detailRequest.center[1], 0.025);
-        group.scale.z = terrainElevationScale;
-        normalizeTerrainMaterials(group);
-        setDetailTerrain((previous) => {
-          if (previous) disposeObject(previous);
-          return group;
-        });
-        renderFrame = window.requestAnimationFrame(() => {
-          if (!cancelled) setDetailPhase("ready");
-        });
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setDetailTerrain(null);
-          setDetailError((err as Error).message);
-          setDetailPhase("error");
-        }
-      });
-
-    return () => {
-      cancelled = true;
-      if (renderFrame !== null) window.cancelAnimationFrame(renderFrame);
-    };
-  }, [detailRequest, terrainElevationScale]);
-
-  useEffect(() => {
-    return () => {
-      if (detailTerrain) disposeObject(detailTerrain);
-    };
-  }, [detailTerrain]);
-
   const terrainMatchesRequest = Boolean(request && requestKey && renderedTerrainKey === requestKey);
   const sceneReadyForMarkers = terrainMatchesRequest || phase === "flat";
   const showPhotoPins = Boolean(focusedPlacement);
@@ -505,12 +355,6 @@ export default function TerrainGallery({ onOverlayChange }: { onOverlayChange: (
               radiusKm: request.radiusKm,
             },
             basePhase: phase,
-            detail: {
-              status: detailStatusLabel(detailRequest, detailPhase, detailError),
-              ...(detailRequest ? { zoom: detailRequest.zoom } : {}),
-              ...(detailRequest ? { estimatedSatelliteTiles: detailRequest.estimatedSatelliteTiles } : {}),
-              ...(detailRequest ? { radiusKm: detailRequest.radiusKm } : {}),
-            },
           }
         : {}),
       ...(focusedPlacement ? { focusedPlacement, onBack: returnToRegional } : {}),
@@ -527,9 +371,6 @@ export default function TerrainGallery({ onOverlayChange }: { onOverlayChange: (
         : {}),
     };
   }, [
-    detailError,
-    detailPhase,
-    detailRequest,
     error,
     focusedPlacement,
     galleryLoading,
@@ -558,7 +399,6 @@ export default function TerrainGallery({ onOverlayChange }: { onOverlayChange: (
   return (
     <group>
       {terrain && terrainMatchesRequest && <primitive object={terrain} />}
-      {detailTerrain && terrainMatchesRequest && <primitive object={detailTerrain} />}
 
       {sceneReadyForMarkers && showPhotoPins && localPhotoLayout.map((item) => (
         item.kind === "flower" ? (
@@ -633,23 +473,6 @@ export function TerrainOverlay({ state }: { state: TerrainOverlayState | null })
           <div style={tileStatusRowStyle}>
             <span>Radius</span>
             <strong style={tileStatusValueStyle}>{formatRadius(state.request.radiusKm)}</strong>
-          </div>
-          <div style={tileStatusSubheaderStyle}>Detail</div>
-          <div style={tileStatusRowStyle}>
-            <span>Status</span>
-            <strong style={tileStatusValueStyle}>{state.detail?.status ?? "Inactive"}</strong>
-          </div>
-          <div style={tileStatusRowStyle}>
-            <span>Resolution</span>
-            <strong style={tileStatusValueStyle}>{state.detail?.zoom ? `z${state.detail.zoom}` : "-"}</strong>
-          </div>
-          <div style={tileStatusRowStyle}>
-            <span>Estimated tiles</span>
-            <strong style={tileStatusValueStyle}>{state.detail?.estimatedSatelliteTiles ?? "-"}</strong>
-          </div>
-          <div style={tileStatusRowStyle}>
-            <span>Radius</span>
-            <strong style={tileStatusValueStyle}>{state.detail?.radiusKm ? formatRadius(state.detail.radiusKm) : "-"}</strong>
           </div>
         </div>
       )}
@@ -949,16 +772,6 @@ function terrainPhaseLabel(phase: TerrainPhase) {
     default:
       return "Waiting";
   }
-}
-
-function detailStatusLabel(
-  request: TerrainDetailRequest | null,
-  phase: TerrainPhase,
-  error: string | null
-) {
-  if (error) return "Error";
-  if (!request) return "Inactive";
-  return terrainPhaseLabel(phase);
 }
 
 function formatRadius(radiusKm: number) {
