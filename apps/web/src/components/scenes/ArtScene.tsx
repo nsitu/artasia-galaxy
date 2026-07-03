@@ -4,6 +4,8 @@ import { OrbitControls, Preload } from "@react-three/drei";
 import { useGalleryStore } from "../../stores/galleryStore";
 import TerrainGallery, { TerrainOverlay, type TerrainOverlayState } from "./TerrainGallery";
 
+const DEFAULT_TERRAIN_CAMERA_POSITION: [number, number, number] = [0, -12, 10];
+
 export default function ArtScene() {
   const fetchPhotos = useGalleryStore((s) => s.fetchPhotos);
   const photos = useGalleryStore((s) => s.photos);
@@ -25,23 +27,34 @@ export default function ArtScene() {
         <a href="/admin" style={btnStyle}>
           Admin
         </a>
-        <span style={photoCountStyle}>
-          {photos.length > 0 && `${photos.length} photo${photos.length !== 1 ? "s" : ""}`}
-        </span>
       </div>
 
       {error && <div style={errorStyle}>{error}</div>}
 
       {selectedPhoto && (
-        <div style={metadataOverlayStyle}>
-          <div style={metadataTitleStyle}>{selectedPhoto.fileName}</div>
-          <div style={metadataDescriptionStyle}>
-            {selectedDescription || "No description metadata."}
+        <div
+          style={photoLightboxStyle}
+          role="dialog"
+          aria-modal="true"
+          aria-label={selectedPhoto.fileName}
+          onClick={() => selectPhoto(null)}
+        >
+          <img
+            src={selectedPhoto.previewUrl}
+            alt={selectedPhoto.fileName}
+            style={photoLightboxImageStyle}
+            onClick={(event) => event.stopPropagation()}
+          />
+          <div style={photoLightboxMetadataStyle} onClick={(event) => event.stopPropagation()}>
+            <div style={photoLightboxTitleStyle}>{selectedPhoto.fileName}</div>
+            <div style={photoLightboxDescriptionStyle}>
+              {selectedDescription || "No description metadata."}
+            </div>
           </div>
           <button
             onClick={() => selectPhoto(null)}
-            aria-label="Close metadata"
-            style={metadataCloseStyle}
+            aria-label="Close photo"
+            style={photoLightboxCloseStyle}
           >
             x
           </button>
@@ -51,8 +64,12 @@ export default function ArtScene() {
       <TerrainOverlay state={terrainOverlay} />
 
       <Canvas
-        camera={{ position: [0, 0, 16], fov: 50 }}
+        camera={{ position: DEFAULT_TERRAIN_CAMERA_POSITION, fov: 50 }}
         dpr={[1, 1.5]}
+        onCreated={({ camera }) => {
+          camera.up.set(0, 1, 0);
+          camera.lookAt(0, 0, 0);
+        }}
         style={{ background: "#0a0a14" }}
       >
         <ambientLight intensity={0.8} />
@@ -103,10 +120,6 @@ const btnStyle: React.CSSProperties = {
   textDecoration: "none",
 };
 
-const photoCountStyle: React.CSSProperties = {
-  color: "#aaa",
-};
-
 const errorStyle: React.CSSProperties = {
   position: "absolute",
   bottom: 20,
@@ -121,48 +134,72 @@ const errorStyle: React.CSSProperties = {
   borderRadius: 4,
 };
 
-const metadataOverlayStyle: React.CSSProperties = {
+const photoLightboxStyle: React.CSSProperties = {
   position: "absolute",
-  left: 16,
-  bottom: 42,
-  zIndex: 14,
-  width: "min(420px, calc(100vw - 32px))",
-  maxHeight: "32vh",
+  inset: 0,
+  zIndex: 30,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: 24,
+  background: "rgba(3,3,8,0.88)",
+  cursor: "zoom-out",
+};
+
+const photoLightboxImageStyle: React.CSSProperties = {
+  maxWidth: "calc(100vw - 48px)",
+  maxHeight: "calc(100vh - 48px)",
+  objectFit: "contain",
+  boxShadow: "0 18px 60px rgba(0,0,0,0.5)",
+  cursor: "default",
+};
+
+const photoLightboxMetadataStyle: React.CSSProperties = {
+  position: "absolute",
+  left: 24,
+  bottom: 24,
+  width: "min(520px, calc(100vw - 48px))",
+  maxHeight: "28vh",
   overflowY: "auto",
-  background: "rgba(10,10,20,0.88)",
-  border: "1px solid rgba(255,255,255,0.16)",
+  background: "rgba(10,10,20,0.86)",
+  border: "1px solid rgba(255,255,255,0.18)",
   borderRadius: 6,
-  padding: "12px 40px 12px 14px",
+  padding: "12px 14px",
   color: "#ddd",
   fontFamily: "monospace",
   fontSize: 13,
   lineHeight: 1.45,
+  cursor: "default",
 };
 
-const metadataTitleStyle: React.CSSProperties = {
+const photoLightboxTitleStyle: React.CSSProperties = {
   color: "#fff",
   fontSize: 12,
+  fontWeight: 700,
   marginBottom: 6,
   overflowWrap: "anywhere",
 };
 
-const metadataDescriptionStyle: React.CSSProperties = {
-  color: "#bbb",
+const photoLightboxDescriptionStyle: React.CSSProperties = {
+  color: "#c7ccd6",
   whiteSpace: "pre-wrap",
   overflowWrap: "anywhere",
 };
 
-const metadataCloseStyle: React.CSSProperties = {
+const photoLightboxCloseStyle: React.CSSProperties = {
   position: "absolute",
-  top: 8,
-  right: 8,
-  background: "rgba(255,255,255,0.08)",
-  border: "1px solid rgba(255,255,255,0.14)",
-  borderRadius: 4,
-  color: "#aaa",
+  top: 16,
+  right: 16,
+  background: "rgba(245,247,251,0.94)",
+  border: "1px solid rgba(0,0,0,0.28)",
+  borderRadius: 999,
+  color: "#10131c",
   cursor: "pointer",
   fontFamily: "monospace",
-  fontSize: 12,
-  width: 24,
-  height: 24,
+  fontSize: 24,
+  fontWeight: 700,
+  lineHeight: 1,
+  width: 46,
+  height: 46,
+  boxShadow: "0 10px 32px rgba(0,0,0,0.36)",
 };

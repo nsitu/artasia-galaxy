@@ -39,6 +39,7 @@ const TERRAIN_UNITS_SIDE = 12;
 const CLUSTER_RADIUS = 0.75;
 const MAX_HIGH_DETAIL_SATELLITE_TILES = 72;
 const MAX_DETAIL_SATELLITE_TILES = 64;
+const MAX_THREE_GEO_ZOOM = 17;
 const HIGH_DETAIL_ZOOMS = [17, 16, 15, 14, 13, 12] as const;
 
 export function getGeoPhotos(photos: Photo[]): GeoPhoto[] {
@@ -82,6 +83,16 @@ export function createFixedTerrainRequest(origin: [number, number], radiusKm: nu
     zoom,
     unitsSide: TERRAIN_UNITS_SIDE,
     estimatedSatelliteTiles: estimateSatelliteTileCount(origin, radiusKm, zoom),
+  };
+}
+
+export function createMaxDetailTerrainRequest(origin: [number, number], radiusKm: number): TerrainRequest {
+  return {
+    origin,
+    radiusKm,
+    zoom: MAX_THREE_GEO_ZOOM,
+    unitsSide: TERRAIN_UNITS_SIDE,
+    estimatedSatelliteTiles: estimateSatelliteTileCount(origin, radiusKm, MAX_THREE_GEO_ZOOM),
   };
 }
 

@@ -1,5 +1,5 @@
 import { getPublishedAlbum, listTags, searchAssets, ImmichAsset } from "../infra/ImmichClient.js";
-import { getUploadConfig, placementAnchorTag } from "./uploadConfig.service.js";
+import { placementAnchorTag } from "./uploadConfig.service.js";
 
 export interface Photo {
   id: string;
@@ -121,22 +121,6 @@ function seededShuffle<T>(array: T[], seed: number): T[] {
   return shuffled;
 }
 
-function haversineKm(a: [number, number], b: [number, number]) {
-  const earthRadiusKm = 6371;
-  const dLat = degToRad(b[0] - a[0]);
-  const dLng = degToRad(b[1] - a[1]);
-  const lat1 = degToRad(a[0]);
-  const lat2 = degToRad(b[0]);
-  const value =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
-  return 2 * earthRadiusKm * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
-}
-
-function degToRad(deg: number) {
-  return (deg * Math.PI) / 180;
-}
-
 export async function querySlideshow(
   query: SlideshowQuery
 ): Promise<{ photos: Photo[]; total: number }> {
@@ -164,27 +148,14 @@ export async function querySlideshow(
   if (query.placementFocus) {
     const focus = query.placementFocus;
     const publishedAssetIds = new Set(assets.map((asset) => asset.id));
-    const nearAssets = assets.filter((asset) => {
-      const lat = asset.exifInfo?.latitude;
-      const lng = asset.exifInfo?.longitude;
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
-      return haversineKm([focus.lat, focus.lng], [lat as number, lng as number]) <= focus.radiusKm;
-    });
-
-    const config = await getUploadConfig();
-    const placement = config.placements.find((item) => item.placement_id === focus.placementId);
-    const possibleTagNames = [
-      placementAnchorTag(focus.placementId),
-      placement?.partner_name,
-      placement?.placement_name,
-    ]
-      .map((name) => name?.trim().toLowerCase())
-      .filter((name): name is string => Boolean(name));
+    const directPlacementTag = placementAnchorTag(focus.placementId).toLowerCase();
 
     const allTags = await listTags();
     const placementTagIds = allTags
-      .filter((tag) => possibleTagNames.includes(tag.name.trim().toLowerCase()) ||
-        possibleTagNames.includes(tag.value.trim().toLowerCase()))
+      .filter((tag) =>
+        tag.name.trim().toLowerCase() === directPlacementTag ||
+        tag.value.trim().toLowerCase() === directPlacementTag
+      )
       .map((tag) => tag.id);
 
     const taggedResults = await Promise.all(
@@ -201,7 +172,7 @@ export async function querySlideshow(
       .filter((asset) => asset.type === "IMAGE" && publishedAssetIds.has(asset.id));
 
     const byId = new Map<string, ImmichAsset>();
-    for (const asset of [...nearAssets, ...taggedAssets]) byId.set(asset.id, asset);
+    for (const asset of taggedAssets) byId.set(asset.id, asset);
     assets = Array.from(byId.values());
   }
 
