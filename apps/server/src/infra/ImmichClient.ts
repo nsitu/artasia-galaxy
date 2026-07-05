@@ -64,7 +64,8 @@ function isValidUUID(id: string): boolean {
 
 async function immichRequest(
   path: string,
-  init?: RequestInit
+  init?: RequestInit,
+  options?: { allowErrorStatus?: boolean }
 ): Promise<Response> {
   const url = `${IMMICH_URL}/api${path}`;
   const headers = new Headers(init?.headers);
@@ -85,7 +86,7 @@ async function immichRequest(
     );
   }
 
-  if (!res.ok) {
+  if (!res.ok && !options?.allowErrorStatus) {
     if (res.status === 401) {
       throw new Error(`Immich auth failed (401) — check IMMICH_API_KEY permissions`);
     }
@@ -113,6 +114,8 @@ export async function getAssetThumbnail(
 ): Promise<Response> {
   return immichRequest(
     `/assets/${assetId}/thumbnail?size=${size}`,
+    undefined,
+    { allowErrorStatus: true },
   );
 }
 

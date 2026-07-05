@@ -51,7 +51,7 @@ router.get("/:id/thumbnail", async (req, res) => {
 
     res.status(immichRes.status);
     res.setHeader("Content-Type", immichRes.headers.get("Content-Type") ?? "image/jpeg");
-    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.setHeader("Cache-Control", immichRes.ok ? "public, max-age=86400" : "no-store");
 
     if (immichRes.body) {
       const reader = immichRes.body.getReader();
@@ -75,7 +75,7 @@ router.get("/:id/preview", async (req, res) => {
 
     res.status(immichRes.status);
     res.setHeader("Content-Type", immichRes.headers.get("Content-Type") ?? "image/jpeg");
-    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.setHeader("Cache-Control", immichRes.ok ? "public, max-age=86400" : "no-store");
 
     if (immichRes.body) {
       const reader = immichRes.body.getReader();
