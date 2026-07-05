@@ -1,5 +1,5 @@
 import { useThree } from "@react-three/fiber";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { fetchMapPlacements, type MapPlacement, type Photo } from "../../api/client";
 import { useGalleryStore } from "../../stores/galleryStore";
@@ -36,6 +36,11 @@ type LocalPhotoLayoutItem =
 type TerrainOrbitControls = {
   target?: THREE.Vector3;
   update?: () => void;
+};
+type TerrainCacheEntry = {
+  terrain: THREE.Group | null;
+  projection: ThreeGeoProjection;
+  phase: Extract<TerrainPhase, "ready" | "flat">;
 };
 export type TerrainNotice = {
   label: string;
@@ -76,6 +81,7 @@ export default function TerrainGallery({
   const [placementError, setPlacementError] = useState<string | null>(null);
   const [focusedPlacement, setFocusedPlacement] = useState<MapPlacement | null>(null);
   const [hoveredPlacement, setHoveredPlacement] = useState<MapPlacement | null>(null);
+  const terrainCacheRef = useRef<Map<string, TerrainCacheEntry>>(new Map());
 
   const geoPhotos = useMemo(() => {
     return getGeoPhotos(photos);
@@ -92,7 +98,8 @@ export default function TerrainGallery({
     if (focusedPlacement) {
       return createMaxDetailTerrainRequest([focusedPlacement.lat, focusedPlacement.lng], LOCAL_PLACEMENT_RADIUS_KM);
     }
-    return createTerrainRequest([...geoPhotos, ...geoPlacements]);
+    const regionalLocations = geoPlacements.length > 0 ? geoPlacements : geoPhotos;
+    return createTerrainRequest(regionalLocations);
   }, [focusedPlacement, geoPhotos, geoPlacements]);
   const requestKey = useMemo(() => {
     if (!request) return null;
@@ -233,16 +240,25 @@ export default function TerrainGallery({
       return;
     }
 
+    const cached = requestKey ? terrainCacheRef.current.get(requestKey) : undefined;
+    if (cached) {
+      setTerrain(cached.terrain);
+      setProjection(cached.projection);
+      setLoading(false);
+      setError(null);
+      setPhase(cached.phase);
+      setRenderedTerrainKey(requestKey);
+      return;
+    }
+
     let cancelled = false;
     let renderFrame: number | null = null;
+    let requestProjection: ThreeGeoProjection | null = null;
     setLoading(Boolean(MAPBOX_TOKEN));
     setError(null);
     setPhase("projecting");
     setRenderedTerrainKey(null);
-    setTerrain((previous) => {
-      if (previous) disposeObject(previous);
-      return null;
-    });
+    setTerrain(null);
     setProjection(null);
 
     loadThreeGeo()
@@ -256,12 +272,20 @@ export default function TerrainGallery({
           zoom: request.zoom,
           estimatedSatelliteTiles: request.estimatedSatelliteTiles,
         });
-        setProjection(tgeo.getProjection(request.origin, request.radiusKm, request.unitsSide));
+        requestProjection = tgeo.getProjection(request.origin, request.radiusKm, request.unitsSide);
+        setProjection(requestProjection);
         if (!MAPBOX_TOKEN) {
           setTerrain(null);
           setError("Set VITE_MAPBOX_TOKEN to load terrain.");
           setPhase("flat");
           setRenderedTerrainKey(requestKey);
+          if (requestKey && requestProjection) {
+            terrainCacheRef.current.set(requestKey, {
+              terrain: null,
+              projection: requestProjection,
+              phase: "flat",
+            });
+          }
           return null;
         }
         setPhase("fetching");
@@ -277,10 +301,14 @@ export default function TerrainGallery({
         group.name = "artasia-terrain";
         group.scale.z = terrainElevationScale;
         normalizeTerrainMaterials(group);
-        setTerrain((previous) => {
-          if (previous) disposeObject(previous);
-          return group;
-        });
+        if (requestKey && requestProjection) {
+          terrainCacheRef.current.set(requestKey, {
+            terrain: group,
+            projection: requestProjection,
+            phase: "ready",
+          });
+        }
+        setTerrain(group);
         renderFrame = window.requestAnimationFrame(() => {
           if (!cancelled) {
             setRenderedTerrainKey(requestKey);
@@ -304,14 +332,17 @@ export default function TerrainGallery({
       cancelled = true;
       if (renderFrame !== null) window.cancelAnimationFrame(renderFrame);
     };
-  }, [requestKey, terrainElevationScale]);
+  }, [request, requestKey, terrainElevationScale]);
 
   useEffect(() => {
     return () => {
       document.body.style.cursor = "";
-      if (terrain) disposeObject(terrain);
+      for (const entry of terrainCacheRef.current.values()) {
+        if (entry.terrain) disposeObject(entry.terrain);
+      }
+      terrainCacheRef.current.clear();
     };
-  }, [terrain]);
+  }, []);
 
   const terrainMatchesRequest = Boolean(request && requestKey && renderedTerrainKey === requestKey);
   const sceneReadyForMarkers = terrainMatchesRequest || phase === "flat";
@@ -343,7 +374,7 @@ export default function TerrainGallery({
 
     if (loading || error) {
       return {
-        label: loading ? "Loading terrain" : "Terrain failed",
+        label: loading ? "Loading..." : "Terrain failed",
         detail: error ?? undefined,
         tone: error ? "error" : "loading",
         busy: loading,
@@ -494,7 +525,7 @@ export function FocusedPlacementOverlay({ placement }: { placement: MapPlacement
       }}
       aria-label="Placement details"
     >
-      <div style={siteDetailsHeaderStyle}>
+      <div style={{ ...siteDetailsHeaderStyle, ...(!expanded ? siteDetailsHeaderCollapsedStyle : {}) }}>
         {placement.partner_logo?.url && (
           <img
             src={placement.partner_logo.url}
@@ -513,7 +544,7 @@ export function FocusedPlacementOverlay({ placement }: { placement: MapPlacement
           onClick={() => setExpanded((current) => !current)}
           style={siteDetailsToggleStyle}
         >
-          {expanded ? "-" : "+"}
+          <ChevronIcon direction={expanded ? "down" : "up"} />
         </button>
       </div>
 
@@ -564,6 +595,28 @@ function SiteDetail({ label, value }: { label: string; value: string }) {
       <div style={siteDetailLabelStyle}>{label}</div>
       <div style={siteDetailValueStyle}>{value}</div>
     </div>
+  );
+}
+
+function ChevronIcon({ direction }: { direction: "up" | "down" }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+      style={{
+        ...siteDetailsChevronStyle,
+        transform: direction === "up" ? "rotate(180deg)" : "none",
+      }}
+    >
+      <path
+        d="M3.5 5.75 8 10.25l4.5-4.5"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
   );
 }
 
@@ -659,6 +712,11 @@ const siteDetailsHeaderStyle: React.CSSProperties = {
   borderBottom: "1px solid rgba(255,255,255,0.12)",
 };
 
+const siteDetailsHeaderCollapsedStyle: React.CSSProperties = {
+  paddingBottom: 0,
+  borderBottom: "none",
+};
+
 const siteDetailsTitleWrapStyle: React.CSSProperties = {
   minWidth: 0,
   flex: "1 1 auto",
@@ -678,6 +736,11 @@ const siteDetailsToggleStyle: React.CSSProperties = {
   cursor: "pointer",
   fontSize: 18,
   lineHeight: 1,
+};
+
+const siteDetailsChevronStyle: React.CSSProperties = {
+  width: 16,
+  height: 16,
 };
 
 const partnerLogoStyle: React.CSSProperties = {

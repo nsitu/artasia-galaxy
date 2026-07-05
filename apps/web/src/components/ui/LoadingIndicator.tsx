@@ -44,29 +44,29 @@ const overlayStyle: CSSProperties = {
 
 const panelStyle: CSSProperties = {
   width: "min(280px, calc(100vw - 48px))",
-  background: "rgba(10,10,20,0.86)",
-  border: "1px solid rgba(255,255,255,0.16)",
-  borderRadius: 6,
-  boxShadow: "0 16px 40px rgba(0,0,0,0.32)",
   padding: "12px 14px",
   color: "#d8dde7",
   fontFamily: "monospace",
+  textAlign: "center",
 };
 
 const errorPanelStyle: CSSProperties = {
-  borderColor: "rgba(255,105,105,0.38)",
+  background: "rgba(10,10,20,0.76)",
+  borderRadius: 6,
 };
 
 const headerStyle: CSSProperties = {
   display: "flex",
+  flexDirection: "column",
   alignItems: "center",
-  gap: 9,
+  justifyContent: "center",
+  gap: 10,
 };
 
 const spinnerStyle: CSSProperties = {
-  width: 14,
-  height: 14,
-  border: "2px solid rgba(255,255,255,0.18)",
+  width: 28,
+  height: 28,
+  border: "3px solid rgba(255,255,255,0.2)",
   borderTopColor: "#f5f7fb",
   borderRadius: "50%",
   animation: "artasia-loading-spin 0.85s linear infinite",
