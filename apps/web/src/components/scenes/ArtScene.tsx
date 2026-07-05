@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Preload } from "@react-three/drei";
 import { useGalleryStore } from "../../stores/galleryStore";
@@ -44,6 +44,9 @@ export default function ArtScene() {
 
   const selectedPhoto = selectedPhotoIndex !== null ? photos[selectedPhotoIndex] : null;
   const selectedDescription = selectedPhoto?.exifInfo?.description?.trim();
+  const handleBackActionChange = useCallback((action: (() => void) | null) => {
+    setBackAction(action ? () => action : null);
+  }, []);
 
   return (
     <div style={{ width: "100vw", height: "100vh", position: "relative" }}>
@@ -140,7 +143,7 @@ export default function ArtScene() {
       >
         <ambientLight intensity={0.8} />
         <Suspense fallback={null}>
-          <TerrainGallery onNoticeChange={setTerrainNotice} onBackActionChange={setBackAction} />
+          <TerrainGallery onNoticeChange={setTerrainNotice} onBackActionChange={handleBackActionChange} />
           <OrbitControls
             makeDefault
             enableDamping

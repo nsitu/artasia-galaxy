@@ -414,7 +414,7 @@ export default function TerrainGallery({ onNoticeChange, onBackActionChange }: T
         />
       ))}
 
-      <Html fullscreen>
+      <Html fullscreen style={terrainHudLayerStyle}>
         {focusedPlacement ? (
           <FocusedPlacementOverlay placement={focusedPlacement} />
         ) : (
@@ -459,7 +459,7 @@ function frameTerrainCamera(camera: THREE.Camera, terrain: THREE.Group, controls
 
 function FocusedPlacementOverlay({ placement }: { placement: MapPlacement }) {
   const isMobile = useIsMobileBreakpoint();
-  const [expanded, setExpanded] = useState(!isMobile);
+  const [expanded, setExpanded] = useState(true);
   const people = [placement.team_member, placement.secondary_team_member].filter(
     (person): person is NonNullable<MapPlacement["team_member"]> => Boolean(person?.name)
   );
@@ -468,8 +468,8 @@ function FocusedPlacementOverlay({ placement }: { placement: MapPlacement }) {
   const siteDetails = formatSiteDetails(placement);
 
   useEffect(() => {
-    setExpanded(!isMobile);
-  }, [isMobile, placement.placement_id]);
+    setExpanded(true);
+  }, [placement.placement_id]);
 
   return (
     <section
@@ -492,20 +492,18 @@ function FocusedPlacementOverlay({ placement }: { placement: MapPlacement }) {
           <div style={sitePartnerStyle}>{placement.partner_name || "Partner organization"}</div>
           <div style={siteNameStyle}>{placement.placement_name}</div>
         </div>
-        {isMobile && (
-          <button
-            type="button"
-            aria-expanded={expanded}
-            aria-label={expanded ? "Collapse placement details" : "Expand placement details"}
-            onClick={() => setExpanded((current) => !current)}
-            style={siteDetailsToggleStyle}
-          >
-            {expanded ? "−" : "+"}
-          </button>
-        )}
+        <button
+          type="button"
+          aria-expanded={expanded}
+          aria-label={expanded ? "Collapse placement details" : "Expand placement details"}
+          onClick={() => setExpanded((current) => !current)}
+          style={siteDetailsToggleStyle}
+        >
+          {expanded ? "-" : "+"}
+        </button>
       </div>
 
-      {(!isMobile || expanded) && (
+      {expanded && (
         <div style={siteDetailsGridStyle}>
           <SiteDetail label="Site" value={siteDetails || "Not specified"} />
           <SiteDetail label={peopleLabel} value={people.map((person) => person.name).join(", ") || "Unassigned"} />
@@ -573,11 +571,16 @@ function useIsMobileBreakpoint(breakpointPx = 720) {
   return isMobile;
 }
 
+const terrainHudLayerStyle: React.CSSProperties = {
+  pointerEvents: "none",
+};
+
 const siteDetailsStyle: React.CSSProperties = {
-  position: "absolute",
-  top: 96,
-  left: 16,
-  width: 300,
+  position: "fixed",
+  left: "50%",
+  bottom: 16,
+  transform: "translateX(-50%)",
+  width: "min(560px, calc(100vw - 32px))",
   maxWidth: "calc(100vw - 32px)",
   pointerEvents: "none",
   background: "rgba(10,10,20,0.82)",
@@ -590,18 +593,16 @@ const siteDetailsStyle: React.CSSProperties = {
 };
 
 const mobileSiteDetailsStyle: React.CSSProperties = {
-  position: "fixed",
-  top: "auto",
   bottom: 12,
   left: 12,
   right: 12,
+  transform: "none",
   width: "auto",
   maxWidth: "none",
   zIndex: 13,
   borderRadius: 16,
   padding: 12,
   overflow: "hidden",
-  pointerEvents: "auto",
 };
 
 const mobileSiteDetailsCollapsedStyle: React.CSSProperties = {
