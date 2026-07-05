@@ -328,7 +328,7 @@ export default function PartnerUploadPanel() {
             </>
           )}
         </div>
-        {renderQuestion("Which placement is this for?")}
+        {renderQuestion("Which Artasia placement is this for?")}
         {partnerPlacements.length === 0 ? (
           <div style={emptyStateStyle}>No placements are available for this organization.</div>
         ) : (
@@ -370,12 +370,27 @@ export default function PartnerUploadPanel() {
             <ChevronLeftIcon />
             Back
           </button>
+          {selectedPartner && (
+            <>
+              <span style={navSeparatorStyle} aria-hidden="true" />
+              <div style={navPartnerContextStyle}>
+                {renderPartnerLogo(selectedPartner)}
+                <span>{selectedPartner.name}</span>
+              </div>
+            </>
+          )}
+          {selectedPlacement && (
+            <>
+              <span style={navSeparatorStyle} aria-hidden="true" />
+              <div style={navPlacementContextStyle}>
+                <strong>{selectedPlacement.placement_name}</strong>
+                {selectedPlacement.place_name && <span>{selectedPlacement.place_name}</span>}
+                {formatPlaceAddress(selectedPlacement) && <span>{formatPlaceAddress(selectedPlacement)}</span>}
+              </div>
+            </>
+          )}
         </div>
         {renderQuestion("Add photos")}
-        <div style={uploadContextStyle}>
-          <div>{partnerName}</div>
-          <strong>{selectedPlacement?.placement_name}</strong>
-        </div>
         <div style={fieldStyle}>
           <div
             style={{
@@ -438,14 +453,6 @@ export default function PartnerUploadPanel() {
         </div>
 
         <div style={actionsStyle}>
-          <button
-            type="button"
-            onClick={() => uploadQueued()}
-            disabled={!selectedPlacement || uploading || items.every((item) => item.status === "completed")}
-            style={primaryButtonStyle}
-          >
-            {uploading ? "Uploading..." : "Upload photos"}
-          </button>
           <button
             type="button"
             onClick={() => {
@@ -744,17 +751,18 @@ const navPartnerContextStyle: CSSProperties = {
   fontWeight: 700,
 };
 
+const navPlacementContextStyle: CSSProperties = {
+  display: "grid",
+  gap: 2,
+  color: "#c4ccda",
+  fontSize: 12,
+  lineHeight: 1.25,
+};
+
 const navSeparatorStyle: CSSProperties = {
   width: 1,
   height: 42,
   background: "rgba(255,255,255,0.14)",
-};
-
-const uploadContextStyle: CSSProperties = {
-  display: "grid",
-  gap: 3,
-  color: "#aeb7c7",
-  fontSize: 13,
 };
 
 const dropzoneDisabledStyle: CSSProperties = {
@@ -901,12 +909,6 @@ const buttonBaseStyle: CSSProperties = {
   fontSize: 14,
   fontWeight: 700,
   cursor: "pointer",
-};
-
-const primaryButtonStyle: CSSProperties = {
-  ...buttonBaseStyle,
-  background: "linear-gradient(135deg, #f5d28c 0%, #efb86b 100%)",
-  color: "#17120a",
 };
 
 const secondaryButtonStyle: CSSProperties = {
