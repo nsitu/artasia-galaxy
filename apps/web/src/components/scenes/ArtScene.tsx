@@ -2,7 +2,8 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Preload } from "@react-three/drei";
 import { useGalleryStore } from "../../stores/galleryStore";
-import TerrainGallery from "./TerrainGallery";
+import LoadingIndicator from "../ui/LoadingIndicator";
+import TerrainGallery, { type TerrainNotice } from "./TerrainGallery";
 
 const DEFAULT_TERRAIN_CAMERA_POSITION: [number, number, number] = [0, -12, 10];
 
@@ -12,6 +13,7 @@ export default function ArtScene() {
   const selectedPhotoIndex = useGalleryStore((s) => s.selectedPhotoIndex);
   const selectPhoto = useGalleryStore((s) => s.selectPhoto);
   const error = useGalleryStore((s) => s.error);
+  const [terrainNotice, setTerrainNotice] = useState<TerrainNotice | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
@@ -80,6 +82,7 @@ export default function ArtScene() {
       </div>
 
       {error && <div style={errorStyle}>{error}</div>}
+      {terrainNotice && <LoadingIndicator {...terrainNotice} />}
 
       {selectedPhoto && (
         <div
@@ -122,7 +125,7 @@ export default function ArtScene() {
       >
         <ambientLight intensity={0.8} />
         <Suspense fallback={null}>
-          <TerrainGallery />
+          <TerrainGallery onNoticeChange={setTerrainNotice} />
           <OrbitControls
             makeDefault
             enableDamping

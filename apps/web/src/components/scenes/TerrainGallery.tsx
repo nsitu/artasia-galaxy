@@ -37,14 +37,18 @@ type TerrainOrbitControls = {
   target?: THREE.Vector3;
   update?: () => void;
 };
-type TerrainNotice = {
+export type TerrainNotice = {
   label: string;
   detail?: string;
   tone?: "loading" | "error" | "muted";
   busy?: boolean;
 };
 
-export default function TerrainGallery() {
+interface TerrainGalleryProps {
+  onNoticeChange?: (notice: TerrainNotice | null) => void;
+}
+
+export default function TerrainGallery({ onNoticeChange }: TerrainGalleryProps = {}) {
   const camera = useThree((state) => state.camera);
   const controls = useThree((state) => (state as unknown as { controls?: TerrainOrbitControls }).controls);
   const photos = useGalleryStore((s) => s.photos);
@@ -312,6 +316,42 @@ export default function TerrainGallery() {
 
   const isPreparingTerrain = photos.length === 0 && placements.length === 0 && !placementError;
   const hasNoTerrainLocations = !isPreparingTerrain && geoPhotos.length === 0 && geoPlacements.length === 0;
+
+  const notice = useMemo<TerrainNotice | null>(() => {
+    if (isPreparingTerrain) {
+      return {
+        label: galleryLoading ? "Loading gallery" : "Preparing terrain",
+      };
+    }
+
+    if (hasNoTerrainLocations) {
+      return {
+        label: placementError ? "Placement locations failed" : "No terrain locations",
+        detail: placementError ?? "No GPS photos or placements for terrain mode.",
+        tone: placementError ? "error" : "muted",
+        busy: false,
+      };
+    }
+
+    if (loading || error) {
+      return {
+        label: loading ? "Loading terrain" : "Terrain failed",
+        detail: error ?? undefined,
+        tone: error ? "error" : "loading",
+        busy: loading,
+      };
+    }
+
+    return null;
+  }, [error, galleryLoading, hasNoTerrainLocations, isPreparingTerrain, loading, placementError]);
+
+  useEffect(() => {
+    onNoticeChange?.(notice);
+  }, [notice, onNoticeChange]);
+
+  useEffect(() => {
+    return () => onNoticeChange?.(null);
+  }, [onNoticeChange]);
 
   if (isPreparingTerrain || hasNoTerrainLocations) return null;
 
