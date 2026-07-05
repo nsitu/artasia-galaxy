@@ -1,9 +1,14 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Preload } from "@react-three/drei";
+import type { MapPlacement } from "../../api/client";
 import { useGalleryStore } from "../../stores/galleryStore";
 import LoadingIndicator from "../ui/LoadingIndicator";
-import TerrainGallery, { type TerrainNotice } from "./TerrainGallery";
+import TerrainGallery, {
+  FocusedPlacementOverlay,
+  PlacementHoverLabel,
+  type TerrainNotice,
+} from "./TerrainGallery";
 
 const DEFAULT_TERRAIN_CAMERA_POSITION: [number, number, number] = [0, -12, 10];
 
@@ -15,6 +20,8 @@ export default function ArtScene() {
   const error = useGalleryStore((s) => s.error);
   const [terrainNotice, setTerrainNotice] = useState<TerrainNotice | null>(null);
   const [backAction, setBackAction] = useState<(() => void) | null>(null);
+  const [focusedPlacementDetails, setFocusedPlacementDetails] = useState<MapPlacement | null>(null);
+  const [hoveredPlacementDetails, setHoveredPlacementDetails] = useState<MapPlacement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
@@ -101,6 +108,10 @@ export default function ArtScene() {
 
       {error && <div style={errorStyle}>{error}</div>}
       {terrainNotice && <LoadingIndicator {...terrainNotice} />}
+      {focusedPlacementDetails && <FocusedPlacementOverlay placement={focusedPlacementDetails} />}
+      {!focusedPlacementDetails && hoveredPlacementDetails && (
+        <PlacementHoverLabel placement={hoveredPlacementDetails} />
+      )}
 
       {selectedPhoto && (
         <div
@@ -143,7 +154,12 @@ export default function ArtScene() {
       >
         <ambientLight intensity={0.8} />
         <Suspense fallback={null}>
-          <TerrainGallery onNoticeChange={setTerrainNotice} onBackActionChange={handleBackActionChange} />
+          <TerrainGallery
+            onNoticeChange={setTerrainNotice}
+            onBackActionChange={handleBackActionChange}
+            onFocusedPlacementChange={setFocusedPlacementDetails}
+            onHoveredPlacementChange={setHoveredPlacementDetails}
+          />
           <OrbitControls
             makeDefault
             enableDamping

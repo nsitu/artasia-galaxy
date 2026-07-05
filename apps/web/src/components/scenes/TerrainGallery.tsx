@@ -1,4 +1,3 @@
-import { Html } from "@react-three/drei";
 import { useThree } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import * as THREE from "three";
@@ -48,9 +47,16 @@ export type TerrainNotice = {
 interface TerrainGalleryProps {
   onNoticeChange?: (notice: TerrainNotice | null) => void;
   onBackActionChange?: (action: (() => void) | null) => void;
+  onFocusedPlacementChange?: (placement: MapPlacement | null) => void;
+  onHoveredPlacementChange?: (placement: MapPlacement | null) => void;
 }
 
-export default function TerrainGallery({ onNoticeChange, onBackActionChange }: TerrainGalleryProps = {}) {
+export default function TerrainGallery({
+  onNoticeChange,
+  onBackActionChange,
+  onFocusedPlacementChange,
+  onHoveredPlacementChange,
+}: TerrainGalleryProps = {}) {
   const camera = useThree((state) => state.camera);
   const controls = useThree((state) => (state as unknown as { controls?: TerrainOrbitControls }).controls);
   const photos = useGalleryStore((s) => s.photos);
@@ -363,6 +369,22 @@ export default function TerrainGallery({ onNoticeChange, onBackActionChange }: T
     return () => onBackActionChange?.(null);
   }, [onBackActionChange]);
 
+  useEffect(() => {
+    onFocusedPlacementChange?.(focusedPlacement);
+  }, [focusedPlacement, onFocusedPlacementChange]);
+
+  useEffect(() => {
+    return () => onFocusedPlacementChange?.(null);
+  }, [onFocusedPlacementChange]);
+
+  useEffect(() => {
+    onHoveredPlacementChange?.(focusedPlacement ? null : hoveredPlacement);
+  }, [focusedPlacement, hoveredPlacement, onHoveredPlacementChange]);
+
+  useEffect(() => {
+    return () => onHoveredPlacementChange?.(null);
+  }, [onHoveredPlacementChange]);
+
   if (isPreparingTerrain || hasNoTerrainLocations) return null;
 
   return (
@@ -414,14 +436,6 @@ export default function TerrainGallery({ onNoticeChange, onBackActionChange }: T
         />
       ))}
 
-      <Html fullscreen style={terrainHudLayerStyle}>
-        {focusedPlacement ? (
-          <FocusedPlacementOverlay placement={focusedPlacement} />
-        ) : (
-          hoveredPlacement ? <PlacementHoverLabel placement={hoveredPlacement} /> : null
-        )}
-      </Html>
-
     </group>
   );
 }
@@ -457,7 +471,7 @@ function frameTerrainCamera(camera: THREE.Camera, terrain: THREE.Group, controls
   controls?.update?.();
 }
 
-function FocusedPlacementOverlay({ placement }: { placement: MapPlacement }) {
+export function FocusedPlacementOverlay({ placement }: { placement: MapPlacement }) {
   const isMobile = useIsMobileBreakpoint();
   const [expanded, setExpanded] = useState(true);
   const people = [placement.team_member, placement.secondary_team_member].filter(
@@ -514,7 +528,7 @@ function FocusedPlacementOverlay({ placement }: { placement: MapPlacement }) {
   );
 }
 
-function PlacementHoverLabel({ placement }: { placement: MapPlacement }) {
+export function PlacementHoverLabel({ placement }: { placement: MapPlacement }) {
   return (
     <section style={placementHoverLabelStyle} aria-live="polite">
       <div style={placementHoverPartnerStyle}>{placement.partner_name || "Placement"}</div>
@@ -571,15 +585,12 @@ function useIsMobileBreakpoint(breakpointPx = 720) {
   return isMobile;
 }
 
-const terrainHudLayerStyle: React.CSSProperties = {
-  pointerEvents: "none",
-};
-
 const siteDetailsStyle: React.CSSProperties = {
   position: "fixed",
   left: "50%",
   bottom: 16,
   transform: "translateX(-50%)",
+  zIndex: 13,
   width: "min(560px, calc(100vw - 32px))",
   maxWidth: "calc(100vw - 32px)",
   pointerEvents: "none",
