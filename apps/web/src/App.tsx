@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import ArtScene from "./components/scenes/ArtScene";
+import PartnerUploadPanel from "./components/ui/PartnerUploadPanel";
 import UploadPanel from "./components/ui/UploadPanel";
 
 function getAdminAuthError() {
@@ -32,6 +33,10 @@ export default function App() {
 
   if (path === "/admin") {
     return <UploadPanel initialError={adminAuthError} />;
+  }
+
+  if (path === "/partners") {
+    return <PartnerUploadPanel />;
   }
 
   return <ArtScene />;

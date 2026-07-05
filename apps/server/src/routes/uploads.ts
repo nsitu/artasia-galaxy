@@ -717,17 +717,20 @@ router.post(
       const uploader = typeof req.body.uploader === "string" ? req.body.uploader.trim() : "";
       const uploader_id = parseInt(typeof req.body.uploader_id === "string" ? req.body.uploader_id.trim() : "", 10);
       const placement_id = parseInt(typeof req.body.placement_id === "string" ? req.body.placement_id.trim() : "", 10);
+      const hasUploaderSelection = Boolean(uploader) || Number.isFinite(uploader_id);
       const [location, selectedUploader] = await Promise.all([
         findConfiguredPlacement(placement_id),
-        findConfiguredUploader({
-          id: Number.isFinite(uploader_id) ? uploader_id : undefined,
-          name: uploader,
-        }),
+        hasUploaderSelection
+          ? findConfiguredUploader({
+              id: Number.isFinite(uploader_id) ? uploader_id : undefined,
+              name: uploader,
+            })
+          : Promise.resolve(undefined),
       ]);
       const rawActivityId = parseInt(typeof req.body.activity_id === "string" ? req.body.activity_id : "", 10);
       const selectedTags = Number.isFinite(rawActivityId) ? await getActivityTagNames(rawActivityId) : [];
 
-      if (!selectedUploader) {
+      if (hasUploaderSelection && !selectedUploader) {
         res.status(400).json({ error: "Select a valid uploader." });
         return;
       }
@@ -737,7 +740,7 @@ router.post(
         return;
       }
 
-      if (!placementIncludesUploader(location, selectedUploader.id)) {
+      if (selectedUploader && !placementIncludesUploader(location, selectedUploader.id)) {
         res.status(400).json({ error: "Select a placement assigned to the selected uploader." });
         return;
       }
@@ -761,7 +764,6 @@ router.post(
         return;
       }
 
-      const album = await ensureAlbum(selectedUploader.name);
       const tagNames = [...selectedTags, ...getPlacementTagNames(location)];
 
       const results = await processWithConcurrency(files, 2, async (file) => {
@@ -787,7 +789,10 @@ router.post(
             lng: location.place?.lng,
           });
           await tagAsset(uploaded.id, tagNames);
-          await addAssetsToAlbum(album.id, [uploaded.id]);
+          if (selectedUploader) {
+            const album = await ensureAlbum(selectedUploader.name);
+            await addAssetsToAlbum(album.id, [uploaded.id]);
+          }
 
           return {
             fileName: file.originalname,
@@ -806,8 +811,8 @@ router.post(
       });
 
       res.json({
-        uploader: selectedUploader.name,
-        uploader_id: selectedUploader.id,
+        uploader: selectedUploader?.name ?? null,
+        uploader_id: selectedUploader?.id ?? null,
         placement_id,
         tags: tagNames,
         results,

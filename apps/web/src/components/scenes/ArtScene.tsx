@@ -27,6 +27,9 @@ export default function ArtScene() {
         <a href="/admin" style={btnStyle}>
           Admin
         </a>
+        <a href="/partners" style={btnStyle}>
+          Partners
+        </a>
       </div>
 
       {error && <div style={errorStyle}>{error}</div>}

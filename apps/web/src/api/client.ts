@@ -289,7 +289,7 @@ export async function fetchMapPlacements(): Promise<MapPlacement[]> {
 
 export function uploadFiles(params: {
   files: File[];
-  uploader: UploadUploader;
+  uploader?: UploadUploader;
   location: UploadPlacement;
   activityId?: number;
   onProgress?: (percent: number) => void;
@@ -297,8 +297,10 @@ export function uploadFiles(params: {
   return new Promise((resolve, reject) => {
     const form = new FormData();
     for (const file of params.files) form.append("files", file);
-    form.append("uploader", params.uploader.name);
-    form.append("uploader_id", String(params.uploader.id));
+    if (params.uploader) {
+      form.append("uploader", params.uploader.name);
+      form.append("uploader_id", String(params.uploader.id));
+    }
     form.append("placement_id", String(params.location.placement_id));
     if (params.activityId != null) form.append("activity_id", String(params.activityId));
 
