@@ -12,6 +12,7 @@ import reconcileRoutes from "./routes/reconcile.js";
 import settingsRoutes, { mountSSE } from "./routes/settings.js";
 import driveRoutes from "./routes/drive.js";
 import { checkImmichHealth, getImmichConfig } from "./infra/ImmichClient.js";
+import { readAuthSession } from "./services/auth.service.js";
 import { initializeImmichStructure, logReconcileDriftAtBoot } from "./services/startup.service.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -64,6 +65,15 @@ app.get("/api/v1/health", async (_req, res) => {
 const publicDir = path.resolve(__dirname, "../../public");
 if (existsSync(publicDir)) {
   app.use(express.static(publicDir));
+
+  app.get(/^\/admin(?:\/.*)?$/, (req, res) => {
+    if (!readAuthSession(req)) {
+      res.redirect("/api/v1/auth/google/start");
+      return;
+    }
+
+    res.sendFile(path.join(publicDir, "index.html"));
+  });
 
   app.get(/.*/, (req, res) => {
     if (req.path.startsWith("/api")) return;
