@@ -32,9 +32,10 @@ interface UploadItem {
 
 interface UploadPanelProps {
   initialError?: string | null;
+  onSignedOut?: () => void;
 }
 
-export default function UploadPanel({ initialError }: UploadPanelProps) {
+export default function UploadPanel({ initialError, onSignedOut }: UploadPanelProps) {
   const [options, setOptions] = useState<UploadOptions | null>(null);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [uploaderKey, setUploaderKey] = useState("");
@@ -518,6 +519,7 @@ export default function UploadPanel({ initialError }: UploadPanelProps) {
     try {
       await logoutAuthUser();
       setAuthUser({ authenticated: false });
+      onSignedOut?.();
     } catch (err) {
       setError((err as Error).message);
     }

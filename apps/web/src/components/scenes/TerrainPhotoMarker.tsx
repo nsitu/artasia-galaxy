@@ -204,10 +204,10 @@ export function TerrainPhotoFlower({
   return (
     <group ref={groupRef} position={[x, y, z + BASE_LIFT]} {...createPointerHandlers(onClick, onPointerEnter, onPointerLeave)}>
       <mesh ref={stemRef} geometry={stemGeometry}>
-        <meshStandardMaterial color={isSelected ? "#9df7a8" : "#47753a"} roughness={0.7} transparent opacity={0.72} />
+        <meshStandardMaterial color={isSelected ? "#9df7a8" : "#49d05a"} roughness={0.62} transparent opacity={0.82} />
       </mesh>
       <mesh geometry={baseGeometry}>
-        <meshStandardMaterial color={isSelected ? "#9df7a8" : "#365f30"} roughness={0.8} transparent opacity={0.72} />
+        <meshStandardMaterial color={isSelected ? "#9df7a8" : "#33b84a"} roughness={0.72} transparent opacity={0.82} />
       </mesh>
       <group
         ref={headRef}
