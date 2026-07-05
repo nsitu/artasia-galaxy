@@ -400,6 +400,8 @@ function frameTerrainCamera(camera: THREE.Camera, terrain: THREE.Group, controls
 }
 
 function FocusedPlacementOverlay({ placement }: { placement: MapPlacement }) {
+  const isMobile = useIsMobileBreakpoint();
+  const [expanded, setExpanded] = useState(!isMobile);
   const people = [placement.team_member, placement.secondary_team_member].filter(
     (person): person is NonNullable<MapPlacement["team_member"]> => Boolean(person?.name)
   );
@@ -407,8 +409,19 @@ function FocusedPlacementOverlay({ placement }: { placement: MapPlacement }) {
   const peopleLabel = people.length > 1 ? "Artist Educators" : "Artist Educator";
   const siteDetails = formatSiteDetails(placement);
 
+  useEffect(() => {
+    setExpanded(!isMobile);
+  }, [isMobile, placement.placement_id]);
+
   return (
-    <section style={siteDetailsStyle} aria-label="Placement details">
+    <section
+      style={{
+        ...siteDetailsStyle,
+        ...(isMobile ? mobileSiteDetailsStyle : {}),
+        ...(isMobile && !expanded ? mobileSiteDetailsCollapsedStyle : {}),
+      }}
+      aria-label="Placement details"
+    >
       <div style={siteDetailsHeaderStyle}>
         {placement.partner_logo?.url && (
           <img
@@ -417,17 +430,30 @@ function FocusedPlacementOverlay({ placement }: { placement: MapPlacement }) {
             style={partnerLogoStyle}
           />
         )}
-        <div>
+        <div style={siteDetailsTitleWrapStyle}>
           <div style={sitePartnerStyle}>{placement.partner_name || "Partner organization"}</div>
           <div style={siteNameStyle}>{placement.placement_name}</div>
         </div>
+        {isMobile && (
+          <button
+            type="button"
+            aria-expanded={expanded}
+            aria-label={expanded ? "Collapse placement details" : "Expand placement details"}
+            onClick={() => setExpanded((current) => !current)}
+            style={siteDetailsToggleStyle}
+          >
+            {expanded ? "−" : "+"}
+          </button>
+        )}
       </div>
 
-      <div style={siteDetailsGridStyle}>
-        <SiteDetail label="Site" value={siteDetails || "Not specified"} />
-        <SiteDetail label={peopleLabel} value={people.map((person) => person.name).join(", ") || "Unassigned"} />
-        <SiteDetail label="Children" value={participantDetails || "Not specified"} />
-      </div>
+      {(!isMobile || expanded) && (
+        <div style={siteDetailsGridStyle}>
+          <SiteDetail label="Site" value={siteDetails || "Not specified"} />
+          <SiteDetail label={peopleLabel} value={people.map((person) => person.name).join(", ") || "Unassigned"} />
+          <SiteDetail label="Children" value={participantDetails || "Not specified"} />
+        </div>
+      )}
     </section>
   );
 }
@@ -471,6 +497,24 @@ function SiteDetail({ label, value }: { label: string; value: string }) {
   );
 }
 
+function useIsMobileBreakpoint(breakpointPx = 720) {
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia(`(max-width: ${breakpointPx}px)`).matches;
+  });
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(`(max-width: ${breakpointPx}px)`);
+    const onChange = (event: MediaQueryListEvent) => setIsMobile(event.matches);
+
+    setIsMobile(mediaQuery.matches);
+    mediaQuery.addEventListener("change", onChange);
+    return () => mediaQuery.removeEventListener("change", onChange);
+  }, [breakpointPx]);
+
+  return isMobile;
+}
+
 const siteDetailsStyle: React.CSSProperties = {
   position: "absolute",
   top: 96,
@@ -485,6 +529,25 @@ const siteDetailsStyle: React.CSSProperties = {
   color: "#d8dde7",
   fontFamily: "monospace",
   boxShadow: "0 12px 32px rgba(0,0,0,0.28)",
+};
+
+const mobileSiteDetailsStyle: React.CSSProperties = {
+  position: "fixed",
+  top: "auto",
+  bottom: 12,
+  left: 12,
+  right: 12,
+  width: "auto",
+  maxWidth: "none",
+  zIndex: 13,
+  borderRadius: 16,
+  padding: 12,
+  overflow: "hidden",
+  pointerEvents: "auto",
+};
+
+const mobileSiteDetailsCollapsedStyle: React.CSSProperties = {
+  maxHeight: 86,
 };
 
 const placementHoverLabelStyle: React.CSSProperties = {
@@ -524,6 +587,27 @@ const siteDetailsHeaderStyle: React.CSSProperties = {
   gap: 10,
   paddingBottom: 10,
   borderBottom: "1px solid rgba(255,255,255,0.12)",
+};
+
+const siteDetailsTitleWrapStyle: React.CSSProperties = {
+  minWidth: 0,
+  flex: "1 1 auto",
+};
+
+const siteDetailsToggleStyle: React.CSSProperties = {
+  pointerEvents: "auto",
+  flex: "0 0 auto",
+  width: 30,
+  height: 30,
+  display: "grid",
+  placeItems: "center",
+  borderRadius: 999,
+  background: "rgba(255,255,255,0.08)",
+  color: "#eef2f8",
+  border: "1px solid rgba(255,255,255,0.14)",
+  cursor: "pointer",
+  fontSize: 18,
+  lineHeight: 1,
 };
 
 const partnerLogoStyle: React.CSSProperties = {
