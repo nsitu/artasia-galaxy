@@ -15,6 +15,7 @@ import {
   searchAssetIdsByTag,
   tagAsset,
   untagAssets,
+  updateAssetDescription,
   updateAssetLocation,
   uploadAsset,
 } from "../infra/ImmichClient.js";
@@ -670,6 +671,28 @@ router.post("/assets/:assetId/published", async (req, res) => {
       asset_id: assetId,
       published,
       published_album_id: album.id,
+    });
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
+});
+
+router.post("/assets/:assetId/caption", async (req, res) => {
+  try {
+    const assetId = req.params.assetId.trim();
+    if (!assetId) {
+      res.status(400).json({ error: "Asset ID is required." });
+      return;
+    }
+
+    const caption = typeof req.body?.caption === "string" ? req.body.caption.trim() : "";
+    await getAsset(assetId);
+    await updateAssetDescription(assetId, caption);
+
+    res.json({
+      ok: true,
+      asset_id: assetId,
+      caption,
     });
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });

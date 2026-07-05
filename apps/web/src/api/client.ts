@@ -286,6 +286,21 @@ export async function setAssetPublished(params: {
   }
 }
 
+export async function updateAssetCaption(params: {
+  assetId: string;
+  caption: string;
+}): Promise<void> {
+  const res = await fetch(`/api/v1/uploads/assets/${params.assetId}/caption`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ caption: params.caption }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+}
+
 export async function fetchMapPlacements(): Promise<MapPlacement[]> {
   const res = await fetch("/api/v1/placements");
   if (!res.ok) {

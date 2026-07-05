@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { fetchUploadOptions, uploadFiles, type UploadOptions } from "../../api/client";
+import { fetchUploadOptions, updateAssetCaption, uploadFiles, type UploadOptions } from "../../api/client";
 
 interface UploadItem {
   id: string;
@@ -8,6 +8,9 @@ interface UploadItem {
   progress: number;
   error?: string;
   assetId?: string;
+  caption?: string;
+  captionStatus?: "idle" | "saving" | "saved" | "failed";
+  captionError?: string;
 }
 
 type UploadPlacement = UploadOptions["placements"][number];
@@ -252,6 +255,52 @@ export default function PartnerUploadPanel() {
     }
   }
 
+  function updateItemCaption(itemId: string, value: string) {
+    setItems((current) =>
+      current.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              caption: value,
+              captionStatus: "idle",
+              captionError: undefined,
+            }
+          : item
+      )
+    );
+  }
+
+  async function saveItemCaption(item: UploadItem) {
+    if (!item.assetId) return;
+    const caption = item.caption?.trim() ?? "";
+    setItems((current) =>
+      current.map((entry) =>
+        entry.id === item.id
+          ? { ...entry, captionStatus: "saving", captionError: undefined }
+          : entry
+      )
+    );
+
+    try {
+      await updateAssetCaption({ assetId: item.assetId, caption });
+      setItems((current) =>
+        current.map((entry) =>
+          entry.id === item.id
+            ? { ...entry, caption, captionStatus: "saved", captionError: undefined }
+            : entry
+        )
+      );
+    } catch (err) {
+      setItems((current) =>
+        current.map((entry) =>
+          entry.id === item.id
+            ? { ...entry, captionStatus: "failed", captionError: (err as Error).message }
+            : entry
+        )
+      );
+    }
+  }
+
   function onDrop(event: React.DragEvent<HTMLDivElement>) {
     event.preventDefault();
     addFiles(event.dataTransfer.files);
@@ -437,15 +486,56 @@ export default function PartnerUploadPanel() {
           ) : (
             items.map((item) => (
               <div key={item.id} style={queueItemStyle}>
-                <div style={queueItemMainStyle}>
-                  <div style={queueItemNameStyle}>{item.file.name}</div>
-                  <div style={queueItemMetaStyle}>
-                    {formatBytes(item.file.size)} | {item.status}
-                    {item.error ? ` | ${item.error}` : ""}
-                  </div>
+                <div style={queueThumbStyle}>
+                  {item.assetId ? (
+                    <img
+                      src={`/api/v1/assets/${item.assetId}/thumbnail?v=${encodeURIComponent(item.assetId)}`}
+                      alt=""
+                      style={queueThumbImageStyle}
+                    />
+                  ) : (
+                    <span style={queueThumbPlaceholderStyle}>
+                      {item.status === "failed" ? "failed" : "uploading"}
+                    </span>
+                  )}
                 </div>
-                <div style={progressTrackStyle} aria-hidden="true">
-                  <div style={{ ...progressFillStyle, width: `${item.progress}%` }} />
+                <div style={queueItemContentStyle}>
+                  <div style={queueItemMainStyle}>
+                    <div style={queueItemNameStyle}>{item.file.name}</div>
+                    <div style={queueItemMetaStyle}>
+                      {formatBytes(item.file.size)} | {item.status}
+                      {item.error ? ` | ${item.error}` : ""}
+                    </div>
+                  </div>
+                  <div style={progressTrackStyle} aria-hidden="true">
+                    <div style={{ ...progressFillStyle, width: `${item.progress}%` }} />
+                  </div>
+                  {item.assetId && (
+                    <label style={captionFieldStyle}>
+                      <span style={captionLabelStyle}>Caption</span>
+                      <div style={captionRowStyle}>
+                        <input
+                          type="text"
+                          value={item.caption ?? ""}
+                          onChange={(event) => updateItemCaption(item.id, event.target.value)}
+                          placeholder="Optional caption"
+                          style={captionInputStyle}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => void saveItemCaption(item)}
+                          disabled={item.captionStatus === "saving"}
+                          style={captionSaveButtonStyle}
+                        >
+                          {item.captionStatus === "saving" ? "Saving..." : "Save"}
+                        </button>
+                      </div>
+                      {item.captionStatus === "saved" && <span style={captionStatusStyle}>Saved</span>}
+                      {item.captionStatus === "failed" && (
+                        <span style={captionErrorStyle}>{item.captionError ?? "Caption failed"}</span>
+                      )}
+                    </label>
+                  )}
                 </div>
               </div>
             ))
@@ -776,6 +866,57 @@ const fieldStyle: CSSProperties = {
   gap: 10,
 };
 
+const captionFieldStyle: CSSProperties = {
+  display: "grid",
+  gap: 8,
+};
+
+const captionLabelStyle: CSSProperties = {
+  color: "#e7edf7",
+  fontSize: 13,
+  fontWeight: 700,
+};
+
+const captionInputStyle: CSSProperties = {
+  minHeight: 46,
+  borderRadius: 8,
+  border: "1px solid rgba(255,255,255,0.14)",
+  background: "rgba(255,255,255,0.05)",
+  color: "#f5f8fd",
+  padding: "0 12px",
+  fontSize: 14,
+  minWidth: 0,
+  width: "100%",
+};
+
+const captionRowStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr auto",
+  gap: 8,
+};
+
+const captionSaveButtonStyle: CSSProperties = {
+  minHeight: 46,
+  padding: "0 14px",
+  borderRadius: 8,
+  border: "1px solid rgba(255,255,255,0.12)",
+  background: "rgba(255,255,255,0.08)",
+  color: "#eef3fb",
+  cursor: "pointer",
+  fontSize: 13,
+  fontWeight: 700,
+};
+
+const captionStatusStyle: CSSProperties = {
+  color: "#8bd7a8",
+  fontSize: 12,
+};
+
+const captionErrorStyle: CSSProperties = {
+  color: "#ffb3b3",
+  fontSize: 12,
+};
+
 const labelStyle: CSSProperties = {
   fontSize: 13,
   fontWeight: 700,
@@ -850,6 +991,39 @@ const queueItemStyle: CSSProperties = {
   border: "1px solid rgba(255,255,255,0.10)",
   background: "rgba(255,255,255,0.03)",
   padding: 14,
+  display: "grid",
+  gridTemplateColumns: "72px 1fr",
+  gap: 12,
+  alignItems: "center",
+};
+
+const queueThumbStyle: CSSProperties = {
+  width: 72,
+  height: 56,
+  borderRadius: 8,
+  background: "rgba(255,255,255,0.05)",
+  border: "1px solid rgba(255,255,255,0.08)",
+  overflow: "hidden",
+  display: "grid",
+  placeItems: "center",
+};
+
+const queueThumbImageStyle: CSSProperties = {
+  width: "100%",
+  height: "100%",
+  objectFit: "cover",
+};
+
+const queueThumbPlaceholderStyle: CSSProperties = {
+  color: "#8f98a9",
+  fontSize: 10,
+  textTransform: "uppercase",
+};
+
+const queueItemContentStyle: CSSProperties = {
+  display: "grid",
+  gap: 10,
+  minWidth: 0,
 };
 
 const queueItemMainStyle: CSSProperties = {

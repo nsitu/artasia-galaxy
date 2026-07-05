@@ -140,6 +140,14 @@ export async function updateAssetLocation(assetId: string, params: {
   });
 }
 
+export async function updateAssetDescription(assetId: string, description: string) {
+  await immichRequest(`/assets/${assetId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ description }),
+  });
+}
+
 export async function searchAssets(params: {
   albumId?: string;
   albumIds?: string[];
