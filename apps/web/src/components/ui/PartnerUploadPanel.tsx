@@ -285,7 +285,7 @@ export default function PartnerUploadPanel() {
                 key={partner.name}
                 type="button"
                 onClick={() => selectPartner(partner.name)}
-                style={selectionButtonStyle}
+                style={partnerSelectionButtonStyle}
               >
                 {renderPartnerLogo(partner)}
                 <span style={selectionButtonTextStyle}>
@@ -677,7 +677,7 @@ const backButtonIconStyle: CSSProperties = {
 
 const buttonGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, calc((100% - 20px) / 3)))",
   gap: 10,
 };
 
@@ -701,6 +701,12 @@ const selectionButtonStyle: CSSProperties = {
   cursor: "pointer",
 };
 
+const partnerSelectionButtonStyle: CSSProperties = {
+  ...selectionButtonStyle,
+  flexDirection: "column",
+  alignItems: "flex-start",
+};
+
 const selectionButtonTextStyle: CSSProperties = {
   minWidth: 0,
   display: "grid",
@@ -722,8 +728,8 @@ const selectionButtonMetaStyle: CSSProperties = {
 
 const partnerButtonLogoStyle: CSSProperties = {
   flex: "0 0 auto",
-  width: 56,
-  height: 42,
+  width: 88,
+  height: 48,
   objectFit: "contain",
   background: "rgba(255,255,255,0.92)",
   borderRadius: 4,
