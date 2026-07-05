@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import * as THREE from "three";
 import { fetchMapPlacements, type MapPlacement, type Photo } from "../../api/client";
 import { useGalleryStore } from "../../stores/galleryStore";
-import LoadingIndicator from "../ui/LoadingIndicator";
 import { OrbitingPhotoBanner, TerrainPhotoFlower } from "./TerrainPhotoMarker";
 import PlaceMarker from "./PlaceMarker";
 import {
@@ -45,20 +44,7 @@ type TerrainNotice = {
   busy?: boolean;
 };
 
-export interface TerrainOverlayState {
-  notice?: TerrainNotice;
-  request?: {
-    zoom: number;
-    estimatedSatelliteTiles: number;
-    radiusKm: number;
-  };
-  basePhase?: TerrainPhase;
-  focusedPlacement?: MapPlacement | null;
-  hoveredPlacement?: MapPlacement | null;
-  onBack?: () => void;
-}
-
-export default function TerrainGallery({ onOverlayChange }: { onOverlayChange: (state: TerrainOverlayState | null) => void }) {
+export default function TerrainGallery() {
   const camera = useThree((state) => state.camera);
   const controls = useThree((state) => (state as unknown as { controls?: TerrainOrbitControls }).controls);
   const photos = useGalleryStore((s) => s.photos);
@@ -326,73 +312,6 @@ export default function TerrainGallery({ onOverlayChange }: { onOverlayChange: (
 
   const isPreparingTerrain = photos.length === 0 && placements.length === 0 && !placementError;
   const hasNoTerrainLocations = !isPreparingTerrain && geoPhotos.length === 0 && geoPlacements.length === 0;
-  const terrainOverlay = useMemo<TerrainOverlayState>(() => {
-    if (isPreparingTerrain) {
-      return {
-        notice: {
-          label: galleryLoading ? "Loading gallery" : "Preparing terrain",
-        },
-      };
-    }
-
-    if (hasNoTerrainLocations) {
-      return {
-        notice: {
-          label: placementError ? "Placement locations failed" : "No terrain locations",
-          detail: placementError ?? "No GPS photos or placements for terrain mode.",
-          tone: placementError ? "error" : "muted",
-          busy: false,
-        },
-      };
-    }
-
-    return {
-      ...(request
-        ? {
-            request: {
-              zoom: request.zoom,
-              estimatedSatelliteTiles: request.estimatedSatelliteTiles,
-              radiusKm: request.radiusKm,
-            },
-            basePhase: phase,
-          }
-        : {}),
-      ...(focusedPlacement ? { focusedPlacement, onBack: returnToRegional } : {}),
-      ...(!focusedPlacement && hoveredPlacement ? { hoveredPlacement } : {}),
-      ...(loading || error
-        ? {
-            notice: {
-              label: loading ? "Loading terrain" : "Terrain failed",
-              detail: error ?? undefined,
-              tone: error ? "error" : "loading",
-              busy: loading,
-            },
-          }
-        : {}),
-    };
-  }, [
-    error,
-    focusedPlacement,
-    galleryLoading,
-    geoPhotos.length,
-    geoPlacements.length,
-    hasNoTerrainLocations,
-    isPreparingTerrain,
-    loading,
-    phase,
-    hoveredPlacement,
-    placementError,
-    request,
-    returnToRegional,
-  ]);
-
-  useEffect(() => {
-    onOverlayChange(terrainOverlay);
-  }, [onOverlayChange, terrainOverlay]);
-
-  useEffect(() => {
-    return () => onOverlayChange(null);
-  }, [onOverlayChange]);
 
   if (isPreparingTerrain || hasNoTerrainLocations) return null;
 
@@ -446,49 +365,6 @@ export default function TerrainGallery({ onOverlayChange }: { onOverlayChange: (
       ))}
 
     </group>
-  );
-}
-
-export function TerrainOverlay({ state }: { state: TerrainOverlayState | null }) {
-  if (!state) return null;
-
-  return (
-    <div style={terrainOverlayRootStyle}>
-      {state.request && (
-        <div style={tileStatusStyle}>
-          <div style={tileStatusHeaderStyle}>Terrain tiles</div>
-          <div style={tileStatusSubheaderStyle}>Base</div>
-          <div style={tileStatusRowStyle}>
-            <span>Status</span>
-            <strong style={tileStatusValueStyle}>{terrainPhaseLabel(state.basePhase ?? "idle")}</strong>
-          </div>
-          <div style={tileStatusRowStyle}>
-            <span>Resolution</span>
-            <strong style={tileStatusValueStyle}>z{state.request.zoom}</strong>
-          </div>
-          <div style={tileStatusRowStyle}>
-            <span>Estimated tiles</span>
-            <strong style={tileStatusValueStyle}>{state.request.estimatedSatelliteTiles}</strong>
-          </div>
-          <div style={tileStatusRowStyle}>
-            <span>Radius</span>
-            <strong style={tileStatusValueStyle}>{formatRadius(state.request.radiusKm)}</strong>
-          </div>
-        </div>
-      )}
-      {state.focusedPlacement && state.onBack && (
-        <>
-          <button type="button" onClick={state.onBack} style={backButtonStyle}>
-            Back to regional view
-          </button>
-          <FocusedPlacementOverlay placement={state.focusedPlacement} />
-        </>
-      )}
-      {!state.focusedPlacement && state.hoveredPlacement && (
-        <PlacementHoverLabel placement={state.hoveredPlacement} />
-      )}
-      {state.notice && <LoadingIndicator {...state.notice} />}
-    </div>
   );
 }
 
@@ -594,28 +470,6 @@ function SiteDetail({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
-
-const terrainOverlayRootStyle: React.CSSProperties = {
-  position: "absolute",
-  inset: 0,
-  zIndex: 12,
-  pointerEvents: "none",
-};
-
-const backButtonStyle: React.CSSProperties = {
-  position: "absolute",
-  top: 56,
-  left: 16,
-  pointerEvents: "auto",
-  background: "rgba(255,255,255,0.08)",
-  color: "#ddd",
-  border: "1px solid rgba(255,255,255,0.18)",
-  borderRadius: 4,
-  padding: "7px 12px",
-  cursor: "pointer",
-  fontFamily: "monospace",
-  fontSize: 12,
-};
 
 const siteDetailsStyle: React.CSSProperties = {
   position: "absolute",
