@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Preload } from "@react-three/drei";
 import { useGalleryStore } from "../../stores/galleryStore";
@@ -13,10 +13,32 @@ export default function ArtScene() {
   const selectPhoto = useGalleryStore((s) => s.selectPhoto);
   const error = useGalleryStore((s) => s.error);
   const [terrainOverlay, setTerrainOverlay] = useState<TerrainOverlayState | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     fetchPhotos();
   }, [fetchPhotos]);
+
+  useEffect(() => {
+    function onDocumentPointerDown(event: PointerEvent) {
+      if (!menuRef.current) return;
+      if (!menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", onDocumentPointerDown);
+    return () => document.removeEventListener("pointerdown", onDocumentPointerDown);
+  }, []);
+
+  const menuItems = useMemo(
+    () => [
+      { href: "/admin", label: "Admin" },
+      { href: "/partners", label: "Partners" },
+    ],
+    []
+  );
 
   const selectedPhoto = selectedPhotoIndex !== null ? photos[selectedPhotoIndex] : null;
   const selectedDescription = selectedPhoto?.exifInfo?.description?.trim();
@@ -24,12 +46,38 @@ export default function ArtScene() {
   return (
     <div style={{ width: "100vw", height: "100vh", position: "relative" }}>
       <div style={hudStyle}>
-        <a href="/admin" style={btnStyle}>
-          Admin
-        </a>
-        <a href="/partners" style={btnStyle}>
-          Partners
-        </a>
+        <div ref={menuRef} style={menuWrapStyle}>
+          <button
+            type="button"
+            aria-label="Open navigation menu"
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
+            onClick={() => setMenuOpen((current) => !current)}
+            style={menuButtonStyle}
+          >
+            <span style={menuIconStyle}>
+              <span style={menuLineStyle} />
+              <span style={menuLineStyle} />
+              <span style={menuLineStyle} />
+            </span>
+          </button>
+
+          {menuOpen && (
+            <div role="menu" style={menuPanelStyle}>
+              {menuItems.map((item) => (
+                <a
+                  key={item.href}
+                  role="menuitem"
+                  href={item.href}
+                  style={menuItemStyle}
+                  onClick={() => setMenuOpen(false)}
+                >
+                  {item.label}
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {error && <div style={errorStyle}>{error}</div>}
@@ -108,6 +156,64 @@ const hudStyle: React.CSSProperties = {
   fontSize: 13,
   color: "#aaa",
   pointerEvents: "none",
+};
+
+const menuWrapStyle: React.CSSProperties = {
+  position: "relative",
+  pointerEvents: "auto",
+};
+
+const menuButtonStyle: React.CSSProperties = {
+  pointerEvents: "auto",
+  width: 40,
+  height: 40,
+  display: "grid",
+  placeItems: "center",
+  background: "rgba(255,255,255,0.08)",
+  color: "#ccc",
+  border: "1px solid rgba(255,255,255,0.15)",
+  borderRadius: 10,
+  cursor: "pointer",
+};
+
+const menuIconStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 3,
+  width: 16,
+};
+
+const menuLineStyle: React.CSSProperties = {
+  display: "block",
+  width: "100%",
+  height: 2,
+  borderRadius: 999,
+  background: "currentColor",
+};
+
+const menuPanelStyle: React.CSSProperties = {
+  position: "absolute",
+  top: 48,
+  left: 0,
+  minWidth: 152,
+  padding: 8,
+  borderRadius: 12,
+  background: "rgba(12, 14, 22, 0.94)",
+  border: "1px solid rgba(255,255,255,0.14)",
+  boxShadow: "0 18px 40px rgba(0,0,0,0.35)",
+  display: "grid",
+  gap: 6,
+  zIndex: 20,
+};
+
+const menuItemStyle: React.CSSProperties = {
+  display: "block",
+  padding: "10px 12px",
+  borderRadius: 8,
+  textDecoration: "none",
+  color: "#eef3fb",
+  fontSize: 13,
+  fontFamily: "monospace",
+  background: "rgba(255,255,255,0.03)",
 };
 
 const btnStyle: React.CSSProperties = {
