@@ -30,6 +30,20 @@ function formatBytes(bytes: number) {
   return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[unitIndex]}`;
 }
 
+function formatParticipantAge(age?: string) {
+  const value = age?.trim();
+  if (!value) return "";
+  return /\d/.test(value) ? `age ${value}` : value;
+}
+
+function formatPlaceAddress(placement: UploadPlacement) {
+  const address = placement.address?.trim() ?? "";
+  const city = placement.place_city?.trim() ?? "";
+  if (!address) return city;
+  if (!city || address.toLowerCase().includes(city.toLowerCase())) return address;
+  return `${address}, ${city}`;
+}
+
 export default function PartnerUploadPanel() {
   const [options, setOptions] = useState<UploadOptions | null>(null);
   const [partnerName, setPartnerName] = useState("");
@@ -246,15 +260,9 @@ export default function PartnerUploadPanel() {
   const completedCount = items.filter((item) => item.status === "completed").length;
   const failedCount = items.filter((item) => item.status === "failed").length;
 
-  function renderStepHeader(title: string, step: number) {
+  function renderQuestion(title: string) {
     return (
-      <div style={stepHeaderStyle}>
-        <div style={stepBadgeStyle(true)}>{step}</div>
-        <div style={stepHeaderTextStyle}>
-          <div style={stepLabelStyle}>Step {step}</div>
-          <div style={stepTitleStyle}>{title}</div>
-        </div>
-      </div>
+      <h2 style={screenQuestionStyle}>{title}</h2>
     );
   }
 
@@ -273,7 +281,7 @@ export default function PartnerUploadPanel() {
   function renderPartnerStep() {
     return (
       <section style={screenStyle}>
-        {renderStepHeader("Which organization do you represent?", 1)}
+        {renderQuestion("Which organization do you represent?")}
         {loading ? (
           <div style={emptyStateStyle}>Loading partner placements...</div>
         ) : partners.length === 0 ? (
@@ -310,18 +318,17 @@ export default function PartnerUploadPanel() {
             <ChevronLeftIcon />
             Back
           </button>
-        </div>
-        {renderStepHeader("Which placement is this for?", 2)}
-        <div style={contextLineStyle}>
-          {selectedPartner ? (
+          {selectedPartner && (
             <>
-              {renderPartnerLogo(selectedPartner)}
-              <span>{selectedPartner.name}</span>
+              <span style={navSeparatorStyle} aria-hidden="true" />
+              <div style={navPartnerContextStyle}>
+                {renderPartnerLogo(selectedPartner)}
+                <span>{selectedPartner.name}</span>
+              </div>
             </>
-          ) : (
-            "Choose an organization first."
           )}
         </div>
+        {renderQuestion("Which placement is this for?")}
         {partnerPlacements.length === 0 ? (
           <div style={emptyStateStyle}>No placements are available for this organization.</div>
         ) : (
@@ -335,9 +342,17 @@ export default function PartnerUploadPanel() {
               >
                 <span style={selectionButtonTextStyle}>
                   <span style={selectionButtonTitleStyle}>{placement.placement_name}</span>
-                  <span style={selectionButtonMetaStyle}>
-                    {[placement.delivery_schedule, placement.participant_age].filter(Boolean).join(" | ") || "Placement"}
-                  </span>
+                  {placement.place_name && (
+                    <span style={selectionButtonMetaStyle}>{placement.place_name}</span>
+                  )}
+                  {formatPlaceAddress(placement) && (
+                    <span style={selectionButtonMetaStyle}>{formatPlaceAddress(placement)}</span>
+                  )}
+                  {[placement.delivery_schedule, formatParticipantAge(placement.participant_age)].filter(Boolean).length > 0 && (
+                    <span style={selectionButtonMetaStyle}>
+                      {[placement.delivery_schedule, formatParticipantAge(placement.participant_age)].filter(Boolean).join(" | ")}
+                    </span>
+                  )}
                 </span>
               </button>
             ))}
@@ -356,7 +371,7 @@ export default function PartnerUploadPanel() {
             Back
           </button>
         </div>
-        {renderStepHeader("Add photos", 3)}
+        {renderQuestion("Add photos")}
         <div style={uploadContextStyle}>
           <div>{partnerName}</div>
           <strong>{selectedPlacement?.placement_name}</strong>
@@ -598,51 +613,18 @@ const stepCardStyle = (completed: boolean, active: boolean): CSSProperties => ({
   gap: 14,
 });
 
-const stepHeaderStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "flex-start",
-  gap: 12,
-};
-
-const stepBadgeStyle = (completed: boolean): CSSProperties => ({
-  flex: "0 0 auto",
-  width: 28,
-  height: 28,
-  borderRadius: 999,
-  display: "grid",
-  placeItems: "center",
-  background: completed ? "linear-gradient(135deg, #f5d28c 0%, #efb86b 100%)" : "rgba(255,255,255,0.08)",
-  color: completed ? "#17120a" : "#eef3fb",
-  border: completed ? "none" : "1px solid rgba(255,255,255,0.12)",
-  fontSize: 13,
-  fontWeight: 800,
-  lineHeight: 1,
-});
-
-const stepHeaderTextStyle: CSSProperties = {
-  minWidth: 0,
-  display: "grid",
-  gap: 2,
-};
-
-const stepLabelStyle: CSSProperties = {
-  color: "#aeb7c7",
-  fontSize: 11,
-  letterSpacing: "0.18em",
-  textTransform: "uppercase",
-};
-
-const stepTitleStyle: CSSProperties = {
-  color: "#f5f8fd",
-  fontSize: 16,
-  fontWeight: 700,
-  lineHeight: 1.25,
-};
-
 const stepHintStyle: CSSProperties = {
   color: "#aeb7c7",
   fontSize: 12,
   lineHeight: 1.45,
+};
+
+const screenQuestionStyle: CSSProperties = {
+  margin: 0,
+  color: "#f5f8fd",
+  fontSize: 20,
+  fontWeight: 700,
+  lineHeight: 1.25,
 };
 
 const screenStyle: CSSProperties = {
@@ -652,7 +634,10 @@ const screenStyle: CSSProperties = {
 
 const screenNavStyle: CSSProperties = {
   display: "flex",
-  justifyContent: "flex-start",
+  alignItems: "center",
+  justifyContent: "start",
+  gap: "3rem",
+  flexWrap: "wrap",
 };
 
 const backButtonStyle: CSSProperties = {
@@ -751,6 +736,18 @@ const contextLineStyle: CSSProperties = {
   gap: 10,
   color: "#c4ccda",
   fontSize: 13,
+};
+
+const navPartnerContextStyle: CSSProperties = {
+  ...contextLineStyle,
+  justifyContent: "flex-end",
+  fontWeight: 700,
+};
+
+const navSeparatorStyle: CSSProperties = {
+  width: 1,
+  height: 42,
+  background: "rgba(255,255,255,0.14)",
 };
 
 const uploadContextStyle: CSSProperties = {

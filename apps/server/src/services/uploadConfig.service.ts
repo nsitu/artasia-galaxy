@@ -35,6 +35,8 @@ export interface ArtasiaPlacement {
   delivery_end_time?: string;
   delivery_schedule?: string;
   participant_age?: string;
+  place_name?: string;
+  place_city?: string;
   address?: string;
   shared_with?: string;
   lat?: number;
@@ -79,6 +81,14 @@ const RESERVED_ALBUMS = new Set(["published"]);
 
 function cleanString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function formatPlaceAddress(place: WpArtasiaPlacement["place"]) {
+  const address = place?.address?.trim() ?? "";
+  const city = place?.city?.trim() ?? "";
+  if (!address) return city;
+  if (!city || address.toLowerCase().includes(city.toLowerCase())) return address;
+  return `${address}, ${city}`;
 }
 
 function nonEmptyValues(values: Array<string | undefined>) {
@@ -130,6 +140,7 @@ function mapPartnerLogo(logo: PartnerLogo) {
 function mapWpPlacement(wp: WpArtasiaPlacement): ArtasiaPlacement {
   const lat = wp.place?.lat;
   const lng = wp.place?.lng;
+  const address = formatPlaceAddress(wp.place);
   return {
     placement_id: wp.placement_id,
     placement_name: wp.placement_name,
@@ -144,7 +155,9 @@ function mapWpPlacement(wp: WpArtasiaPlacement): ArtasiaPlacement {
     ...(wp.delivery_end_time ? { delivery_end_time: wp.delivery_end_time } : {}),
     ...(wp.delivery_schedule ? { delivery_schedule: wp.delivery_schedule } : {}),
     ...(wp.participant_age ? { participant_age: wp.participant_age } : {}),
-    ...(wp.place?.address ? { address: wp.place.address } : {}),
+    ...(wp.place?.name ? { place_name: wp.place.name } : {}),
+    ...(wp.place?.city ? { place_city: wp.place.city } : {}),
+    ...(address ? { address } : {}),
     ...(wp.place?.shared_with ? { shared_with: wp.place.shared_with } : {}),
     ...(lat != null && lat !== 0 ? { lat } : {}),
     ...(lng != null && lng !== 0 ? { lng } : {}),
