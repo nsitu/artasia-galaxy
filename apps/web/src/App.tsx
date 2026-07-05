@@ -27,8 +27,9 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    document.documentElement.classList.toggle("admin-page", path === "/admin");
-    return () => document.documentElement.classList.remove("admin-page");
+    const usesDocumentScroll = path === "/admin" || path === "/partners";
+    document.documentElement.classList.toggle("document-scroll-page", usesDocumentScroll);
+    return () => document.documentElement.classList.remove("document-scroll-page");
   }, [path]);
 
   if (path === "/admin") {

@@ -453,10 +453,10 @@ export default function PartnerUploadPanel() {
         <div style={headerStyle}>
           <div>
             <div style={eyebrowStyle}>Partner uploads</div>
-            <h1 style={titleStyle}>Share photos for a placement</h1>
+            <h1 style={titleStyle}>Share photos with Artasia</h1>
             <p style={subtitleStyle}>
-              Choose your organization, pick the placement, then add photos. Uploads land in the right
-              place without publishing controls.
+              Help us amplify children's voices! Contribute photos and videos from Artasia programming at your organization.
+              Your uploads will be reviewed and possibly included in our online exhibition.
             </p>
           </div>
           <a href="/" style={secondaryLinkStyle}>
