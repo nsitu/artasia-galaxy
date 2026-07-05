@@ -150,7 +150,7 @@ const hudStyle: React.CSSProperties = {
   right: 0,
   zIndex: 10,
   display: "flex",
-  justifyContent: "space-between",
+  justifyContent: "flex-end",
   padding: "12px 16px",
   fontFamily: "monospace",
   fontSize: 13,
