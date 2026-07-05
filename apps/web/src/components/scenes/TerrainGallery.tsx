@@ -47,9 +47,10 @@ export type TerrainNotice = {
 
 interface TerrainGalleryProps {
   onNoticeChange?: (notice: TerrainNotice | null) => void;
+  onBackActionChange?: (action: (() => void) | null) => void;
 }
 
-export default function TerrainGallery({ onNoticeChange }: TerrainGalleryProps = {}) {
+export default function TerrainGallery({ onNoticeChange, onBackActionChange }: TerrainGalleryProps = {}) {
   const camera = useThree((state) => state.camera);
   const controls = useThree((state) => (state as unknown as { controls?: TerrainOrbitControls }).controls);
   const photos = useGalleryStore((s) => s.photos);
@@ -354,6 +355,14 @@ export default function TerrainGallery({ onNoticeChange }: TerrainGalleryProps =
     return () => onNoticeChange?.(null);
   }, [onNoticeChange]);
 
+  useEffect(() => {
+    onBackActionChange?.(focusedPlacement ? returnToRegional : null);
+  }, [focusedPlacement, onBackActionChange, returnToRegional]);
+
+  useEffect(() => {
+    return () => onBackActionChange?.(null);
+  }, [onBackActionChange]);
+
   if (isPreparingTerrain || hasNoTerrainLocations) return null;
 
   return (
@@ -407,7 +416,7 @@ export default function TerrainGallery({ onNoticeChange }: TerrainGalleryProps =
 
       <Html fullscreen>
         {focusedPlacement ? (
-          <FocusedPlacementOverlay placement={focusedPlacement} onBack={returnToRegional} />
+          <FocusedPlacementOverlay placement={focusedPlacement} />
         ) : (
           hoveredPlacement ? <PlacementHoverLabel placement={hoveredPlacement} /> : null
         )}
@@ -448,13 +457,7 @@ function frameTerrainCamera(camera: THREE.Camera, terrain: THREE.Group, controls
   controls?.update?.();
 }
 
-function FocusedPlacementOverlay({
-  placement,
-  onBack,
-}: {
-  placement: MapPlacement;
-  onBack: () => void;
-}) {
+function FocusedPlacementOverlay({ placement }: { placement: MapPlacement }) {
   const isMobile = useIsMobileBreakpoint();
   const [expanded, setExpanded] = useState(!isMobile);
   const people = [placement.team_member, placement.secondary_team_member].filter(
@@ -469,64 +472,47 @@ function FocusedPlacementOverlay({
   }, [isMobile, placement.placement_id]);
 
   return (
-    <>
-      <button
-        type="button"
-        aria-label="Back to regional view"
-        onClick={onBack}
-        style={{
-          ...localBackButtonStyle,
-          ...(isMobile ? mobileLocalBackButtonStyle : {}),
-        }}
-      >
-        <svg viewBox="0 0 16 16" aria-hidden="true" style={backChevronStyle}>
-          <path d="M10.5 2.5 5 8l5.5 5.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        <span>Back</span>
-      </button>
-
-      <section
-        style={{
-          ...siteDetailsStyle,
-          ...(isMobile ? mobileSiteDetailsStyle : {}),
-          ...(isMobile && !expanded ? mobileSiteDetailsCollapsedStyle : {}),
-        }}
-        aria-label="Placement details"
-      >
-        <div style={siteDetailsHeaderStyle}>
-          {placement.partner_logo?.url && (
-            <img
-              src={placement.partner_logo.url}
-              alt={placement.partner_logo.alt || placement.partner_name || "Partner logo"}
-              style={partnerLogoStyle}
-            />
-          )}
-          <div style={siteDetailsTitleWrapStyle}>
-            <div style={sitePartnerStyle}>{placement.partner_name || "Partner organization"}</div>
-            <div style={siteNameStyle}>{placement.placement_name}</div>
-          </div>
-          {isMobile && (
-            <button
-              type="button"
-              aria-expanded={expanded}
-              aria-label={expanded ? "Collapse placement details" : "Expand placement details"}
-              onClick={() => setExpanded((current) => !current)}
-              style={siteDetailsToggleStyle}
-            >
-              {expanded ? "−" : "+"}
-            </button>
-          )}
-        </div>
-
-        {(!isMobile || expanded) && (
-          <div style={siteDetailsGridStyle}>
-            <SiteDetail label="Site" value={siteDetails || "Not specified"} />
-            <SiteDetail label={peopleLabel} value={people.map((person) => person.name).join(", ") || "Unassigned"} />
-            <SiteDetail label="Children" value={participantDetails || "Not specified"} />
-          </div>
+    <section
+      style={{
+        ...siteDetailsStyle,
+        ...(isMobile ? mobileSiteDetailsStyle : {}),
+        ...(isMobile && !expanded ? mobileSiteDetailsCollapsedStyle : {}),
+      }}
+      aria-label="Placement details"
+    >
+      <div style={siteDetailsHeaderStyle}>
+        {placement.partner_logo?.url && (
+          <img
+            src={placement.partner_logo.url}
+            alt={placement.partner_logo.alt || placement.partner_name || "Partner logo"}
+            style={partnerLogoStyle}
+          />
         )}
-      </section>
-    </>
+        <div style={siteDetailsTitleWrapStyle}>
+          <div style={sitePartnerStyle}>{placement.partner_name || "Partner organization"}</div>
+          <div style={siteNameStyle}>{placement.placement_name}</div>
+        </div>
+        {isMobile && (
+          <button
+            type="button"
+            aria-expanded={expanded}
+            aria-label={expanded ? "Collapse placement details" : "Expand placement details"}
+            onClick={() => setExpanded((current) => !current)}
+            style={siteDetailsToggleStyle}
+          >
+            {expanded ? "−" : "+"}
+          </button>
+        )}
+      </div>
+
+      {(!isMobile || expanded) && (
+        <div style={siteDetailsGridStyle}>
+          <SiteDetail label="Site" value={siteDetails || "Not specified"} />
+          <SiteDetail label={peopleLabel} value={people.map((person) => person.name).join(", ") || "Unassigned"} />
+          <SiteDetail label="Children" value={participantDetails || "Not specified"} />
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -620,37 +606,6 @@ const mobileSiteDetailsStyle: React.CSSProperties = {
 
 const mobileSiteDetailsCollapsedStyle: React.CSSProperties = {
   maxHeight: 86,
-};
-
-const localBackButtonStyle: React.CSSProperties = {
-  position: "absolute",
-  top: 14,
-  left: 16,
-  zIndex: 14,
-  pointerEvents: "auto",
-  minHeight: 36,
-  padding: "0 12px 0 10px",
-  borderRadius: 999,
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 6,
-  background: "rgba(10,10,20,0.82)",
-  color: "#eef2f8",
-  border: "1px solid rgba(255,255,255,0.18)",
-  boxShadow: "0 10px 26px rgba(0,0,0,0.28)",
-  cursor: "pointer",
-  fontFamily: "monospace",
-  fontSize: 12,
-};
-
-const mobileLocalBackButtonStyle: React.CSSProperties = {
-  top: 12,
-  left: 12,
-};
-
-const backChevronStyle: React.CSSProperties = {
-  width: 14,
-  height: 14,
 };
 
 const placementHoverLabelStyle: React.CSSProperties = {

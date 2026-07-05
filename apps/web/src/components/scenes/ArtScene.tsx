@@ -14,6 +14,7 @@ export default function ArtScene() {
   const selectPhoto = useGalleryStore((s) => s.selectPhoto);
   const error = useGalleryStore((s) => s.error);
   const [terrainNotice, setTerrainNotice] = useState<TerrainNotice | null>(null);
+  const [backAction, setBackAction] = useState<(() => void) | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
@@ -81,6 +82,20 @@ export default function ArtScene() {
         </div>
       </div>
 
+      {backAction && (
+        <button
+          type="button"
+          aria-label="Back to regional view"
+          onClick={backAction}
+          style={backButtonStyle}
+        >
+          <svg viewBox="0 0 16 16" aria-hidden="true" style={backChevronStyle}>
+            <path d="M10.5 2.5 5 8l5.5 5.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span>Back</span>
+        </button>
+      )}
+
       {error && <div style={errorStyle}>{error}</div>}
       {terrainNotice && <LoadingIndicator {...terrainNotice} />}
 
@@ -125,7 +140,7 @@ export default function ArtScene() {
       >
         <ambientLight intensity={0.8} />
         <Suspense fallback={null}>
-          <TerrainGallery onNoticeChange={setTerrainNotice} />
+          <TerrainGallery onNoticeChange={setTerrainNotice} onBackActionChange={setBackAction} />
           <OrbitControls
             makeDefault
             enableDamping
@@ -193,7 +208,7 @@ const menuLineStyle: React.CSSProperties = {
 const menuPanelStyle: React.CSSProperties = {
   position: "absolute",
   top: 48,
-  left: 0,
+  right: 0,
   minWidth: 152,
   padding: 8,
   borderRadius: 12,
@@ -214,6 +229,32 @@ const menuItemStyle: React.CSSProperties = {
   fontSize: 13,
   fontFamily: "monospace",
   background: "rgba(255,255,255,0.03)",
+};
+
+const backButtonStyle: React.CSSProperties = {
+  position: "absolute",
+  top: 12,
+  left: 16,
+  zIndex: 15,
+  pointerEvents: "auto",
+  minHeight: 40,
+  padding: "0 12px 0 10px",
+  borderRadius: 999,
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  background: "rgba(10,10,20,0.82)",
+  color: "#eef2f8",
+  border: "1px solid rgba(255,255,255,0.18)",
+  boxShadow: "0 10px 26px rgba(0,0,0,0.28)",
+  cursor: "pointer",
+  fontFamily: "monospace",
+  fontSize: 12,
+};
+
+const backChevronStyle: React.CSSProperties = {
+  width: 14,
+  height: 14,
 };
 
 const btnStyle: React.CSSProperties = {
