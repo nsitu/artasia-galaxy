@@ -503,13 +503,27 @@ export default function PartnerUploadPanel() {
                   <div style={queueItemMainStyle}>
                     <div style={queueItemNameStyle}>{item.file.name}</div>
                     <div style={queueItemMetaStyle}>
-                      {formatBytes(item.file.size)} | {item.status}
-                      {item.error ? ` | ${item.error}` : ""}
+                      <span>{formatBytes(item.file.size)}</span>
+                      <span style={queueMetaSeparatorStyle} aria-hidden="true" />
+                      {item.status === "completed" ? (
+                        <span style={completedStatusStyle}>
+                          <CheckIcon />
+                          upload completed
+                        </span>
+                      ) : item.status}
+                      {item.error && (
+                        <>
+                          <span style={queueMetaSeparatorStyle} aria-hidden="true" />
+                          <span style={queueErrorTextStyle}>{item.error}</span>
+                        </>
+                      )}
                     </div>
                   </div>
-                  <div style={progressTrackStyle} aria-hidden="true">
-                    <div style={{ ...progressFillStyle, width: `${item.progress}%` }} />
-                  </div>
+                  {item.status !== "completed" && (
+                    <div style={progressTrackStyle} aria-hidden="true">
+                      <div style={{ ...progressFillStyle, width: `${item.progress}%` }} />
+                    </div>
+                  )}
                   {item.assetId && (
                     <label style={captionFieldStyle}>
                       <span style={captionLabelStyle}>Caption</span>
@@ -594,6 +608,21 @@ function ChevronLeftIcon() {
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" style={completedCheckStyle}>
+      <path
+        d="M3.25 8.25 6.5 11.5l6.25-7"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
       />
     </svg>
   );
@@ -991,8 +1020,7 @@ const queueItemStyle: CSSProperties = {
   border: "1px solid rgba(255,255,255,0.10)",
   background: "rgba(255,255,255,0.03)",
   padding: 14,
-  display: "grid",
-  gridTemplateColumns: "72px 1fr",
+  display: "flex",
   gap: 12,
   alignItems: "center",
 };
@@ -1024,6 +1052,7 @@ const queueItemContentStyle: CSSProperties = {
   display: "grid",
   gap: 10,
   minWidth: 0,
+  flex: "1 1 auto",
 };
 
 const queueItemMainStyle: CSSProperties = {
@@ -1040,9 +1069,38 @@ const queueItemNameStyle: CSSProperties = {
 };
 
 const queueItemMetaStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "flex-end",
+  gap: 8,
+  flexWrap: "wrap",
   fontSize: 12,
   color: "#a6b0c2",
   textAlign: "right",
+};
+
+const queueMetaSeparatorStyle: CSSProperties = {
+  width: 1,
+  height: 12,
+  background: "rgba(166,176,194,0.45)",
+  flex: "0 0 auto",
+};
+
+const queueErrorTextStyle: CSSProperties = {
+  color: "#ffb3b3",
+};
+
+const completedStatusStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 4,
+  color: "#8bd7a8",
+  fontWeight: 700,
+};
+
+const completedCheckStyle: CSSProperties = {
+  width: 14,
+  height: 14,
 };
 
 const progressTrackStyle: CSSProperties = {
