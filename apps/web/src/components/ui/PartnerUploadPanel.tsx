@@ -68,6 +68,8 @@ export default function PartnerUploadPanel() {
     return partnerPlacements.find((placement) => String(placement.placement_id) === placementKey) ?? null;
   }, [partnerPlacements, placementKey]);
 
+  const activeStep = !partnerName ? 1 : !selectedPlacement ? 2 : 3;
+
   useEffect(() => {
     setPlacementKey((current) =>
       partnerPlacements.some((placement) => String(placement.placement_id) === current) ? current : ""
@@ -226,66 +228,107 @@ export default function PartnerUploadPanel() {
 
         {error && <div style={errorStyle}>{error}</div>}
 
-        <div style={stepGridStyle}>
-          <label style={fieldStyle}>
-            <span style={labelStyle}>1. Which organization do you represent?</span>
-            <select value={partnerName} onChange={(event) => selectPartner(event.target.value)} style={selectStyle}>
-              <option value="">Select your organization</option>
-              {partners.map((partner) => (
-                <option key={partner} value={partner}>
-                  {partner}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label style={fieldStyle}>
-            <span style={labelStyle}>2. Which placement is this for?</span>
-            <select
-              value={placementKey}
-              onChange={(event) => selectPlacement(event.target.value)}
-              disabled={!partnerName}
-              style={selectStyle}
-            >
-              <option value="">
-                {partnerName ? "Select a placement" : "Choose an organization first"}
-              </option>
-              {partnerPlacements.map((placement) => (
-                <option key={placement.placement_id} value={String(placement.placement_id)}>
-                  {placement.placement_name}
-                  {placement.delivery_schedule ? ` · ${placement.delivery_schedule}` : ""}
-                </option>
-              ))}
-            </select>
-            {selectedPlacement && <div style={helpTextStyle}>{selectedPlacement.partner_name}</div>}
-          </label>
-
-          <div style={fieldStyle}>
-            <span style={labelStyle}>3. Add photos</span>
-            <div style={dropzoneStyle} role="button" tabIndex={0} onClick={() => inputRef.current?.click()}>
-              <div style={dropzoneTitleStyle}>Drop files here or click to choose</div>
-              <div style={dropzoneBodyStyle}>
-                {selectedPlacement
-                  ? `Uploads will be tagged to ${selectedPlacement.placement_name}.`
-                  : "Select a placement first to enable uploading."}
-              </div>
-              <div style={dropzoneMetaStyle}>
-                Max batch: {options ? formatBytes(options.limits.maxBatchBytes) : "..."}
+        <div style={stepperStyle}>
+          <section style={stepCardStyle(activeStep >= 1, activeStep === 1)}>
+            <div style={stepHeaderStyle}>
+              <div style={stepBadgeStyle(activeStep >= 1)}>{partnerName ? "✓" : "1"}</div>
+              <div style={stepHeaderTextStyle}>
+                <div style={stepLabelStyle}>Step 1</div>
+                <div style={stepTitleStyle}>Which organization do you represent?</div>
               </div>
             </div>
-            <input
-              ref={inputRef}
-              type="file"
-              accept="image/*,video/*"
-              multiple
-              hidden
-              disabled={!selectedPlacement}
-              onChange={(event) => {
-                if (event.target.files) addFiles(event.target.files);
-                event.target.value = "";
-              }}
-            />
-          </div>
+            <label style={fieldStyle}>
+              <span style={labelStyle}>Partner organization</span>
+              <select value={partnerName} onChange={(event) => selectPartner(event.target.value)} style={selectStyle}>
+                <option value="">Select your organization</option>
+                {partners.map((partner) => (
+                  <option key={partner} value={partner}>
+                    {partner}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {partnerName && <div style={stepHintStyle}>Selected: {partnerName}</div>}
+          </section>
+
+          <section style={stepCardStyle(activeStep >= 2, activeStep === 2)}>
+            <div style={stepHeaderStyle}>
+              <div style={stepBadgeStyle(activeStep >= 2)}>{selectedPlacement ? "✓" : "2"}</div>
+              <div style={stepHeaderTextStyle}>
+                <div style={stepLabelStyle}>Step 2</div>
+                <div style={stepTitleStyle}>Which placement is this for?</div>
+              </div>
+            </div>
+            <label style={fieldStyle}>
+              <span style={labelStyle}>Placement</span>
+              <select
+                value={placementKey}
+                onChange={(event) => selectPlacement(event.target.value)}
+                disabled={!partnerName}
+                style={selectStyle}
+              >
+                <option value="">
+                  {partnerName ? "Select a placement" : "Choose an organization first"}
+                </option>
+                {partnerPlacements.map((placement) => (
+                  <option key={placement.placement_id} value={String(placement.placement_id)}>
+                    {placement.placement_name}
+                    {placement.delivery_schedule ? ` · ${placement.delivery_schedule}` : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {selectedPlacement ? (
+              <div style={stepHintStyle}>
+                {selectedPlacement.partner_name} · {selectedPlacement.placement_name}
+              </div>
+            ) : (
+              <div style={stepHintStyle}>Choose the placement that should receive these photos.</div>
+            )}
+          </section>
+
+          <section style={stepCardStyle(activeStep >= 3, activeStep === 3)}>
+            <div style={stepHeaderStyle}>
+              <div style={stepBadgeStyle(activeStep >= 3)}>{selectedPlacement ? "✓" : "3"}</div>
+              <div style={stepHeaderTextStyle}>
+                <div style={stepLabelStyle}>Step 3</div>
+                <div style={stepTitleStyle}>Add photos</div>
+              </div>
+            </div>
+            <div style={fieldStyle}>
+              <div
+                style={{
+                  ...dropzoneStyle,
+                  ...(selectedPlacement ? {} : dropzoneDisabledStyle),
+                }}
+                role="button"
+                tabIndex={0}
+                onClick={() => selectedPlacement && inputRef.current?.click()}
+              >
+                <div style={dropzoneTitleStyle}>Drop files here or click to choose</div>
+                <div style={dropzoneBodyStyle}>
+                  {selectedPlacement
+                    ? `Uploads will be tagged to ${selectedPlacement.placement_name}.`
+                    : "Select a placement first to enable uploading."}
+                </div>
+                <div style={dropzoneMetaStyle}>
+                  Max batch: {options ? formatBytes(options.limits.maxBatchBytes) : "..."}
+                </div>
+              </div>
+              <input
+                ref={inputRef}
+                type="file"
+                accept="image/*,video/*"
+                multiple
+                hidden
+                disabled={!selectedPlacement}
+                onChange={(event) => {
+                  if (event.target.files) addFiles(event.target.files);
+                  event.target.value = "";
+                }}
+              />
+            </div>
+          </section>
         </div>
 
         <div style={summaryBarStyle}>
@@ -433,10 +476,77 @@ const errorStyle: CSSProperties = {
   lineHeight: 1.45,
 };
 
-const stepGridStyle: CSSProperties = {
+const stepperStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
   gap: 16,
+};
+
+const stepCardStyle = (completed: boolean, active: boolean): CSSProperties => ({
+  borderRadius: 20,
+  border: active
+    ? "1px solid rgba(245, 210, 140, 0.34)"
+    : "1px solid rgba(255,255,255,0.10)",
+  background: active ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.035)",
+  boxShadow: active
+    ? "0 16px 36px rgba(0,0,0,0.24)"
+    : completed
+      ? "0 10px 24px rgba(0,0,0,0.18)"
+      : "none",
+  padding: 18,
+  display: "grid",
+  gap: 14,
+});
+
+const stepHeaderStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "flex-start",
+  gap: 12,
+};
+
+const stepBadgeStyle = (completed: boolean): CSSProperties => ({
+  flex: "0 0 auto",
+  width: 28,
+  height: 28,
+  borderRadius: 999,
+  display: "grid",
+  placeItems: "center",
+  background: completed ? "linear-gradient(135deg, #f5d28c 0%, #efb86b 100%)" : "rgba(255,255,255,0.08)",
+  color: completed ? "#17120a" : "#eef3fb",
+  border: completed ? "none" : "1px solid rgba(255,255,255,0.12)",
+  fontSize: 13,
+  fontWeight: 800,
+  lineHeight: 1,
+});
+
+const stepHeaderTextStyle: CSSProperties = {
+  minWidth: 0,
+  display: "grid",
+  gap: 2,
+};
+
+const stepLabelStyle: CSSProperties = {
+  color: "#aeb7c7",
+  fontSize: 11,
+  letterSpacing: "0.18em",
+  textTransform: "uppercase",
+};
+
+const stepTitleStyle: CSSProperties = {
+  color: "#f5f8fd",
+  fontSize: 16,
+  fontWeight: 700,
+  lineHeight: 1.25,
+};
+
+const stepHintStyle: CSSProperties = {
+  color: "#aeb7c7",
+  fontSize: 12,
+  lineHeight: 1.45,
+};
+
+const dropzoneDisabledStyle: CSSProperties = {
+  opacity: 0.56,
+  cursor: "not-allowed",
 };
 
 const fieldStyle: CSSProperties = {
