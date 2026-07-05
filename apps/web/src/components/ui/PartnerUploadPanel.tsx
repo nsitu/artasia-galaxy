@@ -10,6 +10,14 @@ interface UploadItem {
   assetId?: string;
 }
 
+type UploadPlacement = UploadOptions["placements"][number];
+
+interface PartnerOption {
+  name: string;
+  logo?: UploadPlacement["partner_logo"];
+  placements: UploadPlacement[];
+}
+
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   const units = ["KB", "MB", "GB"];
@@ -52,17 +60,34 @@ export default function PartnerUploadPanel() {
     };
   }, []);
 
-  const partners = useMemo(() => {
+  const partners = useMemo<PartnerOption[]>(() => {
     if (!options) return [];
-    return Array.from(new Set(options.placements.map((placement) => placement.partner_name).filter(Boolean))).sort((a, b) =>
-      a.localeCompare(b)
-    );
+    const grouped = new Map<string, PartnerOption>();
+    for (const placement of options.placements) {
+      const name = placement.partner_name?.trim();
+      if (!name) continue;
+      const current = grouped.get(name);
+      if (current) {
+        current.placements.push(placement);
+        if (!current.logo && placement.partner_logo) current.logo = placement.partner_logo;
+      } else {
+        grouped.set(name, {
+          name,
+          logo: placement.partner_logo,
+          placements: [placement],
+        });
+      }
+    }
+    return Array.from(grouped.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [options]);
 
+  const selectedPartner = useMemo(() => {
+    return partners.find((partner) => partner.name === partnerName) ?? null;
+  }, [partnerName, partners]);
+
   const partnerPlacements = useMemo(() => {
-    if (!options || !partnerName) return [];
-    return options.placements.filter((placement) => placement.partner_name === partnerName);
-  }, [options, partnerName]);
+    return selectedPartner?.placements ?? [];
+  }, [selectedPartner]);
 
   const selectedPlacement = useMemo(() => {
     return partnerPlacements.find((placement) => String(placement.placement_id) === placementKey) ?? null;
@@ -103,6 +128,19 @@ export default function PartnerUploadPanel() {
     setPlacementKey(value);
     setItems([]);
     setError(null);
+  }
+
+  function goBack() {
+    if (activeStep === 3) {
+      setPlacementKey("");
+      setItems([]);
+      setError(null);
+      return;
+    }
+    if (activeStep === 2) {
+      setPartnerName("");
+      resetSelection();
+    }
   }
 
   function addFiles(fileList: FileList | File[]) {
@@ -208,141 +246,163 @@ export default function PartnerUploadPanel() {
   const completedCount = items.filter((item) => item.status === "completed").length;
   const failedCount = items.filter((item) => item.status === "failed").length;
 
-  return (
-    <main style={pageStyle} onDragOver={(event) => event.preventDefault()} onDrop={onDrop}>
-      <div style={backgroundGlowStyle} />
-      <section style={panelStyle}>
-        <div style={headerStyle}>
-          <div>
-            <div style={eyebrowStyle}>Partner uploads</div>
-            <h1 style={titleStyle}>Share photos for a placement</h1>
-            <p style={subtitleStyle}>
-              Choose your organization, pick the placement, then add photos. Uploads land in the right
-              place without publishing controls.
-            </p>
-          </div>
-          <a href="/" style={secondaryLinkStyle}>
-            Viewer
-          </a>
+  function renderStepHeader(title: string, step: number) {
+    return (
+      <div style={stepHeaderStyle}>
+        <div style={stepBadgeStyle(true)}>{step}</div>
+        <div style={stepHeaderTextStyle}>
+          <div style={stepLabelStyle}>Step {step}</div>
+          <div style={stepTitleStyle}>{title}</div>
         </div>
+      </div>
+    );
+  }
 
-        {error && <div style={errorStyle}>{error}</div>}
+  function renderPartnerLogo(partner: Pick<PartnerOption, "name" | "logo">) {
+    return partner.logo?.url ? (
+      <img
+        src={partner.logo.url}
+        alt={partner.logo.alt || partner.name}
+        style={partnerButtonLogoStyle}
+      />
+    ) : (
+      <span style={partnerButtonLogoFallbackStyle}>{partner.name.slice(0, 1).toUpperCase()}</span>
+    );
+  }
 
-        <div style={stepperStyle}>
-          <section style={stepCardStyle(activeStep >= 1, activeStep === 1)}>
-            <div style={stepHeaderStyle}>
-              <div style={stepBadgeStyle(activeStep >= 1)}>{partnerName ? "✓" : "1"}</div>
-              <div style={stepHeaderTextStyle}>
-                <div style={stepLabelStyle}>Step 1</div>
-                <div style={stepTitleStyle}>Which organization do you represent?</div>
-              </div>
-            </div>
-            <label style={fieldStyle}>
-              <span style={labelStyle}>Partner organization</span>
-              <select value={partnerName} onChange={(event) => selectPartner(event.target.value)} style={selectStyle}>
-                <option value="">Select your organization</option>
-                {partners.map((partner) => (
-                  <option key={partner} value={partner}>
-                    {partner}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {partnerName && <div style={stepHintStyle}>Selected: {partnerName}</div>}
-          </section>
-
-          <section style={stepCardStyle(activeStep >= 2, activeStep === 2)}>
-            <div style={stepHeaderStyle}>
-              <div style={stepBadgeStyle(activeStep >= 2)}>{selectedPlacement ? "✓" : "2"}</div>
-              <div style={stepHeaderTextStyle}>
-                <div style={stepLabelStyle}>Step 2</div>
-                <div style={stepTitleStyle}>Which placement is this for?</div>
-              </div>
-            </div>
-            <label style={fieldStyle}>
-              <span style={labelStyle}>Placement</span>
-              <select
-                value={placementKey}
-                onChange={(event) => selectPlacement(event.target.value)}
-                disabled={!partnerName}
-                style={selectStyle}
+  function renderPartnerStep() {
+    return (
+      <section style={screenStyle}>
+        {renderStepHeader("Which organization do you represent?", 1)}
+        {loading ? (
+          <div style={emptyStateStyle}>Loading partner placements...</div>
+        ) : partners.length === 0 ? (
+          <div style={emptyStateStyle}>No partner organizations are available.</div>
+        ) : (
+          <div style={buttonGridStyle}>
+            {partners.map((partner) => (
+              <button
+                key={partner.name}
+                type="button"
+                onClick={() => selectPartner(partner.name)}
+                style={selectionButtonStyle}
               >
-                <option value="">
-                  {partnerName ? "Select a placement" : "Choose an organization first"}
-                </option>
-                {partnerPlacements.map((placement) => (
-                  <option key={placement.placement_id} value={String(placement.placement_id)}>
-                    {placement.placement_name}
-                    {placement.delivery_schedule ? ` · ${placement.delivery_schedule}` : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {selectedPlacement ? (
-              <div style={stepHintStyle}>
-                {selectedPlacement.partner_name} · {selectedPlacement.placement_name}
-              </div>
-            ) : (
-              <div style={stepHintStyle}>Choose the placement that should receive these photos.</div>
-            )}
-          </section>
+                {renderPartnerLogo(partner)}
+                <span style={selectionButtonTextStyle}>
+                  <span style={selectionButtonTitleStyle}>{partner.name}</span>
+                  <span style={selectionButtonMetaStyle}>
+                    {partner.placements.length} placement{partner.placements.length === 1 ? "" : "s"}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
+    );
+  }
 
-          <section style={stepCardStyle(activeStep >= 3, activeStep === 3)}>
-            <div style={stepHeaderStyle}>
-              <div style={stepBadgeStyle(activeStep >= 3)}>{selectedPlacement ? "✓" : "3"}</div>
-              <div style={stepHeaderTextStyle}>
-                <div style={stepLabelStyle}>Step 3</div>
-                <div style={stepTitleStyle}>Add photos</div>
-              </div>
-            </div>
-            <div style={fieldStyle}>
-              <div
-                style={{
-                  ...dropzoneStyle,
-                  ...(selectedPlacement ? {} : dropzoneDisabledStyle),
-                }}
-                role="button"
-                tabIndex={0}
-                onClick={() => selectedPlacement && inputRef.current?.click()}
+  function renderPlacementStep() {
+    return (
+      <section style={screenStyle}>
+        <div style={screenNavStyle}>
+          <button type="button" onClick={goBack} style={backButtonStyle}>
+            <ChevronLeftIcon />
+            Back
+          </button>
+        </div>
+        {renderStepHeader("Which placement is this for?", 2)}
+        <div style={contextLineStyle}>
+          {selectedPartner ? (
+            <>
+              {renderPartnerLogo(selectedPartner)}
+              <span>{selectedPartner.name}</span>
+            </>
+          ) : (
+            "Choose an organization first."
+          )}
+        </div>
+        {partnerPlacements.length === 0 ? (
+          <div style={emptyStateStyle}>No placements are available for this organization.</div>
+        ) : (
+          <div style={placementButtonListStyle}>
+            {partnerPlacements.map((placement) => (
+              <button
+                key={placement.placement_id}
+                type="button"
+                onClick={() => selectPlacement(String(placement.placement_id))}
+                style={selectionButtonStyle}
               >
-                <div style={dropzoneTitleStyle}>Drop files here or click to choose</div>
-                <div style={dropzoneBodyStyle}>
-                  {selectedPlacement
-                    ? `Uploads will be tagged to ${selectedPlacement.placement_name}.`
-                    : "Select a placement first to enable uploading."}
-                </div>
-                <div style={dropzoneMetaStyle}>
-                  Max batch: {options ? formatBytes(options.limits.maxBatchBytes) : "..."}
-                </div>
-              </div>
-              <input
-                ref={inputRef}
-                type="file"
-                accept="image/*,video/*"
-                multiple
-                hidden
-                disabled={!selectedPlacement}
-                onChange={(event) => {
-                  if (event.target.files) addFiles(event.target.files);
-                  event.target.value = "";
-                }}
-              />
+                <span style={selectionButtonTextStyle}>
+                  <span style={selectionButtonTitleStyle}>{placement.placement_name}</span>
+                  <span style={selectionButtonMetaStyle}>
+                    {[placement.delivery_schedule, placement.participant_age].filter(Boolean).join(" | ") || "Placement"}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
+    );
+  }
+
+  function renderUploadStep() {
+    return (
+      <section style={screenStyle}>
+        <div style={screenNavStyle}>
+          <button type="button" onClick={goBack} style={backButtonStyle}>
+            <ChevronLeftIcon />
+            Back
+          </button>
+        </div>
+        {renderStepHeader("Add photos", 3)}
+        <div style={uploadContextStyle}>
+          <div>{partnerName}</div>
+          <strong>{selectedPlacement?.placement_name}</strong>
+        </div>
+        <div style={fieldStyle}>
+          <div
+            style={{
+              ...dropzoneStyle,
+              ...(selectedPlacement ? {} : dropzoneDisabledStyle),
+            }}
+            role="button"
+            tabIndex={0}
+            onClick={() => selectedPlacement && inputRef.current?.click()}
+          >
+            <div style={dropzoneTitleStyle}>Drop files here or click to choose</div>
+            <div style={dropzoneBodyStyle}>
+              {selectedPlacement
+                ? `Uploads will be tagged to ${selectedPlacement.placement_name}.`
+                : "Select a placement first to enable uploading."}
             </div>
-          </section>
+            <div style={dropzoneMetaStyle}>
+              Max batch: {options ? formatBytes(options.limits.maxBatchBytes) : "..."}
+            </div>
+          </div>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*,video/*"
+            multiple
+            hidden
+            disabled={!selectedPlacement}
+            onChange={(event) => {
+              if (event.target.files) addFiles(event.target.files);
+              event.target.value = "";
+            }}
+          />
         </div>
 
         <div style={summaryBarStyle}>
-          <div>{partnerName ? `Organization: ${partnerName}` : "Organization not selected"}</div>
-          <div>{selectedPlacement ? `Placement: ${selectedPlacement.placement_name}` : "Placement not selected"}</div>
           <div>{items.length} file{items.length === 1 ? "" : "s"} in queue</div>
           <div>{completedCount} completed</div>
           <div>{failedCount} failed</div>
         </div>
 
         <div style={queueStyle}>
-          {loading ? (
-            <div style={emptyStateStyle}>Loading partner placements...</div>
-          ) : items.length === 0 ? (
+          {items.length === 0 ? (
             <div style={emptyStateStyle}>No files added yet.</div>
           ) : (
             items.map((item) => (
@@ -350,8 +410,8 @@ export default function PartnerUploadPanel() {
                 <div style={queueItemMainStyle}>
                   <div style={queueItemNameStyle}>{item.file.name}</div>
                   <div style={queueItemMetaStyle}>
-                    {formatBytes(item.file.size)} · {item.status}
-                    {item.error ? ` · ${item.error}` : ""}
+                    {formatBytes(item.file.size)} | {item.status}
+                    {item.error ? ` | ${item.error}` : ""}
                   </div>
                 </div>
                 <div style={progressTrackStyle} aria-hidden="true">
@@ -383,14 +443,55 @@ export default function PartnerUploadPanel() {
           </button>
         </div>
       </section>
+    );
+  }
+
+  return (
+    <main style={pageStyle} onDragOver={(event) => event.preventDefault()} onDrop={onDrop}>
+      <div style={backgroundGlowStyle} />
+      <section style={panelStyle}>
+        <div style={headerStyle}>
+          <div>
+            <div style={eyebrowStyle}>Partner uploads</div>
+            <h1 style={titleStyle}>Share photos for a placement</h1>
+            <p style={subtitleStyle}>
+              Choose your organization, pick the placement, then add photos. Uploads land in the right
+              place without publishing controls.
+            </p>
+          </div>
+          <a href="/" style={secondaryLinkStyle}>
+            Viewer
+          </a>
+        </div>
+
+        {error && <div style={errorStyle}>{error}</div>}
+
+        {activeStep === 1 ? renderPartnerStep() : activeStep === 2 ? renderPlacementStep() : renderUploadStep()}
+      </section>
     </main>
+  );
+}
+
+function ChevronLeftIcon() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" style={backButtonIconStyle}>
+      <path
+        d="M10.5 2.5 5 8l5.5 5.5"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
   );
 }
 
 const pageStyle: CSSProperties = {
   minHeight: "100vh",
   position: "relative",
-  overflow: "hidden",
+  overflowX: "hidden",
+  overflowY: "auto",
   background:
     "radial-gradient(circle at top left, rgba(219, 172, 112, 0.20), transparent 28%), radial-gradient(circle at bottom right, rgba(88, 138, 255, 0.15), transparent 24%), linear-gradient(180deg, #0a0b12 0%, #10131b 50%, #0b0d14 100%)",
   color: "#f2f6fc",
@@ -542,6 +643,115 @@ const stepHintStyle: CSSProperties = {
   color: "#aeb7c7",
   fontSize: 12,
   lineHeight: 1.45,
+};
+
+const screenStyle: CSSProperties = {
+  display: "grid",
+  gap: 18,
+};
+
+const screenNavStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "flex-start",
+};
+
+const backButtonStyle: CSSProperties = {
+  minHeight: 38,
+  padding: "0 12px 0 8px",
+  borderRadius: 999,
+  border: "1px solid rgba(255,255,255,0.12)",
+  background: "rgba(255,255,255,0.05)",
+  color: "#eef3fb",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  cursor: "pointer",
+  fontSize: 13,
+  fontWeight: 700,
+};
+
+const backButtonIconStyle: CSSProperties = {
+  width: 15,
+  height: 15,
+};
+
+const buttonGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: 10,
+};
+
+const placementButtonListStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: 8,
+};
+
+const selectionButtonStyle: CSSProperties = {
+  width: "100%",
+  display: "flex",
+  alignItems: "center",
+  gap: 12,
+  textAlign: "left",
+  background: "rgba(255,255,255,0.04)",
+  color: "#ddd",
+  border: "1px solid rgba(255,255,255,0.10)",
+  borderRadius: 8,
+  padding: 12,
+  cursor: "pointer",
+};
+
+const selectionButtonTextStyle: CSSProperties = {
+  minWidth: 0,
+  display: "grid",
+  gap: 4,
+};
+
+const selectionButtonTitleStyle: CSSProperties = {
+  color: "#f2f6fc",
+  fontSize: 14,
+  lineHeight: 1.3,
+  fontWeight: 700,
+};
+
+const selectionButtonMetaStyle: CSSProperties = {
+  color: "#9ca7b8",
+  fontSize: 12,
+  lineHeight: 1.3,
+};
+
+const partnerButtonLogoStyle: CSSProperties = {
+  flex: "0 0 auto",
+  width: 56,
+  height: 42,
+  objectFit: "contain",
+  background: "rgba(255,255,255,0.92)",
+  borderRadius: 4,
+  padding: 5,
+};
+
+const partnerButtonLogoFallbackStyle: CSSProperties = {
+  ...partnerButtonLogoStyle,
+  display: "grid",
+  placeItems: "center",
+  color: "#151922",
+  fontSize: 18,
+  fontWeight: 800,
+};
+
+const contextLineStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  color: "#c4ccda",
+  fontSize: 13,
+};
+
+const uploadContextStyle: CSSProperties = {
+  display: "grid",
+  gap: 3,
+  color: "#aeb7c7",
+  fontSize: 13,
 };
 
 const dropzoneDisabledStyle: CSSProperties = {

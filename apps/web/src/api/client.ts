@@ -63,6 +63,12 @@ export interface UploadPlacement {
   secondary_team_member_id?: number;
   secondary_team_member_name?: string;
   partner_name: string;
+  partner_logo?: {
+    id: number;
+    url: string;
+    mime_type: string;
+    alt: string;
+  } | null;
   delivery_weekday?: string;
   delivery_start_time?: string;
   delivery_end_time?: string;

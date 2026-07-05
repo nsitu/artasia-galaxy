@@ -24,6 +24,12 @@ export interface ArtasiaPlacement {
   secondary_team_member_id?: number;
   secondary_team_member_name?: string;
   partner_name: string;
+  partner_logo?: {
+    id: number;
+    url: string;
+    mime_type: string;
+    alt: string;
+  } | null;
   delivery_weekday?: string;
   delivery_start_time?: string;
   delivery_end_time?: string;
@@ -132,6 +138,7 @@ function mapWpPlacement(wp: WpArtasiaPlacement): ArtasiaPlacement {
     ...(wp.secondary_team_member?.id ? { secondary_team_member_id: wp.secondary_team_member.id } : {}),
     ...(wp.secondary_team_member?.name ? { secondary_team_member_name: wp.secondary_team_member.name } : {}),
     partner_name: wp.partner?.name ?? "",
+    ...(wp.partner?.logo ? { partner_logo: mapPartnerLogo(wp.partner.logo) } : {}),
     ...(wp.delivery_weekday ? { delivery_weekday: wp.delivery_weekday } : {}),
     ...(wp.delivery_start_time ? { delivery_start_time: wp.delivery_start_time } : {}),
     ...(wp.delivery_end_time ? { delivery_end_time: wp.delivery_end_time } : {}),
