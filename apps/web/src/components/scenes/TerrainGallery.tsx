@@ -254,6 +254,7 @@ export default function TerrainGallery({
     let cancelled = false;
     let renderFrame: number | null = null;
     let requestProjection: ThreeGeoProjection | null = null;
+    let stagedGroup: THREE.Group | null = null;
     setLoading(Boolean(MAPBOX_TOKEN));
     setError(null);
     setPhase("projecting");
@@ -289,17 +290,27 @@ export default function TerrainGallery({
           return null;
         }
         setPhase("fetching");
-        return tgeo.getTerrainRgb(request.origin, request.radiusKm, request.zoom);
+        return tgeo.getTerrain(request.origin, request.radiusKm, request.zoom, {
+          onRgbDem: (meshes) => {
+            if (cancelled) return;
+            stagedGroup = createTerrainGroup(meshes, terrainElevationScale);
+            setTerrain(stagedGroup);
+            setRenderedTerrainKey(requestKey);
+            setPhase("rendering");
+          },
+          onSatelliteMat: (mesh) => {
+            if (cancelled) return;
+            normalizeTerrainMaterials(mesh);
+          },
+        });
       })
-      .then((group) => {
-        if (!group) return;
+      .then((result) => {
+        if (!result) return;
+        const group = stagedGroup ?? createTerrainGroup(result.rgbDem ?? [], terrainElevationScale);
         if (cancelled) {
           disposeObject(group);
           return;
         }
-        setPhase("rendering");
-        group.name = "artasia-terrain";
-        group.scale.z = terrainElevationScale;
         normalizeTerrainMaterials(group);
         if (requestKey && requestProjection) {
           terrainCacheRef.current.set(requestKey, {
@@ -308,7 +319,10 @@ export default function TerrainGallery({
             phase: "ready",
           });
         }
-        setTerrain(group);
+        if (!stagedGroup) {
+          setTerrain(group);
+          setRenderedTerrainKey(requestKey);
+        }
         renderFrame = window.requestAnimationFrame(() => {
           if (!cancelled) {
             setRenderedTerrainKey(requestKey);
@@ -895,6 +909,17 @@ function disposeObject(object: THREE.Object3D) {
       material?.dispose();
     }
   });
+}
+
+function createTerrainGroup(meshes: THREE.Mesh[], terrainElevationScale: number) {
+  const group = new THREE.Group();
+  group.name = "artasia-terrain";
+  group.scale.z = terrainElevationScale;
+  for (const mesh of meshes) {
+    group.add(mesh);
+  }
+  normalizeTerrainMaterials(group);
+  return group;
 }
 
 function normalizeTerrainMaterials(object: THREE.Object3D) {

@@ -8,6 +8,15 @@ export interface ThreeGeoProjection {
   unitsPerMeter: number;
 }
 
+export interface ThreeGeoTerrainCallbacks {
+  onRgbDem?: (meshes: THREE.Mesh[]) => void;
+  onSatelliteMat?: (mesh: THREE.Mesh) => void;
+}
+
+export interface ThreeGeoTerrainResult {
+  rgbDem?: THREE.Mesh[];
+}
+
 export interface ThreeGeoConstructor {
   new (options?: {
     tokenMapbox?: string;
@@ -19,6 +28,12 @@ export interface ThreeGeoConstructor {
       radius: number,
       unitsSide?: number
     ): ThreeGeoProjection;
+    getTerrain(
+      origin: [number, number],
+      radius: number,
+      zoom: number,
+      callbacks?: ThreeGeoTerrainCallbacks
+    ): Promise<ThreeGeoTerrainResult>;
     getTerrainRgb(
       origin: [number, number],
       radius: number,
