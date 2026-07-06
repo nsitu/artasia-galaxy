@@ -14,7 +14,7 @@ import { loadThreeGeo, type ThreeGeoProjection } from "./threeGeoRuntime";
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN ?? "";
 const REGIONAL_TERRAIN_ELEVATION_SCALE = 8;
-const LOCAL_TERRAIN_ELEVATION_SCALE = 2;
+const LOCAL_TERRAIN_ELEVATION_SCALE = 1.25;
 const DEFAULT_TERRAIN_CAMERA_POSITION = new THREE.Vector3(0, -12, 10);
 const LOCAL_PLACEMENT_RADIUS_KM = 0.5;
 const SAME_LOCATION_THRESHOLD_METERS = 15;
