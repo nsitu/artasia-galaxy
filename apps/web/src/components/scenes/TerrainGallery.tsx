@@ -13,12 +13,345 @@ import {
 import { loadThreeGeo, type ThreeGeoProjection } from "./threeGeoRuntime";
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN ?? "";
-const REGIONAL_TERRAIN_ELEVATION_SCALE = 5;
+const REGIONAL_TERRAIN_ELEVATION_SCALE = 8;
 const LOCAL_TERRAIN_ELEVATION_SCALE = 2;
 const DEFAULT_TERRAIN_CAMERA_POSITION = new THREE.Vector3(0, -12, 10);
-const LOCAL_PLACEMENT_RADIUS_KM = 1;
+const LOCAL_PLACEMENT_RADIUS_KM = 0.5;
 const SAME_LOCATION_THRESHOLD_METERS = 15;
 const REGIONAL_FLOWER_DENSITY_RADIUS = 0.62;
+const REGIONAL_CAMERA_FIT_SCALE = 0.5;
+const LOCAL_CAMERA_FIT_SCALE = 0.55;
+const REGIONAL_DEM_ZOOM_OFFSET = 5;
+const LOCAL_DEM_ZOOM_OFFSET = 3;
+
+type TerrainBenchmark = {
+  key: string;
+  start: number;
+  rgbDemAt: number | null;
+  firstSatMatAt: number | null;
+  lastSatMatAt: number | null;
+  satMatCount: number;
+  readyAt: number | null;
+  totalTiles: number | null;
+};
+
+function createTerrainBenchmark(key: string): TerrainBenchmark {
+  return {
+    key,
+    start: performance.now(),
+    rgbDemAt: null,
+    firstSatMatAt: null,
+    lastSatMatAt: null,
+    satMatCount: 0,
+    readyAt: null,
+    totalTiles: null,
+  };
+}
+
+function logTerrainBenchmark(stage: string, bench: TerrainBenchmark, extra?: Record<string, unknown>) {
+  const now = performance.now();
+  const elapsed = now - bench.start;
+  const payload = { ...extra, elapsedMs: Math.round(elapsed) };
+  console.info(`[terrain:${stage}] ${bench.key}`, payload);
+}
+
+function summarizeTerrainBenchmark(bench: TerrainBenchmark) {
+  const demLatency = bench.rgbDemAt !== null ? Math.round(bench.rgbDemAt - bench.start) : null;
+  const firstTexLatency = bench.firstSatMatAt !== null ? Math.round(bench.firstSatMatAt - bench.start) : null;
+  const lastTexLatency = bench.lastSatMatAt !== null ? Math.round(bench.lastSatMatAt - bench.start) : null;
+  const readyLatency = bench.readyAt !== null ? Math.round(bench.readyAt - bench.start) : null;
+  const textureSpread = bench.lastSatMatAt !== null && bench.firstSatMatAt !== null
+    ? Math.round(bench.lastSatMatAt - bench.firstSatMatAt)
+    : null;
+  console.info(`[terrain:summary] ${bench.key}`, {
+    demLatencyMs: demLatency,
+    firstTextureLatencyMs: firstTexLatency,
+    lastTextureLatencyMs: lastTexLatency,
+    textureSpreadMs: textureSpread,
+    readyLatencyMs: readyLatency,
+    texturesLoaded: bench.satMatCount,
+    totalTiles: bench.totalTiles,
+  });
+}
+
+const MAPBOX_TILE_PATTERN = /api\.mapbox\.com\/(v4\/mapbox\.terrain-rgb|styles\/v1\/mapbox\/satellite-v9)/;
+const MAPBOX_SAT_PATTERN = /api\.mapbox\.com\/styles\/v1\/mapbox\/satellite-v9/;
+const MAPBOX_DEM_PATTERN = /api\.mapbox\.com\/v4\/mapbox\.terrain-rgb/;
+
+type TileTimings = {
+  started: number;
+  done: number;
+  inflight: number;
+  totalBytes: number;
+  firstFetchAt: number | null;
+  lastResponseEndAt: number | null;
+  duration: { p50: number; p90: number; max: number };
+  queue: { p50: number; p90: number; max: number };
+  server: { p50: number; p90: number; max: number };
+  download: { p50: number; p90: number; max: number };
+};
+
+function pickPercentile(sorted: number[], p: number): number {
+  if (sorted.length === 0) return 0;
+  const idx = Math.min(sorted.length - 1, Math.floor(sorted.length * p));
+  return Math.round(sorted[idx]);
+}
+
+function collectTileTimings(
+  bench: TerrainBenchmark,
+  pattern: RegExp,
+): TileTimings | null {
+  if (typeof performance === "undefined" || !performance.getEntriesByType) return null;
+  const entries = performance.getEntriesByType("resource") as PerformanceResourceTiming[];
+  const matched = entries.filter(
+    (e) => e.fetchStart >= bench.start && pattern.test(e.name),
+  );
+  if (matched.length === 0) return null;
+
+  const started = matched.length;
+  const done = matched.filter((e) => e.responseEnd > 0).length;
+  const inflight = started - done;
+  const totalBytes = matched.reduce((sum, e) => sum + (e.transferSize || 0), 0);
+  const firstFetchAt = Math.min(...matched.map((e) => e.fetchStart));
+  const finished = matched.filter((e) => e.responseEnd > 0);
+  const lastResponseEndAt = finished.length > 0 ? Math.max(...finished.map((e) => e.responseEnd)) : null;
+
+  const durations = matched.map((e) => e.duration).filter((d) => d > 0).sort((a, b) => a - b);
+  const queueTimes = matched
+    .filter((e) => e.requestStart > 0)
+    .map((e) => e.requestStart - e.fetchStart)
+    .sort((a, b) => a - b);
+  const serverTimes = matched
+    .filter((e) => e.responseStart > 0)
+    .map((e) => e.responseStart - e.requestStart)
+    .sort((a, b) => a - b);
+  const downloadTimes = matched
+    .filter((e) => e.responseEnd > 0 && e.responseStart > 0)
+    .map((e) => e.responseEnd - e.responseStart)
+    .sort((a, b) => a - b);
+
+  return {
+    started,
+    done,
+    inflight,
+    totalBytes,
+    firstFetchAt: Math.round(firstFetchAt - bench.start),
+    lastResponseEndAt: lastResponseEndAt !== null ? Math.round(lastResponseEndAt - bench.start) : null,
+    duration: { p50: pickPercentile(durations, 0.5), p90: pickPercentile(durations, 0.9), max: pickPercentile(durations, 1) },
+    queue: { p50: pickPercentile(queueTimes, 0.5), p90: pickPercentile(queueTimes, 0.9), max: pickPercentile(queueTimes, 1) },
+    server: { p50: pickPercentile(serverTimes, 0.5), p90: pickPercentile(serverTimes, 0.9), max: pickPercentile(serverTimes, 1) },
+    download: { p50: pickPercentile(downloadTimes, 0.5), p90: pickPercentile(downloadTimes, 0.9), max: pickPercentile(downloadTimes, 1) },
+  };
+}
+
+function logTileTimings(stage: string, bench: TerrainBenchmark, label: string, pattern: RegExp) {
+  const timings = collectTileTimings(bench, pattern);
+  if (!timings) {
+    console.info(`[terrain:${stage}] ${bench.key} ${label}: no resource timings`);
+    return;
+  }
+  console.info(`[terrain:${stage}] ${bench.key} ${label}`, {
+    started: timings.started,
+    done: timings.done,
+    inflight: timings.inflight,
+    totalBytes: timings.totalBytes,
+    firstFetchAtMs: timings.firstFetchAt,
+    lastResponseEndAtMs: timings.lastResponseEndAt,
+    duration: timings.duration,
+    queueMs: timings.queue,
+    serverLatencyMs: timings.server,
+    downloadMs: timings.download,
+  });
+}
+
+function startLongTaskObserver(bench: TerrainBenchmark): PerformanceObserver | null {
+  if (typeof PerformanceObserver === "undefined" || !PerformanceObserver.supportedEntryTypes?.includes("longtask")) {
+    return null;
+  }
+  const observer = new PerformanceObserver((list) => {
+    for (const entry of list.getEntries()) {
+      const startMs = Math.round(entry.startTime - bench.start);
+      console.info(`[terrain:longtask] ${bench.key}`, {
+        startMs,
+        durationMs: Math.round(entry.duration),
+        elapsedAtEndMs: Math.round(entry.startTime + entry.duration - bench.start),
+      });
+    }
+  });
+  observer.observe({ entryTypes: ["longtask"] });
+  return observer;
+}
+
+type TileDispatchProbe = {
+  active: boolean;
+  satCount: number;
+  demCount: number;
+  firstSatDispatchAt: number | null;
+  lastSatDispatchAt: number | null;
+  lastBench: TerrainBenchmark | null;
+};
+
+function installTileDispatchProbe(bench: TerrainBenchmark): () => void {
+  const probe: TileDispatchProbe = {
+    active: true,
+    satCount: 0,
+    demCount: 0,
+    firstSatDispatchAt: null,
+    lastSatDispatchAt: null,
+    lastBench: bench,
+  };
+
+  const patchXHR = () => {
+    const origOpen = XMLHttpRequest.prototype.open;
+    const origSend = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.open = function (method: string, url: string, ...rest: unknown[]) {
+      (this as XMLHttpRequest & { __artasiaUrl?: string }).__artasiaUrl = url;
+      return origOpen.call(this as XMLHttpRequest, method, url, ...(rest as [boolean, string | null]));
+    };
+    XMLHttpRequest.prototype.send = function (...args: unknown[]) {
+      const self = this as XMLHttpRequest & { __artasiaUrl?: string };
+      if (probe.active && typeof self.__artasiaUrl === "string" && probe.lastBench) {
+        const url = self.__artasiaUrl;
+        const b = probe.lastBench;
+        if (MAPBOX_SAT_PATTERN.test(url)) {
+          probe.satCount += 1;
+          const now = performance.now();
+          if (probe.firstSatDispatchAt === null) probe.firstSatDispatchAt = now;
+          probe.lastSatDispatchAt = now;
+          if (probe.satCount === 1 || probe.satCount % 10 === 0) {
+            console.info(`[terrain:xhr-sat-dispatch] ${b.key}`, {
+              dispatch: probe.satCount,
+              elapsedMs: Math.round(now - b.start),
+              url: url.slice(0, 120),
+            });
+          }
+        } else if (MAPBOX_DEM_PATTERN.test(url)) {
+          probe.demCount += 1;
+          if (probe.demCount === 1 || probe.demCount % 5 === 0) {
+            console.info(`[terrain:xhr-dem-dispatch] ${b.key}`, {
+              dispatch: probe.demCount,
+              elapsedMs: Math.round(performance.now() - b.start),
+            });
+          }
+        }
+      }
+      return origSend.apply(self as XMLHttpRequest, args as [XMLHttpRequestBodyInit | Document | null]);
+    };
+    return () => {
+      XMLHttpRequest.prototype.open = origOpen;
+      XMLHttpRequest.prototype.send = origSend;
+    };
+  };
+
+  let restoreFetch: (() => void) | null = null;
+  if (typeof window.fetch === "function") {
+    const origFetch = window.fetch;
+    window.fetch = function (input: RequestInfo | URL, init?: RequestInit) {
+      if (probe.active && probe.lastBench) {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input?.url;
+        if (url && MAPBOX_SAT_PATTERN.test(url)) {
+          probe.satCount += 1;
+          const now = performance.now();
+          if (probe.firstSatDispatchAt === null) probe.firstSatDispatchAt = now;
+          probe.lastSatDispatchAt = now;
+          if (probe.satCount === 1 || probe.satCount % 10 === 0) {
+            console.info(`[terrain:fetch-sat-dispatch] ${probe.lastBench.key}`, {
+              dispatch: probe.satCount,
+              elapsedMs: Math.round(now - probe.lastBench.start),
+              url: url.slice(0, 120),
+            });
+          }
+        } else if (url && MAPBOX_DEM_PATTERN.test(url)) {
+          probe.demCount += 1;
+          if (probe.demCount === 1 || probe.demCount % 5 === 0) {
+            console.info(`[terrain:fetch-dem-dispatch] ${probe.lastBench.key}`, {
+              dispatch: probe.demCount,
+              elapsedMs: Math.round(performance.now() - probe.lastBench.start),
+            });
+          }
+        }
+      }
+      return origFetch.call(this, input, init);
+    };
+    restoreFetch = () => {
+      window.fetch = origFetch;
+    };
+  }
+
+  const restoreXHR = patchXHR();
+
+  // three-geo (via get-pixels) loads raster tiles as `new Image()` with
+  // `crossOrigin="Anonymous"` and assigns `img.src = url` — see three-geo.min
+  // .js:99052. Neither fetch() nor XHR is involved, which is why the XHR probe
+  // above records zero dispatches while Resource Timing still shows the tiles.
+  // To timestamp the actual `img.src = url` assignment we override the
+  // `HTMLImageElement.prototype.src` setter for the duration of this terrain
+  // load.
+  let restoreImageSrc: (() => void) | null = null;
+  const imgDescriptor = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, "src");
+  if (imgDescriptor?.set) {
+    const origSet = imgDescriptor.set;
+    Object.defineProperty(HTMLImageElement.prototype, "src", {
+      configurable: true,
+      enumerable: true,
+      get: imgDescriptor.get,
+      set(value: string) {
+        if (probe.active && probe.lastBench && typeof value === "string") {
+          const b = probe.lastBench;
+          if (MAPBOX_SAT_PATTERN.test(value)) {
+            probe.satCount += 1;
+            const now = performance.now();
+            if (probe.firstSatDispatchAt === null) probe.firstSatDispatchAt = now;
+            probe.lastSatDispatchAt = now;
+            if (probe.satCount === 1 || probe.satCount % 10 === 0) {
+              console.info(`[terrain:image-sat-dispatch] ${b.key}`, {
+                dispatch: probe.satCount,
+                elapsedMs: Math.round(now - b.start),
+                url: value.slice(0, 120),
+              });
+            }
+          } else if (MAPBOX_DEM_PATTERN.test(value)) {
+            probe.demCount += 1;
+            if (probe.demCount === 1 || probe.demCount % 5 === 0) {
+              console.info(`[terrain:image-dem-dispatch] ${b.key}`, {
+                dispatch: probe.demCount,
+                elapsedMs: Math.round(performance.now() - b.start),
+              });
+            }
+          }
+        }
+        return origSet.call(this as HTMLImageElement, value);
+      },
+    });
+    restoreImageSrc = () => {
+      Object.defineProperty(HTMLImageElement.prototype, "src", {
+        configurable: true,
+        enumerable: true,
+        get: imgDescriptor.get,
+        set: origSet,
+      });
+    };
+  }
+
+  return () => {
+    probe.active = false;
+    restoreXHR();
+    restoreFetch?.();
+    restoreImageSrc?.();
+    if (probe.lastBench) {
+      console.info(`[terrain:tile-dispatch-summary] ${probe.lastBench.key}`, {
+        satDispatches: probe.satCount,
+        demDispatches: probe.demCount,
+        firstSatDispatchAtMs: probe.firstSatDispatchAt !== null
+          ? Math.round(probe.firstSatDispatchAt - probe.lastBench.start)
+          : null,
+        lastSatDispatchAtMs: probe.lastSatDispatchAt !== null
+          ? Math.round(probe.lastSatDispatchAt - probe.lastBench.start)
+          : null,
+      });
+    }
+  };
+}
 type TerrainPhase = "idle" | "projecting" | "fetching" | "rendering" | "ready" | "flat" | "error";
 type LocalPhotoLayoutItem =
   | {
@@ -48,12 +381,19 @@ export type TerrainNotice = {
   tone?: "loading" | "error" | "muted";
   busy?: boolean;
 };
+export type PartnerFilterOption = {
+  value: string;
+  label: string;
+  count: number;
+};
 
 interface TerrainGalleryProps {
   onNoticeChange?: (notice: TerrainNotice | null) => void;
   onBackActionChange?: (action: (() => void) | null) => void;
   onFocusedPlacementChange?: (placement: MapPlacement | null) => void;
   onHoveredPlacementChange?: (placement: MapPlacement | null) => void;
+  onPartnerFilterOptionsChange?: (options: PartnerFilterOption[]) => void;
+  selectedPartnerFilter?: string;
 }
 
 export default function TerrainGallery({
@@ -61,6 +401,8 @@ export default function TerrainGallery({
   onBackActionChange,
   onFocusedPlacementChange,
   onHoveredPlacementChange,
+  onPartnerFilterOptionsChange,
+  selectedPartnerFilter = "",
 }: TerrainGalleryProps = {}) {
   const camera = useThree((state) => state.camera);
   const controls = useThree((state) => (state as unknown as { controls?: TerrainOrbitControls }).controls);
@@ -79,6 +421,7 @@ export default function TerrainGallery({
   const [renderedTerrainKey, setRenderedTerrainKey] = useState<string | null>(null);
   const [placements, setPlacements] = useState<MapPlacement[]>([]);
   const [placementError, setPlacementError] = useState<string | null>(null);
+  const [placementsResolved, setPlacementsResolved] = useState(false);
   const [focusedPlacement, setFocusedPlacement] = useState<MapPlacement | null>(null);
   const [hoveredPlacement, setHoveredPlacement] = useState<MapPlacement | null>(null);
   const terrainCacheRef = useRef<Map<string, TerrainCacheEntry>>(new Map());
@@ -93,17 +436,41 @@ export default function TerrainGallery({
         .map((placement) => ({ lat: placement.lat, lng: placement.lng })),
     [focusedPlacement, placements]
   );
-  const visiblePlacements = useMemo(() => focusedPlacement ? [focusedPlacement] : placements, [focusedPlacement, placements]);
+  const partnerFilterOptions = useMemo<PartnerFilterOption[]>(() => {
+    const counts = new Map<string, number>();
+    for (const placement of placements) {
+      const partner = placement.partner_name?.trim();
+      if (!partner) continue;
+      counts.set(partner, (counts.get(partner) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([partner, count]) => ({ value: partner, label: partner, count }));
+  }, [placements]);
+  const filteredRegionalPlacements = useMemo(() => {
+    if (!selectedPartnerFilter) return placements;
+    return placements.filter((placement) => placement.partner_name?.trim() === selectedPartnerFilter);
+  }, [placements, selectedPartnerFilter]);
+  const visiblePlacements = useMemo(
+    () => focusedPlacement ? [focusedPlacement] : filteredRegionalPlacements,
+    [filteredRegionalPlacements, focusedPlacement]
+  );
   const request = useMemo(() => {
     if (focusedPlacement) {
       return createMaxDetailTerrainRequest([focusedPlacement.lat, focusedPlacement.lng], LOCAL_PLACEMENT_RADIUS_KM);
     }
-    const regionalLocations = geoPlacements.length > 0 ? geoPlacements : geoPhotos;
-    return createTerrainRequest(regionalLocations);
-  }, [focusedPlacement, geoPhotos, geoPlacements]);
+    // Don't fall back to geoPhotos until the placements fetch has actually
+    // resolved; otherwise we'd fire a regional terrain load on photos alone,
+    // get evicted a moment later when placements arrive, and re-fetch with a
+    // different region (the double map-load issue).
+    if (geoPlacements.length > 0) return createTerrainRequest(geoPlacements);
+    if (placementsResolved) return createTerrainRequest(geoPhotos);
+    return null;
+  }, [focusedPlacement, geoPhotos, geoPlacements, placementsResolved]);
   const requestKey = useMemo(() => {
     if (!request) return null;
     const mode = focusedPlacement ? `placement:${focusedPlacement.placement_id}` : "regional";
+    const demZoomOffset = focusedPlacement ? LOCAL_DEM_ZOOM_OFFSET : REGIONAL_DEM_ZOOM_OFFSET;
     return [
       mode,
       request.origin[0],
@@ -111,11 +478,13 @@ export default function TerrainGallery({
       request.radiusKm,
       request.zoom,
       request.unitsSide,
+      `dem${demZoomOffset}`,
     ].join(":");
   }, [focusedPlacement, request]);
   const terrainElevationScale = focusedPlacement
     ? LOCAL_TERRAIN_ELEVATION_SCALE
     : REGIONAL_TERRAIN_ELEVATION_SCALE;
+  const terrainDemZoomOffset = focusedPlacement ? LOCAL_DEM_ZOOM_OFFSET : REGIONAL_DEM_ZOOM_OFFSET;
   const localPhotoLayout = useMemo<LocalPhotoLayoutItem[]>(() => {
     if (!focusedPlacement || !projection) return [];
     const [placementX, placementY, placementZ = 0] = projection.proj([focusedPlacement.lat, focusedPlacement.lng]);
@@ -218,10 +587,14 @@ export default function TerrainGallery({
         if (!cancelled) {
           setPlacements(data);
           setPlacementError(null);
+          setPlacementsResolved(true);
         }
       })
       .catch((err) => {
-        if (!cancelled) setPlacementError((err as Error).message);
+        if (!cancelled) {
+          setPlacementError((err as Error).message);
+          setPlacementsResolved(true);
+        }
       });
 
     return () => {
@@ -242,6 +615,7 @@ export default function TerrainGallery({
 
     const cached = requestKey ? terrainCacheRef.current.get(requestKey) : undefined;
     if (cached) {
+      console.info(`[terrain:cache-hit] ${requestKey}`);
       setTerrain(cached.terrain);
       setProjection(cached.projection);
       setLoading(false);
@@ -255,6 +629,11 @@ export default function TerrainGallery({
     let renderFrame: number | null = null;
     let requestProjection: ThreeGeoProjection | null = null;
     let stagedGroup: THREE.Group | null = null;
+    let committedToCache = false;
+    const abortController = new AbortController();
+    const bench = requestKey ? createTerrainBenchmark(requestKey) : createTerrainBenchmark("unknown");
+    const longTaskObserver = startLongTaskObserver(bench);
+    const uninstallTileDispatchProbe = installTileDispatchProbe(bench);
     setLoading(Boolean(MAPBOX_TOKEN));
     setError(null);
     setPhase("projecting");
@@ -264,17 +643,21 @@ export default function TerrainGallery({
 
     loadThreeGeo()
       .then((ThreeGeo) => {
+        if (cancelled) return null;
         const tgeo = new ThreeGeo({
           tokenMapbox: MAPBOX_TOKEN,
           unitsSide: request.unitsSide,
         });
-        console.info("Artasia terrain request", {
+        logTerrainBenchmark("request", bench, {
           radiusKm: request.radiusKm,
           zoom: request.zoom,
+          demZoomOffset: terrainDemZoomOffset,
           estimatedSatelliteTiles: request.estimatedSatelliteTiles,
+          mode: focusedPlacement ? "placement" : "regional",
         });
         requestProjection = tgeo.getProjection(request.origin, request.radiusKm, request.unitsSide);
         setProjection(requestProjection);
+        logTerrainBenchmark("projected", bench, { unitsSide: request.unitsSide });
         if (!MAPBOX_TOKEN) {
           setTerrain(null);
           setError("Set VITE_MAPBOX_TOKEN to load terrain.");
@@ -290,19 +673,46 @@ export default function TerrainGallery({
           return null;
         }
         setPhase("fetching");
-        return tgeo.getTerrain(request.origin, request.radiusKm, request.zoom, {
-          onRgbDem: (meshes) => {
-            if (cancelled) return;
-            stagedGroup = createTerrainGroup(meshes, terrainElevationScale);
-            setTerrain(stagedGroup);
-            setRenderedTerrainKey(requestKey);
-            setPhase("rendering");
+        logTerrainBenchmark("fetching", bench);
+        return tgeo.getTerrain(
+          request.origin,
+          request.radiusKm,
+          request.zoom,
+          {
+            onRgbDem: (meshes) => {
+              if (cancelled) return;
+              bench.rgbDemAt = performance.now();
+              bench.totalTiles = meshes.length;
+              logTerrainBenchmark("rgb-dem", bench, {
+                meshCount: meshes.length,
+                verticesPerMesh: meshes[0]?.geometry.attributes.position?.count ?? null,
+              });
+              logTileTimings("rgb-dem", bench, "dem-tiles", MAPBOX_DEM_PATTERN);
+              logTileTimings("rgb-dem", bench, "sat-tiles", MAPBOX_SAT_PATTERN);
+              stagedGroup = createTerrainGroup(meshes, terrainElevationScale);
+              setTerrain(stagedGroup);
+              setRenderedTerrainKey(requestKey);
+              setPhase("rendering");
+            },
+            onSatelliteMat: (mesh) => {
+              if (cancelled) return;
+              const now = performance.now();
+              const isFirst = bench.firstSatMatAt === null;
+              if (isFirst) bench.firstSatMatAt = now;
+              bench.lastSatMatAt = now;
+              bench.satMatCount += 1;
+              if (isFirst) {
+                logTerrainBenchmark("satellite-mat", bench, { loaded: bench.satMatCount });
+                logTileTimings("satellite-mat", bench, "first-texture-snapshot", MAPBOX_SAT_PATTERN);
+              } else if (bench.satMatCount % 5 === 0) {
+                logTerrainBenchmark("satellite-mat", bench, { loaded: bench.satMatCount });
+                logTileTimings("satellite-mat", bench, `at-${bench.satMatCount}-textures`, MAPBOX_SAT_PATTERN);
+              }
+              normalizeTerrainMaterials(mesh);
+            },
           },
-          onSatelliteMat: (mesh) => {
-            if (cancelled) return;
-            normalizeTerrainMaterials(mesh);
-          },
-        });
+          { signal: abortController.signal, demZoomOffset: terrainDemZoomOffset },
+        );
       })
       .then((result) => {
         if (!result) return;
@@ -318,6 +728,7 @@ export default function TerrainGallery({
             projection: requestProjection,
             phase: "ready",
           });
+          committedToCache = true;
         }
         if (!stagedGroup) {
           setTerrain(group);
@@ -327,10 +738,18 @@ export default function TerrainGallery({
           if (!cancelled) {
             setRenderedTerrainKey(requestKey);
             setPhase("ready");
+            bench.readyAt = performance.now();
+            if (bench.totalTiles === null) {
+              bench.totalTiles = result.rgbDem?.length ?? null;
+            }
+            summarizeTerrainBenchmark(bench);
+            logTileTimings("ready", bench, "dem-tiles-final", MAPBOX_DEM_PATTERN);
+            logTileTimings("ready", bench, "sat-tiles-final", MAPBOX_SAT_PATTERN);
           }
         });
       })
       .catch((err) => {
+        if ((err as Error).name === "AbortError") return;
         if (!cancelled) {
           setTerrain(null);
           setRenderedTerrainKey(null);
@@ -344,9 +763,13 @@ export default function TerrainGallery({
 
     return () => {
       cancelled = true;
+      abortController.abort();
       if (renderFrame !== null) window.cancelAnimationFrame(renderFrame);
+      longTaskObserver?.disconnect();
+      uninstallTileDispatchProbe();
+      if (stagedGroup && !committedToCache) disposeObject(stagedGroup);
     };
-  }, [request, requestKey, terrainElevationScale]);
+  }, [request, requestKey, terrainElevationScale, terrainDemZoomOffset]);
 
   useEffect(() => {
     return () => {
@@ -364,8 +787,8 @@ export default function TerrainGallery({
 
   useEffect(() => {
     if (!terrain || !terrainMatchesRequest) return;
-    frameTerrainCamera(camera, terrain, controls);
-  }, [camera, controls, focusedPlacement?.placement_id, terrain, terrainMatchesRequest]);
+    frameTerrainCamera(camera, terrain, controls, focusedPlacement ? LOCAL_CAMERA_FIT_SCALE : REGIONAL_CAMERA_FIT_SCALE);
+  }, [camera, controls, focusedPlacement, terrain, terrainMatchesRequest]);
 
   const isPreparingTerrain = photos.length === 0 && placements.length === 0 && !placementError;
   const hasNoTerrainLocations = !isPreparingTerrain && geoPhotos.length === 0 && geoPlacements.length === 0;
@@ -430,6 +853,22 @@ export default function TerrainGallery({
     return () => onHoveredPlacementChange?.(null);
   }, [onHoveredPlacementChange]);
 
+  useEffect(() => {
+    if (!hoveredPlacement) return;
+    if (focusedPlacement) return;
+    if (!visiblePlacements.some((placement) => placement.placement_id === hoveredPlacement.placement_id)) {
+      setHoveredPlacement(null);
+    }
+  }, [focusedPlacement, hoveredPlacement, visiblePlacements]);
+
+  useEffect(() => {
+    onPartnerFilterOptionsChange?.(partnerFilterOptions);
+  }, [onPartnerFilterOptionsChange, partnerFilterOptions]);
+
+  useEffect(() => {
+    return () => onPartnerFilterOptionsChange?.([]);
+  }, [onPartnerFilterOptionsChange]);
+
   if (isPreparingTerrain || hasNoTerrainLocations) return null;
 
   return (
@@ -493,7 +932,12 @@ function resetTerrainCamera(camera: THREE.Camera, controls?: TerrainOrbitControl
   controls?.update?.();
 }
 
-function frameTerrainCamera(camera: THREE.Camera, terrain: THREE.Group, controls?: TerrainOrbitControls) {
+function frameTerrainCamera(
+  camera: THREE.Camera,
+  terrain: THREE.Group,
+  controls?: TerrainOrbitControls,
+  fitScale = 0.72,
+) {
   terrain.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(terrain);
   if (!Number.isFinite(box.min.x) || !Number.isFinite(box.max.x)) {
@@ -507,7 +951,7 @@ function frameTerrainCamera(camera: THREE.Camera, terrain: THREE.Group, controls
   const direction = DEFAULT_TERRAIN_CAMERA_POSITION.clone().normalize();
   const fitSize = Math.max(size.x, size.y, 1);
   const fov = camera instanceof THREE.PerspectiveCamera ? camera.fov : 50;
-  const fitDistance = (fitSize * 0.72) / Math.tan(THREE.MathUtils.degToRad(fov / 2));
+  const fitDistance = (fitSize * fitScale) / Math.tan(THREE.MathUtils.degToRad(fov / 2));
 
   camera.position.copy(target).add(direction.multiplyScalar(fitDistance));
   camera.up.set(0, 1, 0);
@@ -903,11 +1347,7 @@ function disposeObject(object: THREE.Object3D) {
     const mesh = child as THREE.Mesh;
     mesh.geometry?.dispose();
     const material = mesh.material;
-    if (Array.isArray(material)) {
-      material.forEach((item) => item.dispose());
-    } else {
-      material?.dispose();
-    }
+    disposeMaterial(material);
   });
 }
 
@@ -916,10 +1356,48 @@ function createTerrainGroup(meshes: THREE.Mesh[], terrainElevationScale: number)
   group.name = "artasia-terrain";
   group.scale.z = terrainElevationScale;
   for (const mesh of meshes) {
+    applyTerrainWireframeMaterial(mesh);
     group.add(mesh);
   }
   normalizeTerrainMaterials(group);
   return group;
+}
+
+const TERRAIN_OUTLINE_NAME = "artasia-tile-outline";
+
+function disposeOutline(mesh: THREE.Mesh) {
+  const outline = mesh.getObjectByName(TERRAIN_OUTLINE_NAME) as THREE.LineSegments | null;
+  if (!outline) return;
+  mesh.remove(outline);
+  outline.geometry.dispose();
+  const outlineMaterial = outline.material as THREE.Material | THREE.Material[];
+  if (Array.isArray(outlineMaterial)) outlineMaterial.forEach((m) => m.dispose());
+  else outlineMaterial.dispose();
+}
+
+function applyTerrainWireframeMaterial(mesh: THREE.Mesh, disposeExisting = true) {
+  if (disposeExisting) disposeMaterial(mesh.material);
+  // Render the actual terrain triangulation while satellite textures arrive.
+  // This mirrors three-geo's viewer wireframe mode without allocating expensive
+  // EdgesGeometry for every dense terrain tile.
+  mesh.material = new THREE.MeshBasicMaterial({
+    color: 0xc8e88a,
+    wireframe: true,
+    transparent: true,
+    opacity: 0.38,
+    depthWrite: false,
+    toneMapped: false,
+  });
+
+  disposeOutline(mesh);
+}
+
+function disposeMaterial(material?: THREE.Material | THREE.Material[]) {
+  if (Array.isArray(material)) {
+    material.forEach((item) => item.dispose());
+  } else {
+    material?.dispose();
+  }
 }
 
 function normalizeTerrainMaterials(object: THREE.Object3D) {
@@ -934,6 +1412,13 @@ function normalizeTerrainMaterials(object: THREE.Object3D) {
       if (map) {
         map.colorSpace = THREE.SRGBColorSpace;
         map.needsUpdate = true;
+        // Satellite texture is now bound: restore an opaque, dept-writing
+        // surface and drop the placeholder wireframe outline.
+        const basic = item as THREE.MeshBasicMaterial;
+        basic.transparent = false;
+        basic.opacity = 1;
+        basic.depthWrite = true;
+        disposeOutline(mesh);
       }
       item.needsUpdate = true;
     }

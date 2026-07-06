@@ -6,6 +6,7 @@ import { useGalleryStore } from "../../stores/galleryStore";
 import LoadingIndicator from "../ui/LoadingIndicator";
 import TerrainGallery, {
   FocusedPlacementOverlay,
+  type PartnerFilterOption,
   PlacementHoverLabel,
   type TerrainNotice,
 } from "./TerrainGallery";
@@ -22,6 +23,8 @@ export default function ArtScene() {
   const [backAction, setBackAction] = useState<(() => void) | null>(null);
   const [focusedPlacementDetails, setFocusedPlacementDetails] = useState<MapPlacement | null>(null);
   const [hoveredPlacementDetails, setHoveredPlacementDetails] = useState<MapPlacement | null>(null);
+  const [partnerFilterOptions, setPartnerFilterOptions] = useState<PartnerFilterOption[]>([]);
+  const [selectedPartnerFilter, setSelectedPartnerFilter] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
@@ -54,6 +57,13 @@ export default function ArtScene() {
   const handleBackActionChange = useCallback((action: (() => void) | null) => {
     setBackAction(action ? () => action : null);
   }, []);
+
+  useEffect(() => {
+    if (!selectedPartnerFilter) return;
+    if (!partnerFilterOptions.some((option) => option.value === selectedPartnerFilter)) {
+      setSelectedPartnerFilter("");
+    }
+  }, [partnerFilterOptions, selectedPartnerFilter]);
 
   return (
     <div style={{ width: "100vw", height: "100vh", position: "relative" }}>
@@ -92,6 +102,10 @@ export default function ArtScene() {
         </div>
       </div>
 
+      <a href="/" aria-label="Artasia home" style={homeLogoLinkStyle}>
+        <img src="/artasia.svg" alt="" style={homeLogoImageStyle} />
+      </a>
+
       {backAction && (
         <button
           type="button"
@@ -104,6 +118,24 @@ export default function ArtScene() {
           </svg>
           <span>Back</span>
         </button>
+      )}
+
+      {!focusedPlacementDetails && partnerFilterOptions.length > 0 && (
+        <label style={partnerFilterStyle}>
+          <select
+            aria-label="Filter placements by partner"
+            value={selectedPartnerFilter}
+            onChange={(event) => setSelectedPartnerFilter(event.target.value)}
+            style={partnerFilterSelectStyle}
+          >
+            <option value="" style={partnerFilterOptionStyle}>All partners</option>
+            {partnerFilterOptions.map((option) => (
+              <option key={option.value} value={option.value} style={partnerFilterOptionStyle}>
+                {option.label} ({option.count})
+              </option>
+            ))}
+          </select>
+        </label>
       )}
 
       {error && <div style={errorStyle}>{error}</div>}
@@ -159,6 +191,8 @@ export default function ArtScene() {
             onBackActionChange={handleBackActionChange}
             onFocusedPlacementChange={setFocusedPlacementDetails}
             onHoveredPlacementChange={setHoveredPlacementDetails}
+            onPartnerFilterOptionsChange={setPartnerFilterOptions}
+            selectedPartnerFilter={selectedPartnerFilter}
           />
           <OrbitControls
             makeDefault
@@ -253,7 +287,7 @@ const menuItemStyle: React.CSSProperties = {
 const backButtonStyle: React.CSSProperties = {
   position: "absolute",
   top: 12,
-  left: 16,
+  left: 178,
   zIndex: 15,
   pointerEvents: "auto",
   minHeight: 40,
@@ -274,6 +308,51 @@ const backButtonStyle: React.CSSProperties = {
 const backChevronStyle: React.CSSProperties = {
   width: 14,
   height: 14,
+};
+
+const homeLogoLinkStyle: React.CSSProperties = {
+  position: "absolute",
+  top: 12,
+  left: 16,
+  zIndex: 16,
+  width: 150,
+  height: 50,
+  display: "grid",
+  placeItems: "center",
+  pointerEvents: "auto",
+};
+
+const homeLogoImageStyle: React.CSSProperties = {
+  width: 144,
+  height: 48,
+  objectFit: "contain",
+  display: "block",
+};
+
+const partnerFilterStyle: React.CSSProperties = {
+  position: "absolute",
+  top: 22,
+  left: 178,
+  zIndex: 12,
+  pointerEvents: "auto",
+};
+
+const partnerFilterSelectStyle: React.CSSProperties = {
+  maxWidth: "min(320px, calc(100vw - 96px))",
+  background: "rgba(12,14,22,0.92)",
+  color: "#f4f7fb",
+  border: "none",
+  borderRadius: 6,
+  padding: "7px 9px",
+  fontFamily: "monospace",
+  fontSize: 12,
+  outline: "none",
+  boxShadow: "none",
+};
+
+const partnerFilterOptionStyle: React.CSSProperties = {
+  background: "#121620",
+  color: "#f4f7fb",
 };
 
 const btnStyle: React.CSSProperties = {
