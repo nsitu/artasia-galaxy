@@ -12,6 +12,7 @@ class FlowerPhotoMaterial extends THREE.ShaderMaterial {
         petalCount: { value: 10 },
         borderColor: { value: new THREE.Color("#ff1f2d") },
         borderWidth: { value: 0.075 },
+        imageAspect: { value: 1 },
       },
       vertexShader: `
         varying vec2 vUv;
@@ -27,6 +28,7 @@ class FlowerPhotoMaterial extends THREE.ShaderMaterial {
         uniform float petalCount;
         uniform vec3 borderColor;
         uniform float borderWidth;
+        uniform float imageAspect;
         varying vec2 vUv;
 
         void main() {
@@ -41,7 +43,14 @@ class FlowerPhotoMaterial extends THREE.ShaderMaterial {
 
           if (alpha < 0.02) discard;
 
-          vec4 color = texture2D(photoMap, vUv);
+          vec2 photoUv = vUv;
+          if (imageAspect > 1.0) {
+            photoUv.x = (photoUv.x - 0.5) / imageAspect + 0.5;
+          } else {
+            photoUv.y = (photoUv.y - 0.5) * imageAspect + 0.5;
+          }
+
+          vec4 color = texture2D(photoMap, photoUv);
           float borderMix = 1.0 - smoothstep(0.0, borderWidth, edge);
           vec3 finalColor = mix(color.rgb, borderColor, borderMix);
           gl_FragColor = vec4(finalColor, color.a * alpha * flowerOpacity);
@@ -89,6 +98,14 @@ class FlowerPhotoMaterial extends THREE.ShaderMaterial {
   set borderWidth(value: number) {
     this.uniforms.borderWidth.value = value;
   }
+
+  get imageAspect() {
+    return this.uniforms.imageAspect.value as number;
+  }
+
+  set imageAspect(value: number) {
+    this.uniforms.imageAspect.value = value;
+  }
 }
 
 extend({ FlowerPhotoMaterial });
@@ -101,6 +118,7 @@ declare module "@react-three/fiber" {
       petalCount?: number;
       borderColor?: THREE.Color | string | number;
       borderWidth?: number;
+      imageAspect?: number;
     };
   }
 }
@@ -128,7 +146,7 @@ interface OrbitBannerProps extends SharedPhotoProps {
 const BASE_LIFT = 0.025;
 const STEM_HEIGHT = 0.28;
 const TRACKING_RADIUS = 0.15;
-const HEAD_RADIUS = 0.14;
+const HEAD_RADIUS = 0.21;
 const PETAL_LOBE_COUNT = 10;
 const STEM_RADIUS = 0.009;
 const MAX_TILT = THREE.MathUtils.degToRad(48);
@@ -165,6 +183,7 @@ export function TerrainPhotoFlower({
   const texture = usePhotoTexture(url);
   const [x, y, z] = position;
 
+  const imageAspect = Number.isFinite(width / height) && height > 0 ? width / height : 1;
   const headSize = HEAD_RADIUS * 2;
   const stemGeometry = useMemo(() => createInitialStemGeometry(), []);
   const baseGeometry = useMemo(() => new THREE.SphereGeometry(STEM_RADIUS * 1.45, 12, 8), []);
@@ -221,6 +240,7 @@ export function TerrainPhotoFlower({
             flowerOpacity={0.96}
             borderColor="#ff1f2d"
             borderWidth={0.075}
+            imageAspect={imageAspect}
             transparent
             side={THREE.DoubleSide}
             depthWrite={false}

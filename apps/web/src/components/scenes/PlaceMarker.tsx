@@ -14,7 +14,7 @@ interface Props {
 const BASE_LIFT = 0.025;
 const STEM_HEIGHT = 0.34;
 const TRACKING_RADIUS = 0.18;
-const HEAD_RADIUS = 0.153;
+const HEAD_RADIUS = 0.2295;
 const PETAL_LOBE_COUNT = 10;
 const STEM_RADIUS = 0.011;
 const MAX_TILT = THREE.MathUtils.degToRad(48);
