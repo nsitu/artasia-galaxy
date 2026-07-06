@@ -500,7 +500,12 @@ export default function TerrainGallery({
       if (Number.isFinite(lat) && Number.isFinite(lng)) {
         const photoLatLng = [lat as number, lng as number] as [number, number];
         const placementLatLng = [focusedPlacement.lat, focusedPlacement.lng] as [number, number];
-        if (haversineMeters(placementLatLng, photoLatLng) > SAME_LOCATION_THRESHOLD_METERS) {
+        const distanceFromPlacementMeters = haversineMeters(placementLatLng, photoLatLng);
+        const isPlantableOnLocalTerrain =
+          distanceFromPlacementMeters > SAME_LOCATION_THRESHOLD_METERS &&
+          distanceFromPlacementMeters <= LOCAL_PLACEMENT_RADIUS_KM * 1000;
+
+        if (isPlantableOnLocalTerrain) {
           const [x, y, z = 0] = projection.proj(photoLatLng);
           return {
             kind: "flower",
@@ -898,7 +903,6 @@ export default function TerrainGallery({
             width={item.photo.width}
             height={item.photo.height}
             center={item.center}
-            unitsPerMeter={projection?.unitsPerMeter ?? 0}
             isSelected={item.index === selectedIndex}
             isHighlighted={item.index === hoveredIndex}
             onClick={() => selectPhoto(item.index === selectedIndex ? null : item.index)}

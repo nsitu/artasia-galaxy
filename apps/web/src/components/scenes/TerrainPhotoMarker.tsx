@@ -123,7 +123,6 @@ interface FlowerProps extends SharedPhotoProps {
 
 interface OrbitBannerProps extends SharedPhotoProps {
   center: [number, number, number];
-  unitsPerMeter: number;
 }
 
 const BASE_LIFT = 0.025;
@@ -138,8 +137,8 @@ const TRACKING_EASE = 0.12;
 const UP = new THREE.Vector3(0, 0, 1);
 const BANNER_MAX_WIDTH = 0.95;
 const BANNER_MAX_HEIGHT = 0.58;
-const ORBIT_MIN_METERS = 100;
-const ORBIT_MAX_METERS = 500;
+const ORBIT_MIN_UNITS = 0.72;
+const ORBIT_MAX_UNITS = 2.15;
 const ORBIT_HEIGHT = 0.72;
 const ORBIT_SPEED = 0.16;
 
@@ -241,7 +240,6 @@ export function OrbitingPhotoBanner({
   width,
   height,
   center,
-  unitsPerMeter,
   isSelected,
   isHighlighted,
   onClick,
@@ -252,10 +250,10 @@ export function OrbitingPhotoBanner({
   const imageRef = useRef<THREE.Mesh>(null);
   const texture = usePhotoTexture(url);
   const orbit = useMemo(() => ({
-    radius: stableRange(`${id}:radius`, ORBIT_MIN_METERS, ORBIT_MAX_METERS) * unitsPerMeter,
+    radius: stableRange(`${id}:radius`, ORBIT_MIN_UNITS, ORBIT_MAX_UNITS),
     phase: stableRange(`${id}:phase`, 0, Math.PI * 2),
     speed: stableRange(`${id}:speed`, ORBIT_SPEED * 0.75, ORBIT_SPEED * 1.25),
-  }), [id, unitsPerMeter]);
+  }), [id]);
   const [cx, cy, cz] = center;
   const aspect = width / height;
   const imageW = aspect >= 1 ? BANNER_MAX_WIDTH : BANNER_MAX_HEIGHT * aspect;
