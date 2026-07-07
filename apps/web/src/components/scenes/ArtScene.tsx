@@ -22,6 +22,11 @@ const TERRAIN_MAP_MOUSE_BUTTONS = {
   RIGHT: THREE.MOUSE.PAN,
 };
 const TERRAIN_GROUND_PLANE_NORMAL = new THREE.Vector3(0, 0, 1);
+const TERRAIN_GL_OPTIONS = {
+  antialias: false,
+  powerPreference: "default" as WebGLPowerPreference,
+  failIfMajorPerformanceCaveat: false,
+};
 
 type TerrainMapControls = {
   target: THREE.Vector3;
@@ -41,6 +46,7 @@ export default function ArtScene() {
   const [partnerFilterOptions, setPartnerFilterOptions] = useState<PartnerFilterOption[]>([]);
   const [selectedPartnerFilter, setSelectedPartnerFilter] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [webglError, setWebglError] = useState<string | null>(() => getWebGL2SupportError());
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -190,44 +196,78 @@ export default function ArtScene() {
         </div>
       )}
 
-      <Canvas
-        camera={{ position: DEFAULT_TERRAIN_CAMERA_POSITION, fov: 50 }}
-        dpr={[1, 1.5]}
-        onCreated={({ camera }) => {
-          camera.up.set(0, 1, 0);
-          camera.lookAt(0, 0, 0);
-        }}
-        style={{ background: "#0a0a14" }}
-      >
-        <ambientLight intensity={0.8} />
-        <Suspense fallback={null}>
-          <TerrainGallery
-            onNoticeChange={setTerrainNotice}
-            onBackActionChange={handleBackActionChange}
-            onFocusedPlacementChange={setFocusedPlacementDetails}
-            onHoveredPlacementChange={setHoveredPlacementDetails}
-            onPartnerFilterOptionsChange={setPartnerFilterOptions}
-            selectedPartnerFilter={selectedPartnerFilter}
-          />
-          <MapControls
-            makeDefault
-            enableDamping
-            dampingFactor={0.08}
-            enablePan={false}
-            enableZoom
-            enableRotate
-            minDistance={1.5}
-            maxDistance={80}
-            minPolarAngle={TERRAIN_MIN_TILT}
-            maxPolarAngle={TERRAIN_MAX_TILT}
-            minAzimuthAngle={TERRAIN_MAP_HEADING}
-            maxAzimuthAngle={TERRAIN_MAP_HEADING}
-            mouseButtons={TERRAIN_MAP_MOUSE_BUTTONS}
-          />
-          <GroundPlanePanControls />
-          <Preload all />
-        </Suspense>
-      </Canvas>
+      {webglError ? (
+        <WebGLFallback message={webglError} />
+      ) : (
+        <Canvas
+          camera={{ position: DEFAULT_TERRAIN_CAMERA_POSITION, fov: 50 }}
+          dpr={[1, 1]}
+          gl={TERRAIN_GL_OPTIONS}
+          onCreated={({ camera, gl }) => {
+            camera.up.set(0, 1, 0);
+            camera.lookAt(0, 0, 0);
+            gl.domElement.addEventListener("webglcontextlost", () => {
+              setWebglError("The 3D map lost its WebGL context. Reload this page, or try a newer iPad/browser if the issue repeats.");
+            });
+          }}
+          onError={(error) => {
+            setWebglError(error instanceof Error ? error.message : "The 3D map could not start WebGL.");
+          }}
+          style={{ background: "#0a0a14" }}
+        >
+          <ambientLight intensity={0.8} />
+          <Suspense fallback={null}>
+            <TerrainGallery
+              onNoticeChange={setTerrainNotice}
+              onBackActionChange={handleBackActionChange}
+              onFocusedPlacementChange={setFocusedPlacementDetails}
+              onHoveredPlacementChange={setHoveredPlacementDetails}
+              onPartnerFilterOptionsChange={setPartnerFilterOptions}
+              selectedPartnerFilter={selectedPartnerFilter}
+            />
+            <MapControls
+              makeDefault
+              enableDamping
+              dampingFactor={0.08}
+              enablePan={false}
+              enableZoom
+              enableRotate
+              minDistance={1.5}
+              maxDistance={80}
+              minPolarAngle={TERRAIN_MIN_TILT}
+              maxPolarAngle={TERRAIN_MAX_TILT}
+              minAzimuthAngle={TERRAIN_MAP_HEADING}
+              maxAzimuthAngle={TERRAIN_MAP_HEADING}
+              mouseButtons={TERRAIN_MAP_MOUSE_BUTTONS}
+            />
+            <GroundPlanePanControls />
+            <Preload all />
+          </Suspense>
+        </Canvas>
+      )}
+    </div>
+  );
+}
+
+function getWebGL2SupportError() {
+  if (typeof document === "undefined") return null;
+
+  const canvas = document.createElement("canvas");
+  const gl = canvas.getContext("webgl2", TERRAIN_GL_OPTIONS) as WebGL2RenderingContext | null;
+  if (!gl) {
+    return "This 3D map requires WebGL 2. Safari on this iPad could not create a WebGL 2 context.";
+  }
+
+  gl.getExtension("WEBGL_lose_context")?.loseContext();
+  return null;
+}
+
+function WebGLFallback({ message }: { message: string }) {
+  return (
+    <div style={webglFallbackStyle} role="status">
+      <img src="/artasia.svg" alt="" style={webglFallbackLogoStyle} />
+      <div style={webglFallbackTitleStyle}>3D map unavailable</div>
+      <div style={webglFallbackMessageStyle}>{message}</div>
     </div>
   );
 }
@@ -349,6 +389,40 @@ const hudStyle: React.CSSProperties = {
   fontSize: 13,
   color: "#aaa",
   pointerEvents: "none",
+};
+
+const webglFallbackStyle: React.CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  zIndex: 2,
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 12,
+  padding: 24,
+  color: "#eef2f8",
+  background: "#0a0a14",
+  textAlign: "center",
+  fontFamily: "monospace",
+};
+
+const webglFallbackLogoStyle: React.CSSProperties = {
+  width: 72,
+  height: "auto",
+  marginBottom: 4,
+};
+
+const webglFallbackTitleStyle: React.CSSProperties = {
+  fontSize: 18,
+  fontWeight: 700,
+};
+
+const webglFallbackMessageStyle: React.CSSProperties = {
+  maxWidth: 420,
+  color: "#aeb7c6",
+  fontSize: 13,
+  lineHeight: 1.5,
 };
 
 const menuWrapStyle: React.CSSProperties = {
