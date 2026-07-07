@@ -33,6 +33,7 @@ jobs:
             echo "image_changed=true" >> "$GITHUB_OUTPUT"
             echo "compose_changed=true" >> "$GITHUB_OUTPUT"
             echo "plugin_changed=true" >> "$GITHUB_OUTPUT"
+            echo "deploy_changed=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -51,6 +52,7 @@ jobs:
           image_changed=false
           compose_changed=false
           plugin_changed=false
+          deploy_changed=false
 
           while IFS= read -r file; do
             [[ -z "$file" ]] && continue
@@ -65,12 +67,16 @@ jobs:
               docker-compose.yml)
                 compose_changed=true
                 ;;
+              .github/workflows/deploy.yml)
+                deploy_changed=true
+                ;;
             esac
           done <<< "$changed_files"
 
           echo "image_changed=$image_changed" >> "$GITHUB_OUTPUT"
           echo "compose_changed=$compose_changed" >> "$GITHUB_OUTPUT"
           echo "plugin_changed=$plugin_changed" >> "$GITHUB_OUTPUT"
+          echo "deploy_changed=$deploy_changed" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         if: steps.changes.outputs.image_changed == 'true'
@@ -123,7 +129,7 @@ jobs:
             sudo rm -rf /tmp/artasia-galaxy-deploy
 
       - name: Deploy to VM
-        if: steps.changes.outputs.image_changed == 'true' || steps.changes.outputs.compose_changed == 'true'
+        if: steps.changes.outputs.image_changed == 'true' || steps.changes.outputs.compose_changed == 'true' || steps.changes.outputs.deploy_changed == 'true'
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VM_HOST }}
