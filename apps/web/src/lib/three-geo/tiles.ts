@@ -70,7 +70,13 @@ export async function decodeToPixels(url: string, signal?: AbortSignal): Promise
     const blob = await response.blob();
     if (!blob.size) return null;
     if (signal?.aborted) return null;
-    const bitmap = await createImageBitmap(blob);
+    // Terrain-RGB tiles encode elevation in exact channel values. Safari/iOS can
+    // color-convert decoded image pixels by default, which corrupts the DEM and
+    // turns the mesh into extreme spikes after elevation decoding.
+    const bitmap = await createImageBitmap(blob, {
+      colorSpaceConversion: "none",
+      premultiplyAlpha: "none",
+    });
     if (signal?.aborted) {
       bitmap.close?.();
       return null;
