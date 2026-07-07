@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 const buildLabelFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/Toronto",
   hour: "numeric",
   minute: "2-digit",
   month: "short",
