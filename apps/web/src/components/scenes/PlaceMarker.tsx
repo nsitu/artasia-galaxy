@@ -20,6 +20,10 @@ const STEM_RADIUS = 0.011;
 const MAX_TILT = THREE.MathUtils.degToRad(48);
 const MIN_UPWARDNESS = 0.34;
 const TRACKING_EASE = 0.12;
+const HEAD_FULL_SCALE_DISTANCE = 8;
+const HEAD_MIN_SCALE_DISTANCE = 1.6;
+const HEAD_MIN_SCALE = 0.24;
+const HEAD_MAX_SCALE = 1.08;
 const UP = new THREE.Vector3(0, 0, 1);
 
 export default function PlaceMarker({
@@ -66,11 +70,13 @@ export default function PlaceMarker({
 
     const sphereCenter = new THREE.Vector3(0, 0, stemHeight);
     const cameraLocal = group.worldToLocal(camera.position.clone());
+    const cameraDistance = cameraLocal.distanceTo(sphereCenter);
     const targetDirection = getTiltLimitedDirection(cameraLocal, sphereCenter);
     currentDirection.current.lerp(targetDirection, TRACKING_EASE).normalize();
 
     const headCenter = sphereCenter.clone().add(currentDirection.current.clone().multiplyScalar(trackingRadius));
     head.position.copy(headCenter);
+    head.scale.setScalar(getCameraResponsiveHeadScale(cameraDistance));
     orientHeadToCamera(head, group, camera);
 
     if (lastStemDirection.current.angleTo(currentDirection.current) > 0.025) {
@@ -162,6 +168,12 @@ function getTiltLimitedDirection(cameraLocal: THREE.Vector3, sphereCenter: THREE
   if (angleFromUp <= MAX_TILT) return ideal;
 
   return UP.clone().lerp(ideal, MAX_TILT / angleFromUp).normalize();
+}
+
+function getCameraResponsiveHeadScale(cameraDistance: number) {
+  if (!Number.isFinite(cameraDistance)) return 1;
+  const t = THREE.MathUtils.smoothstep(cameraDistance, HEAD_MIN_SCALE_DISTANCE, HEAD_FULL_SCALE_DISTANCE);
+  return THREE.MathUtils.lerp(HEAD_MIN_SCALE, HEAD_MAX_SCALE, t);
 }
 
 function createStemCurve(sphereCenter: THREE.Vector3, headCenter: THREE.Vector3, stemHeight: number) {
