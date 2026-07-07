@@ -160,6 +160,7 @@ export default function ArtScene() {
       )}
 
       {error && <div style={errorStyle}>{error}</div>}
+      <div style={buildStampStyle}>{__ARTASIA_BUILD_LABEL__}</div>
       {terrainNotice && <LoadingIndicator {...terrainNotice} />}
       {focusedPlacementDetails && <FocusedPlacementOverlay placement={focusedPlacementDetails} />}
       {!focusedPlacementDetails && hoveredPlacementDetails && (
@@ -579,6 +580,19 @@ const errorStyle: React.CSSProperties = {
   background: "rgba(0,0,0,0.7)",
   padding: "8px 16px",
   borderRadius: 4,
+};
+
+const buildStampStyle: React.CSSProperties = {
+  position: "absolute",
+  left: 12,
+  bottom: 10,
+  zIndex: 9,
+  pointerEvents: "none",
+  color: "rgba(238,242,248,0.62)",
+  fontFamily: "monospace",
+  fontSize: 10,
+  lineHeight: 1,
+  textShadow: "0 1px 3px rgba(0,0,0,0.7)",
 };
 
 const photoLightboxStyle: React.CSSProperties = {
