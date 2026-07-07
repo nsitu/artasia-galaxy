@@ -133,7 +133,15 @@ jobs:
             set -euo pipefail
             cd /opt/artasia-galaxy
             sudo ARTASIA_IMAGE=${{ env.IMAGE_NAME }}:latest docker compose pull
-            sudo ARTASIA_IMAGE=${{ env.IMAGE_NAME }}:latest docker compose up -d --remove-orphans
+            if ! sudo ARTASIA_IMAGE=${{ env.IMAGE_NAME }}:latest docker compose up -d --remove-orphans; then
+              echo "Docker Compose update failed; removing stale artasia service containers and retrying once."
+              sudo docker ps -a \
+                --filter "label=com.docker.compose.project=artasia-galaxy" \
+                --filter "label=com.docker.compose.service=artasia" \
+                --format "{{.ID}}" \
+                | xargs -r sudo docker rm -f
+              sudo ARTASIA_IMAGE=${{ env.IMAGE_NAME }}:latest docker compose up -d --remove-orphans
+            fi
             sudo docker image prune -f
 
       - name: Copy WordPress plugin to VM temp
