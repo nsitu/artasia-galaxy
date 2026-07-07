@@ -2,7 +2,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { Canvas, useThree } from "@react-three/fiber";
 import { MapControls, Preload } from "@react-three/drei";
 import * as THREE from "three";
-import type { MapPlacement } from "../../api/client";
+import { fetchUploadOptions, type ActivityOption, type MapPlacement } from "../../api/client";
 import { useGalleryStore } from "../../stores/galleryStore";
 import LoadingIndicator from "../ui/LoadingIndicator";
 import TerrainGallery, {
@@ -48,6 +48,8 @@ export default function ArtScene() {
   const [previewPlacementAction, setPreviewPlacementAction] = useState<(() => void) | null>(null);
   const [partnerFilterOptions, setPartnerFilterOptions] = useState<PartnerFilterOption[]>([]);
   const [selectedPartnerFilter, setSelectedPartnerFilter] = useState("");
+  const [activityFilterOptions, setActivityFilterOptions] = useState<ActivityOption[]>([]);
+  const [selectedActivityFilter, setSelectedActivityFilter] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [webglError, setWebglError] = useState<string | null>(() => getWebGL2SupportError());
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -55,6 +57,22 @@ export default function ArtScene() {
   useEffect(() => {
     fetchPhotos();
   }, [fetchPhotos]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchUploadOptions()
+      .then((options) => {
+        if (!cancelled) setActivityFilterOptions(options.activities);
+      })
+      .catch((err) => {
+        console.warn(`[viewer] failed to load activity filters: ${(err as Error).message}`);
+        if (!cancelled) setActivityFilterOptions([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     function onDocumentPointerDown(event: PointerEvent) {
@@ -92,6 +110,17 @@ export default function ArtScene() {
       setSelectedPartnerFilter("");
     }
   }, [partnerFilterOptions, selectedPartnerFilter]);
+
+  useEffect(() => {
+    if (!selectedActivityFilter) return;
+    if (!activityFilterOptions.some((option) => String(option.id) === selectedActivityFilter)) {
+      setSelectedActivityFilter("");
+    }
+  }, [activityFilterOptions, selectedActivityFilter]);
+
+  useEffect(() => {
+    if (!focusedPlacementDetails) setSelectedActivityFilter("");
+  }, [focusedPlacementDetails]);
 
   return (
     <div style={{ width: "100vw", height: "100vh", position: "relative" }}>
@@ -160,6 +189,24 @@ export default function ArtScene() {
             {partnerFilterOptions.map((option) => (
               <option key={option.value} value={option.value} style={partnerFilterOptionStyle}>
                 {option.label} ({option.count})
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      {focusedPlacementDetails && activityFilterOptions.length > 0 && (
+        <label style={activityFilterStyle}>
+          <select
+            aria-label="Filter photos by activity"
+            value={selectedActivityFilter}
+            onChange={(event) => setSelectedActivityFilter(event.target.value)}
+            style={partnerFilterSelectStyle}
+          >
+            <option value="" style={partnerFilterOptionStyle}>All Activities</option>
+            {activityFilterOptions.map((option) => (
+              <option key={option.id} value={String(option.id)} style={partnerFilterOptionStyle}>
+                {option.label}
               </option>
             ))}
           </select>
@@ -236,6 +283,7 @@ export default function ArtScene() {
               onPreviewPlacementChange={handlePreviewPlacementChange}
               onPartnerFilterOptionsChange={setPartnerFilterOptions}
               selectedPartnerFilter={selectedPartnerFilter}
+              selectedActivityFilter={selectedActivityFilter}
             />
             <MapControls
               makeDefault
@@ -546,6 +594,11 @@ const partnerFilterStyle: React.CSSProperties = {
   left: 178,
   zIndex: 12,
   pointerEvents: "auto",
+};
+
+const activityFilterStyle: React.CSSProperties = {
+  ...partnerFilterStyle,
+  left: 256,
 };
 
 const partnerFilterSelectStyle: React.CSSProperties = {

@@ -1,5 +1,5 @@
-import { getPublishedAlbum, listTags, searchAssets, ImmichAsset } from "../infra/ImmichClient.js";
-import { placementAnchorTag } from "./uploadConfig.service.js";
+import { getPublishedAlbum, listTags, searchAssetIdsByTag, searchAssets, ImmichAsset } from "../infra/ImmichClient.js";
+import { activityAnchorTag, getUploadConfig, placementAnchorTag } from "./uploadConfig.service.js";
 
 export interface Photo {
   id: string;
@@ -41,6 +41,7 @@ export interface SlideshowQuery {
     lat: number;
     lng: number;
     radiusKm: number;
+    activityId?: number;
   };
 }
 
@@ -174,6 +175,34 @@ export async function querySlideshow(
     const byId = new Map<string, ImmichAsset>();
     for (const asset of taggedAssets) byId.set(asset.id, asset);
     assets = Array.from(byId.values());
+
+    if (focus.activityId != null && Number.isFinite(focus.activityId)) {
+      const config = await getUploadConfig();
+      const activity = config.activities.find((a) => a.id === focus.activityId);
+      if (!activity) {
+        assets = [];
+      } else {
+        const anchorTagName = activityAnchorTag(focus.activityId);
+        const labelNorm = activity.label.trim().toLowerCase();
+        const activityTagIds = allTags
+          .filter((tag) =>
+            tag.name.trim().toLowerCase() === anchorTagName ||
+            tag.value.trim().toLowerCase() === anchorTagName ||
+            tag.name.trim().toLowerCase() === labelNorm ||
+            tag.value.trim().toLowerCase() === labelNorm
+          )
+          .map((tag) => tag.id);
+
+        if (activityTagIds.length === 0) {
+          assets = [];
+        } else {
+          const activityAssetIds = new Set(
+            (await Promise.all(activityTagIds.map(searchAssetIdsByTag))).flat()
+          );
+          assets = assets.filter((asset) => activityAssetIds.has(asset.id));
+        }
+      }
+    }
   }
 
   let photos = assets.map(assetToPhoto);

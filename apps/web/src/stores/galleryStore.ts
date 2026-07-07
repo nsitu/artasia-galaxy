@@ -14,6 +14,7 @@ interface GalleryState {
     lat: number;
     lng: number;
     radiusKm: number;
+    activityId?: number;
   }) => Promise<void>;
   selectPhoto: (index: number | null) => void;
 }

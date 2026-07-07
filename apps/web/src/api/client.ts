@@ -33,6 +33,7 @@ export async function fetchSlideshow(params: {
     lat: number;
     lng: number;
     radiusKm: number;
+    activityId?: number;
   };
 }): Promise<{ photos: Photo[]; total: number }> {
   const res = await fetch("/api/v1/slideshow/query", {

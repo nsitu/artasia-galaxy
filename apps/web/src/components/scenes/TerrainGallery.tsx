@@ -395,6 +395,7 @@ interface TerrainGalleryProps {
   onPreviewPlacementChange?: (placement: MapPlacement | null, openAction?: (() => void) | null) => void;
   onPartnerFilterOptionsChange?: (options: PartnerFilterOption[]) => void;
   selectedPartnerFilter?: string;
+  selectedActivityFilter?: string;
 }
 
 export default function TerrainGallery({
@@ -405,6 +406,7 @@ export default function TerrainGallery({
   onPreviewPlacementChange,
   onPartnerFilterOptionsChange,
   selectedPartnerFilter = "",
+  selectedActivityFilter = "",
 }: TerrainGalleryProps = {}) {
   const camera = useThree((state) => state.camera);
   const controls = useThree((state) => (state as unknown as { controls?: TerrainOrbitControls }).controls);
@@ -455,6 +457,11 @@ export default function TerrainGallery({
     if (!selectedPartnerFilter) return placements;
     return placements.filter((placement) => placement.partner_name?.trim() === selectedPartnerFilter);
   }, [placements, selectedPartnerFilter]);
+  const selectedActivityId = useMemo(() => {
+    if (!selectedActivityFilter) return undefined;
+    const value = parseInt(selectedActivityFilter, 10);
+    return Number.isFinite(value) ? value : undefined;
+  }, [selectedActivityFilter]);
   const visiblePlacements = useMemo(
     () => focusedPlacement ? [focusedPlacement] : filteredRegionalPlacements,
     [filteredRegionalPlacements, focusedPlacement]
@@ -574,13 +581,7 @@ export default function TerrainGallery({
     setFocusedPlacement(placement);
     setRenderedTerrainKey(null);
     selectPhoto(null);
-    void fetchPlacementFocus({
-      placementId: placement.placement_id,
-      lat: placement.lat,
-      lng: placement.lng,
-      radiusKm: LOCAL_PLACEMENT_RADIUS_KM,
-    });
-  }, [fetchPlacementFocus, selectPhoto]);
+  }, [selectPhoto]);
 
   const returnToRegional = useCallback(() => {
     document.body.style.cursor = "";
@@ -840,6 +841,17 @@ export default function TerrainGallery({
   useEffect(() => {
     onNoticeChange?.(notice);
   }, [notice, onNoticeChange]);
+
+  useEffect(() => {
+    if (!focusedPlacement) return;
+    void fetchPlacementFocus({
+      placementId: focusedPlacement.placement_id,
+      lat: focusedPlacement.lat,
+      lng: focusedPlacement.lng,
+      radiusKm: LOCAL_PLACEMENT_RADIUS_KM,
+      activityId: selectedActivityId,
+    });
+  }, [fetchPlacementFocus, focusedPlacement, selectedActivityId]);
 
   useEffect(() => {
     return () => onNoticeChange?.(null);
