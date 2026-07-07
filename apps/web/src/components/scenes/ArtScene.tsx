@@ -19,7 +19,7 @@ const TERRAIN_MAX_TILT = 2.75;
 const TERRAIN_MAP_MOUSE_BUTTONS = {
   LEFT: THREE.MOUSE.PAN,
   MIDDLE: THREE.MOUSE.DOLLY,
-  RIGHT: THREE.MOUSE.PAN,
+  RIGHT: THREE.MOUSE.ROTATE,
 };
 const TERRAIN_GROUND_PLANE_NORMAL = new THREE.Vector3(0, 0, 1);
 const TERRAIN_GL_OPTIONS = {
@@ -303,7 +303,7 @@ function GroundPlanePanControls() {
 
     function canStartPan(event: PointerEvent) {
       if (event.ctrlKey || event.metaKey || event.shiftKey) return false;
-      if (event.pointerType === "mouse") return event.button === 0 || event.button === 2;
+      if (event.pointerType === "mouse") return event.button === 0;
       return event.isPrimary;
     }
 
