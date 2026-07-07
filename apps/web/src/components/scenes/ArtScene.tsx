@@ -124,7 +124,63 @@ export default function ArtScene() {
 
   return (
     <div style={{ width: "100vw", height: "100vh", position: "relative" }}>
-      <div style={hudStyle}>
+      <div style={topNavStyle}>
+        <a href="/" aria-label="Artasia home" style={homeLogoLinkStyle}>
+          <img src="/artasia.svg" alt="" style={homeLogoImageStyle} />
+        </a>
+
+        <div style={topControlGroupStyle}>
+          {backAction && (
+            <button
+              type="button"
+              aria-label="Back to regional view"
+              onClick={backAction}
+              style={backButtonStyle}
+            >
+              <svg viewBox="0 0 16 16" aria-hidden="true" style={backChevronStyle}>
+                <path d="M10.5 2.5 5 8l5.5 5.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span>Back</span>
+            </button>
+          )}
+
+          {!focusedPlacementDetails && partnerFilterOptions.length > 0 && (
+            <label style={filterControlStyle}>
+              <select
+                aria-label="Filter placements by partner"
+                value={selectedPartnerFilter}
+                onChange={(event) => setSelectedPartnerFilter(event.target.value)}
+                style={filterSelectStyle}
+              >
+                <option value="" style={filterOptionStyle}>All partners</option>
+                {partnerFilterOptions.map((option) => (
+                  <option key={option.value} value={option.value} style={filterOptionStyle}>
+                    {option.label} ({option.count})
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          {focusedPlacementDetails && activityFilterOptions.length > 0 && (
+            <label style={filterControlStyle}>
+              <select
+                aria-label="Filter photos by activity"
+                value={selectedActivityFilter}
+                onChange={(event) => setSelectedActivityFilter(event.target.value)}
+                style={filterSelectStyle}
+              >
+                <option value="" style={filterOptionStyle}>All Activities</option>
+                {activityFilterOptions.map((option) => (
+                  <option key={option.id} value={String(option.id)} style={filterOptionStyle}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
+
         <div ref={menuRef} style={menuWrapStyle}>
           <button
             type="button"
@@ -158,60 +214,6 @@ export default function ArtScene() {
           )}
         </div>
       </div>
-
-      <a href="/" aria-label="Artasia home" style={homeLogoLinkStyle}>
-        <img src="/artasia.svg" alt="" style={homeLogoImageStyle} />
-      </a>
-
-      {backAction && (
-        <button
-          type="button"
-          aria-label="Back to regional view"
-          onClick={backAction}
-          style={backButtonStyle}
-        >
-          <svg viewBox="0 0 16 16" aria-hidden="true" style={backChevronStyle}>
-            <path d="M10.5 2.5 5 8l5.5 5.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <span>Back</span>
-        </button>
-      )}
-
-      {!focusedPlacementDetails && partnerFilterOptions.length > 0 && (
-        <label style={partnerFilterStyle}>
-          <select
-            aria-label="Filter placements by partner"
-            value={selectedPartnerFilter}
-            onChange={(event) => setSelectedPartnerFilter(event.target.value)}
-            style={partnerFilterSelectStyle}
-          >
-            <option value="" style={partnerFilterOptionStyle}>All partners</option>
-            {partnerFilterOptions.map((option) => (
-              <option key={option.value} value={option.value} style={partnerFilterOptionStyle}>
-                {option.label} ({option.count})
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-
-      {focusedPlacementDetails && activityFilterOptions.length > 0 && (
-        <label style={activityFilterStyle}>
-          <select
-            aria-label="Filter photos by activity"
-            value={selectedActivityFilter}
-            onChange={(event) => setSelectedActivityFilter(event.target.value)}
-            style={partnerFilterSelectStyle}
-          >
-            <option value="" style={partnerFilterOptionStyle}>All Activities</option>
-            {activityFilterOptions.map((option) => (
-              <option key={option.id} value={String(option.id)} style={partnerFilterOptionStyle}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
 
       {error && <div style={errorStyle}>{error}</div>}
       <div style={buildStampStyle}>{__ARTASIA_BUILD_LABEL__}</div>
@@ -436,18 +438,26 @@ function GroundPlanePanControls() {
   return null;
 }
 
-const hudStyle: React.CSSProperties = {
+const topNavStyle: React.CSSProperties = {
   position: "absolute",
-  top: 0,
-  left: 0,
-  right: 0,
-  zIndex: 10,
+  top: 12,
+  left: 16,
+  right: 16,
+  zIndex: 16,
   display: "flex",
-  justifyContent: "flex-end",
-  padding: "12px 16px",
+  alignItems: "center",
+  gap: 12,
   fontFamily: "monospace",
-  fontSize: 13,
   color: "#aaa",
+  pointerEvents: "none",
+};
+
+const topControlGroupStyle: React.CSSProperties = {
+  flex: "1 1 auto",
+  minWidth: 0,
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
   pointerEvents: "none",
 };
 
@@ -486,6 +496,7 @@ const webglFallbackMessageStyle: React.CSSProperties = {
 };
 
 const menuWrapStyle: React.CSSProperties = {
+  flex: "0 0 auto",
   position: "relative",
   pointerEvents: "auto",
 };
@@ -544,12 +555,8 @@ const menuItemStyle: React.CSSProperties = {
 };
 
 const backButtonStyle: React.CSSProperties = {
-  position: "absolute",
-  top: 12,
-  left: 178,
-  zIndex: 15,
   pointerEvents: "auto",
-  minHeight: 40,
+  height: 40,
   padding: "0 12px 0 10px",
   borderRadius: 999,
   display: "inline-flex",
@@ -570,11 +577,8 @@ const backChevronStyle: React.CSSProperties = {
 };
 
 const homeLogoLinkStyle: React.CSSProperties = {
-  position: "absolute",
-  top: 12,
-  left: 16,
-  zIndex: 16,
-  width: 150,
+  flex: "0 0 auto",
+  width: "clamp(92px, 18vw, 150px)",
   height: 50,
   display: "grid",
   placeItems: "center",
@@ -582,54 +586,36 @@ const homeLogoLinkStyle: React.CSSProperties = {
 };
 
 const homeLogoImageStyle: React.CSSProperties = {
-  width: 144,
+  width: "100%",
   height: 48,
   objectFit: "contain",
   display: "block",
 };
 
-const partnerFilterStyle: React.CSSProperties = {
-  position: "absolute",
-  top: 22,
-  left: 178,
-  zIndex: 12,
+const filterControlStyle: React.CSSProperties = {
   pointerEvents: "auto",
+  minWidth: 0,
 };
 
-const activityFilterStyle: React.CSSProperties = {
-  ...partnerFilterStyle,
-  left: 256,
-};
-
-const partnerFilterSelectStyle: React.CSSProperties = {
-  maxWidth: "min(320px, calc(100vw - 96px))",
-  background: "rgba(12,14,22,0.92)",
+const filterSelectStyle: React.CSSProperties = {
+  width: "clamp(116px, 28vw, 320px)",
+  maxWidth: "100%",
+  height: 40,
+  background: "rgba(10,10,20,0.82)",
   color: "#f4f7fb",
-  border: "none",
-  borderRadius: 6,
-  padding: "7px 9px",
+  border: "1px solid rgba(255,255,255,0.18)",
+  borderRadius: 999,
+  padding: "0 34px 0 14px",
   fontFamily: "monospace",
   fontSize: 12,
   outline: "none",
-  boxShadow: "none",
+  boxShadow: "0 10px 26px rgba(0,0,0,0.28)",
+  cursor: "pointer",
 };
 
-const partnerFilterOptionStyle: React.CSSProperties = {
+const filterOptionStyle: React.CSSProperties = {
   background: "#121620",
   color: "#f4f7fb",
-};
-
-const btnStyle: React.CSSProperties = {
-  pointerEvents: "auto",
-  background: "rgba(255,255,255,0.08)",
-  color: "#ccc",
-  border: "1px solid rgba(255,255,255,0.15)",
-  borderRadius: 4,
-  padding: "4px 12px",
-  cursor: "pointer",
-  fontSize: 13,
-  fontFamily: "monospace",
-  textDecoration: "none",
 };
 
 const errorStyle: React.CSSProperties = {
