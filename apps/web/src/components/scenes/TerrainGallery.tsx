@@ -392,6 +392,7 @@ interface TerrainGalleryProps {
   onBackActionChange?: (action: (() => void) | null) => void;
   onFocusedPlacementChange?: (placement: MapPlacement | null) => void;
   onHoveredPlacementChange?: (placement: MapPlacement | null) => void;
+  onPreviewPlacementChange?: (placement: MapPlacement | null, openAction?: (() => void) | null) => void;
   onPartnerFilterOptionsChange?: (options: PartnerFilterOption[]) => void;
   selectedPartnerFilter?: string;
 }
@@ -401,11 +402,13 @@ export default function TerrainGallery({
   onBackActionChange,
   onFocusedPlacementChange,
   onHoveredPlacementChange,
+  onPreviewPlacementChange,
   onPartnerFilterOptionsChange,
   selectedPartnerFilter = "",
 }: TerrainGalleryProps = {}) {
   const camera = useThree((state) => state.camera);
   const controls = useThree((state) => (state as unknown as { controls?: TerrainOrbitControls }).controls);
+  const usesTouchPreview = useTouchPreviewMode();
   const photos = useGalleryStore((s) => s.photos);
   const galleryLoading = useGalleryStore((s) => s.loading);
   const selectedIndex = useGalleryStore((s) => s.selectedPhotoIndex);
@@ -424,6 +427,7 @@ export default function TerrainGallery({
   const [placementsResolved, setPlacementsResolved] = useState(false);
   const [focusedPlacement, setFocusedPlacement] = useState<MapPlacement | null>(null);
   const [hoveredPlacement, setHoveredPlacement] = useState<MapPlacement | null>(null);
+  const [previewPlacement, setPreviewPlacement] = useState<MapPlacement | null>(null);
   const terrainCacheRef = useRef<Map<string, TerrainCacheEntry>>(new Map());
 
   const geoPhotos = useMemo(() => {
@@ -566,6 +570,7 @@ export default function TerrainGallery({
   const focusPlacement = useCallback((placement: MapPlacement) => {
     document.body.style.cursor = "";
     setHoveredPlacement(null);
+    setPreviewPlacement(null);
     setFocusedPlacement(placement);
     setRenderedTerrainKey(null);
     selectPhoto(null);
@@ -580,10 +585,16 @@ export default function TerrainGallery({
   const returnToRegional = useCallback(() => {
     document.body.style.cursor = "";
     setFocusedPlacement(null);
+    setPreviewPlacement(null);
     setRenderedTerrainKey(null);
     selectPhoto(null);
     void fetchPhotos();
   }, [fetchPhotos, selectPhoto]);
+
+  const openPreviewPlacement = useCallback(() => {
+    if (!previewPlacement) return;
+    focusPlacement(previewPlacement);
+  }, [focusPlacement, previewPlacement]);
 
   useEffect(() => {
     let cancelled = false;
@@ -859,12 +870,31 @@ export default function TerrainGallery({
   }, [onHoveredPlacementChange]);
 
   useEffect(() => {
+    onPreviewPlacementChange?.(
+      focusedPlacement ? null : previewPlacement,
+      focusedPlacement || !previewPlacement ? null : openPreviewPlacement
+    );
+  }, [focusedPlacement, onPreviewPlacementChange, openPreviewPlacement, previewPlacement]);
+
+  useEffect(() => {
+    return () => onPreviewPlacementChange?.(null, null);
+  }, [onPreviewPlacementChange]);
+
+  useEffect(() => {
     if (!hoveredPlacement) return;
     if (focusedPlacement) return;
     if (!visiblePlacements.some((placement) => placement.placement_id === hoveredPlacement.placement_id)) {
       setHoveredPlacement(null);
     }
   }, [focusedPlacement, hoveredPlacement, visiblePlacements]);
+
+  useEffect(() => {
+    if (!previewPlacement) return;
+    if (focusedPlacement) return;
+    if (!visiblePlacements.some((placement) => placement.placement_id === previewPlacement.placement_id)) {
+      setPreviewPlacement(null);
+    }
+  }, [focusedPlacement, previewPlacement, visiblePlacements]);
 
   useEffect(() => {
     onPartnerFilterOptionsChange?.(partnerFilterOptions);
@@ -921,9 +951,16 @@ export default function TerrainGallery({
           brandColorOne={placement.partner_brand_color_one}
           brandColorTwo={placement.partner_brand_color_two}
           heightScale={heightScale}
-          onClick={focusedPlacement ? undefined : () => focusPlacement(placement)}
-          onPointerEnter={focusedPlacement ? undefined : () => setHoveredPlacement(placement)}
-          onPointerLeave={focusedPlacement ? undefined : () => setHoveredPlacement(null)}
+          onClick={focusedPlacement ? undefined : () => {
+            if (usesTouchPreview) {
+              setHoveredPlacement(null);
+              setPreviewPlacement(placement);
+              return;
+            }
+            focusPlacement(placement);
+          }}
+          onPointerEnter={focusedPlacement || usesTouchPreview ? undefined : () => setHoveredPlacement(placement)}
+          onPointerLeave={focusedPlacement || usesTouchPreview ? undefined : () => setHoveredPlacement(null)}
         />
       ))}
 
@@ -1033,6 +1070,32 @@ export function PlacementHoverLabel({ placement }: { placement: MapPlacement }) 
   );
 }
 
+export function PlacementPreviewPanel({ placement, onOpen }: { placement: MapPlacement; onOpen: () => void }) {
+  const siteDetails = formatSiteDetails(placement);
+  const participantDetails = formatParticipantDetails(placement);
+
+  return (
+    <section style={placementPreviewPanelStyle} aria-label="Placement preview">
+      <button type="button" onClick={onOpen} style={placementPreviewButtonStyle}>
+        {placement.partner_logo?.url && (
+          <img
+            src={placement.partner_logo.url}
+            alt={placement.partner_logo.alt || placement.partner_name || "Partner logo"}
+            style={placementPreviewLogoStyle}
+          />
+        )}
+        <span style={placementPreviewContentStyle}>
+          <span style={placementPreviewPartnerStyle}>{placement.partner_name || "Partner organization"}</span>
+          <span style={placementPreviewNameStyle}>{placement.placement_name}</span>
+          {siteDetails && <span style={placementPreviewMetaStyle}>{siteDetails}</span>}
+          {participantDetails && <span style={placementPreviewMetaStyle}>{participantDetails}</span>}
+        </span>
+        <span style={placementPreviewActionStyle}>View</span>
+      </button>
+    </section>
+  );
+}
+
 function formatSiteDetails(placement: MapPlacement) {
   const details = [
     placement.place_name?.trim(),
@@ -1103,6 +1166,25 @@ function useIsMobileBreakpoint(breakpointPx = 720) {
   return isMobile;
 }
 
+function useTouchPreviewMode() {
+  const query = "(hover: none), (pointer: coarse)";
+  const [usesTouchPreview, setUsesTouchPreview] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia(query).matches;
+  });
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(query);
+    const onChange = (event: MediaQueryListEvent) => setUsesTouchPreview(event.matches);
+
+    setUsesTouchPreview(mediaQuery.matches);
+    mediaQuery.addEventListener("change", onChange);
+    return () => mediaQuery.removeEventListener("change", onChange);
+  }, []);
+
+  return usesTouchPreview;
+}
+
 const siteDetailsStyle: React.CSSProperties = {
   position: "fixed",
   left: "50%",
@@ -1171,6 +1253,79 @@ const placementHoverNameStyle: React.CSSProperties = {
   fontWeight: 700,
   lineHeight: 1.3,
   overflowWrap: "anywhere",
+};
+
+const placementPreviewPanelStyle: React.CSSProperties = {
+  position: "fixed",
+  left: 12,
+  right: 12,
+  bottom: 44,
+  zIndex: 15,
+  pointerEvents: "auto",
+  fontFamily: "monospace",
+};
+
+const placementPreviewButtonStyle: React.CSSProperties = {
+  width: "100%",
+  minHeight: 82,
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  padding: 12,
+  borderRadius: 14,
+  border: "1px solid rgba(255,255,255,0.18)",
+  background: "rgba(10,10,20,0.9)",
+  color: "#eef2f8",
+  boxShadow: "0 12px 32px rgba(0,0,0,0.32)",
+  textAlign: "left",
+  cursor: "pointer",
+};
+
+const placementPreviewLogoStyle: React.CSSProperties = {
+  flex: "0 0 auto",
+  width: 56,
+  height: 42,
+  objectFit: "contain",
+  background: "rgba(255,255,255,0.92)",
+  borderRadius: 4,
+  padding: 5,
+};
+
+const placementPreviewContentStyle: React.CSSProperties = {
+  minWidth: 0,
+  flex: "1 1 auto",
+  display: "grid",
+  gap: 3,
+};
+
+const placementPreviewPartnerStyle: React.CSSProperties = {
+  color: "#f4f7fb",
+  fontSize: 12,
+  fontWeight: 700,
+  lineHeight: 1.25,
+  overflowWrap: "anywhere",
+};
+
+const placementPreviewNameStyle: React.CSSProperties = {
+  color: "#cfd6e2",
+  fontSize: 11,
+  lineHeight: 1.3,
+  overflowWrap: "anywhere",
+};
+
+const placementPreviewMetaStyle: React.CSSProperties = {
+  color: "#8f9bad",
+  fontSize: 10,
+  lineHeight: 1.25,
+  overflowWrap: "anywhere",
+};
+
+const placementPreviewActionStyle: React.CSSProperties = {
+  flex: "0 0 auto",
+  color: "#ffffff",
+  fontSize: 12,
+  fontWeight: 700,
+  paddingLeft: 6,
 };
 
 const siteDetailsHeaderStyle: React.CSSProperties = {

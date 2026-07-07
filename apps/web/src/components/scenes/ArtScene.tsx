@@ -9,6 +9,7 @@ import TerrainGallery, {
   FocusedPlacementOverlay,
   type PartnerFilterOption,
   PlacementHoverLabel,
+  PlacementPreviewPanel,
   type TerrainNotice,
 } from "./TerrainGallery";
 
@@ -43,6 +44,8 @@ export default function ArtScene() {
   const [backAction, setBackAction] = useState<(() => void) | null>(null);
   const [focusedPlacementDetails, setFocusedPlacementDetails] = useState<MapPlacement | null>(null);
   const [hoveredPlacementDetails, setHoveredPlacementDetails] = useState<MapPlacement | null>(null);
+  const [previewPlacementDetails, setPreviewPlacementDetails] = useState<MapPlacement | null>(null);
+  const [previewPlacementAction, setPreviewPlacementAction] = useState<(() => void) | null>(null);
   const [partnerFilterOptions, setPartnerFilterOptions] = useState<PartnerFilterOption[]>([]);
   const [selectedPartnerFilter, setSelectedPartnerFilter] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -77,6 +80,10 @@ export default function ArtScene() {
   const selectedDescription = selectedPhoto?.exifInfo?.description?.trim();
   const handleBackActionChange = useCallback((action: (() => void) | null) => {
     setBackAction(action ? () => action : null);
+  }, []);
+  const handlePreviewPlacementChange = useCallback((placement: MapPlacement | null, action?: (() => void) | null) => {
+    setPreviewPlacementDetails(placement);
+    setPreviewPlacementAction(action ? () => action : null);
   }, []);
 
   useEffect(() => {
@@ -163,6 +170,9 @@ export default function ArtScene() {
       <div style={buildStampStyle}>{__ARTASIA_BUILD_LABEL__}</div>
       {terrainNotice && <LoadingIndicator {...terrainNotice} />}
       {focusedPlacementDetails && <FocusedPlacementOverlay placement={focusedPlacementDetails} />}
+      {!focusedPlacementDetails && previewPlacementDetails && previewPlacementAction && (
+        <PlacementPreviewPanel placement={previewPlacementDetails} onOpen={previewPlacementAction} />
+      )}
       {!focusedPlacementDetails && hoveredPlacementDetails && (
         <PlacementHoverLabel placement={hoveredPlacementDetails} />
       )}
@@ -223,6 +233,7 @@ export default function ArtScene() {
               onBackActionChange={handleBackActionChange}
               onFocusedPlacementChange={setFocusedPlacementDetails}
               onHoveredPlacementChange={setHoveredPlacementDetails}
+              onPreviewPlacementChange={handlePreviewPlacementChange}
               onPartnerFilterOptionsChange={setPartnerFilterOptions}
               selectedPartnerFilter={selectedPartnerFilter}
             />
