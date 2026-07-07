@@ -10,8 +10,8 @@ class FlowerPhotoMaterial extends THREE.ShaderMaterial {
         photoMap: { value: null },
         flowerOpacity: { value: 1 },
         petalCount: { value: 10 },
-        borderColor: { value: new THREE.Color("#ff1f2d") },
-        borderWidth: { value: 0.075 },
+        borderColor: { value: new THREE.Color("#ffffff") },
+        borderWidth: { value: 0.12 },
         imageAspect: { value: 1 },
       },
       vertexShader: `
@@ -146,7 +146,7 @@ interface OrbitBannerProps extends SharedPhotoProps {
 const BASE_LIFT = 0.025;
 const STEM_HEIGHT = 0.28;
 const TRACKING_RADIUS = 0.15;
-const HEAD_RADIUS = 0.21;
+const HEAD_RADIUS = 0.26;
 const PETAL_LOBE_COUNT = 10;
 const STEM_RADIUS = 0.009;
 const MAX_TILT = THREE.MathUtils.degToRad(48);
@@ -238,8 +238,8 @@ export function TerrainPhotoFlower({
             photoMap={texture}
             petalCount={PETAL_LOBE_COUNT}
             flowerOpacity={0.96}
-            borderColor="#ff1f2d"
-            borderWidth={0.075}
+            borderColor="#ffffff"
+            borderWidth={0.12}
             imageAspect={imageAspect}
             transparent
             side={THREE.DoubleSide}

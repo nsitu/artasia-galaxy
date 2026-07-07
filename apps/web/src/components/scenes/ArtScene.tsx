@@ -1,6 +1,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Preload } from "@react-three/drei";
+import { MapControls, Preload } from "@react-three/drei";
+import { MOUSE } from "three";
 import type { MapPlacement } from "../../api/client";
 import { useGalleryStore } from "../../stores/galleryStore";
 import LoadingIndicator from "../ui/LoadingIndicator";
@@ -12,6 +13,14 @@ import TerrainGallery, {
 } from "./TerrainGallery";
 
 const DEFAULT_TERRAIN_CAMERA_POSITION: [number, number, number] = [0, -12, 10];
+const TERRAIN_MAP_HEADING = 0;
+const TERRAIN_MIN_TILT = 2.1;
+const TERRAIN_MAX_TILT = 2.75;
+const TERRAIN_MAP_MOUSE_BUTTONS = {
+  LEFT: MOUSE.PAN,
+  MIDDLE: MOUSE.DOLLY,
+  RIGHT: MOUSE.PAN,
+};
 
 export default function ArtScene() {
   const fetchPhotos = useGalleryStore((s) => s.fetchPhotos);
@@ -194,15 +203,21 @@ export default function ArtScene() {
             onPartnerFilterOptionsChange={setPartnerFilterOptions}
             selectedPartnerFilter={selectedPartnerFilter}
           />
-          <OrbitControls
+          <MapControls
             makeDefault
             enableDamping
             dampingFactor={0.08}
             enablePan
             enableZoom
+            enableRotate
             screenSpacePanning
             minDistance={1.5}
             maxDistance={80}
+            minPolarAngle={TERRAIN_MIN_TILT}
+            maxPolarAngle={TERRAIN_MAX_TILT}
+            minAzimuthAngle={TERRAIN_MAP_HEADING}
+            maxAzimuthAngle={TERRAIN_MAP_HEADING}
+            mouseButtons={TERRAIN_MAP_MOUSE_BUTTONS}
           />
           <Preload all />
         </Suspense>
