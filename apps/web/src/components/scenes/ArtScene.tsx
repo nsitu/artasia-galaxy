@@ -1,7 +1,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useThree } from "@react-three/fiber";
 import { MapControls, Preload } from "@react-three/drei";
-import { MOUSE } from "three";
+import * as THREE from "three";
 import type { MapPlacement } from "../../api/client";
 import { useGalleryStore } from "../../stores/galleryStore";
 import LoadingIndicator from "../ui/LoadingIndicator";
@@ -17,9 +17,15 @@ const TERRAIN_MAP_HEADING = 0;
 const TERRAIN_MIN_TILT = 2.1;
 const TERRAIN_MAX_TILT = 2.75;
 const TERRAIN_MAP_MOUSE_BUTTONS = {
-  LEFT: MOUSE.PAN,
-  MIDDLE: MOUSE.DOLLY,
-  RIGHT: MOUSE.PAN,
+  LEFT: THREE.MOUSE.PAN,
+  MIDDLE: THREE.MOUSE.DOLLY,
+  RIGHT: THREE.MOUSE.PAN,
+};
+const TERRAIN_GROUND_PLANE_NORMAL = new THREE.Vector3(0, 0, 1);
+
+type TerrainMapControls = {
+  target: THREE.Vector3;
+  update?: () => void;
 };
 
 export default function ArtScene() {
@@ -207,10 +213,9 @@ export default function ArtScene() {
             makeDefault
             enableDamping
             dampingFactor={0.08}
-            enablePan
+            enablePan={false}
             enableZoom
             enableRotate
-            screenSpacePanning
             minDistance={1.5}
             maxDistance={80}
             minPolarAngle={TERRAIN_MIN_TILT}
@@ -219,11 +224,116 @@ export default function ArtScene() {
             maxAzimuthAngle={TERRAIN_MAP_HEADING}
             mouseButtons={TERRAIN_MAP_MOUSE_BUTTONS}
           />
+          <GroundPlanePanControls />
           <Preload all />
         </Suspense>
       </Canvas>
     </div>
   );
+}
+
+function GroundPlanePanControls() {
+  const camera = useThree((state) => state.camera);
+  const gl = useThree((state) => state.gl);
+  const controls = useThree((state) => (state as unknown as { controls?: TerrainMapControls }).controls);
+
+  useEffect(() => {
+    if (!controls?.target) return;
+
+    const element = gl.domElement;
+    const terrainControls = controls;
+    const raycaster = new THREE.Raycaster();
+    const pointerNdc = new THREE.Vector2();
+    const dragPlane = new THREE.Plane(TERRAIN_GROUND_PLANE_NORMAL, -terrainControls.target.z);
+    const activePointers = new Map<number, PointerEvent>();
+    const dragAnchor = new THREE.Vector3();
+    const dragPoint = new THREE.Vector3();
+    let activePointerId: number | null = null;
+
+    function intersectGroundPlane(event: PointerEvent, target: THREE.Vector3) {
+      const rect = element.getBoundingClientRect();
+      pointerNdc.set(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1
+      );
+      dragPlane.constant = -terrainControls.target.z;
+      raycaster.setFromCamera(pointerNdc, camera);
+      return raycaster.ray.intersectPlane(dragPlane, target);
+    }
+
+    function canStartPan(event: PointerEvent) {
+      if (event.ctrlKey || event.metaKey || event.shiftKey) return false;
+      if (event.pointerType === "mouse") return event.button === 0 || event.button === 2;
+      return event.isPrimary;
+    }
+
+    function stopPan(event?: PointerEvent) {
+      if (activePointerId !== null && element.hasPointerCapture?.(activePointerId)) {
+        element.releasePointerCapture(activePointerId);
+      }
+      activePointerId = null;
+      if (event) activePointers.delete(event.pointerId);
+    }
+
+    function onPointerDown(event: PointerEvent) {
+      activePointers.set(event.pointerId, event);
+
+      if (activePointerId !== null || activePointers.size !== 1 || !canStartPan(event)) {
+        stopPan();
+        return;
+      }
+
+      const point = intersectGroundPlane(event, dragAnchor);
+      if (!point) return;
+      activePointerId = event.pointerId;
+      element.setPointerCapture?.(event.pointerId);
+      event.preventDefault();
+    }
+
+    function onPointerMove(event: PointerEvent) {
+      activePointers.set(event.pointerId, event);
+      if (activePointerId !== event.pointerId) return;
+
+      if (activePointers.size !== 1) {
+        stopPan(event);
+        return;
+      }
+
+      const point = intersectGroundPlane(event, dragPoint);
+      if (!point) return;
+
+      const delta = dragAnchor.clone().sub(dragPoint);
+      camera.position.add(delta);
+      terrainControls.target.add(delta);
+      terrainControls.update?.();
+      event.preventDefault();
+    }
+
+    function onPointerUp(event: PointerEvent) {
+      if (activePointerId === event.pointerId) stopPan(event);
+      else activePointers.delete(event.pointerId);
+    }
+
+    function onContextMenu(event: MouseEvent) {
+      event.preventDefault();
+    }
+
+    element.addEventListener("pointerdown", onPointerDown);
+    element.addEventListener("pointermove", onPointerMove);
+    element.addEventListener("pointerup", onPointerUp);
+    element.addEventListener("pointercancel", onPointerUp);
+    element.addEventListener("contextmenu", onContextMenu);
+
+    return () => {
+      element.removeEventListener("pointerdown", onPointerDown);
+      element.removeEventListener("pointermove", onPointerMove);
+      element.removeEventListener("pointerup", onPointerUp);
+      element.removeEventListener("pointercancel", onPointerUp);
+      element.removeEventListener("contextmenu", onContextMenu);
+    };
+  }, [camera, controls, gl]);
+
+  return null;
 }
 
 const hudStyle: React.CSSProperties = {
