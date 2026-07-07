@@ -180,6 +180,13 @@ function artasia_sanitize_placement_time($value, string $meta_key = '', string $
     return isset($options[$value]) ? $value : '';
 }
 
+function artasia_sanitize_hex_color_meta($value, string $meta_key = '', string $object_type = '', string $object_subtype = ''): string
+{
+    $color = sanitize_hex_color((string) $value);
+
+    return $color ?: '';
+}
+
 function artasia_format_placement_schedule(int $post_id): string
 {
     $weekdays = artasia_placement_weekday_options();
@@ -801,6 +808,8 @@ function artasia_partner_meta_box_html(WP_Post $post): void
     $logo_id   = intval(get_post_meta($post->ID, 'artasia_logo_id', true));
     $logo_url  = $logo_id ? wp_get_attachment_url($logo_id) : '';
     $notes     = get_post_meta($post->ID, 'artasia_notes', true);
+    $brand_color_one = get_post_meta($post->ID, 'artasia_brand_color_one', true);
+    $brand_color_two = get_post_meta($post->ID, 'artasia_brand_color_two', true);
 
     $type_options = ['Partner Organization', 'Program', 'Community Group', 'School Board', 'Other'];
 
@@ -827,6 +836,20 @@ function artasia_partner_meta_box_html(WP_Post $post): void
         <tr>
             <th><label for="artasia_website">Website</label></th>
             <td><input type="url" id="artasia_website" name="artasia_website" value="<?php echo esc_attr($website); ?>" class="widefat" /></td>
+        </tr>
+        <tr>
+            <th><label for="artasia_brand_color_one">Brand Color One</label></th>
+            <td>
+                <input type="text" id="artasia_brand_color_one" name="artasia_brand_color_one" value="<?php echo esc_attr($brand_color_one); ?>" placeholder="#ff6600" pattern="#[0-9a-fA-F]{6}" class="regular-text" />
+                <p class="description">Optional hex color used for this partner's flower heads, e.g. <code>#ff6600</code>.</p>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_brand_color_two">Brand Color Two</label></th>
+            <td>
+                <input type="text" id="artasia_brand_color_two" name="artasia_brand_color_two" value="<?php echo esc_attr($brand_color_two); ?>" placeholder="#8b160f" pattern="#[0-9a-fA-F]{6}" class="regular-text" />
+                <p class="description">Optional secondary hex color used for this partner's flower center, e.g. <code>#8b160f</code>.</p>
+            </td>
         </tr>
         <tr>
             <th><label for="artasia_partner_logo_id">Logo</label></th>
@@ -899,6 +922,8 @@ function artasia_save_partner_meta(int $post_id): void
     update_post_meta($post_id, 'artasia_partner_type', sanitize_text_field($_POST['artasia_partner_type'] ?? ''));
     update_post_meta($post_id, 'artasia_partner_acronym', sanitize_text_field($_POST['artasia_partner_acronym'] ?? ''));
     update_post_meta($post_id, 'artasia_website', esc_url_raw($_POST['artasia_website'] ?? ''));
+    update_post_meta($post_id, 'artasia_brand_color_one', artasia_sanitize_hex_color_meta($_POST['artasia_brand_color_one'] ?? ''));
+    update_post_meta($post_id, 'artasia_brand_color_two', artasia_sanitize_hex_color_meta($_POST['artasia_brand_color_two'] ?? ''));
     update_post_meta($post_id, 'artasia_logo_id', artasia_validate_partner_logo_id(intval($_POST['artasia_logo_id'] ?? 0)));
     update_post_meta($post_id, 'artasia_notes', sanitize_textarea_field($_POST['artasia_notes'] ?? ''));
 }

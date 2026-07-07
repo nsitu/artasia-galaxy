@@ -918,6 +918,8 @@ export default function TerrainGallery({
           markerId={String(placement.placement_id)}
           position={position}
           placementName={placement.placement_name}
+          brandColorOne={placement.partner_brand_color_one}
+          brandColorTwo={placement.partner_brand_color_two}
           heightScale={heightScale}
           onClick={focusedPlacement ? undefined : () => focusPlacement(placement)}
           onPointerEnter={focusedPlacement ? undefined : () => setHoveredPlacement(placement)}
@@ -1138,17 +1140,21 @@ const mobileSiteDetailsCollapsedStyle: React.CSSProperties = {
 
 const placementHoverLabelStyle: React.CSSProperties = {
   position: "absolute",
-  top: 56,
-  left: 16,
-  maxWidth: "min(360px, calc(100vw - 32px))",
+  left: "50%",
+  bottom: 18,
+  transform: "translateX(-50%)",
+  width: "max-content",
+  maxWidth: "min(460px, calc(100vw - 32px))",
   pointerEvents: "none",
   background: "rgba(10,10,20,0.82)",
   border: "1px solid rgba(255,255,255,0.18)",
   borderRadius: 6,
-  padding: "9px 12px",
+  padding: "10px 14px",
   color: "#eef2f8",
   fontFamily: "monospace",
   boxShadow: "0 12px 32px rgba(0,0,0,0.28)",
+  textAlign: "center",
+  zIndex: 14,
 };
 
 const placementHoverPartnerStyle: React.CSSProperties = {

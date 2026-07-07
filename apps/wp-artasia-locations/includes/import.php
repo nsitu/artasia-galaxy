@@ -143,7 +143,7 @@ function artasia_render_tools_page(): void
 
         <h3>Headers</h3>
         <p>Required headers: <code>placement_name</code>, <code>project_name</code>, <code>place_name</code>, <code>partner_name</code>.</p>
-        <p>Optional headers: <code>project_year</code>, <code>project_description</code>, <code>program_context</code>, <code>earlyon</code>, <code>section</code>, <code>delivery_weekday</code>, <code>delivery_start_time</code>, <code>delivery_end_time</code>, <code>participants</code>, <code>age_range</code>, <code>place_street_address</code>, <code>place_city</code>, <code>place_postal_code</code>, <code>place_shared_with</code>, <code>place_latitude</code>, <code>place_longitude</code>, <code>place_notes</code>, <code>partner_type</code>, <code>partner_website</code>, <code>partner_notes</code>, <code>team_member_name</code>, <code>team_member_role</code>, <code>team_member_email</code>, <code>team_member_notes</code>, <code>secondary_team_member_name</code>, <code>secondary_team_member_role</code>, <code>secondary_team_member_email</code>, <code>secondary_team_member_notes</code>.</p>
+        <p>Optional headers: <code>project_year</code>, <code>project_description</code>, <code>program_context</code>, <code>earlyon</code>, <code>section</code>, <code>delivery_weekday</code>, <code>delivery_start_time</code>, <code>delivery_end_time</code>, <code>participants</code>, <code>age_range</code>, <code>place_street_address</code>, <code>place_city</code>, <code>place_postal_code</code>, <code>place_shared_with</code>, <code>place_latitude</code>, <code>place_longitude</code>, <code>place_notes</code>, <code>partner_type</code>, <code>partner_website</code>, <code>partner_brand_color_one</code>, <code>partner_brand_color_two</code>, <code>partner_notes</code>, <code>team_member_name</code>, <code>team_member_role</code>, <code>team_member_email</code>, <code>team_member_notes</code>, <code>secondary_team_member_name</code>, <code>secondary_team_member_role</code>, <code>secondary_team_member_email</code>, <code>secondary_team_member_notes</code>.</p>
         <p>For <code>earlyon</code>, use values like <code>yes</code>, <code>no</code>, <code>true</code>, <code>false</code>, <code>1</code>, or <code>0</code>.</p>
         <p>For delivery times, use 24-hour values like <code>09:00</code>, <code>09:30</code>, or <code>20:00</code>.</p>
 
@@ -263,6 +263,8 @@ function artasia_download_import_template(): void
         'partner_name' => 'Hamilton Public Library',
         'partner_type' => 'Partner Organization',
         'partner_website' => 'https://www.hpl.ca',
+        'partner_brand_color_one' => '#ff6600',
+        'partner_brand_color_two' => '#8b160f',
         'partner_notes' => 'Library partner',
         'team_member_name' => 'Taylor Morgan',
         'team_member_role' => 'Artist Educator',
@@ -411,6 +413,8 @@ function artasia_import_location_record(array $record): string
 
     artasia_import_update_meta_if_present($partner_id, 'artasia_partner_type', $record, 'partner_type', 'sanitize_text_field');
     artasia_import_update_meta_if_present($partner_id, 'artasia_website', $record, 'partner_website', 'esc_url_raw');
+    artasia_import_update_meta_if_present($partner_id, 'artasia_brand_color_one', $record, 'partner_brand_color_one', 'artasia_sanitize_hex_color_meta');
+    artasia_import_update_meta_if_present($partner_id, 'artasia_brand_color_two', $record, 'partner_brand_color_two', 'artasia_sanitize_hex_color_meta');
     artasia_import_update_meta_if_present($partner_id, 'artasia_notes', $record, 'partner_notes', 'sanitize_textarea_field');
 
     if ($team_member_id) {
@@ -478,6 +482,8 @@ function artasia_import_csv_headers(): array
         'partner_name',
         'partner_type',
         'partner_website',
+        'partner_brand_color_one',
+        'partner_brand_color_two',
         'partner_notes',
         'team_member_name',
         'team_member_role',

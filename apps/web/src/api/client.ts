@@ -69,6 +69,8 @@ export interface UploadPlacement {
     mime_type: string;
     alt: string;
   } | null;
+  partner_brand_color_one?: string;
+  partner_brand_color_two?: string;
   delivery_weekday?: string;
   delivery_start_time?: string;
   delivery_end_time?: string;
@@ -99,6 +101,8 @@ export interface MapPlacement {
     mime_type: string;
     alt: string;
   } | null;
+  partner_brand_color_one?: string;
+  partner_brand_color_two?: string;
   team_member?: UploadUploader;
   secondary_team_member?: UploadUploader;
   participant_count?: number;

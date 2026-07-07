@@ -211,6 +211,20 @@ function artasia_register_meta_fields(): void
         'show_in_rest' => true,
         'sanitize_callback' => 'esc_url_raw',
     ]);
+    register_post_meta('artasia_partner', 'artasia_brand_color_one', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_hex_color_meta',
+    ]);
+    register_post_meta('artasia_partner', 'artasia_brand_color_two', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_hex_color_meta',
+    ]);
     register_post_meta('artasia_partner', 'artasia_logo_id', [
         'type'         => 'integer',
         'single'       => true,

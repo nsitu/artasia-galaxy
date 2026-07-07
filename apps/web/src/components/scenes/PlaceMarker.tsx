@@ -6,6 +6,8 @@ interface Props {
   markerId: string;
   position: [number, number, number];
   placementName: string;
+  brandColorOne?: string;
+  brandColorTwo?: string;
   heightScale?: number;
   onClick?: () => void;
   onPointerEnter?: () => void;
@@ -29,12 +31,18 @@ const HEAD_AGENT_PADDING_PX = 10;
 const HEAD_AGENT_REPULSION = 0.5;
 const HEAD_AGENT_EASE = 0.18;
 const HEAD_AGENT_TETHER_EXTENSION = 1.9;
+const DEFAULT_HEAD_COLOR = "#ff1f2d";
+const DEFAULT_HEAD_EMISSIVE = "#6a070c";
+const DEFAULT_CENTER_COLOR = "#8b160f";
+const DEFAULT_CENTER_EMISSIVE = "#2a0302";
 const UP = new THREE.Vector3(0, 0, 1);
 
 export default function PlaceMarker({
   markerId,
   position,
   placementName,
+  brandColorOne,
+  brandColorTwo,
   heightScale,
   onClick,
   onPointerEnter,
@@ -50,6 +58,7 @@ export default function PlaceMarker({
   const size = useThree((state) => state.size);
   const [x, y, z] = position;
   const resolvedHeightScale = useMemo(() => heightScale ?? getHeightScale(placementName), [heightScale, placementName]);
+  const flowerColors = useMemo(() => getFlowerColors(brandColorOne, brandColorTwo), [brandColorOne, brandColorTwo]);
   const stemHeight = STEM_HEIGHT * resolvedHeightScale;
   const trackingRadius = TRACKING_RADIUS * resolvedHeightScale;
 
@@ -120,13 +129,15 @@ export default function PlaceMarker({
         }
       : undefined,
     onPointerOver: onClick || onPointerEnter
-      ? () => {
+      ? (event: ThreeEvent<PointerEvent>) => {
+          event.stopPropagation();
           if (onClick) document.body.style.cursor = "pointer";
           onPointerEnter?.();
         }
       : undefined,
     onPointerOut: onClick || onPointerLeave
-      ? () => {
+      ? (event: ThreeEvent<PointerEvent>) => {
+          event.stopPropagation();
           document.body.style.cursor = "";
           onPointerLeave?.();
         }
@@ -134,18 +145,18 @@ export default function PlaceMarker({
   };
 
   return (
-    <group ref={groupRef} position={[x, y, z + BASE_LIFT]} {...pointerHandlers}>
+    <group ref={groupRef} position={[x, y, z + BASE_LIFT]}>
       <mesh ref={stemRef} geometry={initialStemGeometry}>
         <meshStandardMaterial color="#49d05a" roughness={0.62} transparent opacity={0.82} />
       </mesh>
       <mesh geometry={baseGeometry}>
         <meshStandardMaterial color="#33b84a" roughness={0.72} transparent opacity={0.82} />
       </mesh>
-      <group ref={headRef} position={[0, 0, stemHeight + trackingRadius]}>
+      <group ref={headRef} position={[0, 0, stemHeight + trackingRadius]} {...pointerHandlers}>
         <mesh geometry={headGeometry}>
           <meshStandardMaterial
-            color="#ff1f2d"
-            emissive="#6a070c"
+            color={flowerColors.head}
+            emissive={flowerColors.headEmissive}
             roughness={0.55}
             transparent
             opacity={0.78}
@@ -157,8 +168,8 @@ export default function PlaceMarker({
         </mesh>
         <mesh geometry={centerGeometry} position={[0, 0, 0.003]}>
           <meshStandardMaterial
-            color="#8b160f"
-            emissive="#2a0302"
+            color={flowerColors.center}
+            emissive={flowerColors.centerEmissive}
             roughness={0.75}
             transparent
             opacity={0.84}
@@ -177,6 +188,29 @@ function orientHeadToCamera(head: THREE.Object3D, parent: THREE.Object3D, camera
   const cameraWorldQuaternion = camera.getWorldQuaternion(new THREE.Quaternion());
   const parentWorldQuaternion = parent.getWorldQuaternion(new THREE.Quaternion()).invert();
   head.quaternion.copy(parentWorldQuaternion.multiply(cameraWorldQuaternion));
+}
+
+function getFlowerColors(brandColorOne?: string, brandColorTwo?: string) {
+  const head = normalizeHexColor(brandColorOne) ?? DEFAULT_HEAD_COLOR;
+  const center = normalizeHexColor(brandColorTwo) ?? DEFAULT_CENTER_COLOR;
+
+  return {
+    head,
+    headEmissive: darkenHexColor(head, DEFAULT_HEAD_EMISSIVE),
+    center,
+    centerEmissive: darkenHexColor(center, DEFAULT_CENTER_EMISSIVE),
+  };
+}
+
+function normalizeHexColor(value?: string) {
+  const color = value?.trim();
+  return color && /^#[0-9a-fA-F]{6}$/.test(color) ? color : null;
+}
+
+function darkenHexColor(value: string, fallback: string) {
+  const color = normalizeHexColor(value);
+  if (!color) return fallback;
+  return new THREE.Color(color).multiplyScalar(0.38).getStyle();
 }
 
 function getTiltLimitedDirection(cameraLocal: THREE.Vector3, sphereCenter: THREE.Vector3) {

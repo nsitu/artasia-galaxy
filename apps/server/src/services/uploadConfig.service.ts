@@ -30,6 +30,8 @@ export interface ArtasiaPlacement {
     mime_type: string;
     alt: string;
   } | null;
+  partner_brand_color_one?: string;
+  partner_brand_color_two?: string;
   delivery_weekday?: string;
   delivery_start_time?: string;
   delivery_end_time?: string;
@@ -53,6 +55,8 @@ export interface ArtasiaMapPlacement {
     mime_type: string;
     alt: string;
   } | null;
+  partner_brand_color_one?: string;
+  partner_brand_color_two?: string;
   team_member?: UploadUploader;
   secondary_team_member?: UploadUploader;
   participant_count?: number;
@@ -150,6 +154,8 @@ function mapWpPlacement(wp: WpArtasiaPlacement): ArtasiaPlacement {
     ...(wp.secondary_team_member?.name ? { secondary_team_member_name: wp.secondary_team_member.name } : {}),
     partner_name: wp.partner?.name ?? "",
     ...(wp.partner?.logo ? { partner_logo: mapPartnerLogo(wp.partner.logo) } : {}),
+    ...(wp.partner?.brand_color_one ? { partner_brand_color_one: wp.partner.brand_color_one } : {}),
+    ...(wp.partner?.brand_color_two ? { partner_brand_color_two: wp.partner.brand_color_two } : {}),
     ...(wp.delivery_weekday ? { delivery_weekday: wp.delivery_weekday } : {}),
     ...(wp.delivery_start_time ? { delivery_start_time: wp.delivery_start_time } : {}),
     ...(wp.delivery_end_time ? { delivery_end_time: wp.delivery_end_time } : {}),
@@ -203,6 +209,8 @@ export async function getMapPlacements(): Promise<ArtasiaMapPlacement[]> {
       placement_name: wp.placement_name,
       ...(wp.partner?.name ? { partner_name: wp.partner.name } : {}),
       ...(wp.partner?.logo ? { partner_logo: mapPartnerLogo(wp.partner.logo) } : {}),
+      ...(wp.partner?.brand_color_one ? { partner_brand_color_one: wp.partner.brand_color_one } : {}),
+      ...(wp.partner?.brand_color_two ? { partner_brand_color_two: wp.partner.brand_color_two } : {}),
       ...(wp.team_member ? { team_member: mapWpUploader(wp.team_member) } : {}),
       ...(wp.secondary_team_member ? { secondary_team_member: mapWpUploader(wp.secondary_team_member) } : {}),
       ...(wp.participant_count ? { participant_count: wp.participant_count } : {}),

@@ -153,6 +153,8 @@ function artasia_get_expanded_placements(): WP_REST_Response
                 'name'    => $partner->post_title,
                 'type'    => get_post_meta($partner->ID, 'artasia_partner_type', true) ?: '',
                 'website' => get_post_meta($partner->ID, 'artasia_website', true) ?: '',
+                'brand_color_one' => get_post_meta($partner->ID, 'artasia_brand_color_one', true) ?: '',
+                'brand_color_two' => get_post_meta($partner->ID, 'artasia_brand_color_two', true) ?: '',
                 'logo'    => artasia_get_partner_logo_response($logo_id),
             ];
         }

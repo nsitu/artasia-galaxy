@@ -14,6 +14,8 @@ export interface WpPartner {
   name: string;
   type: string;
   website?: string;
+  brand_color_one?: string;
+  brand_color_two?: string;
   logo?: {
     id: number;
     url: string;
