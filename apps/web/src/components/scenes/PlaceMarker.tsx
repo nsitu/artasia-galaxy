@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 
 interface Props {
+  markerId: string;
   position: [number, number, number];
   placementName: string;
   heightScale?: number;
@@ -24,9 +25,14 @@ const HEAD_FULL_SCALE_DISTANCE = 8;
 const HEAD_MIN_SCALE_DISTANCE = 1.6;
 const HEAD_MIN_SCALE = 0.24;
 const HEAD_MAX_SCALE = 1.08;
+const HEAD_AGENT_PADDING_PX = 10;
+const HEAD_AGENT_REPULSION = 0.5;
+const HEAD_AGENT_EASE = 0.18;
+const HEAD_AGENT_TETHER_EXTENSION = 1.9;
 const UP = new THREE.Vector3(0, 0, 1);
 
 export default function PlaceMarker({
+  markerId,
   position,
   placementName,
   heightScale,
@@ -38,8 +44,10 @@ export default function PlaceMarker({
   const headRef = useRef<THREE.Group>(null);
   const stemRef = useRef<THREE.Mesh>(null);
   const currentDirection = useRef(new THREE.Vector3(0, 0, 1));
+  const currentHeadCenter = useRef<THREE.Vector3 | null>(null);
   const lastStemDirection = useRef(new THREE.Vector3(0, 0, 1));
   const camera = useThree((state) => state.camera);
+  const size = useThree((state) => state.size);
   const [x, y, z] = position;
   const resolvedHeightScale = useMemo(() => heightScale ?? getHeightScale(placementName), [heightScale, placementName]);
   const stemHeight = STEM_HEIGHT * resolvedHeightScale;
@@ -54,13 +62,15 @@ export default function PlaceMarker({
   );
 
   useEffect(() => {
+    const state = getMarkerAgentState(markerId);
     return () => {
       headGeometry.dispose();
       centerGeometry.dispose();
       baseGeometry.dispose();
       stemRef.current?.geometry.dispose();
+      markerAgents.delete(state.id);
     };
-  }, [baseGeometry, centerGeometry, headGeometry, initialStemGeometry]);
+  }, [baseGeometry, centerGeometry, headGeometry, initialStemGeometry, markerId]);
 
   useFrame(() => {
     const group = groupRef.current;
@@ -74,17 +84,31 @@ export default function PlaceMarker({
     const targetDirection = getTiltLimitedDirection(cameraLocal, sphereCenter);
     currentDirection.current.lerp(targetDirection, TRACKING_EASE).normalize();
 
-    const headCenter = sphereCenter.clone().add(currentDirection.current.clone().multiplyScalar(trackingRadius));
-    head.position.copy(headCenter);
-    head.scale.setScalar(getCameraResponsiveHeadScale(cameraDistance));
+    const headScale = getCameraResponsiveHeadScale(cameraDistance);
+    const preferredHeadCenter = sphereCenter.clone().add(currentDirection.current.clone().multiplyScalar(trackingRadius));
+    const resolvedHeadCenter = resolveAgentHeadCenter({
+      markerId,
+      group,
+      camera,
+      size,
+      stemHeight,
+      trackingRadius,
+      headScale,
+      preferredHeadCenter,
+      currentHeadCenter: currentHeadCenter.current,
+    });
+    currentHeadCenter.current = resolvedHeadCenter.clone();
+    head.position.copy(resolvedHeadCenter);
+    head.scale.setScalar(headScale);
     orientHeadToCamera(head, group, camera);
 
-    if (lastStemDirection.current.angleTo(currentDirection.current) > 0.025) {
-      const curve = createStemCurve(sphereCenter, headCenter, stemHeight);
+    const stemDirection = resolvedHeadCenter.clone().sub(sphereCenter).normalize();
+    if (lastStemDirection.current.angleTo(stemDirection) > 0.025) {
+      const curve = createStemCurve(sphereCenter, resolvedHeadCenter, stemHeight);
       const nextGeometry = new THREE.TubeGeometry(curve, 18, STEM_RADIUS, 8, false);
       stem.geometry.dispose();
       stem.geometry = nextGeometry;
-      lastStemDirection.current.copy(currentDirection.current);
+      lastStemDirection.current.copy(stemDirection);
     }
   });
 
@@ -174,6 +198,137 @@ function getCameraResponsiveHeadScale(cameraDistance: number) {
   if (!Number.isFinite(cameraDistance)) return 1;
   const t = THREE.MathUtils.smoothstep(cameraDistance, HEAD_MIN_SCALE_DISTANCE, HEAD_FULL_SCALE_DISTANCE);
   return THREE.MathUtils.lerp(HEAD_MIN_SCALE, HEAD_MAX_SCALE, t);
+}
+
+type MarkerAgentState = {
+  id: string;
+  screen: THREE.Vector2;
+  radiusPx: number;
+  world: THREE.Vector3;
+};
+
+const markerAgents = new Map<string, MarkerAgentState>();
+
+function getMarkerAgentState(id: string) {
+  let state = markerAgents.get(id);
+  if (!state) {
+    state = {
+      id,
+      screen: new THREE.Vector2(),
+      radiusPx: 0,
+      world: new THREE.Vector3(),
+    };
+    markerAgents.set(id, state);
+  }
+  return state;
+}
+
+function resolveAgentHeadCenter({
+  markerId,
+  group,
+  camera,
+  size,
+  stemHeight,
+  trackingRadius,
+  headScale,
+  preferredHeadCenter,
+  currentHeadCenter,
+}: {
+  markerId: string;
+  group: THREE.Group;
+  camera: THREE.Camera;
+  size: { width: number; height: number };
+  stemHeight: number;
+  trackingRadius: number;
+  headScale: number;
+  preferredHeadCenter: THREE.Vector3;
+  currentHeadCenter: THREE.Vector3 | null;
+}) {
+  group.updateMatrixWorld(true);
+  camera.updateMatrixWorld(true);
+
+  const state = getMarkerAgentState(markerId);
+  const preferredWorld = group.localToWorld(preferredHeadCenter.clone());
+  const preferredScreen = projectToScreen(preferredWorld, camera, size);
+  const radiusPx = estimateScreenRadius(preferredWorld, HEAD_RADIUS * headScale, camera, size);
+  let screenOffset = new THREE.Vector2();
+
+  for (const other of markerAgents.values()) {
+    if (other.id === markerId || other.radiusPx <= 0) continue;
+    const delta = preferredScreen.clone().sub(other.screen);
+    const distance = Math.max(delta.length(), 0.001);
+    const minDistance = radiusPx + other.radiusPx + HEAD_AGENT_PADDING_PX;
+    if (distance >= minDistance) continue;
+
+    screenOffset.add(delta.multiplyScalar(((minDistance - distance) / distance) * HEAD_AGENT_REPULSION));
+  }
+
+  const resolvedScreen = preferredScreen.add(screenOffset);
+  const resolvedWorld = screenToWorldOnCameraPlane(resolvedScreen, preferredWorld, camera, size);
+  const resolvedLocal = group.worldToLocal(resolvedWorld);
+  const sphereCenter = new THREE.Vector3(0, 0, stemHeight);
+  const maxTether = trackingRadius * HEAD_AGENT_TETHER_EXTENSION;
+  const tetherOffset = resolvedLocal.sub(sphereCenter);
+
+  if (tetherOffset.length() > maxTether) {
+    tetherOffset.setLength(maxTether);
+  }
+
+  const targetLocal = sphereCenter.add(tetherOffset);
+  const easedLocal = currentHeadCenter
+    ? currentHeadCenter.clone().lerp(targetLocal, HEAD_AGENT_EASE)
+    : targetLocal;
+  const easedWorld = group.localToWorld(easedLocal.clone());
+
+  state.screen.copy(projectToScreen(easedWorld, camera, size));
+  state.radiusPx = estimateScreenRadius(easedWorld, HEAD_RADIUS * headScale, camera, size);
+  state.world.copy(easedWorld);
+
+  return easedLocal;
+}
+
+function projectToScreen(point: THREE.Vector3, camera: THREE.Camera, size: { width: number; height: number }) {
+  const projected = point.clone().project(camera);
+  return new THREE.Vector2(
+    ((projected.x + 1) / 2) * size.width,
+    ((-projected.y + 1) / 2) * size.height
+  );
+}
+
+function screenToWorldOnCameraPlane(
+  screen: THREE.Vector2,
+  planePoint: THREE.Vector3,
+  camera: THREE.Camera,
+  size: { width: number; height: number }
+) {
+  const ndc = new THREE.Vector3(
+    (screen.x / size.width) * 2 - 1,
+    -(screen.y / size.height) * 2 + 1,
+    0.5
+  );
+  const raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera(new THREE.Vector2(ndc.x, ndc.y), camera);
+  const normal = camera.getWorldDirection(new THREE.Vector3());
+  const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, planePoint);
+  return raycaster.ray.intersectPlane(plane, new THREE.Vector3()) ?? planePoint.clone();
+}
+
+function estimateScreenRadius(
+  center: THREE.Vector3,
+  radiusWorld: number,
+  camera: THREE.Camera,
+  size: { width: number; height: number }
+) {
+  const distance = camera.position.distanceTo(center);
+  if (!Number.isFinite(distance) || distance <= 0) return 0;
+  if (camera instanceof THREE.PerspectiveCamera) {
+    const visibleHeight = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * distance;
+    return (radiusWorld / visibleHeight) * size.height;
+  }
+  if (camera instanceof THREE.OrthographicCamera) {
+    return (radiusWorld * camera.zoom * size.height) / (camera.top - camera.bottom);
+  }
+  return 0;
 }
 
 function createStemCurve(sphereCenter: THREE.Vector3, headCenter: THREE.Vector3, stemHeight: number) {

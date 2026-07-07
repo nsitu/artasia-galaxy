@@ -915,6 +915,7 @@ export default function TerrainGallery({
       {sceneReadyForMarkers && placementLayout.map(({ placement, position, heightScale }) => (
         <PlaceMarker
           key={placement.placement_id}
+          markerId={String(placement.placement_id)}
           position={position}
           placementName={placement.placement_name}
           heightScale={heightScale}
