@@ -1407,15 +1407,6 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   function renderSiteSelection() {
     return (
       <div style={siteSelectionPanelStyle}>
-        <div style={detailHeaderStyle}>
-          <div>
-            <h2 style={detailTitleStyle}>Sites</h2>
-            <div style={detailMetaStyle}>
-              {filteredPlacements.length} visible site{filteredPlacements.length === 1 ? "" : "s"}
-            </div>
-          </div>
-        </div>
-
         <div style={siteChoiceGridStyle}>
           <div style={siteChoiceCardStyle}>
             <div style={siteCardContentStyle}>
@@ -2032,6 +2023,12 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
               </label>
             )}
 
+            {workspaceMode === "sites" && (
+              <div style={sidebarSummaryStyle}>
+                {filteredPlacements.length} visible site{filteredPlacements.length === 1 ? "" : "s"}
+              </div>
+            )}
+
             {workspaceMode === "browse" && (
               <label style={labelStyle}>
                 Assets
@@ -2515,6 +2512,12 @@ const placementMenuStyle: React.CSSProperties = {
   overflow: "auto",
   padding: "1rem",
   boxSizing: "border-box",
+};
+
+const sidebarSummaryStyle: React.CSSProperties = {
+  color: "#8f98a8",
+  fontSize: 12,
+  lineHeight: 1.35,
 };
 
 const siteSelectionPanelStyle: React.CSSProperties = {
