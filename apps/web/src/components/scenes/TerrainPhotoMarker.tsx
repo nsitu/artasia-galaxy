@@ -26,8 +26,6 @@ class FlowerPhotoMaterial extends THREE.ShaderMaterial {
         }
       `,
       fragmentShader: `
-        #include <colorspace_pars_fragment>
-
         uniform sampler2D photoMap;
         uniform float flowerOpacity;
         uniform float brightness;
@@ -170,8 +168,6 @@ class AdjustedPhotoMaterial extends THREE.ShaderMaterial {
         }
       `,
       fragmentShader: `
-        #include <colorspace_pars_fragment>
-
         uniform sampler2D photoMap;
         uniform float brightness;
         uniform float contrast;
