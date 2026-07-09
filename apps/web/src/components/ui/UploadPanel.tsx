@@ -101,10 +101,12 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   const [assetsLoading, setAssetsLoading] = useState(false);
   const [notice, setNotice] = useState<{ tone: NoticeTone; message: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const cropImageRef = useRef<HTMLImageElement | null>(null);
   const cropStartRef = useRef<{ x: number; y: number } | null>(null);
   const uploadInProgressRef = useRef(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   // Drive import state
   const [uploadMode, setUploadMode] = useState<"files" | "drive">("files");
@@ -171,6 +173,26 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   useEffect(() => {
     if (initialError) setError(initialError);
   }, [initialError]);
+
+  useEffect(() => {
+    function onDocumentPointerDown(event: PointerEvent) {
+      if (!menuRef.current) return;
+      if (!menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", onDocumentPointerDown);
+    return () => document.removeEventListener("pointerdown", onDocumentPointerDown);
+  }, []);
+
+  const menuItems = useMemo(
+    () => [
+      { href: "/", label: "Viewer" },
+      { href: "/partners", label: "Partners" },
+    ],
+    []
+  );
 
   // Load Drive folders when switching to Drive tab or changing drive type
   useEffect(() => {
@@ -1682,9 +1704,38 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                
             </div>
           </div>
-          <a href="/" style={secondaryLinkButtonStyle}>
-            Viewer
-          </a>
+          <div ref={menuRef} style={navMenuWrapStyle}>
+            <button
+              type="button"
+              aria-label="Open navigation menu"
+              aria-expanded={menuOpen}
+              aria-haspopup="menu"
+              onClick={() => setMenuOpen((current) => !current)}
+              style={navMenuButtonStyle}
+            >
+              <span style={navMenuIconStyle}>
+                <span style={navMenuLineStyle} />
+                <span style={navMenuLineStyle} />
+                <span style={navMenuLineStyle} />
+              </span>
+            </button>
+
+            {menuOpen && (
+              <div role="menu" style={navMenuPanelStyle}>
+                {menuItems.map((item) => (
+                  <a
+                    key={item.href}
+                    role="menuitem"
+                    href={item.href}
+                    style={navMenuItemStyle}
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    {item.label}
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <div style={authBarStyle}>
@@ -2147,28 +2198,29 @@ const pageStyle: React.CSSProperties = {
   minHeight: "100vh",
   background: "#0b0d12",
   color: "#ddd",
-  padding: 18,
+  padding: "22px 24px 28px",
   boxSizing: "border-box",
   fontFamily: "system-ui, sans-serif",
   overflowY: "auto",
 };
 
 const panelStyle: React.CSSProperties = {
-  width: "min(1680px, 100%)",
+  width: "100%",
   margin: "0 auto",
-  background: "#11131a",
-  border: "1px solid rgba(255,255,255,0.16)",
-  borderRadius: 8,
-  padding: 18,
+  minHeight: "calc(100vh - 50px)",
+  background: "transparent",
+  border: "none",
+  borderRadius: 0,
+  padding: 0,
   boxSizing: "border-box",
 };
 
 const headerStyle: React.CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
-  alignItems: "flex-start",
+  alignItems: "center",
   gap: 16,
-  marginBottom: 16,
+  marginBottom: 18,
 };
 
 const headerBrandStyle: React.CSSProperties = {
@@ -2187,6 +2239,62 @@ const titleStyle: React.CSSProperties = {
   margin: 0,
   fontSize: 22,
   fontWeight: 600,
+};
+
+const navMenuWrapStyle: React.CSSProperties = {
+  flex: "0 0 auto",
+  position: "relative",
+};
+
+const navMenuButtonStyle: React.CSSProperties = {
+  width: 40,
+  height: 40,
+  display: "grid",
+  placeItems: "center",
+  background: "rgba(255,255,255,0.08)",
+  color: "#ddd",
+  border: "1px solid rgba(255,255,255,0.16)",
+  borderRadius: 4,
+  cursor: "pointer",
+};
+
+const navMenuIconStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 3,
+  width: 16,
+};
+
+const navMenuLineStyle: React.CSSProperties = {
+  display: "block",
+  width: "100%",
+  height: 2,
+  borderRadius: 999,
+  background: "currentColor",
+};
+
+const navMenuPanelStyle: React.CSSProperties = {
+  position: "absolute",
+  top: 48,
+  right: 0,
+  minWidth: 152,
+  padding: 8,
+  borderRadius: 4,
+  background: "rgba(12, 14, 22, 0.96)",
+  border: "1px solid rgba(255,255,255,0.14)",
+  boxShadow: "0 18px 40px rgba(0,0,0,0.35)",
+  display: "grid",
+  gap: 6,
+  zIndex: 20,
+};
+
+const navMenuItemStyle: React.CSSProperties = {
+  display: "block",
+  padding: "10px 12px",
+  borderRadius: 4,
+  textDecoration: "none",
+  color: "#eef3fb",
+  fontSize: 13,
+  background: "rgba(255,255,255,0.03)",
 };
 
 const introStyle: React.CSSProperties = {
