@@ -70,7 +70,6 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [uploaderKey, setUploaderKey] = useState("");
   const [browsePartnerKey, setBrowsePartnerKey] = useState("");
-  const [uploadPartnerKey, setUploadPartnerKey] = useState("");
   const [browseContextFilter, setBrowseContextFilter] = useState<BrowseContextFilter>("all");
   const [placementKey, setPlacementKey] = useState("");
   const [activityTagFilter, setActivityTagFilter] = useState("");
@@ -289,7 +288,6 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
 
     setUploaderKey(String(matchedUploaderId));
     setBrowsePartnerKey("");
-    setUploadPartnerKey("");
     setPlacementKey("");
     setSiteScope("select");
     setSelectedAsset(null);
@@ -305,14 +303,13 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
 
   const filteredPlacements = useMemo(() => {
     if (!options) return [];
-    const uploaderFilteredPlacements = selectedUploader
+    const uploaderFilteredPlacements = selectedUploader && workspaceMode !== "upload"
       ? options.placements.filter((placement) => placementIncludesUploader(placement, selectedUploader.id))
       : options.placements;
     const contextFilteredPlacements = uploaderFilteredPlacements.filter(placementMatchesBrowseContext);
-    const activePartnerKey = workspaceMode === "upload" ? uploadPartnerKey : browsePartnerKey;
-    if (!activePartnerKey) return contextFilteredPlacements;
-    return contextFilteredPlacements.filter((placement) => placement.partner_name?.trim() === activePartnerKey);
-  }, [browseContextFilter, browsePartnerKey, options, selectedUploader, uploadPartnerKey, workspaceMode]);
+    if (workspaceMode === "upload" || !browsePartnerKey) return contextFilteredPlacements;
+    return contextFilteredPlacements.filter((placement) => placement.partner_name?.trim() === browsePartnerKey);
+  }, [browseContextFilter, browsePartnerKey, options, selectedUploader, workspaceMode]);
 
   const browsePartnerOptions = useMemo(() => {
     if (!options) return [];
@@ -332,24 +329,6 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([partnerName, count]) => ({ partnerName, count }));
   }, [browseContextFilter, options, selectedUploader, workspaceMode]);
-
-  const uploadPartnerOptions = useMemo(() => {
-    if (!options) return [];
-    const counts = new Map<string, number>();
-    const uploaderFilteredPlacements = selectedUploader
-      ? options.placements.filter((placement) => placementIncludesUploader(placement, selectedUploader.id))
-      : options.placements;
-
-    for (const placement of uploaderFilteredPlacements) {
-      const partnerName = placement.partner_name?.trim();
-      if (!partnerName) continue;
-      counts.set(partnerName, (counts.get(partnerName) ?? 0) + 1);
-    }
-
-    return Array.from(counts.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([partnerName, count]) => ({ partnerName, count }));
-  }, [options, selectedUploader]);
 
   const selectedPlacement = useMemo(() => {
     return filteredPlacements.find((placement) => String(placement.placement_id) === placementKey) ?? null;
@@ -388,13 +367,6 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     if (browsePartnerOptions.some((option) => option.partnerName === browsePartnerKey)) return;
     setBrowsePartnerKey("");
   }, [browsePartnerKey, browsePartnerOptions, workspaceMode]);
-
-  useEffect(() => {
-    if (workspaceMode !== "upload") return;
-    if (!uploadPartnerKey) return;
-    if (uploadPartnerOptions.some((option) => option.partnerName === uploadPartnerKey)) return;
-    setUploadPartnerKey("");
-  }, [uploadPartnerKey, uploadPartnerOptions, workspaceMode]);
 
   useEffect(() => {
     if (assetMode === "untagged") {
@@ -440,10 +412,6 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   }, [assetMode, visiblePlacementIds, activityTagFilter]);
 
   function addFiles(fileList: FileList | File[]) {
-    if (!selectedUploader) {
-      setError("Select an Artasia Team Member before adding files.");
-      return;
-    }
     if (!selectedPlacement) {
       setError("Select a placement before adding files.");
       return;
@@ -470,14 +438,10 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     const hasQueued = items.some((item) => item.status === "queued");
     if (!hasQueued || uploadInProgressRef.current) return;
     void uploadQueued();
-  }, [items, selectedUploader, selectedPlacement]);
+  }, [items, selectedPlacement]);
 
   async function uploadQueued() {
     if (uploadInProgressRef.current) return;
-    if (!selectedUploader) {
-      setError("Select an Artasia Team Member.");
-      return;
-    }
     if (!selectedPlacement) {
       setError("Select a placement.");
       return;
@@ -507,7 +471,6 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
         try {
           const results = await uploadFiles({
             files: [file],
-            uploader: selectedUploader,
             location: selectedPlacement,
             activityId: activityTagFilter ? parseInt(activityTagFilter, 10) : undefined,
             onProgress: (progress) => {
@@ -630,20 +593,15 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   function browsePlacement(placement: UploadOptions["placements"][number]) {
     selectPlacement(placement);
     setWorkspaceMode("browse");
-    setUploadPartnerKey("");
   }
 
   function browseAllSites() {
     selectAllSites();
     setWorkspaceMode("browse");
-    setUploadPartnerKey("");
   }
 
   function uploadToPlacement(placement: UploadOptions["placements"][number]) {
-    const matchedUploaderId = matchedAuthUploaderId();
-    if (matchedUploaderId) setUploaderKey(String(matchedUploaderId));
     setBrowsePartnerKey("");
-    setUploadPartnerKey("");
     selectPlacement(placement);
     setWorkspaceMode("upload");
   }
@@ -1922,7 +1880,6 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
             type="button"
             onClick={() => {
               setWorkspaceMode("sites");
-              setUploadPartnerKey("");
               setSelectedAsset(null);
               setItems([]);
               setNotice(null);
@@ -1938,7 +1895,6 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
             type="button"
             onClick={() => {
               setWorkspaceMode("browse");
-              setUploadPartnerKey("");
               setSiteScope("select");
               setPlacementKey("");
               setSelectedAsset(null);
@@ -1955,11 +1911,8 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
           <button
             type="button"
             onClick={() => {
-              const matchedUploaderId = matchedAuthUploaderId();
               setWorkspaceMode("upload");
               setBrowsePartnerKey("");
-              setUploadPartnerKey("");
-              if (matchedUploaderId) setUploaderKey(String(matchedUploaderId));
               setSiteScope("select");
               setPlacementKey("");
               setSelectedAsset(null);
@@ -1977,50 +1930,27 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
 
         <div style={adminLayoutStyle}>
           <aside style={placementMenuStyle}>
-            <label style={labelStyle}>
-              {workspaceMode === "upload" ? "Asset Owner" : "Team Member"}
-              <select
-                value={uploaderKey}
-                onChange={(e) => {
-                  setUploaderKey(e.target.value);
-                  setBrowsePartnerKey("");
-                  setUploadPartnerKey("");
-                  setPlacementKey("");
-                  setSiteScope("select");
-                  setSelectedAsset(null);
-                  setItems([]);
-                  setNotice(null);
-                  setError(null);
-                }}
-                style={inputStyle}
-              >
-                <option value="">{workspaceMode === "upload" ? "Select a team member" : "All Team Members"}</option>
-                {(options?.uploaders ?? []).map((uploader) => (
-                  <option key={uploader.id} value={String(uploader.id)}>
-                    {uploader.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            {workspaceMode === "upload" && (
+            {workspaceMode !== "upload" && (
               <label style={labelStyle}>
-                Artasia Partner
+                Team Member
                 <select
-                  value={uploadPartnerKey}
+                  value={uploaderKey}
                   onChange={(e) => {
-                    setUploadPartnerKey(e.target.value);
+                    setUploaderKey(e.target.value);
+                    setBrowsePartnerKey("");
                     setPlacementKey("");
                     setSiteScope("select");
                     setSelectedAsset(null);
                     setItems([]);
+                    setNotice(null);
+                    setError(null);
                   }}
                   style={inputStyle}
                 >
-                  <option value="">All Partners</option>
-                  {uploadPartnerOptions.map((option) => (
-                    <option key={option.partnerName} value={option.partnerName}>
-                      {option.partnerName} ({option.count})
+                  <option value="">All Team Members</option>
+                  {(options?.uploaders ?? []).map((uploader) => (
+                    <option key={uploader.id} value={String(uploader.id)}>
+                      {uploader.name}
                     </option>
                   ))}
                 </select>
@@ -2131,10 +2061,9 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                     <div>
                       {renderSiteBreadcrumb(placementLabel(selectedPlacement))}
                       <div style={detailMetaStyle}>
-                        Owner: {selectedUploader?.name ?? "Select a team member"}
                         {activityTagFilter
-                          ? ` | Activity: ${options?.activities.find((activity) => String(activity.id) === activityTagFilter)?.label ?? "Selected activity"}`
-                        : " | No activity tag"}
+                          ? `Activity: ${options?.activities.find((activity) => String(activity.id) === activityTagFilter)?.label ?? "Selected activity"}`
+                          : "No activity tag"}
                       </div>
                     </div>
                   </div>
@@ -2181,10 +2110,6 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                           addFiles(e.dataTransfer.files);
                         }}
                         onClick={() => {
-                          if (!selectedUploader) {
-                            setError("Select an Artasia Team Member before adding files.");
-                            return;
-                          }
                           inputRef.current?.click();
                         }}
                       >
@@ -2196,7 +2121,6 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                           multiple
                           accept={UPLOAD_ACCEPT_TYPES}
                           style={{ display: "none" }}
-                          disabled={!selectedUploader}
                           onChange={(e) => {
                             if (e.target.files) addFiles(e.target.files);
                             e.target.value = "";
