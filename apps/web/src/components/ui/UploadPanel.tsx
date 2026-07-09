@@ -1452,14 +1452,14 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
 
         <div style={siteChoiceGridStyle}>
           <div style={siteChoiceCardStyle}>
-            <div>
+            <div style={siteCardContentStyle}>
               <span style={placementNameStyle}>All Sites</span>
               <span style={placementMetaStyle}>
                 Browse uploads across {filteredPlacements.length} visible site{filteredPlacements.length === 1 ? "" : "s"}
               </span>
             </div>
             <div style={siteActionRowStyle}>
-              <button type="button" onClick={browseAllSites} style={secondaryButtonStyle}>
+              <button type="button" onClick={browseAllSites} style={siteActionButtonStyle}>
                 Browse
               </button>
             </div>
@@ -1469,18 +1469,26 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
               key={placement.placement_id}
               style={siteChoiceCardStyle}
             >
-              <div>
+              <div style={siteCardContentStyle}>
+                {placement.partner_logo?.url && (
+                  <img
+                    src={placement.partner_logo.url}
+                    alt={placement.partner_logo.alt || ""}
+                    style={sitePartnerLogoStyle}
+                    loading="lazy"
+                  />
+                )}
                 <span style={placementNameStyle}>{placementLabel(placement)}</span>
                 <span style={placementMetaStyle}>{placementMetaLabel(placement)}</span>
               </div>
               <div style={siteActionRowStyle}>
-                <button type="button" onClick={() => browsePlacement(placement)} style={secondaryButtonStyle}>
+                <button type="button" onClick={() => browsePlacement(placement)} style={siteActionButtonStyle}>
                   Browse
                 </button>
-                <button type="button" onClick={() => uploadToPlacement(placement)} style={primaryActionButtonStyle}>
+                <button type="button" onClick={() => uploadToPlacement(placement)} style={siteActionButtonStyle}>
                   Upload
                 </button>
-                <a href={placementViewerUrl(placement)} style={secondaryLinkButtonStyle}>
+                <a href={placementViewerUrl(placement)} style={siteActionLinkStyle}>
                   View
                 </a>
               </div>
@@ -2055,9 +2063,9 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                   }}
                   style={inputStyle}
                 >
-                  <option value="all">All Sites</option>
-                  <option value="earlyon">EarlyON Sites</option>
-                  <option value="nonEarlyon">Non-EarlyON Sites</option>
+                  <option value="all">Both EarlyON and Regular Sites</option>
+                  <option value="earlyon">EarlyON Sites Only</option>
+                  <option value="nonEarlyon">Regular Sites Only</option>
                 </select>
               </label>
             )}
@@ -2591,7 +2599,7 @@ const siteChoiceGridStyle: React.CSSProperties = {
 const siteChoiceCardStyle: React.CSSProperties = {
   display: "grid",
   alignContent: "space-between",
-  gap: 4,
+  gap: 14,
   textAlign: "left",
   background: "#171a22",
   color: "#ddd",
@@ -2599,6 +2607,20 @@ const siteChoiceCardStyle: React.CSSProperties = {
   borderRadius: 6,
   padding: 10,
   minHeight: 96,
+};
+
+const siteCardContentStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 7,
+  minWidth: 0,
+};
+
+const sitePartnerLogoStyle: React.CSSProperties = {
+  maxWidth: 104,
+  maxHeight: 42,
+  objectFit: "contain",
+  objectPosition: "left center",
+  marginBottom: 4,
 };
 
 const siteActionRowStyle: React.CSSProperties = {
@@ -2609,17 +2631,33 @@ const siteActionRowStyle: React.CSSProperties = {
   marginTop: 10,
 };
 
+const siteActionButtonStyle: React.CSSProperties = {
+  ...secondaryButtonStyle,
+  minWidth: 88,
+  justifyContent: "center",
+  textAlign: "center",
+};
+
+const siteActionLinkStyle: React.CSSProperties = {
+  ...siteActionButtonStyle,
+  display: "inline-flex",
+  alignItems: "center",
+  textDecoration: "none",
+};
+
 const promptActionStyle: React.CSSProperties = {
   marginTop: 12,
 };
 
 const placementNameStyle: React.CSSProperties = {
+  display: "block",
   color: "#f2f2f2",
   fontSize: 13,
   lineHeight: 1.35,
 };
 
 const placementMetaStyle: React.CSSProperties = {
+  display: "block",
   color: "#8f98a8",
   fontSize: 12,
   lineHeight: 1.3,
