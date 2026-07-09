@@ -49,6 +49,7 @@ interface UploadItem {
 type NoticeTone = "success" | "warning";
 type BrowseContextFilter = "all" | "earlyon" | "nonEarlyon";
 type SiteScope = "select" | "all" | "placement";
+type WorkspaceMode = "sites" | "browse" | "upload";
 
 interface UploadPanelProps {
   initialError?: string | null;
@@ -77,7 +78,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   const [placementAssets, setPlacementAssets] = useState<PlacementAsset[]>([]);
   const [assetMode, setAssetMode] = useState<"placements" | "untagged">("placements");
   const [siteScope, setSiteScope] = useState<SiteScope>("select");
-  const [workspaceMode, setWorkspaceMode] = useState<"browse" | "upload">("browse");
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("sites");
   const [selectedAsset, setSelectedAsset] = useState<PlacementAsset | null>(null);
   const [managePlacementKey, setManagePlacementKey] = useState("");
   const [manageUploaderKey, setManageUploaderKey] = useState("");
@@ -166,6 +167,20 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
       unitIndex += 1;
     }
     return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[unitIndex]}`;
+  }
+
+  function placementViewerUrl(placement: UploadOptions["placements"][number]) {
+    const slug = placement.placement_slug?.trim() || slugifyPlacementName(placement.placement_name);
+    return slug ? `/sites/${encodeURIComponent(slug)}` : "/";
+  }
+
+  function slugifyPlacementName(value: string) {
+    return value
+      .trim()
+      .toLowerCase()
+      .replace(/['"]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
   }
 
   useEffect(() => {
@@ -284,7 +299,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   }
 
   function placementMatchesBrowseContext(placement: UploadOptions["placements"][number]) {
-    if (workspaceMode !== "browse" || browseContextFilter === "all") return true;
+    if (workspaceMode === "upload" || browseContextFilter === "all") return true;
     return browseContextFilter === "earlyon" ? placement.is_earlyon : !placement.is_earlyon;
   }
 
@@ -368,7 +383,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   }, [filteredPlacements, placementKey, siteScope]);
 
   useEffect(() => {
-    if (workspaceMode !== "browse") return;
+    if (workspaceMode === "upload") return;
     if (!browsePartnerKey) return;
     if (browsePartnerOptions.some((option) => option.partnerName === browsePartnerKey)) return;
     setBrowsePartnerKey("");
@@ -600,8 +615,6 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     setItems([]);
     setNotice(null);
     setError(null);
-    if (selectedUploader && placementIncludesUploader(placement, selectedUploader.id)) return;
-    if (placement.team_member_id) setUploaderKey(String(placement.team_member_id));
   }
 
   function selectAllSites() {
@@ -614,9 +627,31 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     setError(null);
   }
 
+  function browsePlacement(placement: UploadOptions["placements"][number]) {
+    selectPlacement(placement);
+    setWorkspaceMode("browse");
+    setUploadPartnerKey("");
+  }
+
+  function browseAllSites() {
+    selectAllSites();
+    setWorkspaceMode("browse");
+    setUploadPartnerKey("");
+  }
+
+  function uploadToPlacement(placement: UploadOptions["placements"][number]) {
+    const matchedUploaderId = matchedAuthUploaderId();
+    if (matchedUploaderId) setUploaderKey(String(matchedUploaderId));
+    setBrowsePartnerKey("");
+    setUploadPartnerKey("");
+    selectPlacement(placement);
+    setWorkspaceMode("upload");
+  }
+
   function returnToSiteSelection() {
     setPlacementKey("");
     setSiteScope("select");
+    setWorkspaceMode("sites");
     setSelectedAsset(null);
     setItems([]);
     setNotice(null);
@@ -1404,14 +1439,11 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   }
 
   function renderSiteSelection() {
-    const showAllSites = workspaceMode === "browse" && assetMode === "placements";
     return (
       <div style={siteSelectionPanelStyle}>
         <div style={detailHeaderStyle}>
           <div>
-            <h2 style={detailTitleStyle}>
-              {workspaceMode === "upload" ? "Choose a destination site" : "Choose a site"}
-            </h2>
+            <h2 style={detailTitleStyle}>Sites</h2>
             <div style={detailMetaStyle}>
               {filteredPlacements.length} visible site{filteredPlacements.length === 1 ? "" : "s"}
             </div>
@@ -1419,34 +1451,79 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
         </div>
 
         <div style={siteChoiceGridStyle}>
-          {showAllSites && (
-            <button
-              type="button"
-              onClick={selectAllSites}
-              style={siteChoiceButtonStyle}
-            >
+          <div style={siteChoiceCardStyle}>
+            <div>
               <span style={placementNameStyle}>All Sites</span>
               <span style={placementMetaStyle}>
                 Browse uploads across {filteredPlacements.length} visible site{filteredPlacements.length === 1 ? "" : "s"}
               </span>
-            </button>
-          )}
+            </div>
+            <div style={siteActionRowStyle}>
+              <button type="button" onClick={browseAllSites} style={secondaryButtonStyle}>
+                Browse
+              </button>
+            </div>
+          </div>
           {filteredPlacements.map((placement) => (
-            <button
+            <div
               key={placement.placement_id}
-              type="button"
-              onClick={() => selectPlacement(placement)}
-              style={siteChoiceButtonStyle}
+              style={siteChoiceCardStyle}
             >
-              <span style={placementNameStyle}>{placementLabel(placement)}</span>
-              <span style={placementMetaStyle}>{placementMetaLabel(placement)}</span>
-            </button>
+              <div>
+                <span style={placementNameStyle}>{placementLabel(placement)}</span>
+                <span style={placementMetaStyle}>{placementMetaLabel(placement)}</span>
+              </div>
+              <div style={siteActionRowStyle}>
+                <button type="button" onClick={() => browsePlacement(placement)} style={secondaryButtonStyle}>
+                  Browse
+                </button>
+                <button type="button" onClick={() => uploadToPlacement(placement)} style={primaryActionButtonStyle}>
+                  Upload
+                </button>
+                <a href={placementViewerUrl(placement)} style={secondaryLinkButtonStyle}>
+                  View
+                </a>
+              </div>
+            </div>
           ))}
         </div>
 
         {filteredPlacements.length === 0 && (
           <div style={emptyStateStyle}>No sites match the current filters.</div>
         )}
+      </div>
+    );
+  }
+
+  function renderSiteBreadcrumb(label: string) {
+    return (
+      <div style={breadcrumbStyle}>
+        <button
+          type="button"
+          onClick={returnToSiteSelection}
+          style={breadcrumbButtonStyle}
+        >
+          Sites
+        </button>
+        <span style={breadcrumbSeparatorStyle}>/</span>
+        <span style={breadcrumbCurrentStyle}>{label}</span>
+      </div>
+    );
+  }
+
+  function renderChooseSitePrompt(action: "browse" | "upload") {
+    return (
+      <div style={emptyStateStyle}>
+        Choose a site from the Sites tab before you {action}.
+        <div style={promptActionStyle}>
+          <button
+            type="button"
+            onClick={returnToSiteSelection}
+            style={secondaryButtonStyle}
+          >
+            Go to Sites
+          </button>
+        </div>
       </div>
     );
   }
@@ -1836,6 +1913,22 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
           <button
             type="button"
             onClick={() => {
+              setWorkspaceMode("sites");
+              setUploadPartnerKey("");
+              setSelectedAsset(null);
+              setItems([]);
+              setNotice(null);
+            }}
+            style={{
+              ...workspaceTabStyle,
+              ...(workspaceMode === "sites" ? workspaceTabActiveStyle : {}),
+            }}
+          >
+            Sites
+          </button>
+          <button
+            type="button"
+            onClick={() => {
               setWorkspaceMode("browse");
               setUploadPartnerKey("");
               setSiteScope("select");
@@ -1926,7 +2019,8 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
               </label>
             )}
 
-            <label style={labelStyle}>
+            {workspaceMode !== "sites" && (
+              <label style={labelStyle}>
               {workspaceMode === "upload" ? "Program Week / Activity Tag" : "Program Week / Activity"}
               <select
                 value={activityTagFilter}
@@ -1944,8 +2038,9 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                 ))}
               </select>
             </label>
+            )}
 
-            {workspaceMode === "browse" && (
+            {workspaceMode !== "upload" && (
               <label style={labelStyle}>
                 Context
                 <select
@@ -1967,7 +2062,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
               </label>
             )}
 
-            {workspaceMode === "browse" && (
+            {workspaceMode !== "upload" && (
               <label style={labelStyle}>
                 Artasia Partner
                 <select
@@ -2019,12 +2114,14 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
           </aside>
 
           <section style={detailStyle}>
-            {workspaceMode === "upload" ? (
+            {workspaceMode === "sites" ? (
+              renderSiteSelection()
+            ) : workspaceMode === "upload" ? (
               selectedPlacement ? (
                 <>
                   <div style={detailHeaderStyle}>
                     <div>
-                      <h2 style={detailTitleStyle}>Upload to {placementLabel(selectedPlacement)}</h2>
+                      {renderSiteBreadcrumb(placementLabel(selectedPlacement))}
                       <div style={detailMetaStyle}>
                         Owner: {selectedUploader?.name ?? "Select a team member"}
                         {activityTagFilter
@@ -2032,13 +2129,6 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                         : " | No activity tag"}
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={returnToSiteSelection}
-                      style={secondaryButtonStyle}
-                    >
-                      Back to Sites
-                    </button>
                   </div>
 
                   <div style={uploadModeTabsStyle}>
@@ -2205,15 +2295,15 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                   )}
                 </>
               ) : (
-                renderSiteSelection()
+                renderChooseSitePrompt("upload")
               )
             ) : assetMode === "placements" && siteScope === "select" ? (
-              renderSiteSelection()
+              renderChooseSitePrompt("browse")
             ) : selectedPlacement ? (
               <>
                 <div style={detailHeaderStyle}>
                   <div>
-                    <h2 style={detailTitleStyle}>{placementLabel(selectedPlacement)}</h2>
+                    {renderSiteBreadcrumb(placementLabel(selectedPlacement))}
                     <div style={detailMetaStyle}>
                       Lead: {selectedPlacement.team_member_name ?? "Unassigned"}
                       {selectedPlacement.secondary_team_member_name
@@ -2230,13 +2320,6 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                     </div>
                     <button
                       type="button"
-                      onClick={returnToSiteSelection}
-                      style={secondaryButtonStyle}
-                    >
-                      Back to Sites
-                    </button>
-                    <button
-                      type="button"
                       onClick={refreshVisibleAssets}
                       style={secondaryButtonStyle}
                     >
@@ -2251,20 +2334,11 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
             ) : (
               <>
                 <div style={detailHeaderStyle}>
-                  <h2 style={detailTitleStyle}>{siteScope === "all" ? "All Sites" : "Assets"}</h2>
+                  {siteScope === "all" ? renderSiteBreadcrumb("All Sites") : <h2 style={detailTitleStyle}>Assets</h2>}
                   <div style={detailHeaderActionsStyle}>
                     <div style={countBadgeStyle}>
                       {assetsLoading ? "..." : placementAssets.length} upload{placementAssets.length === 1 ? "" : "s"}
                     </div>
-                    {siteScope === "all" && (
-                      <button
-                        type="button"
-                        onClick={returnToSiteSelection}
-                        style={secondaryButtonStyle}
-                      >
-                        Back to Sites
-                      </button>
-                    )}
                     <button
                       type="button"
                       onClick={refreshVisibleAssets}
@@ -2514,8 +2588,9 @@ const siteChoiceGridStyle: React.CSSProperties = {
   gap: 10,
 };
 
-const placementButtonStyle: React.CSSProperties = {
+const siteChoiceCardStyle: React.CSSProperties = {
   display: "grid",
+  alignContent: "space-between",
   gap: 4,
   textAlign: "left",
   background: "#171a22",
@@ -2523,12 +2598,19 @@ const placementButtonStyle: React.CSSProperties = {
   border: "1px solid rgba(255,255,255,0.1)",
   borderRadius: 6,
   padding: 10,
-  cursor: "pointer",
+  minHeight: 96,
 };
 
-const siteChoiceButtonStyle: React.CSSProperties = {
-  ...placementButtonStyle,
-  minHeight: 72,
+const siteActionRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  flexWrap: "wrap",
+  marginTop: 10,
+};
+
+const promptActionStyle: React.CSSProperties = {
+  marginTop: 12,
 };
 
 const placementNameStyle: React.CSSProperties = {
@@ -2565,6 +2647,38 @@ const detailTitleStyle: React.CSSProperties = {
   margin: 0,
   color: "#f2f2f2",
   fontSize: 18,
+  lineHeight: 1.3,
+};
+
+const breadcrumbStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  flexWrap: "wrap",
+};
+
+const breadcrumbButtonStyle: React.CSSProperties = {
+  background: "transparent",
+  border: "none",
+  padding: 0,
+  color: "#d8e7ff",
+  cursor: "pointer",
+  font: "inherit",
+  fontSize: 18,
+  fontWeight: 600,
+  lineHeight: 1.3,
+};
+
+const breadcrumbSeparatorStyle: React.CSSProperties = {
+  color: "#697181",
+  fontSize: 18,
+  lineHeight: 1.3,
+};
+
+const breadcrumbCurrentStyle: React.CSSProperties = {
+  color: "#f2f2f2",
+  fontSize: 18,
+  fontWeight: 600,
   lineHeight: 1.3,
 };
 
