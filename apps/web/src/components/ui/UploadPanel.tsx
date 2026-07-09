@@ -73,7 +73,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   const [activityTagFilter, setActivityTagFilter] = useState("");
   const [items, setItems] = useState<UploadItem[]>([]);
   const [placementAssets, setPlacementAssets] = useState<PlacementAsset[]>([]);
-  const [assetMode, setAssetMode] = useState<"placements" | "untagged" | "all">("placements");
+  const [assetMode, setAssetMode] = useState<"placements" | "untagged">("placements");
   const [workspaceMode, setWorkspaceMode] = useState<"browse" | "upload">("browse");
   const [selectedAsset, setSelectedAsset] = useState<PlacementAsset | null>(null);
   const [managePlacementKey, setManagePlacementKey] = useState("");
@@ -365,39 +365,6 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
       };
     }
 
-    if (assetMode === "all") {
-      let cancelled = false;
-      setAssetsLoading(true);
-      const activityId = activityTagFilter ? parseInt(activityTagFilter, 10) : undefined;
-      const taggedFetch = visiblePlacementIds.length > 0
-        ? fetchPlacementAssetSet(visiblePlacementIds, activityId)
-        : Promise.resolve<PlacementAsset[]>([]);
-      const untaggedFetch = activityId == null
-        ? fetchUntaggedPlacementAssets()
-        : Promise.resolve<PlacementAsset[]>([]);
-      Promise.all([taggedFetch, untaggedFetch])
-        .then(([tagged, untagged]) => {
-          if (cancelled) return;
-          const seen = new Set<string>();
-          const combined = [...tagged, ...untagged].filter((a) => {
-            if (seen.has(a.id)) return false;
-            seen.add(a.id);
-            return true;
-          });
-          setPlacementAssets(combined);
-        })
-        .catch((err) => {
-          if (!cancelled) setError((err as Error).message);
-        })
-        .finally(() => {
-          if (!cancelled) setAssetsLoading(false);
-        });
-
-      return () => {
-        cancelled = true;
-      };
-    }
-
     if (visiblePlacementIds.length === 0) {
       setPlacementAssets([]);
       return;
@@ -604,28 +571,6 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     setAssetsLoading(true);
     const activityId = activityTagFilter ? parseInt(activityTagFilter, 10) : undefined;
 
-    if (assetMode === "all") {
-      const taggedFetch = visiblePlacementIds.length > 0
-        ? fetchPlacementAssetSet(visiblePlacementIds, activityId)
-        : Promise.resolve<PlacementAsset[]>([]);
-      const untaggedFetch = activityId == null
-        ? fetchUntaggedPlacementAssets()
-        : Promise.resolve<PlacementAsset[]>([]);
-      Promise.all([taggedFetch, untaggedFetch])
-        .then(([tagged, untagged]) => {
-          const seen = new Set<string>();
-          const combined = [...tagged, ...untagged].filter((a) => {
-            if (seen.has(a.id)) return false;
-            seen.add(a.id);
-            return true;
-          });
-          setPlacementAssets(combined);
-        })
-        .catch((err) => setError((err as Error).message))
-        .finally(() => setAssetsLoading(false));
-      return;
-    }
-
     const request = assetMode === "untagged"
       ? fetchUntaggedPlacementAssets()
       : fetchPlacementAssetSet(visiblePlacementIds, activityId);
@@ -638,7 +583,6 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
 
   function assetGalleryTitle() {
     if (assetMode === "untagged") return "Uploads Needing Placement";
-    if (assetMode === "all") return selectedPlacement ? "Uploads" : "All Uploads";
     return selectedPlacement ? "Uploads" : "Tagged Uploads for Visible Placements";
   }
 
@@ -1913,9 +1857,9 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                 <select
                   value={assetMode}
                   onChange={(e) => {
-                    const nextAssetMode = e.target.value as "placements" | "untagged" | "all";
+                    const nextAssetMode = e.target.value as "placements" | "untagged";
                     setAssetMode(nextAssetMode);
-                    if (nextAssetMode !== "placements") {
+                    if (nextAssetMode === "untagged") {
                       setBrowseContextFilter("all");
                       setBrowsePartnerKey("");
                     }
@@ -1927,7 +1871,6 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                 >
                   <option value="placements">Tagged assets</option>
                   <option value="untagged">Untagged assets</option>
-                  <option value="all">All assets</option>
                 </select>
               </label>
             )}
