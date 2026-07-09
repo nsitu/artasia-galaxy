@@ -294,6 +294,11 @@ const ORBIT_MIN_UNITS = 0.72;
 const ORBIT_MAX_UNITS = 2.15;
 const ORBIT_HEIGHT = 0.72;
 const ORBIT_SPEED = 0.16;
+const STEM_COLOR = new THREE.Color("#49d05a");
+const STEM_SELECTED_COLOR = new THREE.Color("#9df7a8");
+const STEM_HOVER_EMISSIVE = new THREE.Color("#d7ff8f");
+const BASE_COLOR = new THREE.Color("#33b84a");
+const BASE_SELECTED_COLOR = new THREE.Color("#9df7a8");
 
 const tempVector = new THREE.Vector3();
 
@@ -313,6 +318,8 @@ export function TerrainPhotoFlower({
   const groupRef = useRef<THREE.Group>(null);
   const headRef = useRef<THREE.Group>(null);
   const stemRef = useRef<THREE.Mesh>(null);
+  const stemMaterialRef = useRef<THREE.MeshStandardMaterial>(null);
+  const baseMaterialRef = useRef<THREE.MeshStandardMaterial>(null);
   const currentDirection = useRef(new THREE.Vector3(0, 0, 1));
   const lastStemDirection = useRef(new THREE.Vector3(0, 0, 1));
   const camera = useThree((state) => state.camera);
@@ -326,6 +333,10 @@ export function TerrainPhotoFlower({
   const headSize = HEAD_RADIUS * 2;
   const stemGeometry = useMemo(() => createInitialStemGeometry(), []);
   const baseGeometry = useMemo(() => new THREE.SphereGeometry(STEM_RADIUS * 1.45, 12, 8), []);
+  const pointerHandlers = useMemo(
+    () => createPointerHandlers(onClick, onPointerEnter, onPointerLeave),
+    [onClick, onPointerEnter, onPointerLeave],
+  );
 
   useEffect(() => {
     return () => {
@@ -335,7 +346,7 @@ export function TerrainPhotoFlower({
     };
   }, [baseGeometry, stemGeometry]);
 
-  useFrame(() => {
+  useFrame((state) => {
     const group = groupRef.current;
     const head = headRef.current;
     const stem = stemRef.current;
@@ -356,22 +367,36 @@ export function TerrainPhotoFlower({
       stem.geometry = nextGeometry;
       lastStemDirection.current.copy(currentDirection.current);
     }
+
+    const pulse = isHighlighted ? (Math.sin(state.clock.elapsedTime * 9) + 1) * 0.5 : 0;
+    const stemMaterial = stemMaterialRef.current;
+    const baseMaterial = baseMaterialRef.current;
+    if (stemMaterial) {
+      stemMaterial.color.copy(isSelected ? STEM_SELECTED_COLOR : STEM_COLOR);
+      stemMaterial.emissive.copy(STEM_HOVER_EMISSIVE);
+      stemMaterial.emissiveIntensity = isHighlighted ? THREE.MathUtils.lerp(0.15, 1.25, pulse) : 0;
+    }
+    if (baseMaterial) {
+      baseMaterial.color.copy(isSelected ? BASE_SELECTED_COLOR : BASE_COLOR);
+      baseMaterial.emissive.copy(STEM_HOVER_EMISSIVE);
+      baseMaterial.emissiveIntensity = isHighlighted ? THREE.MathUtils.lerp(0.06, 0.55, pulse) : 0;
+    }
   });
 
   return (
-    <group ref={groupRef} position={[x, y, z + BASE_LIFT]} {...createPointerHandlers(onClick, onPointerEnter, onPointerLeave)}>
+    <group ref={groupRef} position={[x, y, z + BASE_LIFT]} {...pointerHandlers}>
       <mesh ref={stemRef} geometry={stemGeometry}>
-        <meshStandardMaterial color={isSelected ? "#9df7a8" : "#49d05a"} roughness={0.62} transparent opacity={0.82} />
+        <meshStandardMaterial ref={stemMaterialRef} color={isSelected ? "#9df7a8" : "#49d05a"} roughness={0.62} transparent opacity={0.9} />
       </mesh>
       <mesh geometry={baseGeometry}>
-        <meshStandardMaterial color={isSelected ? "#9df7a8" : "#33b84a"} roughness={0.72} transparent opacity={0.82} />
+        <meshStandardMaterial ref={baseMaterialRef} color={isSelected ? "#9df7a8" : "#33b84a"} roughness={0.72} transparent opacity={0.9} />
       </mesh>
       <group
         ref={headRef}
         position={[0, 0, STEM_HEIGHT + TRACKING_RADIUS]}
         scale={isHighlighted || isSelected ? 1.14 : 1}
       >
-        <mesh>
+        <mesh {...pointerHandlers}>
           <planeGeometry args={[headSize, headSize]} />
           <flowerPhotoMaterial
             photoMap={texture}
@@ -516,11 +541,13 @@ function createPointerHandlers(
       event.stopPropagation();
       onClick();
     },
-    onPointerOver: () => {
+    onPointerOver: (event: ThreeEvent<PointerEvent>) => {
+      event.stopPropagation();
       document.body.style.cursor = "pointer";
       onPointerEnter();
     },
-    onPointerOut: () => {
+    onPointerOut: (event: ThreeEvent<PointerEvent>) => {
+      event.stopPropagation();
       document.body.style.cursor = "";
       onPointerLeave();
     },
