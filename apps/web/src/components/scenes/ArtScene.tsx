@@ -237,7 +237,7 @@ export default function ArtScene() {
           <img
             src={selectedPhoto.previewUrl}
             alt={selectedPhoto.fileName}
-            style={photoLightboxImageStyle}
+            style={{ ...photoLightboxImageStyle, ...photoAdjustmentFilterStyle(selectedPhoto.adjustments) }}
             onClick={(event) => event.stopPropagation()}
           />
           <div style={photoLightboxMetadataStyle} onClick={(event) => event.stopPropagation()}>
@@ -309,6 +309,19 @@ export default function ArtScene() {
       )}
     </div>
   );
+}
+
+function photoAdjustmentFilterStyle(adjustments?: { brightness?: number; contrast?: number }): React.CSSProperties {
+  const brightness = adjustmentPercent(adjustments?.brightness);
+  const contrast = adjustmentPercent(adjustments?.contrast);
+  return {
+    filter: `brightness(${brightness / 100}) contrast(${contrast / 100})`,
+  };
+}
+
+function adjustmentPercent(value?: number) {
+  if (!Number.isFinite(value)) return 100;
+  return Math.max(50, Math.min(150, Math.round(value as number)));
 }
 
 function getWebGL2SupportError() {

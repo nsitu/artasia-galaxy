@@ -930,6 +930,7 @@ export default function TerrainGallery({
             url={item.photo.thumbnailUrl}
             width={item.photo.width}
             height={item.photo.height}
+            adjustments={item.photo.adjustments}
             position={item.position}
             isSelected={item.index === selectedIndex}
             isHighlighted={item.index === hoveredIndex}
@@ -944,6 +945,7 @@ export default function TerrainGallery({
             url={item.photo.thumbnailUrl}
             width={item.photo.width}
             height={item.photo.height}
+            adjustments={item.photo.adjustments}
             center={item.center}
             isSelected={item.index === selectedIndex}
             isHighlighted={item.index === hoveredIndex}

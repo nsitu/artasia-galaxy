@@ -9,6 +9,8 @@ class FlowerPhotoMaterial extends THREE.ShaderMaterial {
       uniforms: {
         photoMap: { value: null },
         flowerOpacity: { value: 1 },
+        brightness: { value: 1 },
+        contrast: { value: 1 },
         petalCount: { value: 10 },
         borderColor: { value: new THREE.Color("#ffffff") },
         borderWidth: { value: 0.12 },
@@ -25,6 +27,8 @@ class FlowerPhotoMaterial extends THREE.ShaderMaterial {
       fragmentShader: `
         uniform sampler2D photoMap;
         uniform float flowerOpacity;
+        uniform float brightness;
+        uniform float contrast;
         uniform float petalCount;
         uniform vec3 borderColor;
         uniform float borderWidth;
@@ -51,6 +55,8 @@ class FlowerPhotoMaterial extends THREE.ShaderMaterial {
           }
 
           vec4 color = texture2D(photoMap, photoUv);
+          color.rgb = (color.rgb - 0.5) * contrast + 0.5;
+          color.rgb *= brightness;
           float borderMix = 1.0 - smoothstep(0.0, borderWidth, edge);
           vec3 finalColor = mix(color.rgb, borderColor, borderMix);
           gl_FragColor = vec4(finalColor, color.a * alpha * flowerOpacity);
@@ -73,6 +79,22 @@ class FlowerPhotoMaterial extends THREE.ShaderMaterial {
 
   set flowerOpacity(value: number) {
     this.uniforms.flowerOpacity.value = value;
+  }
+
+  get brightness() {
+    return this.uniforms.brightness.value as number;
+  }
+
+  set brightness(value: number) {
+    this.uniforms.brightness.value = value;
+  }
+
+  get contrast() {
+    return this.uniforms.contrast.value as number;
+  }
+
+  set contrast(value: number) {
+    this.uniforms.contrast.value = value;
   }
 
   get petalCount() {
@@ -108,19 +130,88 @@ class FlowerPhotoMaterial extends THREE.ShaderMaterial {
   }
 }
 
-extend({ FlowerPhotoMaterial });
+class AdjustedPhotoMaterial extends THREE.ShaderMaterial {
+  constructor() {
+    super({
+      uniforms: {
+        photoMap: { value: null },
+        brightness: { value: 1 },
+        contrast: { value: 1 },
+      },
+      vertexShader: `
+        varying vec2 vUv;
+
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D photoMap;
+        uniform float brightness;
+        uniform float contrast;
+        varying vec2 vUv;
+
+        void main() {
+          vec4 color = texture2D(photoMap, vUv);
+          color.rgb = (color.rgb - 0.5) * contrast + 0.5;
+          color.rgb *= brightness;
+          gl_FragColor = color;
+        }
+      `,
+    });
+  }
+
+  get photoMap() {
+    return this.uniforms.photoMap.value as THREE.Texture | null;
+  }
+
+  set photoMap(value: THREE.Texture | null) {
+    this.uniforms.photoMap.value = value;
+  }
+
+  get brightness() {
+    return this.uniforms.brightness.value as number;
+  }
+
+  set brightness(value: number) {
+    this.uniforms.brightness.value = value;
+  }
+
+  get contrast() {
+    return this.uniforms.contrast.value as number;
+  }
+
+  set contrast(value: number) {
+    this.uniforms.contrast.value = value;
+  }
+}
+
+extend({ FlowerPhotoMaterial, AdjustedPhotoMaterial });
 
 declare module "@react-three/fiber" {
   interface ThreeElements {
     flowerPhotoMaterial: ThreeElements["shaderMaterial"] & {
       photoMap?: THREE.Texture | null;
       flowerOpacity?: number;
+      brightness?: number;
+      contrast?: number;
       petalCount?: number;
       borderColor?: THREE.Color | string | number;
       borderWidth?: number;
       imageAspect?: number;
     };
+    adjustedPhotoMaterial: ThreeElements["shaderMaterial"] & {
+      photoMap?: THREE.Texture | null;
+      brightness?: number;
+      contrast?: number;
+    };
   }
+}
+
+interface PhotoAdjustments {
+  brightness?: number;
+  contrast?: number;
 }
 
 interface SharedPhotoProps {
@@ -130,6 +221,7 @@ interface SharedPhotoProps {
   height: number;
   isSelected: boolean;
   isHighlighted: boolean;
+  adjustments?: PhotoAdjustments;
   onClick: () => void;
   onPointerEnter: () => void;
   onPointerLeave: () => void;
@@ -173,6 +265,7 @@ export function TerrainPhotoFlower({
   onClick,
   onPointerEnter,
   onPointerLeave,
+  adjustments,
 }: FlowerProps) {
   const groupRef = useRef<THREE.Group>(null);
   const headRef = useRef<THREE.Group>(null);
@@ -184,6 +277,8 @@ export function TerrainPhotoFlower({
   const [x, y, z] = position;
 
   const imageAspect = Number.isFinite(width / height) && height > 0 ? width / height : 1;
+  const brightness = adjustmentScalar(adjustments?.brightness);
+  const contrast = adjustmentScalar(adjustments?.contrast);
   const headSize = HEAD_RADIUS * 2;
   const stemGeometry = useMemo(() => createInitialStemGeometry(), []);
   const baseGeometry = useMemo(() => new THREE.SphereGeometry(STEM_RADIUS * 1.45, 12, 8), []);
@@ -236,6 +331,8 @@ export function TerrainPhotoFlower({
           <planeGeometry args={[headSize, headSize]} />
           <flowerPhotoMaterial
             photoMap={texture}
+            brightness={brightness}
+            contrast={contrast}
             petalCount={PETAL_LOBE_COUNT}
             flowerOpacity={0.96}
             borderColor="#ffffff"
@@ -265,6 +362,7 @@ export function OrbitingPhotoBanner({
   onClick,
   onPointerEnter,
   onPointerLeave,
+  adjustments,
 }: OrbitBannerProps) {
   const groupRef = useRef<THREE.Group>(null);
   const imageRef = useRef<THREE.Mesh>(null);
@@ -276,6 +374,8 @@ export function OrbitingPhotoBanner({
   }), [id]);
   const [cx, cy, cz] = center;
   const aspect = width / height;
+  const brightness = adjustmentScalar(adjustments?.brightness);
+  const contrast = adjustmentScalar(adjustments?.contrast);
   const imageW = aspect >= 1 ? BANNER_MAX_WIDTH : BANNER_MAX_HEIGHT * aspect;
   const imageH = aspect >= 1 ? BANNER_MAX_WIDTH / aspect : BANNER_MAX_HEIGHT;
 
@@ -306,11 +406,22 @@ export function OrbitingPhotoBanner({
           onPointerLeave={onPointerLeave}
         >
           <planeGeometry args={[imageW, imageH]} />
-          <meshBasicMaterial map={texture} side={THREE.DoubleSide} toneMapped={false} />
+          <adjustedPhotoMaterial
+            photoMap={texture}
+            brightness={brightness}
+            contrast={contrast}
+            side={THREE.DoubleSide}
+            toneMapped={false}
+          />
         </mesh>
       </Billboard>
     </group>
   );
+}
+
+function adjustmentScalar(value?: number) {
+  if (!Number.isFinite(value)) return 1;
+  return THREE.MathUtils.clamp(Math.round(value as number), 50, 150) / 100;
 }
 
 function orientHeadToCamera(head: THREE.Object3D, parent: THREE.Object3D, camera: THREE.Camera) {

@@ -1,3 +1,8 @@
+export interface AssetAdjustments {
+  brightness: number;
+  contrast: number;
+}
+
 export interface Photo {
   id: string;
   thumbnailUrl: string;
@@ -8,6 +13,7 @@ export interface Photo {
   createdAt: string;
   fileName: string;
   isFavorite: boolean;
+  adjustments?: AssetAdjustments;
   exifInfo?: {
     make?: string;
     model?: string;
@@ -187,6 +193,7 @@ export interface PlacementAsset {
   uploader_album_id?: string | null;
   thumbnailUrl: string;
   previewUrl: string;
+  adjustments?: AssetAdjustments;
 }
 
 export interface CropParameters {
@@ -359,6 +366,32 @@ export async function resetUploadAssetEdits(assetId: string): Promise<void> {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(body.error ?? `HTTP ${res.status}`);
   }
+}
+
+export async function fetchUploadAssetAdjustments(assetId: string): Promise<AssetAdjustments> {
+  const res = await fetch(`/api/v1/uploads/assets/${assetId}/adjustments`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function updateUploadAssetAdjustments(params: {
+  assetId: string;
+  adjustments: AssetAdjustments;
+}): Promise<AssetAdjustments> {
+  const res = await fetch(`/api/v1/uploads/assets/${params.assetId}/adjustments`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params.adjustments),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  const body = await res.json() as { adjustments?: AssetAdjustments };
+  return body.adjustments ?? params.adjustments;
 }
 
 export async function deleteUploadAsset(params: {

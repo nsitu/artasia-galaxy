@@ -24,6 +24,13 @@ import {
   uploadAsset,
 } from "../infra/ImmichClient.js";
 import { uploadRateLimit } from "../middleware/uploadRateLimit.js";
+import {
+  DEFAULT_ASSET_ADJUSTMENTS,
+  getAssetAdjustmentMap,
+  getAssetAdjustments,
+  saveAssetAdjustments,
+  type AssetAdjustments,
+} from "../services/assetAdjustments.service.js";
 import { getAuthContext } from "../services/auth.service.js";
 import {
   findConfiguredPlacement,
@@ -246,7 +253,8 @@ function clampCropToDimensions(crop: {
 function mapAdminAsset(
   asset: Awaited<ReturnType<typeof getAssetsForPlacementTagIds>>[number],
   uploaderAlbum?: UploaderAlbum,
-  assignment?: AssetManagementAssignment
+  assignment?: AssetManagementAssignment,
+  adjustments?: AssetAdjustments
 ) {
   const dimensions = editableAssetDimensions(asset);
   return {
@@ -267,6 +275,7 @@ function mapAdminAsset(
     uploader_album_id: uploaderAlbum?.id ?? null,
     width: dimensions.width || null,
     height: dimensions.height || null,
+    adjustments: adjustments ?? { ...DEFAULT_ASSET_ADJUSTMENTS },
     thumbnailUrl: assetMediaUrl(asset, "thumbnail"),
     previewUrl: assetMediaUrl(asset, "preview"),
   };
@@ -425,6 +434,7 @@ async function mapAssetsWithUploaderAlbums(assets: Awaited<ReturnType<typeof get
     getManagementAssignments(assets.map((asset) => asset.id)),
     searchAssetsByAlbumId(publishedAlbum.id),
   ]);
+  const adjustmentMap = await getAssetAdjustmentMap(assets.map((asset) => asset.id));
   const publishedAssetIds = new Set(publishedAssets.map((asset) => asset.id));
   return assets.map((asset) => mapAdminAsset(
     asset,
@@ -432,7 +442,8 @@ async function mapAssetsWithUploaderAlbums(assets: Awaited<ReturnType<typeof get
     {
       ...(managementAssignments.get(asset.id) ?? {}),
       published: publishedAssetIds.has(asset.id),
-    }
+    },
+    adjustmentMap.get(asset.id)
   ));
 }
 
@@ -736,6 +747,49 @@ router.post("/assets/:assetId/caption", async (req, res) => {
       asset_id: assetId,
       caption,
     });
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
+});
+
+router.get("/assets/:assetId/adjustments", async (req, res) => {
+  try {
+    const auth = await getAuthContext(req);
+    if (!auth.authenticated) {
+      res.status(401).json({ error: "Sign in to view upload adjustments." });
+      return;
+    }
+
+    const assetId = req.params.assetId.trim();
+    if (!assetId) {
+      res.status(400).json({ error: "Asset ID is required." });
+      return;
+    }
+
+    await getAsset(assetId);
+    res.json(await getAssetAdjustments(assetId));
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
+});
+
+router.put("/assets/:assetId/adjustments", async (req, res) => {
+  try {
+    const auth = await getAuthContext(req);
+    if (!auth.authenticated) {
+      res.status(401).json({ error: "Sign in to edit upload adjustments." });
+      return;
+    }
+
+    const assetId = req.params.assetId.trim();
+    if (!assetId) {
+      res.status(400).json({ error: "Asset ID is required." });
+      return;
+    }
+
+    await getAsset(assetId);
+    const adjustments = await saveAssetAdjustments(assetId, req.body);
+    res.json({ ok: true, asset_id: assetId, adjustments });
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });
   }

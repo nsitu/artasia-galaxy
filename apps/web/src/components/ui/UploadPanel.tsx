@@ -12,12 +12,15 @@ import {
   fetchPlacementAssetSet,
   fetchPlacementAssets,
   fetchUploadOptions,
+  fetchUploadAssetAdjustments,
   fetchUntaggedPlacementAssets,
   logoutAuthUser,
   resetUploadAssetEdits,
   setAssetPublished,
   syncDriveFiles,
+  updateUploadAssetAdjustments,
   uploadFiles,
+  type AssetAdjustments,
   type AuthUser,
   type CropParameters,
   type DriveFile,
@@ -42,6 +45,9 @@ interface UploadPanelProps {
 
 type CropRect = CropParameters;
 const MEDIA_REFRESH_DELAYS_MS = [1500, 3000, 6000, 10000, 15000];
+const DEFAULT_ADJUSTMENTS: AssetAdjustments = { brightness: 100, contrast: 100 };
+const MIN_ADJUSTMENT = 50;
+const MAX_ADJUSTMENT = 150;
 
 export default function UploadPanel({ initialError, onSignedOut }: UploadPanelProps) {
   const [options, setOptions] = useState<UploadOptions | null>(null);
@@ -64,6 +70,10 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   const [cropRect, setCropRect] = useState<CropRect | null>(null);
   const [cropLoading, setCropLoading] = useState(false);
   const [cropSaving, setCropSaving] = useState(false);
+  const [manageBrightness, setManageBrightness] = useState(DEFAULT_ADJUSTMENTS.brightness);
+  const [manageContrast, setManageContrast] = useState(DEFAULT_ADJUSTMENTS.contrast);
+  const [adjustmentsLoading, setAdjustmentsLoading] = useState(false);
+  const [adjustmentsSaving, setAdjustmentsSaving] = useState(false);
   const [cropRefreshKey, setCropRefreshKey] = useState(0);
   const [mediaRefreshAssetId, setMediaRefreshAssetId] = useState<string | null>(null);
   const [mediaRefreshAttempt, setMediaRefreshAttempt] = useState(0);
@@ -476,6 +486,36 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
       : url;
   }
 
+  function normalizeAdjustments(adjustments?: AssetAdjustments | null): AssetAdjustments {
+    return {
+      brightness: clampAdjustment(adjustments?.brightness ?? DEFAULT_ADJUSTMENTS.brightness),
+      contrast: clampAdjustment(adjustments?.contrast ?? DEFAULT_ADJUSTMENTS.contrast),
+    };
+  }
+
+  function clampAdjustment(value: number) {
+    if (!Number.isFinite(value)) return DEFAULT_ADJUSTMENTS.brightness;
+    return Math.max(MIN_ADJUSTMENT, Math.min(MAX_ADJUSTMENT, Math.round(value)));
+  }
+
+  function adjustmentFilterStyle(adjustments?: AssetAdjustments | null): React.CSSProperties {
+    const normalized = normalizeAdjustments(adjustments);
+    return {
+      filter: `brightness(${normalized.brightness / 100}) contrast(${normalized.contrast / 100})`,
+    };
+  }
+
+  function updateAssetAdjustments(assetId: string, adjustments: AssetAdjustments) {
+    setPlacementAssets((current) =>
+      current.map((asset) =>
+        asset.id === assetId ? { ...asset, adjustments } : asset
+      )
+    );
+    setSelectedAsset((current) =>
+      current?.id === assetId ? { ...current, adjustments } : current
+    );
+  }
+
   function queueMediaRefresh(assetId: string) {
     setMediaRefreshAssetId(assetId);
     setMediaRefreshAttempt(0);
@@ -483,11 +523,14 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   }
 
   function openAssetManager(asset: PlacementAsset) {
+    const adjustments = normalizeAdjustments(asset.adjustments);
     setSelectedAsset(asset);
     setManagePlacementKey(asset.placement_id ? String(asset.placement_id) : "");
     setManageUploaderKey(asset.uploader_id ? String(asset.uploader_id) : "");
     setManageActivityTag(asset.activity_id ? String(asset.activity_id) : "");
     setManagePublished(Boolean(asset.published));
+    setManageBrightness(adjustments.brightness);
+    setManageContrast(adjustments.contrast);
     setCropEditing(false);
     setCropRect(null);
     setCropRefreshKey((current) => current + 1);
@@ -502,11 +545,37 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     setManageUploaderKey("");
     setManageActivityTag("");
     setManagePublished(false);
+    setManageBrightness(DEFAULT_ADJUSTMENTS.brightness);
+    setManageContrast(DEFAULT_ADJUSTMENTS.contrast);
     setCropEditing(false);
     setCropRect(null);
     setMediaRefreshAssetId(null);
     setMediaRefreshAttempt(0);
   }
+
+  useEffect(() => {
+    if (!selectedAsset || selectedAsset.type !== "IMAGE" || !authUser?.authenticated) return;
+    let cancelled = false;
+    setAdjustmentsLoading(true);
+    fetchUploadAssetAdjustments(selectedAsset.id)
+      .then((adjustments) => {
+        if (cancelled) return;
+        const normalized = normalizeAdjustments(adjustments);
+        setManageBrightness(normalized.brightness);
+        setManageContrast(normalized.contrast);
+        updateAssetAdjustments(selectedAsset.id, normalized);
+      })
+      .catch((err) => {
+        if (!cancelled) setError((err as Error).message);
+      })
+      .finally(() => {
+        if (!cancelled) setAdjustmentsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedAsset?.id, selectedAsset?.type, authUser?.authenticated]);
 
   async function saveSelectedAssetChanges() {
     if (!selectedAsset) return;
@@ -751,6 +820,39 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     }
   }
 
+  async function saveAdjustments(adjustments: AssetAdjustments) {
+    if (!selectedAsset) return;
+    if (!authUser?.authenticated) {
+      setError("Sign in to edit upload adjustments.");
+      return;
+    }
+
+    const normalized = normalizeAdjustments(adjustments);
+    setAdjustmentsSaving(true);
+    setError(null);
+    try {
+      const saved = await updateUploadAssetAdjustments({
+        assetId: selectedAsset.id,
+        adjustments: normalized,
+      });
+      const savedNormalized = normalizeAdjustments(saved);
+      setManageBrightness(savedNormalized.brightness);
+      setManageContrast(savedNormalized.contrast);
+      updateAssetAdjustments(selectedAsset.id, savedNormalized);
+      refreshVisibleAssets();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setAdjustmentsSaving(false);
+    }
+  }
+
+  function resetAdjustments() {
+    setManageBrightness(DEFAULT_ADJUSTMENTS.brightness);
+    setManageContrast(DEFAULT_ADJUSTMENTS.contrast);
+    void saveAdjustments(DEFAULT_ADJUSTMENTS);
+  }
+
   async function signOut() {
     try {
       await logoutAuthUser();
@@ -867,7 +969,11 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   function renderAssetCard(asset: PlacementAsset) {
     return (
       <button key={asset.id} type="button" onClick={() => openAssetManager(asset)} style={assetCardStyle}>
-        <img src={mediaUrl(asset.thumbnailUrl, asset.id)} alt="" style={assetImageStyle} />
+        <img
+          src={mediaUrl(asset.thumbnailUrl, asset.id)}
+          alt=""
+          style={{ ...assetImageStyle, ...adjustmentFilterStyle(asset.adjustments) }}
+        />
         <span style={assetNameStyle}>{asset.fileName}</span>
         <span style={assetDateStyle}>{asset.uploader_name ?? "No team member album"}</span>
         <span style={assetDateStyle}>{new Date(asset.createdAt).toLocaleDateString()}</span>
@@ -1022,6 +1128,10 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     const activityChanged = manageActivityTag !== (selectedAsset.activity_id ? String(selectedAsset.activity_id) : "");
     const publishedChanged = managePublished !== Boolean(selectedAsset.published);
     const canSaveAsset = placementChanged || uploaderChanged || activityChanged || publishedChanged;
+    const selectedAdjustments = normalizeAdjustments(selectedAsset.adjustments);
+    const adjustmentChanged =
+      manageBrightness !== selectedAdjustments.brightness ||
+      manageContrast !== selectedAdjustments.contrast;
     const displayPreviewUrl = mediaUrl(selectedAsset.previewUrl, selectedAsset.id);
     const cropSourceUrl = `/api/v1/assets/${selectedAsset.id}/preview?v=${encodeURIComponent(
       `${selectedAsset.updatedAt}-${cropRefreshKey}`
@@ -1054,7 +1164,11 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
               <div style={{ ...cropBoxStyle, ...cropOverlayStyle(selectedAsset) }} />
             </div>
           ) : (
-            <img src={displayPreviewUrl} alt="" style={manageMediaStyle} />
+            <img
+              src={displayPreviewUrl}
+              alt=""
+              style={{ ...manageMediaStyle, ...adjustmentFilterStyle({ brightness: manageBrightness, contrast: manageContrast }) }}
+            />
           )}
         </div>
         <div style={manageDetailsStyle}>
@@ -1129,11 +1243,59 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
             />
             Published
           </label>
+          {authUser?.authenticated && selectedAsset.type === "IMAGE" && (
+            <div style={adjustmentPanelStyle}>
+              <label style={adjustmentLabelStyle}>
+                <span>Brightness {manageBrightness}%</span>
+                <input
+                  type="range"
+                  min={MIN_ADJUSTMENT}
+                  max={MAX_ADJUSTMENT}
+                  step={1}
+                  value={manageBrightness}
+                  disabled={adjustmentsLoading || adjustmentsSaving}
+                  onChange={(e) => setManageBrightness(clampAdjustment(Number(e.target.value)))}
+                  style={rangeInputStyle}
+                />
+              </label>
+              <label style={adjustmentLabelStyle}>
+                <span>Contrast {manageContrast}%</span>
+                <input
+                  type="range"
+                  min={MIN_ADJUSTMENT}
+                  max={MAX_ADJUSTMENT}
+                  step={1}
+                  value={manageContrast}
+                  disabled={adjustmentsLoading || adjustmentsSaving}
+                  onChange={(e) => setManageContrast(clampAdjustment(Number(e.target.value)))}
+                  style={rangeInputStyle}
+                />
+              </label>
+              <div style={manageActionsStyle}>
+                <button
+                  type="button"
+                  onClick={() => saveAdjustments({ brightness: manageBrightness, contrast: manageContrast })}
+                  disabled={adjustmentsLoading || adjustmentsSaving || cropSaving || savingAsset || deletingAsset || !adjustmentChanged}
+                  style={secondaryButtonStyle}
+                >
+                  {adjustmentsSaving ? "Saving Adjustments..." : "Save Adjustments"}
+                </button>
+                <button
+                  type="button"
+                  onClick={resetAdjustments}
+                  disabled={adjustmentsLoading || adjustmentsSaving || cropSaving || savingAsset || deletingAsset}
+                  style={secondaryButtonStyle}
+                >
+                  Reset Adjustments
+                </button>
+              </div>
+            </div>
+          )}
           <div style={manageActionsStyle}>
             <button
               type="button"
               onClick={saveSelectedAssetChanges}
-              disabled={savingAsset || deletingAsset || cropSaving || !canSaveAsset}
+              disabled={savingAsset || deletingAsset || cropSaving || adjustmentsSaving || !canSaveAsset}
               style={primaryActionButtonStyle}
             >
               {savingAsset ? "Saving..." : "Save"}
@@ -1166,7 +1328,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                   <button
                     type="button"
                     onClick={startCropEditing}
-                    disabled={cropLoading || cropSaving || savingAsset || deletingAsset}
+                    disabled={cropLoading || cropSaving || savingAsset || deletingAsset || adjustmentsSaving}
                     style={secondaryButtonStyle}
                   >
                     {cropLoading ? "Loading Crop..." : "Crop"}
@@ -1174,7 +1336,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                   <button
                     type="button"
                     onClick={resetCrop}
-                    disabled={cropSaving || savingAsset || deletingAsset}
+                    disabled={cropSaving || savingAsset || deletingAsset || adjustmentsSaving}
                     style={secondaryButtonStyle}
                   >
                     Reset Edits
@@ -1189,13 +1351,13 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
               <button
                 type="button"
                 onClick={deleteSelectedAsset}
-                disabled={savingAsset || deletingAsset || cropSaving}
+                disabled={savingAsset || deletingAsset || cropSaving || adjustmentsSaving}
                 style={dangerButtonStyle}
               >
                 {deletingAsset ? "Deleting..." : "Delete"}
               </button>
             )}
-            <button type="button" onClick={closeAssetManager} disabled={deletingAsset || cropSaving} style={secondaryButtonStyle}>
+            <button type="button" onClick={closeAssetManager} disabled={deletingAsset || cropSaving || adjustmentsSaving} style={secondaryButtonStyle}>
               Close
             </button>
           </div>
@@ -1940,6 +2102,26 @@ const manageActionsStyle: React.CSSProperties = {
   display: "flex",
   gap: 8,
   flexWrap: "wrap",
+};
+
+const adjustmentPanelStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 10,
+  padding: 10,
+  background: "rgba(255,255,255,0.04)",
+  border: "1px solid rgba(255,255,255,0.1)",
+  borderRadius: 4,
+};
+
+const adjustmentLabelStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 6,
+  color: "#cfd6e2",
+  fontSize: 13,
+};
+
+const rangeInputStyle: React.CSSProperties = {
+  width: "100%",
 };
 
 const assetGridStyle: React.CSSProperties = {

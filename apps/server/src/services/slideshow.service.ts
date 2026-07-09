@@ -1,4 +1,5 @@
 import { getPublishedAlbum, listTags, searchAssetIdsByTag, searchAssets, ImmichAsset } from "../infra/ImmichClient.js";
+import { DEFAULT_ASSET_ADJUSTMENTS, getAssetAdjustmentMap, type AssetAdjustments } from "./assetAdjustments.service.js";
 import { activityAnchorTag, getUploadConfig, placementAnchorTag } from "./uploadConfig.service.js";
 
 export interface Photo {
@@ -25,6 +26,7 @@ export interface Photo {
   }>;
   fileName: string;
   isFavorite: boolean;
+  adjustments: AssetAdjustments;
 }
 
 export interface SlideshowQuery {
@@ -70,7 +72,7 @@ function resolveDateRange(preset?: string, startDate?: string, endDate?: string)
   return { takenAfter: startDate, takenBefore: endDate };
 }
 
-function assetToPhoto(asset: ImmichAsset): Photo {
+function assetToPhoto(asset: ImmichAsset, adjustments?: AssetAdjustments): Photo {
   const imgW = asset.exifInfo?.exifImageWidth ?? 1920;
   const imgH = asset.exifInfo?.exifImageHeight ?? 1080;
   const ratio = imgW / imgH;
@@ -103,6 +105,7 @@ function assetToPhoto(asset: ImmichAsset): Photo {
       .map(() => ({ x: 0.5, y: 0.5, width: 0.15, height: 0.2 })),
     fileName: asset.originalFileName,
     isFavorite: asset.isFavorite ?? false,
+    adjustments: adjustments ?? { ...DEFAULT_ASSET_ADJUSTMENTS },
   };
 }
 
@@ -205,7 +208,8 @@ export async function querySlideshow(
     }
   }
 
-  let photos = assets.map(assetToPhoto);
+  const adjustmentMap = await getAssetAdjustmentMap(assets.map((asset) => asset.id));
+  let photos = assets.map((asset) => assetToPhoto(asset, adjustmentMap.get(asset.id)));
 
   if (query.shuffle && query.seed != null) {
     photos = seededShuffle(photos, query.seed);
