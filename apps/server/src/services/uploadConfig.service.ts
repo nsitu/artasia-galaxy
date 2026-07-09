@@ -19,6 +19,7 @@ export interface ActivityConfig {
 export interface ArtasiaPlacement {
   placement_id: number;
   placement_name: string;
+  placement_slug?: string;
   team_member_id?: number;
   team_member_name?: string;
   secondary_team_member_id?: number;
@@ -48,6 +49,7 @@ export interface ArtasiaPlacement {
 export interface ArtasiaMapPlacement {
   placement_id: number;
   placement_name: string;
+  placement_slug?: string;
   partner_name?: string;
   partner_logo?: {
     id: number;
@@ -148,6 +150,7 @@ function mapWpPlacement(wp: WpArtasiaPlacement): ArtasiaPlacement {
   return {
     placement_id: wp.placement_id,
     placement_name: wp.placement_name,
+    ...(wp.placement_slug ? { placement_slug: wp.placement_slug } : {}),
     ...(wp.team_member?.id ? { team_member_id: wp.team_member.id } : {}),
     ...(wp.team_member?.name ? { team_member_name: wp.team_member.name } : {}),
     ...(wp.secondary_team_member?.id ? { secondary_team_member_id: wp.secondary_team_member.id } : {}),
@@ -207,6 +210,7 @@ export async function getMapPlacements(): Promise<ArtasiaMapPlacement[]> {
     return [{
       placement_id: wp.placement_id,
       placement_name: wp.placement_name,
+      ...(wp.placement_slug ? { placement_slug: wp.placement_slug } : {}),
       ...(wp.partner?.name ? { partner_name: wp.partner.name } : {}),
       ...(wp.partner?.logo ? { partner_logo: mapPartnerLogo(wp.partner.logo) } : {}),
       ...(wp.partner?.brand_color_one ? { partner_brand_color_one: wp.partner.brand_color_one } : {}),

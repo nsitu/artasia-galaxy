@@ -191,6 +191,7 @@ function artasia_get_expanded_placements(): WP_REST_Response
         $results[] = [
             'placement_id' => $placement->ID,
             'placement_name' => $placement->post_title,
+            'placement_slug' => $placement->post_name,
             'project' => $project_lookup[$project_id] ?? null,
             'program_context' => get_post_meta($placement->ID, 'artasia_program_context', true) ?: '',
             'is_earlyon' => (bool) get_post_meta($placement->ID, 'artasia_is_earlyon', true),

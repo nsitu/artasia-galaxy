@@ -66,6 +66,7 @@ export async function fetchSlideshow(params: {
 export interface UploadPlacement {
   placement_id: number;
   placement_name: string;
+  placement_slug?: string;
   team_member_id?: number;
   team_member_name?: string;
   secondary_team_member_id?: number;
@@ -102,6 +103,7 @@ export interface UploadUploader {
 export interface MapPlacement {
   placement_id: number;
   placement_name: string;
+  placement_slug?: string;
   partner_name?: string;
   partner_logo?: {
     id: number;

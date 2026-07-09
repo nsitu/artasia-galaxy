@@ -387,6 +387,8 @@ export type PartnerFilterOption = {
   count: number;
 };
 
+const SITE_PATH_PREFIX = "/sites/";
+
 interface TerrainGalleryProps {
   onNoticeChange?: (notice: TerrainNotice | null) => void;
   onBackActionChange?: (action: (() => void) | null) => void;
@@ -427,6 +429,7 @@ export default function TerrainGallery({
   const [placements, setPlacements] = useState<MapPlacement[]>([]);
   const [placementError, setPlacementError] = useState<string | null>(null);
   const [placementsResolved, setPlacementsResolved] = useState(false);
+  const [requestedSiteSlug, setRequestedSiteSlug] = useState(() => getSiteSlugFromPath(window.location.pathname));
   const [focusedPlacement, setFocusedPlacement] = useState<MapPlacement | null>(null);
   const [hoveredPlacement, setHoveredPlacement] = useState<MapPlacement | null>(null);
   const [previewPlacement, setPreviewPlacement] = useState<MapPlacement | null>(null);
@@ -574,21 +577,27 @@ export default function TerrainGallery({
     });
   }, [focusedPlacement, projection, terrain, visiblePlacements]);
 
-  const focusPlacement = useCallback((placement: MapPlacement) => {
+  const focusPlacement = useCallback((placement: MapPlacement, options?: { replaceUrl?: boolean; skipUrlUpdate?: boolean }) => {
     document.body.style.cursor = "";
     setHoveredPlacement(null);
     setPreviewPlacement(null);
     setFocusedPlacement(placement);
     setRenderedTerrainKey(null);
     selectPhoto(null);
+    if (!options?.skipUrlUpdate) {
+      updatePlacementPath(placement, Boolean(options?.replaceUrl));
+    }
   }, [selectPhoto]);
 
-  const returnToRegional = useCallback(() => {
+  const returnToRegional = useCallback((options?: { replaceUrl?: boolean; skipUrlUpdate?: boolean }) => {
     document.body.style.cursor = "";
     setFocusedPlacement(null);
     setPreviewPlacement(null);
     setRenderedTerrainKey(null);
     selectPhoto(null);
+    if (!options?.skipUrlUpdate) {
+      updateViewerPath("/", Boolean(options?.replaceUrl));
+    }
     void fetchPhotos();
   }, [fetchPhotos, selectPhoto]);
 
@@ -596,6 +605,33 @@ export default function TerrainGallery({
     if (!previewPlacement) return;
     focusPlacement(previewPlacement);
   }, [focusPlacement, previewPlacement]);
+
+  useEffect(() => {
+    const onPopState = () => {
+      setRequestedSiteSlug(getSiteSlugFromPath(window.location.pathname));
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  useEffect(() => {
+    if (!placementsResolved) return;
+
+    if (!requestedSiteSlug) {
+      if (focusedPlacement) returnToRegional({ skipUrlUpdate: true });
+      return;
+    }
+
+    const placement = placements.find((candidate) =>
+      normalizeRouteSlug(siteRouteSlug(candidate)) === normalizeRouteSlug(requestedSiteSlug)
+    );
+    if (!placement) {
+      setPlacementError(`No site found for "${requestedSiteSlug}".`);
+      return;
+    }
+    if (focusedPlacement?.placement_id === placement.placement_id) return;
+    focusPlacement(placement, { skipUrlUpdate: true });
+  }, [focusPlacement, focusedPlacement, placements, placementsResolved, requestedSiteSlug, returnToRegional]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1197,6 +1233,42 @@ function useTouchPreviewMode() {
   }, []);
 
   return usesTouchPreview;
+}
+
+function siteRouteSlug(placement: MapPlacement) {
+  return placement.placement_slug?.trim() || slugifyPlacementName(placement.placement_name);
+}
+
+function getSiteSlugFromPath(pathname: string) {
+  if (!pathname.startsWith(SITE_PATH_PREFIX)) return null;
+  const slug = pathname.slice(SITE_PATH_PREFIX.length).split("/")[0] ?? "";
+  return slug ? decodeURIComponent(slug) : null;
+}
+
+function normalizeRouteSlug(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function slugifyPlacementName(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/['"]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function updatePlacementPath(placement: MapPlacement, replace = false) {
+  const slug = siteRouteSlug(placement);
+  if (!slug) return;
+  updateViewerPath(`${SITE_PATH_PREFIX}${encodeURIComponent(slug)}`, replace);
+}
+
+function updateViewerPath(path: string, replace = false) {
+  if (window.location.pathname === path) return;
+  if (replace) window.history.replaceState(null, "", path);
+  else window.history.pushState(null, "", path);
+  window.dispatchEvent(new PopStateEvent("popstate"));
 }
 
 const siteDetailsStyle: React.CSSProperties = {
