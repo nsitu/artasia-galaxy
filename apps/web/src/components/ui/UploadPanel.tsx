@@ -59,6 +59,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   const [options, setOptions] = useState<UploadOptions | null>(null);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [uploaderKey, setUploaderKey] = useState("");
+  const [browsePartnerKey, setBrowsePartnerKey] = useState("");
   const [placementKey, setPlacementKey] = useState("");
   const [activityTagFilter, setActivityTagFilter] = useState("");
   const [items, setItems] = useState<UploadItem[]>([]);
@@ -225,8 +226,29 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
 
   const filteredPlacements = useMemo(() => {
     if (!options) return [];
-    if (!selectedUploader) return options.placements;
-    return options.placements.filter((placement) => placementIncludesUploader(placement, selectedUploader.id));
+    const uploaderFilteredPlacements = selectedUploader
+      ? options.placements.filter((placement) => placementIncludesUploader(placement, selectedUploader.id))
+      : options.placements;
+    if (workspaceMode !== "browse" || !browsePartnerKey) return uploaderFilteredPlacements;
+    return uploaderFilteredPlacements.filter((placement) => placement.partner_name?.trim() === browsePartnerKey);
+  }, [browsePartnerKey, options, selectedUploader, workspaceMode]);
+
+  const browsePartnerOptions = useMemo(() => {
+    if (!options) return [];
+    const counts = new Map<string, number>();
+    const uploaderFilteredPlacements = selectedUploader
+      ? options.placements.filter((placement) => placementIncludesUploader(placement, selectedUploader.id))
+      : options.placements;
+
+    for (const placement of uploaderFilteredPlacements) {
+      const partnerName = placement.partner_name?.trim();
+      if (!partnerName) continue;
+      counts.set(partnerName, (counts.get(partnerName) ?? 0) + 1);
+    }
+
+    return Array.from(counts.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([partnerName, count]) => ({ partnerName, count }));
   }, [options, selectedUploader]);
 
   const selectedPlacement = useMemo(() => {
@@ -257,6 +279,13 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
       filteredPlacements.some((placement) => String(placement.placement_id) === current) ? current : ""
     );
   }, [filteredPlacements]);
+
+  useEffect(() => {
+    if (workspaceMode !== "browse") return;
+    if (!browsePartnerKey) return;
+    if (browsePartnerOptions.some((option) => option.partnerName === browsePartnerKey)) return;
+    setBrowsePartnerKey("");
+  }, [browsePartnerKey, browsePartnerOptions, workspaceMode]);
 
   useEffect(() => {
     if (assetMode === "untagged") {
@@ -1509,6 +1538,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
             onClick={() => {
               setWorkspaceMode("browse");
               setSelectedAsset(null);
+              setItems([]);
             }}
             style={{
               ...workspaceTabStyle,
@@ -1521,6 +1551,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
             type="button"
             onClick={() => {
               setWorkspaceMode("upload");
+              setBrowsePartnerKey("");
               setSelectedAsset(null);
               setAssetMode("placements");
             }}
@@ -1541,6 +1572,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                 value={uploaderKey}
                 onChange={(e) => {
                   setUploaderKey(e.target.value);
+                  setBrowsePartnerKey("");
                   setPlacementKey("");
                   setSelectedAsset(null);
                   setItems([]);
@@ -1575,6 +1607,29 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                 ))}
               </select>
             </label>
+
+            {workspaceMode === "browse" && (
+              <label style={labelStyle}>
+                Artasia Partner
+                <select
+                  value={browsePartnerKey}
+                  onChange={(e) => {
+                    setBrowsePartnerKey(e.target.value);
+                    setPlacementKey("");
+                    setSelectedAsset(null);
+                    setItems([]);
+                  }}
+                  style={inputStyle}
+                >
+                  <option value="">All Partners</option>
+                  {browsePartnerOptions.map((option) => (
+                    <option key={option.partnerName} value={option.partnerName}>
+                      {option.partnerName} ({option.count})
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
 
             {workspaceMode === "browse" && (
               <label style={labelStyle}>
