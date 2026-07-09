@@ -12,6 +12,8 @@ export interface ImmichAsset {
   ownerId: string;
   deviceId: string;
   type: "IMAGE" | "VIDEO";
+  width?: number | null;
+  height?: number | null;
   originalFileName: string;
   originalPath: string;
   fileCreatedAt: string;
@@ -33,6 +35,7 @@ export interface ImmichAsset {
     city?: string;
     state?: string;
     country?: string;
+    orientation?: string | null;
   };
   people?: Array<{
     id: string;

@@ -41,6 +41,7 @@ interface UploadPanelProps {
 }
 
 type CropRect = CropParameters;
+const MEDIA_REFRESH_DELAYS_MS = [1500, 3000, 6000, 10000, 15000];
 
 export default function UploadPanel({ initialError, onSignedOut }: UploadPanelProps) {
   const [options, setOptions] = useState<UploadOptions | null>(null);
@@ -64,6 +65,8 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   const [cropLoading, setCropLoading] = useState(false);
   const [cropSaving, setCropSaving] = useState(false);
   const [cropRefreshKey, setCropRefreshKey] = useState(0);
+  const [mediaRefreshAssetId, setMediaRefreshAssetId] = useState<string | null>(null);
+  const [mediaRefreshAttempt, setMediaRefreshAttempt] = useState(0);
   const [assetsLoading, setAssetsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -206,6 +209,19 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
       ? [selectedPlacement.placement_id]
       : filteredPlacements.map((placement) => placement.placement_id);
   }, [filteredPlacements, selectedPlacement]);
+
+  useEffect(() => {
+    if (!mediaRefreshAssetId) return;
+    if (mediaRefreshAttempt >= MEDIA_REFRESH_DELAYS_MS.length) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setCropRefreshKey((current) => current + 1);
+      setMediaRefreshAttempt((current) => current + 1);
+      refreshVisibleAssets();
+    }, MEDIA_REFRESH_DELAYS_MS[mediaRefreshAttempt]);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [mediaRefreshAssetId, mediaRefreshAttempt, assetMode, visiblePlacementIds, activityTagFilter]);
 
   useEffect(() => {
     setPlacementKey((current) =>
@@ -454,6 +470,18 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     return selectedPlacement ? "Uploads" : "Tagged Uploads for Visible Placements";
   }
 
+  function mediaUrl(url: string, assetId: string) {
+    return mediaRefreshAssetId === assetId
+      ? `${url}&mediaRefresh=${cropRefreshKey}&mediaAttempt=${mediaRefreshAttempt}`
+      : url;
+  }
+
+  function queueMediaRefresh(assetId: string) {
+    setMediaRefreshAssetId(assetId);
+    setMediaRefreshAttempt(0);
+    setCropRefreshKey((current) => current + 1);
+  }
+
   function openAssetManager(asset: PlacementAsset) {
     setSelectedAsset(asset);
     setManagePlacementKey(asset.placement_id ? String(asset.placement_id) : "");
@@ -463,6 +491,8 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     setCropEditing(false);
     setCropRect(null);
     setCropRefreshKey((current) => current + 1);
+    setMediaRefreshAssetId(null);
+    setMediaRefreshAttempt(0);
     setError(null);
   }
 
@@ -474,6 +504,8 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     setManagePublished(false);
     setCropEditing(false);
     setCropRect(null);
+    setMediaRefreshAssetId(null);
+    setMediaRefreshAttempt(0);
   }
 
   async function saveSelectedAssetChanges() {
@@ -567,6 +599,19 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     return { width, height };
   }
 
+  function normalizeCropRect(asset: PlacementAsset, rect: CropRect): CropRect {
+    const dimensions = imageDimensionsForCrop(asset);
+    if (dimensions.width <= 0 || dimensions.height <= 0) return rect;
+    const x = Math.max(0, Math.min(Math.round(rect.x), dimensions.width - 1));
+    const y = Math.max(0, Math.min(Math.round(rect.y), dimensions.height - 1));
+    return {
+      x,
+      y,
+      width: Math.max(1, Math.min(Math.round(rect.width), dimensions.width - x)),
+      height: Math.max(1, Math.min(Math.round(rect.height), dimensions.height - y)),
+    };
+  }
+
   function pointerToImagePoint(event: React.PointerEvent<HTMLElement>, asset: PlacementAsset) {
     const image = cropImageRef.current;
     if (!image) return null;
@@ -584,12 +629,12 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     if (dimensions.width <= 0 || dimensions.height <= 0) return null;
     const width = Math.round(dimensions.width * 0.8);
     const height = Math.round(dimensions.height * 0.8);
-    return {
+    return normalizeCropRect(asset, {
       x: Math.round((dimensions.width - width) / 2),
       y: Math.round((dimensions.height - height) / 2),
       width,
       height,
-    };
+    });
   }
 
   function isCropParameters(value: unknown): value is CropParameters {
@@ -626,12 +671,12 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     const point = pointerToImagePoint(event, selectedAsset);
     if (!point) return;
     cropStartRef.current = point;
-    setCropRect({
+    setCropRect(normalizeCropRect(selectedAsset, {
       x: Math.round(point.x),
       y: Math.round(point.y),
       width: 1,
       height: 1,
-    });
+    }));
     event.currentTarget.setPointerCapture(event.pointerId);
   }
 
@@ -644,12 +689,12 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     const y = Math.min(start.y, point.y);
     const width = Math.abs(point.x - start.x);
     const height = Math.abs(point.y - start.y);
-    setCropRect({
+    setCropRect(normalizeCropRect(selectedAsset, {
       x: Math.round(x),
       y: Math.round(y),
       width: Math.max(1, Math.round(width)),
       height: Math.max(1, Math.round(height)),
-    });
+    }));
   }
 
   function endCropDrag(event: React.PointerEvent<HTMLDivElement>) {
@@ -662,11 +707,12 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   function cropOverlayStyle(asset: PlacementAsset): React.CSSProperties {
     const dimensions = imageDimensionsForCrop(asset);
     if (!cropRect || dimensions.width <= 0 || dimensions.height <= 0) return { display: "none" };
+    const rect = normalizeCropRect(asset, cropRect);
     return {
-      left: `${(cropRect.x / dimensions.width) * 100}%`,
-      top: `${(cropRect.y / dimensions.height) * 100}%`,
-      width: `${(cropRect.width / dimensions.width) * 100}%`,
-      height: `${(cropRect.height / dimensions.height) * 100}%`,
+      left: `${(rect.x / dimensions.width) * 100}%`,
+      top: `${(rect.y / dimensions.height) * 100}%`,
+      width: `${(rect.width / dimensions.width) * 100}%`,
+      height: `${(rect.height / dimensions.height) * 100}%`,
     };
   }
 
@@ -675,9 +721,9 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     setCropSaving(true);
     setError(null);
     try {
-      await cropUploadAsset({ assetId: selectedAsset.id, crop: cropRect });
+      await cropUploadAsset({ assetId: selectedAsset.id, crop: normalizeCropRect(selectedAsset, cropRect) });
       setCropEditing(false);
-      setCropRefreshKey((current) => current + 1);
+      queueMediaRefresh(selectedAsset.id);
       refreshVisibleAssets();
     } catch (err) {
       setError((err as Error).message);
@@ -696,7 +742,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
       await resetUploadAssetEdits(selectedAsset.id);
       setCropRect(defaultCropForAsset(selectedAsset));
       setCropEditing(false);
-      setCropRefreshKey((current) => current + 1);
+      queueMediaRefresh(selectedAsset.id);
       refreshVisibleAssets();
     } catch (err) {
       setError((err as Error).message);
@@ -821,7 +867,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   function renderAssetCard(asset: PlacementAsset) {
     return (
       <button key={asset.id} type="button" onClick={() => openAssetManager(asset)} style={assetCardStyle}>
-        <img src={asset.thumbnailUrl} alt="" style={assetImageStyle} />
+        <img src={mediaUrl(asset.thumbnailUrl, asset.id)} alt="" style={assetImageStyle} />
         <span style={assetNameStyle}>{asset.fileName}</span>
         <span style={assetDateStyle}>{asset.uploader_name ?? "No team member album"}</span>
         <span style={assetDateStyle}>{new Date(asset.createdAt).toLocaleDateString()}</span>
@@ -976,7 +1022,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     const activityChanged = manageActivityTag !== (selectedAsset.activity_id ? String(selectedAsset.activity_id) : "");
     const publishedChanged = managePublished !== Boolean(selectedAsset.published);
     const canSaveAsset = placementChanged || uploaderChanged || activityChanged || publishedChanged;
-    const displayPreviewUrl = `${selectedAsset.previewUrl}&cropRefresh=${cropRefreshKey}`;
+    const displayPreviewUrl = mediaUrl(selectedAsset.previewUrl, selectedAsset.id);
     const cropSourceUrl = `/api/v1/assets/${selectedAsset.id}/preview?v=${encodeURIComponent(
       `${selectedAsset.updatedAt}-${cropRefreshKey}`
     )}`;
@@ -1838,9 +1884,10 @@ const manageMediaStyle: React.CSSProperties = {
 
 const cropStageStyle: React.CSSProperties = {
   position: "relative",
-  width: "100%",
+  width: "fit-content",
+  maxWidth: "100%",
   maxHeight: 360,
-  display: "inline-block",
+  display: "block",
   background: "#0c0e13",
   borderRadius: 4,
   overflow: "hidden",
@@ -1851,9 +1898,10 @@ const cropStageStyle: React.CSSProperties = {
 
 const cropMediaStyle: React.CSSProperties = {
   display: "block",
-  width: "100%",
+  width: "auto",
+  height: "auto",
+  maxWidth: "100%",
   maxHeight: 360,
-  objectFit: "contain",
   pointerEvents: "none",
 };
 

@@ -208,11 +208,47 @@ interface AssetManagementAssignment {
   published?: boolean;
 }
 
+function isFlippedOrientation(orientation?: string | null) {
+  const value = Number(orientation);
+  return Boolean(value && [5, 6, 7, 8, -90, 90].includes(value));
+}
+
+function editableAssetDimensions(asset: Awaited<ReturnType<typeof getAssetsForPlacementTagIds>>[number] | Awaited<ReturnType<typeof getAsset>>) {
+  if (asset.width && asset.height) {
+    return { width: asset.width, height: asset.height };
+  }
+
+  const width = asset.exifInfo?.exifImageWidth ?? 0;
+  const height = asset.exifInfo?.exifImageHeight ?? 0;
+  if (!width || !height) return { width: 0, height: 0 };
+  return isFlippedOrientation(asset.exifInfo?.orientation)
+    ? { width: height, height: width }
+    : { width, height };
+}
+
+function clampCropToDimensions(crop: {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}, dimensions: { width: number; height: number }) {
+  if (dimensions.width <= 0 || dimensions.height <= 0) return crop;
+  const x = Math.max(0, Math.min(crop.x, dimensions.width - 1));
+  const y = Math.max(0, Math.min(crop.y, dimensions.height - 1));
+  return {
+    x,
+    y,
+    width: Math.max(1, Math.min(crop.width, dimensions.width - x)),
+    height: Math.max(1, Math.min(crop.height, dimensions.height - y)),
+  };
+}
+
 function mapAdminAsset(
   asset: Awaited<ReturnType<typeof getAssetsForPlacementTagIds>>[number],
   uploaderAlbum?: UploaderAlbum,
   assignment?: AssetManagementAssignment
 ) {
+  const dimensions = editableAssetDimensions(asset);
   return {
     id: asset.id,
     type: asset.type,
@@ -229,8 +265,8 @@ function mapAdminAsset(
     uploader_id: uploaderAlbum?.uploaderId ?? null,
     uploader_name: uploaderAlbum?.uploaderName ?? null,
     uploader_album_id: uploaderAlbum?.id ?? null,
-    width: asset.exifInfo?.exifImageWidth ?? null,
-    height: asset.exifInfo?.exifImageHeight ?? null,
+    width: dimensions.width || null,
+    height: dimensions.height || null,
     thumbnailUrl: assetMediaUrl(asset, "thumbnail"),
     previewUrl: assetMediaUrl(asset, "preview"),
   };
@@ -740,33 +776,33 @@ router.put("/assets/:assetId/crop", async (req, res) => {
       return;
     }
 
-    const crop = {
+    const requestedCrop = {
       x: Math.round(Number(req.body?.x)),
       y: Math.round(Number(req.body?.y)),
       width: Math.round(Number(req.body?.width)),
       height: Math.round(Number(req.body?.height)),
     };
     if (
-      !Number.isFinite(crop.x) ||
-      !Number.isFinite(crop.y) ||
-      !Number.isFinite(crop.width) ||
-      !Number.isFinite(crop.height) ||
-      crop.x < 0 ||
-      crop.y < 0 ||
-      crop.width < 1 ||
-      crop.height < 1
+      !Number.isFinite(requestedCrop.x) ||
+      !Number.isFinite(requestedCrop.y) ||
+      !Number.isFinite(requestedCrop.width) ||
+      !Number.isFinite(requestedCrop.height) ||
+      requestedCrop.x < 0 ||
+      requestedCrop.y < 0 ||
+      requestedCrop.width < 1 ||
+      requestedCrop.height < 1
     ) {
       res.status(400).json({ error: "Choose a valid crop area." });
       return;
     }
 
     const asset = await getAsset(assetId);
-    const imageWidth = asset.exifInfo?.exifImageWidth;
-    const imageHeight = asset.exifInfo?.exifImageHeight;
+    const dimensions = editableAssetDimensions(asset);
+    const crop = clampCropToDimensions(requestedCrop, dimensions);
     if (
-      imageWidth != null &&
-      imageHeight != null &&
-      (crop.x + crop.width > imageWidth || crop.y + crop.height > imageHeight)
+      dimensions.width > 0 &&
+      dimensions.height > 0 &&
+      (crop.x + crop.width > dimensions.width || crop.y + crop.height > dimensions.height)
     ) {
       res.status(400).json({ error: "Crop area is outside the image bounds." });
       return;
