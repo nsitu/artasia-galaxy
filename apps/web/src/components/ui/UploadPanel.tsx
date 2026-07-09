@@ -48,8 +48,10 @@ interface UploadItem {
 
 type NoticeTone = "success" | "warning";
 type BrowseContextFilter = "all" | "earlyon" | "nonEarlyon";
+type DeliveryDayFilter = "" | "monday" | "tuesday" | "wednesday" | "thursday" | "friday";
 type SiteScope = "select" | "all" | "placement";
 type WorkspaceMode = "sites" | "browse" | "upload" | "import";
+type PlacementMetaLine = { text: string; icon?: string; href?: string; variant?: "location" };
 
 interface UploadPanelProps {
   initialError?: string | null;
@@ -64,6 +66,14 @@ const MAX_ADJUSTMENT = 150;
 const UPLOAD_ACCEPT_TYPES = "image/*,video/*,.heic,.heif,image/heic,image/heif";
 const DEFAULT_SHARED_DRIVE_NAME = "artasia 2026";
 const DEFAULT_SHARED_DRIVE_FOLDER = "documentation";
+const DELIVERY_DAY_OPTIONS: Array<{ value: DeliveryDayFilter; label: string }> = [
+  { value: "", label: "All Delivery Days" },
+  { value: "monday", label: "Monday" },
+  { value: "tuesday", label: "Tuesday" },
+  { value: "wednesday", label: "Wednesday" },
+  { value: "thursday", label: "Thursday" },
+  { value: "friday", label: "Friday" },
+];
 
 export default function UploadPanel({ initialError, onSignedOut }: UploadPanelProps) {
   const [options, setOptions] = useState<UploadOptions | null>(null);
@@ -71,6 +81,9 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   const [uploaderKey, setUploaderKey] = useState("");
   const [browsePartnerKey, setBrowsePartnerKey] = useState("");
   const [browseContextFilter, setBrowseContextFilter] = useState<BrowseContextFilter>("all");
+  const [deliveryDayFilter, setDeliveryDayFilter] = useState<DeliveryDayFilter>("");
+  const [timeOfDayFilter, setTimeOfDayFilter] = useState("");
+  const [ageRangeFilter, setAgeRangeFilter] = useState("");
   const [placementKey, setPlacementKey] = useState("");
   const [activityTagFilter, setActivityTagFilter] = useState("");
   const [items, setItems] = useState<UploadItem[]>([]);
@@ -140,6 +153,53 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     ].filter(Boolean).join(" · ");
   }
 
+  function placementMetaLines(placement: UploadOptions["placements"][number]) {
+    const people = [
+      placement.team_member_name ?? "Unassigned",
+      placement.secondary_team_member_name,
+    ].filter(Boolean).join(" + ");
+    const ageRange = formatParticipantAge(placement.participant_age);
+    const address = placement.address?.trim()
+      || [placement.place_name, placement.place_city].filter(Boolean).join(", ");
+    const locationDisplay = formatPlacementLocationDisplay(placement.partner_name, placement.place_name, address);
+
+    const lines: Array<PlacementMetaLine | null> = [
+      people ? { text: people, icon: "person" } : null,
+      placement.delivery_schedule ? { text: placement.delivery_schedule, icon: "schedule" } : null,
+      ageRange ? { text: ageRange, icon: "child_hat" } : null,
+      locationDisplay ? { text: locationDisplay, href: googleMapsUrl(address), variant: "location" } : null,
+    ];
+
+    return lines.filter((line): line is PlacementMetaLine => Boolean(line));
+  }
+
+  function formatParticipantAge(value?: string) {
+    const trimmed = value?.trim();
+    if (!trimmed) return "";
+    return /\d/.test(trimmed) ? `Ages ${trimmed}` : trimmed;
+  }
+
+  function formatPlacementLocationDisplay(partnerName?: string, placeName?: string, address?: string) {
+    const trimmedAddress = address?.trim();
+    const trimmedPlaceName = placeName?.trim();
+    const trimmedPartnerName = partnerName?.trim();
+    const lines = [
+      trimmedPartnerName,
+      trimmedPlaceName && !trimmedAddress?.toLocaleLowerCase().includes(trimmedPlaceName.toLocaleLowerCase())
+        ? trimmedPlaceName
+        : undefined,
+      trimmedAddress,
+    ].filter(Boolean);
+
+    return lines.join("\n");
+  }
+
+  function googleMapsUrl(address: string) {
+    const queryBase = address.trim();
+    const query = /\bontario\b|\bon\b/i.test(queryBase) ? queryBase : `${queryBase}, Ontario`;
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+  }
+
   useEffect(() => {
     if (options) return;
     const authFallback: AuthUser = { authenticated: false };
@@ -170,6 +230,10 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   function placementViewerUrl(placement: UploadOptions["placements"][number]) {
     const slug = placement.placement_slug?.trim() || slugifyPlacementName(placement.placement_name);
     return slug ? `/sites/${encodeURIComponent(slug)}` : "/";
+  }
+
+  function placementEditUrl(placement: UploadOptions["placements"][number]) {
+    return `https://artsforall.co/wp-admin/post.php?post=${encodeURIComponent(String(placement.placement_id))}&action=edit`;
   }
 
   function slugifyPlacementName(value: string) {
@@ -301,15 +365,44 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     return browseContextFilter === "earlyon" ? placement.is_earlyon : !placement.is_earlyon;
   }
 
+  function placementMatchesDeliveryDay(placement: UploadOptions["placements"][number]) {
+    if (workspaceMode !== "sites" || !deliveryDayFilter) return true;
+    return placement.delivery_weekday === deliveryDayFilter;
+  }
+
+  function placementMatchesTimeOfDay(placement: UploadOptions["placements"][number]) {
+    if (workspaceMode !== "sites" || !timeOfDayFilter) return true;
+    return placement.delivery_start_time === timeOfDayFilter;
+  }
+
+  function placementMatchesAgeRange(placement: UploadOptions["placements"][number]) {
+    if (workspaceMode !== "sites" || !ageRangeFilter) return true;
+    return placement.participant_age?.trim() === ageRangeFilter;
+  }
+
+  function formatTimeOfDay(value: string) {
+    const [hoursRaw, minutesRaw = "00"] = value.split(":");
+    const hours = Number.parseInt(hoursRaw, 10);
+    const minutes = Number.parseInt(minutesRaw, 10);
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return value;
+    const suffix = hours >= 12 ? "PM" : "AM";
+    const displayHours = hours % 12 || 12;
+    return `${displayHours}:${String(minutes).padStart(2, "0")} ${suffix}`;
+  }
+
   const filteredPlacements = useMemo(() => {
     if (!options) return [];
     const uploaderFilteredPlacements = selectedUploader && workspaceMode !== "upload" && workspaceMode !== "import"
       ? options.placements.filter((placement) => placementIncludesUploader(placement, selectedUploader.id))
       : options.placements;
-    const contextFilteredPlacements = uploaderFilteredPlacements.filter(placementMatchesBrowseContext);
+    const contextFilteredPlacements = uploaderFilteredPlacements
+      .filter(placementMatchesBrowseContext)
+      .filter(placementMatchesDeliveryDay)
+      .filter(placementMatchesTimeOfDay)
+      .filter(placementMatchesAgeRange);
     if (workspaceMode === "upload" || workspaceMode === "import" || !browsePartnerKey) return contextFilteredPlacements;
     return contextFilteredPlacements.filter((placement) => placement.partner_name?.trim() === browsePartnerKey);
-  }, [browseContextFilter, browsePartnerKey, options, selectedUploader, workspaceMode]);
+  }, [ageRangeFilter, browseContextFilter, browsePartnerKey, deliveryDayFilter, options, selectedUploader, timeOfDayFilter, workspaceMode]);
 
   const browsePartnerOptions = useMemo(() => {
     if (!options) return [];
@@ -317,7 +410,11 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     const uploaderFilteredPlacements = selectedUploader
       ? options.placements.filter((placement) => placementIncludesUploader(placement, selectedUploader.id))
       : options.placements;
-    const contextFilteredPlacements = uploaderFilteredPlacements.filter(placementMatchesBrowseContext);
+    const contextFilteredPlacements = uploaderFilteredPlacements
+      .filter(placementMatchesBrowseContext)
+      .filter(placementMatchesDeliveryDay)
+      .filter(placementMatchesTimeOfDay)
+      .filter(placementMatchesAgeRange);
 
     for (const placement of contextFilteredPlacements) {
       const partnerName = placement.partner_name?.trim();
@@ -328,24 +425,115 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     return Array.from(counts.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([partnerName, count]) => ({ partnerName, count }));
-  }, [browseContextFilter, options, selectedUploader, workspaceMode]);
+  }, [ageRangeFilter, browseContextFilter, deliveryDayFilter, options, selectedUploader, timeOfDayFilter, workspaceMode]);
+
+  const timeOfDayOptions = useMemo(() => {
+    if (!options) return [];
+    const times = new Set<string>();
+    const placements = options.placements
+      .filter(placementMatchesBrowseContext)
+      .filter(placementMatchesDeliveryDay);
+
+    for (const placement of placements) {
+      const startTime = placement.delivery_start_time?.trim();
+      if (startTime) times.add(startTime);
+    }
+
+    return Array.from(times)
+      .sort((a, b) => a.localeCompare(b))
+      .map((value) => ({ value, label: formatTimeOfDay(value) }));
+  }, [browseContextFilter, deliveryDayFilter, options, workspaceMode]);
+
+  const ageRangeOptions = useMemo(() => {
+    if (!options) return [];
+    const ageRanges = new Set<string>();
+    const placements = options.placements
+      .filter(placementMatchesBrowseContext)
+      .filter(placementMatchesDeliveryDay)
+      .filter(placementMatchesTimeOfDay);
+
+    for (const placement of placements) {
+      const ageRange = placement.participant_age?.trim();
+      if (ageRange) ageRanges.add(ageRange);
+    }
+
+    return Array.from(ageRanges)
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+      .map((value) => ({ value, label: formatParticipantAge(value) }));
+  }, [browseContextFilter, deliveryDayFilter, options, timeOfDayFilter, workspaceMode]);
+
+  const browseUploaderOptions = useMemo(() => {
+    if (!options) return [];
+
+    const placements = options.placements
+      .filter(placementMatchesBrowseContext)
+      .filter(placementMatchesDeliveryDay)
+      .filter(placementMatchesTimeOfDay)
+      .filter(placementMatchesAgeRange)
+      .filter((placement) => !browsePartnerKey || placement.partner_name?.trim() === browsePartnerKey);
+    const counts = new Map<number, number>();
+
+    for (const placement of placements) {
+      const uploaderIds = [
+        placement.team_member_id,
+        placement.secondary_team_member_id,
+      ].filter((id): id is number => typeof id === "number");
+
+      for (const uploaderId of new Set(uploaderIds)) {
+        counts.set(uploaderId, (counts.get(uploaderId) ?? 0) + 1);
+      }
+    }
+
+    return options.uploaders
+      .filter((uploader) => counts.has(uploader.id))
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((uploader) => ({ uploader, count: counts.get(uploader.id) ?? 0 }));
+  }, [ageRangeFilter, browseContextFilter, browsePartnerKey, deliveryDayFilter, options, timeOfDayFilter, workspaceMode]);
 
   const selectedPlacement = useMemo(() => {
     if (!options || !placementKey) return null;
     return options.placements.find((placement) => String(placement.placement_id) === placementKey) ?? null;
   }, [options, placementKey]);
 
-  const selectedPlacementMatchesCurrentFilters = useMemo(() => {
-    if (!placementKey) return false;
-    return filteredPlacements.some((placement) => String(placement.placement_id) === placementKey);
-  }, [filteredPlacements, placementKey]);
+  const browsePlacementOptions = useMemo(() => {
+    const placements = selectedPlacement
+      && !filteredPlacements.some((placement) => placement.placement_id === selectedPlacement.placement_id)
+      ? [selectedPlacement, ...filteredPlacements]
+      : filteredPlacements;
+
+    return [...placements].sort((a, b) => placementLabel(a).localeCompare(placementLabel(b)));
+  }, [filteredPlacements, selectedPlacement]);
+
+  const selectedActivityLabel = useMemo(() => {
+    if (!options || !activityTagFilter) return null;
+    return options.activities.find((activity) => String(activity.id) === activityTagFilter)?.label ?? null;
+  }, [activityTagFilter, options]);
+
+  const browseBreadcrumbParents = useMemo(() => {
+    return [
+      browsePartnerKey.trim() || null,
+      selectedUploader?.name ?? null,
+      selectedActivityLabel,
+    ].filter((label): label is string => Boolean(label));
+  }, [browsePartnerKey, selectedActivityLabel, selectedUploader]);
+
+  const hasActiveSiteFilters = Boolean(
+    uploaderKey
+    || browseContextFilter !== "all"
+    || deliveryDayFilter
+    || timeOfDayFilter
+    || ageRangeFilter
+    || browsePartnerKey
+  );
 
   const visiblePlacementIds = useMemo(() => {
     if (assetMode === "untagged") return [];
-    if (siteScope === "all") return filteredPlacements.map((placement) => placement.placement_id);
+    if (siteScope === "all" || (workspaceMode === "browse" && siteScope === "select")) {
+      return filteredPlacements.map((placement) => placement.placement_id);
+    }
     if (siteScope === "placement" && selectedPlacement) return [selectedPlacement.placement_id];
     return [];
-  }, [assetMode, filteredPlacements, selectedPlacement, siteScope]);
+  }, [assetMode, filteredPlacements, selectedPlacement, siteScope, workspaceMode]);
 
   useEffect(() => {
     if (!mediaRefreshAssetId) return;
@@ -362,11 +550,10 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
 
   useEffect(() => {
     if (siteScope !== "placement") return;
-    if ((workspaceMode === "upload" || workspaceMode === "import") && selectedPlacement) return;
-    if (selectedPlacementMatchesCurrentFilters) return;
+    if (selectedPlacement) return;
     setPlacementKey("");
     setSiteScope("select");
-  }, [selectedPlacement, selectedPlacementMatchesCurrentFilters, siteScope, workspaceMode]);
+  }, [selectedPlacement, siteScope]);
 
   useEffect(() => {
     if (workspaceMode === "upload" || workspaceMode === "import") return;
@@ -374,6 +561,39 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     if (browsePartnerOptions.some((option) => option.partnerName === browsePartnerKey)) return;
     setBrowsePartnerKey("");
   }, [browsePartnerKey, browsePartnerOptions, workspaceMode]);
+
+  useEffect(() => {
+    if (workspaceMode !== "sites") return;
+    if (!timeOfDayFilter) return;
+    if (timeOfDayOptions.some((option) => option.value === timeOfDayFilter)) return;
+    setTimeOfDayFilter("");
+    setPlacementKey("");
+    setSiteScope("select");
+    setSelectedAsset(null);
+    setItems([]);
+  }, [timeOfDayFilter, timeOfDayOptions, workspaceMode]);
+
+  useEffect(() => {
+    if (workspaceMode !== "sites") return;
+    if (!ageRangeFilter) return;
+    if (ageRangeOptions.some((option) => option.value === ageRangeFilter)) return;
+    setAgeRangeFilter("");
+    setPlacementKey("");
+    setSiteScope("select");
+    setSelectedAsset(null);
+    setItems([]);
+  }, [ageRangeFilter, ageRangeOptions, workspaceMode]);
+
+  useEffect(() => {
+    if (workspaceMode === "upload" || workspaceMode === "import") return;
+    if (!uploaderKey) return;
+    if (browseUploaderOptions.some((option) => String(option.uploader.id) === uploaderKey)) return;
+    setUploaderKey("");
+    setPlacementKey("");
+    setSiteScope("select");
+    setSelectedAsset(null);
+    setItems([]);
+  }, [browseUploaderOptions, uploaderKey, workspaceMode]);
 
   useEffect(() => {
     if (assetMode === "untagged") {
@@ -587,23 +807,8 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     setError(null);
   }
 
-  function selectAllSites() {
-    setPlacementKey("");
-    setSiteScope("all");
-    setAssetMode("placements");
-    setSelectedAsset(null);
-    setItems([]);
-    setNotice(null);
-    setError(null);
-  }
-
   function browsePlacement(placement: UploadOptions["placements"][number]) {
     selectPlacement(placement);
-    setWorkspaceMode("browse");
-  }
-
-  function browseAllSites() {
-    selectAllSites();
     setWorkspaceMode("browse");
   }
 
@@ -611,6 +816,21 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     setBrowsePartnerKey("");
     selectPlacement(placement);
     setWorkspaceMode("upload");
+  }
+
+  function clearSiteFilters() {
+    setUploaderKey("");
+    setBrowseContextFilter("all");
+    setDeliveryDayFilter("");
+    setTimeOfDayFilter("");
+    setAgeRangeFilter("");
+    setBrowsePartnerKey("");
+    setPlacementKey("");
+    setSiteScope("select");
+    setSelectedAsset(null);
+    setItems([]);
+    setNotice(null);
+    setError(null);
   }
 
   function importToPlacement(placement: UploadOptions["placements"][number]) {
@@ -1511,48 +1731,75 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     return (
       <div style={siteSelectionPanelStyle}>
         <div style={siteChoiceGridStyle}>
-          <div style={siteChoiceCardStyle}>
-            <div style={siteCardContentStyle}>
-              <span style={placementNameStyle}>All Sites</span>
-              <span style={placementMetaStyle}>
-                Browse uploads across {filteredPlacements.length} visible site{filteredPlacements.length === 1 ? "" : "s"}
-              </span>
-            </div>
-            <div style={siteActionRowStyle}>
-              <button type="button" onClick={browseAllSites} style={siteActionButtonStyle}>
-                Browse
-              </button>
-            </div>
-          </div>
           {filteredPlacements.map((placement) => (
             <div
               key={placement.placement_id}
               style={siteChoiceCardStyle}
             >
               <div style={siteCardContentStyle}>
-                {placement.partner_logo?.url && (
-                  <img
-                    src={placement.partner_logo.url}
-                    alt={placement.partner_logo.alt || ""}
-                    style={sitePartnerLogoStyle}
-                    loading="lazy"
-                  />
+                {(placement.partner_logo?.url || placement.is_earlyon) && (
+                  <div style={siteLogoRowStyle}>
+                    {placement.partner_logo?.url && (
+                      <img
+                        src={placement.partner_logo.url}
+                        alt={placement.partner_logo.alt || ""}
+                        style={sitePartnerLogoStyle}
+                        loading="lazy"
+                      />
+                    )}
+                    {placement.is_earlyon && (
+                      <img
+                        src="/early-on.svg"
+                        alt="EarlyON"
+                        style={siteEarlyOnLogoStyle}
+                        loading="lazy"
+                      />
+                    )}
+                  </div>
                 )}
                 <span style={placementNameStyle}>{placementLabel(placement)}</span>
-                <span style={placementMetaStyle}>{placementMetaLabel(placement)}</span>
+                <span style={placementMetaGroupStyle}>
+                  {placementMetaLines(placement).map((line) => (
+                    line.href ? (
+                      <a
+                        key={line.text}
+                        href={line.href}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={line.variant === "location" ? placementLocationLinkStyle : placementMetaLinkStyle}
+                      >
+                        {line.icon && <span style={placementMetaIconStyle} aria-hidden="true">{line.icon}</span>}
+                        {line.text}
+                      </a>
+                    ) : (
+                      <span key={line.text} style={placementMetaStyle}>
+                        {line.icon && <span style={placementMetaIconStyle} aria-hidden="true">{line.icon}</span>}
+                        {line.text}
+                      </span>
+                    )
+                  ))}
+                </span>
               </div>
               <div style={siteActionRowStyle}>
                 <button type="button" onClick={() => browsePlacement(placement)} style={siteActionButtonStyle}>
+                  <span style={siteActionIconStyle} aria-hidden="true">browse</span>
                   Browse
                 </button>
                 <button type="button" onClick={() => uploadToPlacement(placement)} style={siteActionButtonStyle}>
+                  <span style={siteActionIconStyle} aria-hidden="true">upload</span>
                   Upload
                 </button>
                 <button type="button" onClick={() => importToPlacement(placement)} style={siteActionButtonStyle}>
+                  <span style={siteActionIconStyle} aria-hidden="true">add_to_drive</span>
                   Import
                 </button>
                 <a href={placementViewerUrl(placement)} style={siteActionLinkStyle}>
+                  <span style={siteActionIconStyle} aria-hidden="true">open_in_new</span>
                   View
+                </a>
+                <a href={placementEditUrl(placement)} target="_blank" rel="noreferrer" style={siteActionLinkStyle}>
+                  <span style={siteActionIconStyle} aria-hidden="true">edit</span>
+                  Edit
                 </a>
               </div>
             </div>
@@ -1566,7 +1813,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     );
   }
 
-  function renderSiteBreadcrumb(label: string) {
+  function renderSiteBreadcrumb(label: string, parentLabels: string[] = []) {
     return (
       <div style={breadcrumbStyle}>
         <button
@@ -1577,6 +1824,12 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
           Sites
         </button>
         <span style={breadcrumbSeparatorStyle}>/</span>
+        {parentLabels.map((parentLabel, index) => (
+          <span key={`${parentLabel}-${index}`} style={breadcrumbSegmentStyle}>
+            <span style={breadcrumbParentStyle}>{parentLabel}</span>
+            <span style={breadcrumbSeparatorStyle}>/</span>
+          </span>
+        ))}
         <span style={breadcrumbCurrentStyle}>{label}</span>
       </div>
     );
@@ -1908,7 +2161,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
           <div style={headerBrandStyle}>
             <img src="/artasia.svg" alt="Artasia" style={logoStyle} />
             <div>
-              <h1 style={titleStyle}>Asset Management</h1>
+              <h1 style={titleStyle}>Atlas Admin</h1>
                
             </div>
           </div>
@@ -2003,8 +2256,6 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
             type="button"
             onClick={() => {
               setWorkspaceMode("browse");
-              setSiteScope("select");
-              setPlacementKey("");
               setSelectedAsset(null);
               setItems([]);
               setNotice(null);
@@ -2024,8 +2275,6 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
             onClick={() => {
               setWorkspaceMode("upload");
               setBrowsePartnerKey("");
-              setSiteScope("select");
-              setPlacementKey("");
               setSelectedAsset(null);
               setAssetMode("placements");
               setNotice(null);
@@ -2045,8 +2294,6 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
             onClick={() => {
               setWorkspaceMode("import");
               setBrowsePartnerKey("");
-              setSiteScope("select");
-              setPlacementKey("");
               setSelectedAsset(null);
               setAssetMode("placements");
               setNotice(null);
@@ -2066,6 +2313,38 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
 
         <div style={adminLayoutStyle}>
           <aside style={placementMenuStyle}>
+            {workspaceMode === "browse" && (
+              <label style={labelStyle}>
+                Artasia Site
+                <select
+                  value={assetMode === "untagged" || !selectedPlacement ? "" : String(selectedPlacement.placement_id)}
+                  onChange={(e) => {
+                    const nextPlacementKey = e.target.value;
+                    if (!nextPlacementKey) {
+                      setPlacementKey("");
+                      setSiteScope("all");
+                      setAssetMode("placements");
+                    } else {
+                      setPlacementKey(nextPlacementKey);
+                      setSiteScope("placement");
+                      setAssetMode("placements");
+                    }
+                    setSelectedAsset(null);
+                    setItems([]);
+                    setNotice(null);
+                  }}
+                  style={inputStyle}
+                >
+                  <option value="">All Sites</option>
+                  {browsePlacementOptions.map((placement) => (
+                    <option key={placement.placement_id} value={String(placement.placement_id)}>
+                      {placementLabel(placement)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+
             {workspaceMode !== "upload" && workspaceMode !== "import" && (
               <label style={labelStyle}>
                 Team Member
@@ -2084,9 +2363,9 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                   style={inputStyle}
                 >
                   <option value="">All Team Members</option>
-                  {(options?.uploaders ?? []).map((uploader) => (
-                    <option key={uploader.id} value={String(uploader.id)}>
-                      {uploader.name}
+                  {browseUploaderOptions.map((option) => (
+                    <option key={option.uploader.id} value={String(option.uploader.id)}>
+                      {option.uploader.name} ({option.count})
                     </option>
                   ))}
                 </select>
@@ -2094,29 +2373,37 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
             )}
 
             {workspaceMode !== "sites" && (
-              <label style={labelStyle}>
-              {workspaceMode === "upload" || workspaceMode === "import" ? "Program Week / Activity Tag" : "Program Week / Activity"}
-              <select
-                value={activityTagFilter}
-                onChange={(e) => {
-                  setActivityTagFilter(e.target.value);
-                  setSelectedAsset(null);
-                }}
-                style={inputStyle}
-              >
-                <option value="">{workspaceMode === "upload" || workspaceMode === "import" ? "No activity tag" : "All Activities"}</option>
-                {(options?.activities ?? []).map((activity) => (
-                  <option key={activity.id} value={String(activity.id)}>
-                    {activity.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+              <>
+                <label style={labelStyle}>
+                  {workspaceMode === "upload" || workspaceMode === "import" ? "Program Week / Activity Tag" : "Program Week / Activity"}
+                  <select
+                    value={activityTagFilter}
+                    onChange={(e) => {
+                      setActivityTagFilter(e.target.value);
+                      setSelectedAsset(null);
+                    }}
+                    style={inputStyle}
+                  >
+                    <option value="">{workspaceMode === "upload" || workspaceMode === "import" ? "No activity tag" : "All Activities"}</option>
+                    {(options?.activities ?? []).map((activity) => (
+                      <option key={activity.id} value={String(activity.id)}>
+                        {activity.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {(workspaceMode === "upload" || workspaceMode === "import") && !activityTagFilter && (
+                  <div style={activityWarningStyle}>
+                    <span style={activityWarningIconStyle} aria-hidden="true">warning</span>
+                    Please add an activity tag first.
+                  </div>
+                )}
+              </>
             )}
 
             {workspaceMode !== "upload" && workspaceMode !== "import" && (
               <label style={labelStyle}>
-                Context
+                Program Context
                 <select
                   value={browseContextFilter}
                   onChange={(e) => {
@@ -2129,7 +2416,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                   }}
                   style={inputStyle}
                 >
-                  <option value="all">Both EarlyON and Regular Sites</option>
+                  <option value="all">All Sites (EarlyON and Regular)</option>
                   <option value="earlyon">EarlyON Sites Only</option>
                   <option value="nonEarlyon">Regular Sites Only</option>
                 </select>
@@ -2161,6 +2448,84 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
             )}
 
             {workspaceMode === "sites" && (
+              <label style={labelStyle}>
+                Delivery Day
+                <select
+                  value={deliveryDayFilter}
+                  onChange={(e) => {
+                    setDeliveryDayFilter(e.target.value as DeliveryDayFilter);
+                    setPlacementKey("");
+                    setSiteScope("select");
+                    setSelectedAsset(null);
+                    setItems([]);
+                  }}
+                  style={inputStyle}
+                >
+                  {DELIVERY_DAY_OPTIONS.map((option) => (
+                    <option key={option.value || "all"} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+
+            {workspaceMode === "sites" && (
+              <label style={labelStyle}>
+                Time of Day
+                <select
+                  value={timeOfDayFilter}
+                  onChange={(e) => {
+                    setTimeOfDayFilter(e.target.value);
+                    setPlacementKey("");
+                    setSiteScope("select");
+                    setSelectedAsset(null);
+                    setItems([]);
+                  }}
+                  style={inputStyle}
+                >
+                  <option value="">All Times</option>
+                  {timeOfDayOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+
+            {workspaceMode === "sites" && (
+              <label style={labelStyle}>
+                Age Range
+                <select
+                  value={ageRangeFilter}
+                  onChange={(e) => {
+                    setAgeRangeFilter(e.target.value);
+                    setPlacementKey("");
+                    setSiteScope("select");
+                    setSelectedAsset(null);
+                    setItems([]);
+                  }}
+                  style={inputStyle}
+                >
+                  <option value="">All Age Ranges</option>
+                  {ageRangeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+
+            {workspaceMode === "sites" && hasActiveSiteFilters && (
+              <button type="button" onClick={clearSiteFilters} style={clearFiltersButtonStyle}>
+                <span style={siteActionIconStyle} aria-hidden="true">filter_alt_off</span>
+                Clear Filters
+              </button>
+            )}
+
+            {workspaceMode === "sites" && (
               <div style={sidebarSummaryStyle}>
                 {filteredPlacements.length} visible site{filteredPlacements.length === 1 ? "" : "s"}
               </div>
@@ -2175,7 +2540,11 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                     const nextAssetMode = e.target.value as "placements" | "untagged";
                     setAssetMode(nextAssetMode);
                     if (nextAssetMode === "untagged") {
+                      setUploaderKey("");
+                      setActivityTagFilter("");
                       setBrowseContextFilter("all");
+                      setTimeOfDayFilter("");
+                      setAgeRangeFilter("");
                       setBrowsePartnerKey("");
                     }
                     setPlacementKey("");
@@ -2261,13 +2630,11 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
               ) : (
                 renderChooseSitePrompt("import")
               )
-            ) : assetMode === "placements" && siteScope === "select" ? (
-              renderChooseSitePrompt("browse")
             ) : selectedPlacement ? (
               <>
                 <div style={detailHeaderStyle}>
                   <div>
-                    {renderSiteBreadcrumb(placementLabel(selectedPlacement))}
+                    {renderSiteBreadcrumb(placementLabel(selectedPlacement), browseBreadcrumbParents)}
                     <div style={detailMetaStyle}>
                       Lead: {selectedPlacement.team_member_name ?? "Unassigned"}
                       {selectedPlacement.secondary_team_member_name
@@ -2298,7 +2665,9 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
             ) : (
               <>
                 <div style={detailHeaderStyle}>
-                  {siteScope === "all" ? renderSiteBreadcrumb("All Sites") : <h2 style={detailTitleStyle}>Assets</h2>}
+                  {assetMode === "placements"
+                    ? renderSiteBreadcrumb("All Sites", browseBreadcrumbParents)
+                    : <h2 style={detailTitleStyle}>Assets</h2>}
                   <div style={detailHeaderActionsStyle}>
                     <div style={countBadgeStyle}>
                       {assetsLoading ? "..." : placementAssets.length} upload{placementAssets.length === 1 ? "" : "s"}
@@ -2554,7 +2923,7 @@ const siteSelectionPanelStyle: React.CSSProperties = {
 
 const siteChoiceGridStyle: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+  gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))",
   gap: 10,
 };
 
@@ -2577,34 +2946,80 @@ const siteCardContentStyle: React.CSSProperties = {
   minWidth: 0,
 };
 
+const siteLogoRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  flexWrap: "wrap",
+  marginBottom: 4,
+};
+
 const sitePartnerLogoStyle: React.CSSProperties = {
+  maxWidth: 200,
+  maxHeight: 64,
+  objectFit: "contain",
+  objectPosition: "left center",
+};
+
+const siteEarlyOnLogoStyle: React.CSSProperties = {
   maxWidth: 104,
   maxHeight: 42,
   objectFit: "contain",
   objectPosition: "left center",
-  marginBottom: 4,
 };
 
 const siteActionRowStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
-  gap: 8,
+  gap: 6,
   flexWrap: "wrap",
   marginTop: 10,
 };
 
 const siteActionButtonStyle: React.CSSProperties = {
-  ...secondaryButtonStyle,
-  minWidth: 88,
+  display: "inline-flex",
+  alignItems: "center",
   justifyContent: "center",
+  gap: 5,
+  minWidth: 72,
+  minHeight: 32,
+  background: "transparent",
+  color: "#ddd",
+  border: "1px solid rgba(255,255,255,0.22)",
+  borderRadius: 4,
+  padding: "5px 8px",
+  cursor: "pointer",
+  font: "inherit",
+  fontSize: 13,
+  lineHeight: 1.2,
+  whiteSpace: "nowrap",
   textAlign: "center",
+  boxSizing: "border-box",
+  appearance: "none",
 };
 
 const siteActionLinkStyle: React.CSSProperties = {
   ...siteActionButtonStyle,
+  textDecoration: "none",
+};
+
+const clearFiltersButtonStyle: React.CSSProperties = {
+  ...secondaryButtonStyle,
   display: "inline-flex",
   alignItems: "center",
-  textDecoration: "none",
+  justifyContent: "center",
+  gap: 6,
+  width: "100%",
+  boxSizing: "border-box",
+};
+
+const siteActionIconStyle: React.CSSProperties = {
+  fontFamily: "'Material Symbols Outlined'",
+  fontSize: 16,
+  fontWeight: 400,
+  lineHeight: 1,
+  fontStyle: "normal",
+  fontVariationSettings: "'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24",
 };
 
 const promptActionStyle: React.CSSProperties = {
@@ -2618,11 +3033,40 @@ const placementNameStyle: React.CSSProperties = {
   lineHeight: 1.35,
 };
 
+const placementMetaGroupStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 4,
+};
+
 const placementMetaStyle: React.CSSProperties = {
-  display: "block",
+  display: "flex",
+  alignItems: "center",
+  gap: 5,
   color: "#8f98a8",
   fontSize: 12,
   lineHeight: 1.3,
+};
+
+const placementMetaLinkStyle: React.CSSProperties = {
+  ...placementMetaStyle,
+  textDecoration: "none",
+  whiteSpace: "pre-line",
+};
+
+const placementLocationLinkStyle: React.CSSProperties = {
+  ...placementMetaLinkStyle,
+  borderTop: "1px solid rgba(255,255,255,0.08)",
+  paddingTop: 8,
+  marginTop: 4,
+};
+
+const placementMetaIconStyle: React.CSSProperties = {
+  fontFamily: "'Material Symbols Outlined'",
+  fontSize: 15,
+  fontWeight: 400,
+  lineHeight: 1,
+  fontStyle: "normal",
+  fontVariationSettings: "'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 20",
 };
 
 const detailStyle: React.CSSProperties = {
@@ -2672,6 +3116,19 @@ const breadcrumbButtonStyle: React.CSSProperties = {
 const breadcrumbSeparatorStyle: React.CSSProperties = {
   color: "#697181",
   fontSize: 18,
+  lineHeight: 1.3,
+};
+
+const breadcrumbSegmentStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 8,
+};
+
+const breadcrumbParentStyle: React.CSSProperties = {
+  color: "#d8e7ff",
+  fontSize: 18,
+  fontWeight: 600,
   lineHeight: 1.3,
 };
 
@@ -2725,6 +3182,24 @@ const labelStyle: React.CSSProperties = {
   fontSize: 13,
   color: "#aaa",
   minWidth: 0,
+};
+
+const activityWarningStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  color: "#f4c95d",
+  fontSize: 12,
+  lineHeight: 1.35,
+};
+
+const activityWarningIconStyle: React.CSSProperties = {
+  fontFamily: "'Material Symbols Outlined'",
+  fontSize: 17,
+  fontWeight: 400,
+  lineHeight: 1,
+  fontStyle: "normal",
+  fontVariationSettings: "'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 20",
 };
 
 const checkboxLabelStyle: React.CSSProperties = {
