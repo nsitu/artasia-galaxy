@@ -150,10 +150,6 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
         setOptions(data);
         const currentUser = data.currentUser ?? auth;
         setAuthUser(currentUser);
-        const matchedUploaderId = data.currentUser?.uploader_id ?? auth.uploader?.id ?? null;
-        if (matchedUploaderId) {
-          setUploaderKey(String(matchedUploaderId));
-        }
       })
       .catch((err) => setError((err as Error).message));
   }, [options]);
@@ -261,6 +257,22 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
 
   function placementIncludesUploader(placement: UploadOptions["placements"][number], uploaderId: number) {
     return placement.team_member_id === uploaderId || placement.secondary_team_member_id === uploaderId;
+  }
+
+  function selectMyAssets() {
+    const matchedUploaderId = authUser?.uploader_id ?? authUser?.uploader?.id ?? null;
+    if (!matchedUploaderId) {
+      setError("No matching Artasia Team Member email was found for your account.");
+      return;
+    }
+
+    setUploaderKey(String(matchedUploaderId));
+    setBrowsePartnerKey("");
+    setPlacementKey("");
+    setSelectedAsset(null);
+    setItems([]);
+    setNotice(null);
+    setError(null);
   }
 
   function placementMatchesBrowseContext(placement: UploadOptions["placements"][number]) {
@@ -1742,14 +1754,22 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
           {authUser?.authenticated ? (
             <>
               <span>
-                Signed in as {authUser.email}
-                {authUser.uploader_name || authUser.uploader?.name
-                  ? ` - matched to ${authUser.uploader_name ?? authUser.uploader?.name}`
-                  : " - no matching Artasia Team Member email"}
+                Hello, {authUser.uploader_name ?? authUser.uploader?.name ?? authUser.name ?? "Artasia user"}
+                {authUser.email ? ` (${authUser.email})` : ""}
               </span>
-              <button type="button" onClick={signOut} style={secondaryButtonStyle}>
-                Sign out
-              </button>
+              <div style={authActionGroupStyle}>
+                <button
+                  type="button"
+                  onClick={selectMyAssets}
+                  disabled={!authUser.uploader_id && !authUser.uploader?.id}
+                  style={secondaryButtonStyle}
+                >
+                  My Assets
+                </button>
+                <button type="button" onClick={signOut} style={secondaryButtonStyle}>
+                  Sign out
+                </button>
+              </div>
             </>
           ) : (
             <>
@@ -1893,7 +1913,12 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                 <select
                   value={assetMode}
                   onChange={(e) => {
-                    setAssetMode(e.target.value as "placements" | "untagged" | "all");
+                    const nextAssetMode = e.target.value as "placements" | "untagged" | "all";
+                    setAssetMode(nextAssetMode);
+                    if (nextAssetMode !== "placements") {
+                      setBrowseContextFilter("all");
+                      setBrowsePartnerKey("");
+                    }
                     setPlacementKey("");
                     setSelectedAsset(null);
                     setItems([]);
@@ -2319,6 +2344,13 @@ const authBarStyle: React.CSSProperties = {
   flexWrap: "wrap",
 };
 
+const authActionGroupStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  flexWrap: "wrap",
+};
+
 const primaryLinkButtonStyle: React.CSSProperties = {
   color: "#0b0d12",
   background: "#e8edf8",
@@ -2382,6 +2414,8 @@ const placementMenuStyle: React.CSSProperties = {
   minWidth: 0,
   maxHeight: "calc(100vh - 200px)",
   overflow: "auto",
+  padding: "1rem",
+  boxSizing: "border-box",
 };
 
 const menuHeaderStyle: React.CSSProperties = {
