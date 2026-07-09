@@ -279,7 +279,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     return authUser?.uploader_id ?? authUser?.uploader?.id ?? null;
   }
 
-  function selectMyAssets() {
+  function selectMySites() {
     const matchedUploaderId = matchedAuthUploaderId();
     if (!matchedUploaderId) {
       setError("No matching Artasia Team Member email was found for your account.");
@@ -290,6 +290,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     setBrowsePartnerKey("");
     setPlacementKey("");
     setSiteScope("select");
+    setWorkspaceMode("sites");
     setSelectedAsset(null);
     setItems([]);
     setNotice(null);
@@ -331,7 +332,13 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   }, [browseContextFilter, options, selectedUploader, workspaceMode]);
 
   const selectedPlacement = useMemo(() => {
-    return filteredPlacements.find((placement) => String(placement.placement_id) === placementKey) ?? null;
+    if (!options || !placementKey) return null;
+    return options.placements.find((placement) => String(placement.placement_id) === placementKey) ?? null;
+  }, [options, placementKey]);
+
+  const selectedPlacementMatchesCurrentFilters = useMemo(() => {
+    if (!placementKey) return false;
+    return filteredPlacements.some((placement) => String(placement.placement_id) === placementKey);
   }, [filteredPlacements, placementKey]);
 
   const visiblePlacementIds = useMemo(() => {
@@ -356,10 +363,11 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
 
   useEffect(() => {
     if (siteScope !== "placement") return;
-    if (filteredPlacements.some((placement) => String(placement.placement_id) === placementKey)) return;
+    if (workspaceMode === "upload" && selectedPlacement) return;
+    if (selectedPlacementMatchesCurrentFilters) return;
     setPlacementKey("");
     setSiteScope("select");
-  }, [filteredPlacements, placementKey, siteScope]);
+  }, [selectedPlacement, selectedPlacementMatchesCurrentFilters, siteScope, workspaceMode]);
 
   useEffect(() => {
     if (workspaceMode === "upload") return;
@@ -1851,11 +1859,11 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
               <div style={authActionGroupStyle}>
                 <button
                   type="button"
-                  onClick={selectMyAssets}
+                  onClick={selectMySites}
                   disabled={!authUser.uploader_id && !authUser.uploader?.id}
                   style={secondaryButtonStyle}
                 >
-                  My Assets
+                  My Sites
                 </button>
                 <button type="button" onClick={signOut} style={secondaryButtonStyle}>
                   Sign out
