@@ -47,6 +47,7 @@ interface UploadItem {
 }
 
 type NoticeTone = "success" | "warning";
+type BrowseContextFilter = "all" | "earlyon" | "nonEarlyon";
 
 interface UploadPanelProps {
   initialError?: string | null;
@@ -67,6 +68,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [uploaderKey, setUploaderKey] = useState("");
   const [browsePartnerKey, setBrowsePartnerKey] = useState("");
+  const [browseContextFilter, setBrowseContextFilter] = useState<BrowseContextFilter>("all");
   const [placementKey, setPlacementKey] = useState("");
   const [activityTagFilter, setActivityTagFilter] = useState("");
   const [items, setItems] = useState<UploadItem[]>([]);
@@ -239,14 +241,20 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     return placement.team_member_id === uploaderId || placement.secondary_team_member_id === uploaderId;
   }
 
+  function placementMatchesBrowseContext(placement: UploadOptions["placements"][number]) {
+    if (workspaceMode !== "browse" || browseContextFilter === "all") return true;
+    return browseContextFilter === "earlyon" ? placement.is_earlyon : !placement.is_earlyon;
+  }
+
   const filteredPlacements = useMemo(() => {
     if (!options) return [];
     const uploaderFilteredPlacements = selectedUploader
       ? options.placements.filter((placement) => placementIncludesUploader(placement, selectedUploader.id))
       : options.placements;
-    if (workspaceMode !== "browse" || !browsePartnerKey) return uploaderFilteredPlacements;
-    return uploaderFilteredPlacements.filter((placement) => placement.partner_name?.trim() === browsePartnerKey);
-  }, [browsePartnerKey, options, selectedUploader, workspaceMode]);
+    const contextFilteredPlacements = uploaderFilteredPlacements.filter(placementMatchesBrowseContext);
+    if (workspaceMode !== "browse" || !browsePartnerKey) return contextFilteredPlacements;
+    return contextFilteredPlacements.filter((placement) => placement.partner_name?.trim() === browsePartnerKey);
+  }, [browseContextFilter, browsePartnerKey, options, selectedUploader, workspaceMode]);
 
   const browsePartnerOptions = useMemo(() => {
     if (!options) return [];
@@ -254,8 +262,9 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     const uploaderFilteredPlacements = selectedUploader
       ? options.placements.filter((placement) => placementIncludesUploader(placement, selectedUploader.id))
       : options.placements;
+    const contextFilteredPlacements = uploaderFilteredPlacements.filter(placementMatchesBrowseContext);
 
-    for (const placement of uploaderFilteredPlacements) {
+    for (const placement of contextFilteredPlacements) {
       const partnerName = placement.partner_name?.trim();
       if (!partnerName) continue;
       counts.set(partnerName, (counts.get(partnerName) ?? 0) + 1);
@@ -264,7 +273,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     return Array.from(counts.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([partnerName, count]) => ({ partnerName, count }));
-  }, [options, selectedUploader]);
+  }, [browseContextFilter, options, selectedUploader, workspaceMode]);
 
   const selectedPlacement = useMemo(() => {
     return filteredPlacements.find((placement) => String(placement.placement_id) === placementKey) ?? null;
@@ -1782,6 +1791,27 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                 ))}
               </select>
             </label>
+
+            {workspaceMode === "browse" && (
+              <label style={labelStyle}>
+                Context
+                <select
+                  value={browseContextFilter}
+                  onChange={(e) => {
+                    setBrowseContextFilter(e.target.value as BrowseContextFilter);
+                    setBrowsePartnerKey("");
+                    setPlacementKey("");
+                    setSelectedAsset(null);
+                    setItems([]);
+                  }}
+                  style={inputStyle}
+                >
+                  <option value="all">All Sites</option>
+                  <option value="earlyon">EarlyON Sites</option>
+                  <option value="nonEarlyon">Non-EarlyON Sites</option>
+                </select>
+              </label>
+            )}
 
             {workspaceMode === "browse" && (
               <label style={labelStyle}>

@@ -71,6 +71,7 @@ export interface UploadPlacement {
   team_member_name?: string;
   secondary_team_member_id?: number;
   secondary_team_member_name?: string;
+  is_earlyon: boolean;
   partner_name: string;
   partner_logo?: {
     id: number;
