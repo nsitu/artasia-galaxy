@@ -22,6 +22,16 @@ export const ALLOWED_UPLOAD_MIME_TYPES = new Set([
   "video/webm",
 ]);
 
+export const GENERIC_UPLOAD_MIME_TYPES = new Set([
+  "",
+  "application/octet-stream",
+]);
+
+export const HEIC_UPLOAD_EXTENSIONS = new Set([
+  ".heic",
+  ".heif",
+]);
+
 export const ALLOWED_UPLOAD_EXTENSIONS = new Set([
   ".jpg",
   ".jpeg",

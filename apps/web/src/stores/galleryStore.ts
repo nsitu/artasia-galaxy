@@ -2,8 +2,13 @@ import { create } from "zustand";
 import type { Photo } from "../api/client";
 import { fetchSlideshow } from "../api/client";
 
+type GalleryPhotoScope =
+  | { mode: "regional" }
+  | { mode: "placement"; placementId: number; activityId?: number };
+
 interface GalleryState {
   photos: Photo[];
+  photoScope: GalleryPhotoScope;
   selectedPhotoIndex: number | null;
   loading: boolean;
   error: string | null;
@@ -19,32 +24,56 @@ interface GalleryState {
   selectPhoto: (index: number | null) => void;
 }
 
+let galleryRequestId = 0;
+
 export const useGalleryStore = create<GalleryState>((set) => ({
   photos: [],
+  photoScope: { mode: "regional" },
   selectedPhotoIndex: null,
   loading: false,
   error: null,
 
   fetchPhotos: async () => {
-    set({ loading: true, error: null });
+    const requestId = ++galleryRequestId;
+    set({
+      photos: [],
+      photoScope: { mode: "regional" },
+      loading: true,
+      error: null,
+      selectedPhotoIndex: null,
+    });
     try {
       const result = await fetchSlideshow({});
-      set({ photos: result.photos, loading: false });
+      if (requestId === galleryRequestId) {
+        set({ photos: result.photos, photoScope: { mode: "regional" }, loading: false });
+      }
     } catch (err) {
-      set({ error: (err as Error).message, loading: false });
+      if (requestId === galleryRequestId) {
+        set({ error: (err as Error).message, loading: false });
+      }
     }
   },
 
   fetchPlacementFocus: async (params) => {
-    set({ loading: true, error: null, selectedPhotoIndex: null });
+    const requestId = ++galleryRequestId;
+    const scope: GalleryPhotoScope = {
+      mode: "placement",
+      placementId: params.placementId,
+      ...(params.activityId != null ? { activityId: params.activityId } : {}),
+    };
+    set({ photos: [], photoScope: scope, loading: true, error: null, selectedPhotoIndex: null });
     try {
       const result = await fetchSlideshow({
         placementFocus: params,
         limit: 500,
       });
-      set({ photos: result.photos, loading: false });
+      if (requestId === galleryRequestId) {
+        set({ photos: result.photos, photoScope: scope, loading: false });
+      }
     } catch (err) {
-      set({ error: (err as Error).message, loading: false });
+      if (requestId === galleryRequestId) {
+        set({ error: (err as Error).message, loading: false });
+      }
     }
   },
 

@@ -45,6 +45,8 @@ import {
 import {
   ALLOWED_UPLOAD_EXTENSIONS,
   ALLOWED_UPLOAD_MIME_TYPES,
+  GENERIC_UPLOAD_MIME_TYPES,
+  HEIC_UPLOAD_EXTENSIONS,
   UPLOAD_LIMITS,
 } from "../services/uploadLimits.js";
 
@@ -93,10 +95,16 @@ function cleanup(file: Express.Multer.File) {
 
 function validateFile(file: Express.Multer.File) {
   const extension = extname(file.originalname).toLowerCase();
-  if (!ALLOWED_UPLOAD_MIME_TYPES.has(file.mimetype)) {
+  const hasAllowedExtension = ALLOWED_UPLOAD_EXTENSIONS.has(extension);
+  const hasAllowedMimeType = ALLOWED_UPLOAD_MIME_TYPES.has(file.mimetype);
+  const isGenericHeicUpload =
+    HEIC_UPLOAD_EXTENSIONS.has(extension) &&
+    GENERIC_UPLOAD_MIME_TYPES.has(file.mimetype);
+
+  if (!hasAllowedMimeType && !isGenericHeicUpload) {
     return `Unsupported file type: ${file.mimetype}`;
   }
-  if (!ALLOWED_UPLOAD_EXTENSIONS.has(extension)) {
+  if (!hasAllowedExtension) {
     return `Unsupported file extension: ${extension || "(none)"}`;
   }
   return null;

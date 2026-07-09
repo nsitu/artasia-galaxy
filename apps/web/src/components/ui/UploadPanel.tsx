@@ -48,6 +48,7 @@ const MEDIA_REFRESH_DELAYS_MS = [1500, 3000, 6000, 10000, 15000];
 const DEFAULT_ADJUSTMENTS: AssetAdjustments = { brightness: 100, contrast: 100, saturation: 100 };
 const MIN_ADJUSTMENT = 50;
 const MAX_ADJUSTMENT = 150;
+const UPLOAD_ACCEPT_TYPES = "image/*,video/*,.heic,.heif,image/heic,image/heif";
 
 export default function UploadPanel({ initialError, onSignedOut }: UploadPanelProps) {
   const [options, setOptions] = useState<UploadOptions | null>(null);
@@ -1625,7 +1626,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                           ref={inputRef}
                           type="file"
                           multiple
-                          accept="image/*,video/*"
+                          accept={UPLOAD_ACCEPT_TYPES}
                           style={{ display: "none" }}
                           disabled={!selectedUploader}
                           onChange={(e) => e.target.files && addFiles(e.target.files)}

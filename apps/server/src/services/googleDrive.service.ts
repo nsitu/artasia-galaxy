@@ -8,6 +8,8 @@ const IMAGE_MIME_TYPES = [
   "image/gif",
   "image/webp",
   "image/bmp",
+  "image/heic",
+  "image/heif",
 ];
 const VIDEO_MIME_TYPES = ["video/mp4", "video/quicktime", "video/x-msvideo"];
 const SUPPORTED_MIME_TYPES = [...IMAGE_MIME_TYPES, ...VIDEO_MIME_TYPES];

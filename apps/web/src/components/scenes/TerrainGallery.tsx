@@ -414,6 +414,7 @@ export default function TerrainGallery({
   const controls = useThree((state) => (state as unknown as { controls?: TerrainOrbitControls }).controls);
   const usesTouchPreview = useTouchPreviewMode();
   const photos = useGalleryStore((s) => s.photos);
+  const photoScope = useGalleryStore((s) => s.photoScope);
   const galleryLoading = useGalleryStore((s) => s.loading);
   const selectedIndex = useGalleryStore((s) => s.selectedPhotoIndex);
   const selectPhoto = useGalleryStore((s) => s.selectPhoto);
@@ -435,16 +436,6 @@ export default function TerrainGallery({
   const [previewPlacement, setPreviewPlacement] = useState<MapPlacement | null>(null);
   const terrainCacheRef = useRef<Map<string, TerrainCacheEntry>>(new Map());
 
-  const geoPhotos = useMemo(() => {
-    return getGeoPhotos(photos);
-  }, [photos]);
-  const geoPlacements = useMemo(
-    () =>
-      (focusedPlacement ? [focusedPlacement] : placements)
-        .filter((placement) => Number.isFinite(placement.lat) && Number.isFinite(placement.lng))
-        .map((placement) => ({ lat: placement.lat, lng: placement.lng })),
-    [focusedPlacement, placements]
-  );
   const partnerFilterOptions = useMemo<PartnerFilterOption[]>(() => {
     const counts = new Map<string, number>();
     for (const placement of placements) {
@@ -465,6 +456,24 @@ export default function TerrainGallery({
     const value = parseInt(selectedActivityFilter, 10);
     return Number.isFinite(value) ? value : undefined;
   }, [selectedActivityFilter]);
+  const photosForCurrentView = useMemo(() => {
+    if (focusedPlacement) {
+      return isMatchingPlacementPhotoScope(photoScope, focusedPlacement.placement_id, selectedActivityId)
+        ? photos
+        : [];
+    }
+    return photoScope.mode === "regional" ? photos : [];
+  }, [focusedPlacement, photoScope, photos, selectedActivityId]);
+  const geoPhotos = useMemo(() => {
+    return getGeoPhotos(photosForCurrentView);
+  }, [photosForCurrentView]);
+  const geoPlacements = useMemo(
+    () =>
+      (focusedPlacement ? [focusedPlacement] : placements)
+        .filter((placement) => Number.isFinite(placement.lat) && Number.isFinite(placement.lng))
+        .map((placement) => ({ lat: placement.lat, lng: placement.lng })),
+    [focusedPlacement, placements]
+  );
   const visiblePlacements = useMemo(
     () => focusedPlacement ? [focusedPlacement] : filteredRegionalPlacements,
     [filteredRegionalPlacements, focusedPlacement]
@@ -508,7 +517,7 @@ export default function TerrainGallery({
       terrain ? sampleTerrainZ(terrain, placementX, placementY) ?? placementZ : placementZ,
     ] as [number, number, number];
 
-    return photos.map((photo, index) => {
+    return photosForCurrentView.map((photo, index) => {
       const lat = photo.exifInfo?.latitude;
       const lng = photo.exifInfo?.longitude;
       if (Number.isFinite(lat) && Number.isFinite(lng)) {
@@ -541,7 +550,7 @@ export default function TerrainGallery({
         center: placementCenter,
       };
     });
-  }, [focusedPlacement, photos, projection, terrain]);
+  }, [focusedPlacement, photosForCurrentView, projection, terrain]);
   const placementLayout = useMemo(() => {
     if (!projection) return [];
     const projected = visiblePlacements.flatMap((placement) => {
@@ -843,7 +852,7 @@ export default function TerrainGallery({
     frameTerrainCamera(camera, terrain, controls, focusedPlacement ? LOCAL_CAMERA_FIT_SCALE : REGIONAL_CAMERA_FIT_SCALE);
   }, [camera, controls, focusedPlacement, terrain, terrainMatchesRequest]);
 
-  const isPreparingTerrain = photos.length === 0 && placements.length === 0 && !placementError;
+  const isPreparingTerrain = photosForCurrentView.length === 0 && placements.length === 0 && !placementError;
   const hasNoTerrainLocations = !isPreparingTerrain && geoPhotos.length === 0 && geoPlacements.length === 0;
 
   const notice = useMemo<TerrainNotice | null>(() => {
@@ -1269,6 +1278,16 @@ function updateViewerPath(path: string, replace = false) {
   if (replace) window.history.replaceState(null, "", path);
   else window.history.pushState(null, "", path);
   window.dispatchEvent(new PopStateEvent("popstate"));
+}
+
+function isMatchingPlacementPhotoScope(
+  scope: { mode: "regional" } | { mode: "placement"; placementId: number; activityId?: number },
+  placementId: number,
+  activityId?: number,
+) {
+  return scope.mode === "placement" &&
+    scope.placementId === placementId &&
+    (scope.activityId ?? null) === (activityId ?? null);
 }
 
 const siteDetailsStyle: React.CSSProperties = {

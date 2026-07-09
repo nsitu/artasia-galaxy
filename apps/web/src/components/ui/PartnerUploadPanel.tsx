@@ -16,6 +16,7 @@ interface UploadItem {
 type UploadPlacement = UploadOptions["placements"][number];
 
 const THUMBNAIL_RETRY_DELAYS_MS = [1500, 3000, 6000, 10000, 15000];
+const UPLOAD_ACCEPT_TYPES = "image/*,video/*,.heic,.heif,image/heic,image/heif";
 
 interface PartnerOption {
   name: string;
@@ -524,7 +525,7 @@ export default function PartnerUploadPanel() {
           <input
             ref={inputRef}
             type="file"
-            accept="image/*,video/*"
+            accept={UPLOAD_ACCEPT_TYPES}
             multiple
             hidden
             disabled={!selectedPlacement}
