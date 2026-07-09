@@ -33,7 +33,10 @@ import RetryableUploadThumbnail from "./RetryableUploadThumbnail";
 
 interface UploadItem {
   id: string;
-  file: File;
+  source: "upload" | "drive";
+  file?: File;
+  fileName: string;
+  fileSize?: number;
   status: "queued" | "uploading" | "processing" | "completed" | "failed" | "retrying";
   progress: number;
   error?: string;
@@ -42,6 +45,8 @@ interface UploadItem {
   captionStatus?: "idle" | "saving" | "saved" | "failed";
   captionError?: string;
 }
+
+type NoticeTone = "success" | "warning";
 
 interface UploadPanelProps {
   initialError?: string | null;
@@ -73,6 +78,10 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   const [manageUploaderKey, setManageUploaderKey] = useState("");
   const [manageActivityTag, setManageActivityTag] = useState("");
   const [managePublished, setManagePublished] = useState(false);
+  const [manageCaption, setManageCaption] = useState("");
+  const [captionSaving, setCaptionSaving] = useState(false);
+  const [captionSaveStatus, setCaptionSaveStatus] = useState<"idle" | "saved" | "failed">("idle");
+  const [captionSaveError, setCaptionSaveError] = useState<string | null>(null);
   const [savingAsset, setSavingAsset] = useState(false);
   const [deletingAsset, setDeletingAsset] = useState(false);
   const [cropEditing, setCropEditing] = useState(false);
@@ -88,6 +97,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   const [mediaRefreshAssetId, setMediaRefreshAssetId] = useState<string | null>(null);
   const [mediaRefreshAttempt, setMediaRefreshAttempt] = useState(0);
   const [assetsLoading, setAssetsLoading] = useState(false);
+  const [notice, setNotice] = useState<{ tone: NoticeTone; message: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const cropImageRef = useRef<HTMLImageElement | null>(null);
@@ -380,11 +390,15 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
 
     const files = Array.from(fileList);
     setError(null);
+    setNotice(null);
     setItems((current) => [
       ...current,
       ...files.map((file) => ({
         id: `${file.name}-${file.size}-${file.lastModified}-${crypto.randomUUID()}`,
+        source: "upload" as const,
         file,
+        fileName: file.name,
+        fileSize: file.size,
         status: "queued" as const,
         progress: 0,
       })),
@@ -409,9 +423,13 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     }
 
     uploadInProgressRef.current = true;
-    const queued = items.filter((item) => item.status === "queued" || item.status === "failed");
+    const queued = items.filter((item) =>
+      item.file && (item.status === "queued" || item.status === "failed")
+    );
     try {
       for (const item of queued) {
+        const file = item.file;
+        if (!file) continue;
         setItems((current) =>
           current.map((entry) =>
             entry.id === item.id
@@ -427,7 +445,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
 
         try {
           const results = await uploadFiles({
-            files: [item.file],
+            files: [file],
             uploader: selectedUploader,
             location: selectedPlacement,
             activityId: activityTagFilter ? parseInt(activityTagFilter, 10) : undefined,
@@ -533,6 +551,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     setAssetMode("placements");
     setSelectedAsset(null);
     setItems([]);
+    setNotice(null);
     setError(null);
     if (selectedUploader && placementIncludesUploader(placement, selectedUploader.id)) return;
     if (placement.team_member_id) setUploaderKey(String(placement.team_member_id));
@@ -617,6 +636,17 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     );
   }
 
+  function updateAssetDescription(assetId: string, description: string) {
+    setPlacementAssets((current) =>
+      current.map((asset) =>
+        asset.id === assetId ? { ...asset, description } : asset
+      )
+    );
+    setSelectedAsset((current) =>
+      current?.id === assetId ? { ...current, description } : current
+    );
+  }
+
   function queueMediaRefresh(assetId: string) {
     setMediaRefreshAssetId(assetId);
     setMediaRefreshAttempt(0);
@@ -630,6 +660,9 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     setManageUploaderKey(asset.uploader_id ? String(asset.uploader_id) : "");
     setManageActivityTag(asset.activity_id ? String(asset.activity_id) : "");
     setManagePublished(Boolean(asset.published));
+    setManageCaption(asset.description ?? "");
+    setCaptionSaveStatus("idle");
+    setCaptionSaveError(null);
     setManageBrightness(adjustments.brightness);
     setManageContrast(adjustments.contrast);
     setManageSaturation(adjustments.saturation);
@@ -647,6 +680,10 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     setManageUploaderKey("");
     setManageActivityTag("");
     setManagePublished(false);
+    setManageCaption("");
+    setCaptionSaving(false);
+    setCaptionSaveStatus("idle");
+    setCaptionSaveError(null);
     setManageBrightness(DEFAULT_ADJUSTMENTS.brightness);
     setManageContrast(DEFAULT_ADJUSTMENTS.contrast);
     setManageSaturation(DEFAULT_ADJUSTMENTS.saturation);
@@ -737,6 +774,33 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
       setError((err as Error).message);
     } finally {
       setSavingAsset(false);
+    }
+  }
+
+  async function saveManagedCaption() {
+    if (!selectedAsset) return;
+    if (!authUser?.authenticated) {
+      setError("Sign in to edit captions.");
+      return;
+    }
+
+    const caption = manageCaption.trim();
+    setCaptionSaving(true);
+    setCaptionSaveStatus("idle");
+    setCaptionSaveError(null);
+    setError(null);
+
+    try {
+      await updateAssetCaption({ assetId: selectedAsset.id, caption });
+      updateAssetDescription(selectedAsset.id, caption);
+      setManageCaption(caption);
+      setCaptionSaveStatus("saved");
+      refreshVisibleAssets();
+    } catch (err) {
+      setCaptionSaveStatus("failed");
+      setCaptionSaveError((err as Error).message);
+    } finally {
+      setCaptionSaving(false);
     }
   }
 
@@ -971,11 +1035,13 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   async function syncSelectedDriveFiles() {
     if (selectedDriveFiles.size === 0) {
       setError("Select files to import from Google Drive");
+      setNotice(null);
       return;
     }
 
     setDriveSyncing(true);
     setError(null);
+    setNotice(null);
 
     try {
       const results = await syncDriveFiles({
@@ -986,21 +1052,36 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
 
       const succeeded = results.filter((r) => r.status === "success").length;
       const failed = results.filter((r) => r.status === "failed").length;
+      const importedItems: UploadItem[] = results.map((result) => ({
+        id: `drive-${result.fileId}-${crypto.randomUUID()}`,
+        source: "drive",
+        fileName: result.fileName,
+        status: result.status === "success" && result.assetId ? "completed" : "failed",
+        progress: 100,
+        assetId: result.assetId,
+        error: result.status === "failed" ? result.error ?? "Import failed" : undefined,
+      }));
+
+      if (importedItems.length > 0) {
+        setItems((current) => [...importedItems, ...current]);
+        setUploadMode("files");
+      }
 
       if (succeeded > 0) {
-        setError(
-          `Imported ${succeeded} file${succeeded === 1 ? "" : "s"}${
+        setNotice({
+          tone: failed > 0 ? "warning" : "success",
+          message: `Imported ${succeeded} file${succeeded === 1 ? "" : "s"}${
             failed > 0 ? ` (${failed} failed)` : ""
-          }`
-        );
+          }`,
+        });
         setSelectedDriveFiles(new Set());
-        setUploadMode("files");
         if (selectedPlacement) {
           fetchPlacementAssets(selectedPlacement.placement_id)
             .then(setPlacementAssets)
             .catch((err) => setError((err as Error).message));
         }
       } else {
+        setNotice(null);
         setError(
           `Failed to import files: ${results.map((r) => `${r.fileName}: ${r.error}`).join(", ")}`
         );
@@ -1079,6 +1160,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     setDriveDefaultOpening(true);
     setDriveLoading(true);
     setError(null);
+    setNotice(null);
 
     try {
       const sharedDrives = await fetchDriveFolders("sharedDrives", "root");
@@ -1292,6 +1374,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
       manageBrightness !== selectedAdjustments.brightness ||
       manageContrast !== selectedAdjustments.contrast ||
       manageSaturation !== selectedAdjustments.saturation;
+    const captionChanged = manageCaption.trim() !== (selectedAsset.description ?? "").trim();
     const displayPreviewUrl = mediaUrl(selectedAsset.previewUrl, selectedAsset.id);
     const cropSourceUrl = `/api/v1/assets/${selectedAsset.id}/preview?v=${encodeURIComponent(
       `${selectedAsset.updatedAt}-${cropRefreshKey}`
@@ -1410,6 +1493,35 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
             />
             Published
           </label>
+          <label style={labelStyle}>
+            Caption / Description
+            <textarea
+              value={manageCaption}
+              onChange={(e) => {
+                setManageCaption(e.target.value);
+                setCaptionSaveStatus("idle");
+                setCaptionSaveError(null);
+              }}
+              disabled={!authUser?.authenticated || captionSaving}
+              placeholder="Optional caption"
+              rows={4}
+              style={captionTextareaStyle}
+            />
+          </label>
+          <div style={captionManagerActionsStyle}>
+            <button
+              type="button"
+              onClick={() => void saveManagedCaption()}
+              disabled={!authUser?.authenticated || captionSaving || savingAsset || deletingAsset || cropSaving || adjustmentsSaving || !captionChanged}
+              style={secondaryButtonStyle}
+            >
+              {captionSaving ? "Saving Caption..." : "Save Caption"}
+            </button>
+            {captionSaveStatus === "saved" && <span style={captionStatusStyle}>Saved</span>}
+            {captionSaveStatus === "failed" && (
+              <span style={captionErrorStyle}>{captionSaveError ?? "Caption failed"}</span>
+            )}
+          </div>
           {authUser?.authenticated && selectedAsset.type === "IMAGE" && (
             <div style={adjustmentPanelStyle}>
               <label style={adjustmentLabelStyle}>
@@ -1459,7 +1571,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                     contrast: manageContrast,
                     saturation: manageSaturation,
                   })}
-                  disabled={adjustmentsLoading || adjustmentsSaving || cropSaving || savingAsset || deletingAsset || !adjustmentChanged}
+                  disabled={adjustmentsLoading || adjustmentsSaving || cropSaving || savingAsset || deletingAsset || captionSaving || !adjustmentChanged}
                   style={secondaryButtonStyle}
                 >
                   {adjustmentsSaving ? "Saving Adjustments..." : "Save Adjustments"}
@@ -1467,7 +1579,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                 <button
                   type="button"
                   onClick={resetAdjustments}
-                  disabled={adjustmentsLoading || adjustmentsSaving || cropSaving || savingAsset || deletingAsset}
+                  disabled={adjustmentsLoading || adjustmentsSaving || cropSaving || savingAsset || deletingAsset || captionSaving}
                   style={secondaryButtonStyle}
                 >
                   Reset Adjustments
@@ -1479,7 +1591,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
             <button
               type="button"
               onClick={saveSelectedAssetChanges}
-              disabled={savingAsset || deletingAsset || cropSaving || adjustmentsSaving || !canSaveAsset}
+              disabled={savingAsset || deletingAsset || cropSaving || adjustmentsSaving || captionSaving || !canSaveAsset}
               style={primaryActionButtonStyle}
             >
               {savingAsset ? "Saving..." : "Save"}
@@ -1490,7 +1602,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                   <button
                     type="button"
                     onClick={saveCrop}
-                    disabled={cropSaving || !cropRect}
+                    disabled={cropSaving || captionSaving || !cropRect}
                     style={primaryActionButtonStyle}
                   >
                     {cropSaving ? "Saving crop..." : "Save Crop"}
@@ -1501,7 +1613,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                       setCropEditing(false);
                       setCropRect(null);
                     }}
-                    disabled={cropSaving}
+                    disabled={cropSaving || captionSaving}
                     style={secondaryButtonStyle}
                   >
                     Cancel Crop
@@ -1512,7 +1624,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                   <button
                     type="button"
                     onClick={startCropEditing}
-                    disabled={cropLoading || cropSaving || savingAsset || deletingAsset || adjustmentsSaving}
+                    disabled={cropLoading || cropSaving || savingAsset || deletingAsset || adjustmentsSaving || captionSaving}
                     style={secondaryButtonStyle}
                   >
                     {cropLoading ? "Loading Crop..." : "Crop"}
@@ -1520,7 +1632,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                   <button
                     type="button"
                     onClick={resetCrop}
-                    disabled={cropSaving || savingAsset || deletingAsset || adjustmentsSaving}
+                    disabled={cropSaving || savingAsset || deletingAsset || adjustmentsSaving || captionSaving}
                     style={secondaryButtonStyle}
                   >
                     Reset Edits
@@ -1535,13 +1647,13 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
               <button
                 type="button"
                 onClick={deleteSelectedAsset}
-                disabled={savingAsset || deletingAsset || cropSaving || adjustmentsSaving}
+                disabled={savingAsset || deletingAsset || cropSaving || adjustmentsSaving || captionSaving}
                 style={dangerButtonStyle}
               >
                 {deletingAsset ? "Deleting..." : "Delete"}
               </button>
             )}
-            <button type="button" onClick={closeAssetManager} disabled={deletingAsset || cropSaving || adjustmentsSaving} style={secondaryButtonStyle}>
+            <button type="button" onClick={closeAssetManager} disabled={deletingAsset || cropSaving || adjustmentsSaving || captionSaving} style={secondaryButtonStyle}>
               Close
             </button>
           </div>
@@ -1589,6 +1701,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
           )}
         </div>
 
+        {notice && <div style={notice.tone === "success" ? successNoticeStyle : warningNoticeStyle}>{notice.message}</div>}
         {error && <div style={errorStyle}>{error}</div>}
 
         <div style={workspaceTabsStyle}>
@@ -1598,6 +1711,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
               setWorkspaceMode("browse");
               setSelectedAsset(null);
               setItems([]);
+              setNotice(null);
             }}
             style={{
               ...workspaceTabStyle,
@@ -1613,6 +1727,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
               setBrowsePartnerKey("");
               setSelectedAsset(null);
               setAssetMode("placements");
+              setNotice(null);
             }}
             style={{
               ...workspaceTabStyle,
@@ -1635,6 +1750,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                   setPlacementKey("");
                   setSelectedAsset(null);
                   setItems([]);
+                  setNotice(null);
                   setError(null);
                 }}
                 style={inputStyle}
@@ -1755,6 +1871,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                       onClick={() => {
                         setUploadMode("files");
                         setSelectedDriveFiles(new Set());
+                        setNotice(null);
                       }}
                       style={{
                         ...uploadModeTabStyle,
@@ -1832,14 +1949,18 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                               </div>
                               <div style={queueItemContentStyle}>
                                 <div style={queueItemMainStyle}>
-                                  <div style={{ color: "#eee" }}>{item.file.name}</div>
+                                  <div style={{ color: "#eee" }}>{item.fileName}</div>
                                   <div style={{ color: item.status === "failed" ? "#f88" : "#888", fontSize: 12 }}>
-                                    <span>{formatBytes(item.file.size)}</span>
-                                    <span style={queueMetaSeparatorStyle} aria-hidden="true" />
+                                    {typeof item.fileSize === "number" && (
+                                      <>
+                                        <span>{formatBytes(item.fileSize)}</span>
+                                        <span style={queueMetaSeparatorStyle} aria-hidden="true" />
+                                      </>
+                                    )}
                                     {item.status === "completed" ? (
                                       <span style={completedStatusStyle}>
                                         <CheckIcon />
-                                        upload completed
+                                        {item.source === "drive" ? "import completed" : "upload completed"}
                                       </span>
                                     ) : item.status}
                                     {item.error && (
@@ -1850,7 +1971,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                                     )}
                                   </div>
                                 </div>
-                                {item.status === "failed" ? (
+                                {item.status === "failed" && item.file ? (
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -2558,9 +2679,28 @@ const captionInputStyle: React.CSSProperties = {
   padding: "7px 8px",
 };
 
+const captionTextareaStyle: React.CSSProperties = {
+  background: "#0f1118",
+  color: "#f2f2f2",
+  border: "1px solid rgba(255,255,255,0.16)",
+  borderRadius: 4,
+  padding: "9px 10px",
+  minHeight: 88,
+  resize: "vertical",
+  lineHeight: 1.4,
+  font: "inherit",
+};
+
 const captionSaveButtonStyle: React.CSSProperties = {
   ...secondaryButtonStyle,
   padding: "7px 9px",
+};
+
+const captionManagerActionsStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  flexWrap: "wrap",
 };
 
 const captionStatusStyle: React.CSSProperties = {
@@ -2571,6 +2711,24 @@ const captionStatusStyle: React.CSSProperties = {
 const captionErrorStyle: React.CSSProperties = {
   color: "#ffb0b0",
   fontSize: 11,
+};
+
+const successNoticeStyle: React.CSSProperties = {
+  color: "#9df7a8",
+  background: "rgba(20,180,80,0.13)",
+  border: "1px solid rgba(80,220,120,0.25)",
+  padding: 10,
+  borderRadius: 4,
+  marginBottom: 12,
+};
+
+const warningNoticeStyle: React.CSSProperties = {
+  color: "#ffe2a8",
+  background: "rgba(220,150,40,0.14)",
+  border: "1px solid rgba(240,185,80,0.28)",
+  padding: 10,
+  borderRadius: 4,
+  marginBottom: 12,
 };
 
 const errorStyle: React.CSSProperties = {

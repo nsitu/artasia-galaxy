@@ -269,6 +269,7 @@ function mapAdminAsset(
     id: asset.id,
     type: asset.type,
     fileName: asset.originalFileName,
+    description: asset.exifInfo?.description ?? "",
     createdAt: asset.fileCreatedAt,
     updatedAt: asset.updatedAt,
     archived: asset.isArchived,

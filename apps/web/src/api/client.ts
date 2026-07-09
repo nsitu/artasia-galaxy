@@ -180,6 +180,7 @@ export interface PlacementAsset {
   id: string;
   type: "IMAGE" | "VIDEO";
   fileName: string;
+  description?: string;
   createdAt: string;
   updatedAt: string;
   archived?: boolean;
