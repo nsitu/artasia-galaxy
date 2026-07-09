@@ -125,9 +125,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   const [driveDefaultOpening, setDriveDefaultOpening] = useState(false);
 
   function placementLabel(location: UploadOptions["placements"][number]) {
-    return location.partner_name
-      ? `${location.partner_name} - ${location.placement_name}`
-      : location.placement_name;
+    return location.placement_name;
   }
 
   function placementMetaLabel(placement: UploadOptions["placements"][number]) {
@@ -136,6 +134,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
       placement.secondary_team_member_name,
     ].filter(Boolean).join(" + ");
     return [
+      placement.partner_name,
       people,
       placement.delivery_schedule,
       placement.participant_age ? `(${placement.participant_age})` : undefined,
