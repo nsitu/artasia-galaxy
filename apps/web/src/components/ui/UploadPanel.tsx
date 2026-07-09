@@ -54,6 +54,8 @@ const DEFAULT_ADJUSTMENTS: AssetAdjustments = { brightness: 100, contrast: 100, 
 const MIN_ADJUSTMENT = 50;
 const MAX_ADJUSTMENT = 150;
 const UPLOAD_ACCEPT_TYPES = "image/*,video/*,.heic,.heif,image/heic,image/heif";
+const DEFAULT_SHARED_DRIVE_NAME = "artasia 2026";
+const DEFAULT_SHARED_DRIVE_FOLDER = "documentation";
 
 export default function UploadPanel({ initialError, onSignedOut }: UploadPanelProps) {
   const [options, setOptions] = useState<UploadOptions | null>(null);
@@ -103,6 +105,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   const [selectedDriveFiles, setSelectedDriveFiles] = useState<Set<string>>(new Set());
   const [driveSyncing, setDriveSyncing] = useState(false);
   const [driveLoading, setDriveLoading] = useState(false);
+  const [driveDefaultOpening, setDriveDefaultOpening] = useState(false);
 
   function placementLabel(location: UploadOptions["placements"][number]) {
     return location.partner_name
@@ -160,6 +163,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   // Load Drive folders when switching to Drive tab or changing drive type
   useEffect(() => {
     if (uploadMode !== "drive") return;
+    if (driveDefaultOpening) return;
     if (driveType === "chooser") {
       setDriveFolders([
         {
@@ -192,11 +196,12 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
       })
       .catch((err) => setError((err as Error).message))
       .finally(() => setDriveLoading(false));
-  }, [uploadMode, driveType, selectedDriveFolder, currentDriveId]);
+  }, [uploadMode, driveType, selectedDriveFolder, currentDriveId, driveDefaultOpening]);
 
   // Load files for current Drive folder
   useEffect(() => {
     if (uploadMode !== "drive") return;
+    if (driveDefaultOpening) return;
     if (driveType === "chooser") {
       setDriveFiles([]);
       setDriveLoading(false);
@@ -213,7 +218,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
       .then(({ files }) => setDriveFiles(files.filter((file) => !file.isFolder)))
       .catch((err) => setError((err as Error).message))
       .finally(() => setDriveLoading(false));
-  }, [uploadMode, driveType, selectedDriveFolder, currentDriveId]);
+  }, [uploadMode, driveType, selectedDriveFolder, currentDriveId, driveDefaultOpening]);
 
   const selectedUploader = useMemo(() => {
     if (!options) return null;
@@ -1054,8 +1059,62 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     if (driveType === "sharedDrives" && newPath.length === 1) {
       setCurrentDriveId(undefined);
       setSelectedDriveFolder("root");
+    } else if (driveType === "sharedDrives" && newPath.length === 2) {
+      setCurrentDriveId(newPath[1].id);
+      setSelectedDriveFolder("root");
     } else {
       setSelectedDriveFolder(newPath[newPath.length - 1].id);
+    }
+  }
+
+  function normalizeDriveName(name: string) {
+    return name.trim().toLocaleLowerCase();
+  }
+
+  async function openDriveImportDefault() {
+    setUploadMode("drive");
+    setSelectedDriveFiles(new Set());
+    setDriveFolders([]);
+    setDriveFiles([]);
+    setDriveDefaultOpening(true);
+    setDriveLoading(true);
+    setError(null);
+
+    try {
+      const sharedDrives = await fetchDriveFolders("sharedDrives", "root");
+      const defaultDrive = (sharedDrives.folders ?? []).find((folder) =>
+        normalizeDriveName(folder.name).includes(DEFAULT_SHARED_DRIVE_NAME)
+      );
+
+      if (!defaultDrive) {
+        resetDriveFolderPath();
+        return;
+      }
+
+      const rootFolders = await fetchDriveFolders("sharedDrives", "root", defaultDrive.id);
+      const documentationFolder = (rootFolders.folders ?? []).find(
+        (folder) => normalizeDriveName(folder.name) === DEFAULT_SHARED_DRIVE_FOLDER
+      );
+
+      if (!documentationFolder) {
+        resetDriveFolderPath();
+        return;
+      }
+
+      setDriveType("sharedDrives");
+      setCurrentDriveId(defaultDrive.id);
+      setSelectedDriveFolder(documentationFolder.id);
+      setFolderPath([
+        { id: "__shared_drives__", name: "Shared Drives" },
+        { id: defaultDrive.id, name: defaultDrive.name },
+        { id: documentationFolder.id, name: documentationFolder.name },
+      ]);
+    } catch (err) {
+      console.warn("[drive] Failed to open default Artasia Documentation folder", err);
+      resetDriveFolderPath();
+    } finally {
+      setDriveDefaultOpening(false);
+      setDriveLoading(false);
     }
   }
 
@@ -1136,7 +1195,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
         )}
 
         {/* File/Folder list */}
-        {driveLoading ? (
+        {driveLoading || driveDefaultOpening ? (
           <div style={emptyStateStyle}>Loading...</div>
         ) : driveFolders.length === 0 && driveFiles.length === 0 ? (
           <div style={emptyStateStyle}>No folders or files in this location</div>
@@ -1707,8 +1766,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                     <button
                       type="button"
                       onClick={() => {
-                        setUploadMode("drive");
-                        resetDriveFolderPath();
+                        void openDriveImportDefault();
                       }}
                       disabled={!authUser?.authenticated}
                       style={{
