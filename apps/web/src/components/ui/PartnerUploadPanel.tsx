@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { fetchUploadOptions, updateAssetCaption, uploadFiles, type UploadOptions } from "../../api/client";
+import RetryableUploadThumbnail from "./RetryableUploadThumbnail";
 
 interface UploadItem {
   id: string;
@@ -15,7 +16,6 @@ interface UploadItem {
 
 type UploadPlacement = UploadOptions["placements"][number];
 
-const THUMBNAIL_RETRY_DELAYS_MS = [1500, 3000, 6000, 10000, 15000];
 const UPLOAD_ACCEPT_TYPES = "image/*,video/*,.heic,.heif,image/heic,image/heif";
 
 interface PartnerOption {
@@ -48,65 +48,6 @@ function formatPlaceAddress(placement: UploadPlacement) {
   if (!address) return city;
   if (!city || address.toLowerCase().includes(city.toLowerCase())) return address;
   return `${address}, ${city}`;
-}
-
-function RetryableUploadThumbnail({ assetId }: { assetId: string }) {
-  const [attempt, setAttempt] = useState(0);
-  const [loaded, setLoaded] = useState(false);
-  const [waiting, setWaiting] = useState(false);
-
-  useEffect(() => {
-    setAttempt(0);
-    setLoaded(false);
-    setWaiting(false);
-  }, [assetId]);
-
-  useEffect(() => {
-    if (!waiting) return;
-    if (attempt >= THUMBNAIL_RETRY_DELAYS_MS.length) return;
-
-    const timeoutId = window.setTimeout(() => {
-      setWaiting(false);
-      setAttempt((current) => current + 1);
-    }, THUMBNAIL_RETRY_DELAYS_MS[attempt]);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [attempt, waiting]);
-
-  const src = `/api/v1/assets/${assetId}/thumbnail?v=${encodeURIComponent(assetId)}&thumbnailAttempt=${attempt}`;
-
-  return (
-    <>
-      {!loaded && (
-        <span style={queueThumbPlaceholderStyle}>
-          {attempt >= THUMBNAIL_RETRY_DELAYS_MS.length ? "pending" : "processing"}
-        </span>
-      )}
-      {!waiting && (
-        <img
-          key={`${assetId}-${attempt}`}
-          src={src}
-          alt=""
-          style={{
-            ...queueThumbImageStyle,
-            display: loaded ? "block" : "none",
-          }}
-          onLoad={() => {
-            setLoaded(true);
-            setWaiting(false);
-          }}
-          onError={() => {
-            setLoaded(false);
-            if (attempt < THUMBNAIL_RETRY_DELAYS_MS.length) {
-              setWaiting(true);
-            } else {
-              setWaiting(false);
-            }
-          }}
-        />
-      )}
-    </>
-  );
 }
 
 export default function PartnerUploadPanel() {
@@ -550,7 +491,11 @@ export default function PartnerUploadPanel() {
               <div key={item.id} style={queueItemStyle}>
                 <div style={queueThumbStyle}>
                   {item.assetId ? (
-                    <RetryableUploadThumbnail assetId={item.assetId} />
+                    <RetryableUploadThumbnail
+                      assetId={item.assetId}
+                      imageStyle={queueThumbImageStyle}
+                      placeholderStyle={queueThumbPlaceholderStyle}
+                    />
                   ) : (
                     <span style={queueThumbPlaceholderStyle}>
                       {item.status === "failed" ? "failed" : "uploading"}

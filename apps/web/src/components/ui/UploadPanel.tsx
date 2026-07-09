@@ -18,6 +18,7 @@ import {
   resetUploadAssetEdits,
   setAssetPublished,
   syncDriveFiles,
+  updateAssetCaption,
   updateUploadAssetAdjustments,
   uploadFiles,
   type AssetAdjustments,
@@ -28,6 +29,7 @@ import {
   type UploadOptions,
   type PlacementAsset,
 } from "../../api/client";
+import RetryableUploadThumbnail from "./RetryableUploadThumbnail";
 
 interface UploadItem {
   id: string;
@@ -36,6 +38,9 @@ interface UploadItem {
   progress: number;
   error?: string;
   assetId?: string;
+  caption?: string;
+  captionStatus?: "idle" | "saving" | "saved" | "failed";
+  captionError?: string;
 }
 
 interface UploadPanelProps {
@@ -134,6 +139,18 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
       })
       .catch((err) => setError((err as Error).message));
   }, [options]);
+
+  function formatBytes(bytes: number) {
+    if (bytes < 1024) return `${bytes} B`;
+    const units = ["KB", "MB", "GB"];
+    let value = bytes / 1024;
+    let unitIndex = 0;
+    while (value >= 1024 && unitIndex < units.length - 1) {
+      value /= 1024;
+      unitIndex += 1;
+    }
+    return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[unitIndex]}`;
+  }
 
   useEffect(() => {
     if (initialError) setError(initialError);
@@ -427,6 +444,53 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
           .then(setPlacementAssets)
           .catch((err) => setError((err as Error).message));
       }
+    }
+  }
+
+  function updateItemCaption(itemId: string, value: string) {
+    setItems((current) =>
+      current.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              caption: value,
+              captionStatus: "idle",
+              captionError: undefined,
+            }
+          : item
+      )
+    );
+  }
+
+  async function saveItemCaption(item: UploadItem) {
+    if (!item.assetId) return;
+    const caption = item.caption?.trim() ?? "";
+    setItems((current) =>
+      current.map((entry) =>
+        entry.id === item.id
+          ? { ...entry, captionStatus: "saving", captionError: undefined }
+          : entry
+      )
+    );
+
+    try {
+      await updateAssetCaption({ assetId: item.assetId, caption });
+      setItems((current) =>
+        current.map((entry) =>
+          entry.id === item.id
+            ? { ...entry, caption, captionStatus: "saved", captionError: undefined }
+            : entry
+        )
+      );
+      refreshVisibleAssets();
+    } catch (err) {
+      setItems((current) =>
+        current.map((entry) =>
+          entry.id === item.id
+            ? { ...entry, captionStatus: "failed", captionError: (err as Error).message }
+            : entry
+        )
+      );
     }
   }
 
@@ -1629,7 +1693,10 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                           accept={UPLOAD_ACCEPT_TYPES}
                           style={{ display: "none" }}
                           disabled={!selectedUploader}
-                          onChange={(e) => e.target.files && addFiles(e.target.files)}
+                          onChange={(e) => {
+                            if (e.target.files) addFiles(e.target.files);
+                            e.target.value = "";
+                          }}
                         />
                       </div>
 
@@ -1639,44 +1706,85 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                             <div key={item.id} style={itemStyle}>
                               <div style={thumbStyle}>
                                 {item.assetId ? (
-                                  <img
-                                    src={`/api/v1/assets/${item.assetId}/thumbnail?v=${encodeURIComponent(item.assetId)}`}
-                                    alt=""
-                                    style={thumbImageStyle}
+                                  <RetryableUploadThumbnail
+                                    assetId={item.assetId}
+                                    imageStyle={thumbImageStyle}
+                                    placeholderStyle={queueThumbPlaceholderStyle}
                                   />
                                 ) : (
-                                  <span style={{ color: "#666", fontSize: 11 }}>
+                                  <span style={queueThumbPlaceholderStyle}>
                                     {item.status === "failed" ? "failed" : "uploading"}
                                   </span>
                                 )}
                               </div>
-                              <div>
-                                <div style={{ color: "#eee" }}>{item.file.name}</div>
-                                <div style={{ color: item.status === "failed" ? "#f88" : "#888", fontSize: 12 }}>
-                                  {item.status}
-                                  {item.error ? ` - ${item.error}` : ""}
+                              <div style={queueItemContentStyle}>
+                                <div style={queueItemMainStyle}>
+                                  <div style={{ color: "#eee" }}>{item.file.name}</div>
+                                  <div style={{ color: item.status === "failed" ? "#f88" : "#888", fontSize: 12 }}>
+                                    <span>{formatBytes(item.file.size)}</span>
+                                    <span style={queueMetaSeparatorStyle} aria-hidden="true" />
+                                    {item.status === "completed" ? (
+                                      <span style={completedStatusStyle}>
+                                        <CheckIcon />
+                                        upload completed
+                                      </span>
+                                    ) : item.status}
+                                    {item.error && (
+                                      <>
+                                        <span style={queueMetaSeparatorStyle} aria-hidden="true" />
+                                        <span>{item.error}</span>
+                                      </>
+                                    )}
+                                  </div>
                                 </div>
+                                {item.status === "failed" ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setItems((current) =>
+                                        current.map((entry) =>
+                                          entry.id === item.id
+                                            ? { ...entry, status: "queued", progress: 0, error: undefined }
+                                            : entry
+                                        )
+                                      );
+                                    }}
+                                    style={retryButtonStyle}
+                                  >
+                                    Retry
+                                  </button>
+                                ) : item.status !== "completed" ? (
+                                  <div style={progressTrackStyle}>
+                                    <div style={{ ...progressBarStyle, width: `${item.progress}%` }} />
+                                  </div>
+                                ) : null}
+                                {item.assetId && (
+                                  <label style={captionFieldStyle}>
+                                    <span style={captionLabelStyle}>Caption</span>
+                                    <div style={captionRowStyle}>
+                                      <input
+                                        type="text"
+                                        value={item.caption ?? ""}
+                                        onChange={(event) => updateItemCaption(item.id, event.target.value)}
+                                        placeholder="Optional caption"
+                                        style={captionInputStyle}
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => void saveItemCaption(item)}
+                                        disabled={item.captionStatus === "saving"}
+                                        style={captionSaveButtonStyle}
+                                      >
+                                        {item.captionStatus === "saving" ? "Saving..." : "Save"}
+                                      </button>
+                                    </div>
+                                    {item.captionStatus === "saved" && <span style={captionStatusStyle}>Saved</span>}
+                                    {item.captionStatus === "failed" && (
+                                      <span style={captionErrorStyle}>{item.captionError ?? "Caption failed"}</span>
+                                    )}
+                                  </label>
+                                )}
                               </div>
-                              {item.status === "failed" ? (
-                                <button
-                                  onClick={() => {
-                                    setItems((current) =>
-                                      current.map((entry) =>
-                                        entry.id === item.id
-                                          ? { ...entry, status: "queued", progress: 0, error: undefined }
-                                          : entry
-                                      )
-                                    );
-                                  }}
-                                  style={retryButtonStyle}
-                                >
-                                  Retry
-                                </button>
-                              ) : (
-                                <div style={progressTrackStyle}>
-                                  <div style={{ ...progressBarStyle, width: `${item.progress}%` }} />
-                                </div>
-                              )}
                             </div>
                           ))}
                         </div>
@@ -1753,6 +1861,21 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
         </div>
       </section>
     </main>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" style={completedCheckStyle}>
+      <path
+        d="M3.25 8.25 6.5 11.5l6.25-7"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+      />
+    </svg>
   );
 }
 
@@ -2207,12 +2330,49 @@ const emptyStateStyle: React.CSSProperties = {
 
 const itemStyle: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "54px 1fr 140px",
+  gridTemplateColumns: "54px minmax(0, 1fr)",
   gap: 12,
-  alignItems: "center",
+  alignItems: "start",
   background: "#171a22",
   borderRadius: 4,
   padding: 10,
+};
+
+const queueItemContentStyle: React.CSSProperties = {
+  minWidth: 0,
+  display: "grid",
+  gap: 8,
+};
+
+const queueItemMainStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 4,
+  minWidth: 0,
+};
+
+const queueMetaSeparatorStyle: React.CSSProperties = {
+  display: "inline-block",
+  width: 4,
+  height: 4,
+  borderRadius: 999,
+  background: "currentColor",
+  opacity: 0.42,
+  margin: "0 7px",
+  verticalAlign: "middle",
+};
+
+const completedStatusStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 5,
+  color: "#9df7a8",
+  fontWeight: 600,
+};
+
+const completedCheckStyle: React.CSSProperties = {
+  width: 14,
+  height: 14,
+  flex: "0 0 auto",
 };
 
 const progressTrackStyle: React.CSSProperties = {
@@ -2252,6 +2412,52 @@ const thumbImageStyle: React.CSSProperties = {
   width: "100%",
   height: "100%",
   objectFit: "cover",
+};
+
+const queueThumbPlaceholderStyle: React.CSSProperties = {
+  color: "#666",
+  fontSize: 11,
+};
+
+const captionFieldStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 5,
+};
+
+const captionLabelStyle: React.CSSProperties = {
+  color: "#9aa3b3",
+  fontSize: 11,
+};
+
+const captionRowStyle: React.CSSProperties = {
+  display: "flex",
+  gap: 8,
+  alignItems: "center",
+};
+
+const captionInputStyle: React.CSSProperties = {
+  flex: "1 1 auto",
+  minWidth: 0,
+  background: "#0f1118",
+  color: "#f2f2f2",
+  border: "1px solid rgba(255,255,255,0.16)",
+  borderRadius: 4,
+  padding: "7px 8px",
+};
+
+const captionSaveButtonStyle: React.CSSProperties = {
+  ...secondaryButtonStyle,
+  padding: "7px 9px",
+};
+
+const captionStatusStyle: React.CSSProperties = {
+  color: "#9df7a8",
+  fontSize: 11,
+};
+
+const captionErrorStyle: React.CSSProperties = {
+  color: "#ffb0b0",
+  fontSize: 11,
 };
 
 const errorStyle: React.CSSProperties = {
