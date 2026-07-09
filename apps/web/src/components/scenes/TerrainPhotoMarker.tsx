@@ -60,6 +60,7 @@ class FlowerPhotoMaterial extends THREE.ShaderMaterial {
           float borderMix = 1.0 - smoothstep(0.0, borderWidth, edge);
           vec3 finalColor = mix(color.rgb, borderColor, borderMix);
           gl_FragColor = vec4(finalColor, color.a * alpha * flowerOpacity);
+          #include <colorspace_fragment>
         }
       `,
     });
@@ -157,6 +158,7 @@ class AdjustedPhotoMaterial extends THREE.ShaderMaterial {
           color.rgb = (color.rgb - 0.5) * contrast + 0.5;
           color.rgb *= brightness;
           gl_FragColor = color;
+          #include <colorspace_fragment>
         }
       `,
     });
@@ -276,7 +278,7 @@ export function TerrainPhotoFlower({
   const texture = usePhotoTexture(url);
   const [x, y, z] = position;
 
-  const imageAspect = Number.isFinite(width / height) && height > 0 ? width / height : 1;
+  const imageAspect = getTextureAspect(texture, width, height);
   const brightness = adjustmentScalar(adjustments?.brightness);
   const contrast = adjustmentScalar(adjustments?.contrast);
   const headSize = HEAD_RADIUS * 2;
@@ -340,6 +342,7 @@ export function TerrainPhotoFlower({
             imageAspect={imageAspect}
             transparent
             side={THREE.DoubleSide}
+            toneMapped={false}
             depthWrite={false}
             polygonOffset
             polygonOffsetFactor={-3}
@@ -373,7 +376,7 @@ export function OrbitingPhotoBanner({
     speed: stableRange(`${id}:speed`, ORBIT_SPEED * 0.75, ORBIT_SPEED * 1.25),
   }), [id]);
   const [cx, cy, cz] = center;
-  const aspect = width / height;
+  const aspect = getTextureAspect(texture, width, height);
   const brightness = adjustmentScalar(adjustments?.brightness);
   const contrast = adjustmentScalar(adjustments?.contrast);
   const imageW = aspect >= 1 ? BANNER_MAX_WIDTH : BANNER_MAX_HEIGHT * aspect;
@@ -422,6 +425,21 @@ export function OrbitingPhotoBanner({
 function adjustmentScalar(value?: number) {
   if (!Number.isFinite(value)) return 1;
   return THREE.MathUtils.clamp(Math.round(value as number), 50, 150) / 100;
+}
+
+function getTextureAspect(texture: THREE.Texture, fallbackWidth: number, fallbackHeight: number) {
+  const image = texture.image as {
+    naturalWidth?: number;
+    naturalHeight?: number;
+    width?: number;
+    height?: number;
+  } | null;
+  const textureWidth = image?.naturalWidth ?? image?.width ?? 0;
+  const textureHeight = image?.naturalHeight ?? image?.height ?? 0;
+  if (textureWidth > 0 && textureHeight > 0) return textureWidth / textureHeight;
+  return Number.isFinite(fallbackWidth / fallbackHeight) && fallbackHeight > 0
+    ? fallbackWidth / fallbackHeight
+    : 1;
 }
 
 function orientHeadToCamera(head: THREE.Object3D, parent: THREE.Object3D, camera: THREE.Camera) {
