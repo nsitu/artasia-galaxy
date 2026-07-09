@@ -311,11 +311,12 @@ export default function ArtScene() {
   );
 }
 
-function photoAdjustmentFilterStyle(adjustments?: { brightness?: number; contrast?: number }): React.CSSProperties {
+function photoAdjustmentFilterStyle(adjustments?: { brightness?: number; contrast?: number; saturation?: number }): React.CSSProperties {
   const brightness = adjustmentPercent(adjustments?.brightness);
   const contrast = adjustmentPercent(adjustments?.contrast);
+  const saturation = adjustmentPercent(adjustments?.saturation);
   return {
-    filter: `brightness(${brightness / 100}) contrast(${contrast / 100})`,
+    filter: `brightness(${brightness / 100}) contrast(${contrast / 100}) saturate(${saturation / 100})`,
   };
 }
 

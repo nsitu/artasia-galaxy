@@ -11,6 +11,7 @@ class FlowerPhotoMaterial extends THREE.ShaderMaterial {
         flowerOpacity: { value: 1 },
         brightness: { value: 1 },
         contrast: { value: 1 },
+        saturation: { value: 1 },
         petalCount: { value: 10 },
         borderColor: { value: new THREE.Color("#ffffff") },
         borderWidth: { value: 0.12 },
@@ -25,15 +26,28 @@ class FlowerPhotoMaterial extends THREE.ShaderMaterial {
         }
       `,
       fragmentShader: `
+        #include <colorspace_pars_fragment>
+
         uniform sampler2D photoMap;
         uniform float flowerOpacity;
         uniform float brightness;
         uniform float contrast;
+        uniform float saturation;
         uniform float petalCount;
         uniform vec3 borderColor;
         uniform float borderWidth;
         uniform float imageAspect;
         varying vec2 vUv;
+
+        vec4 applyCssLikeAdjustments(vec4 linearColor, float brightnessValue, float contrastValue, float saturationValue) {
+          vec4 displayColor = sRGBTransferOETF(linearColor);
+          displayColor.rgb = (displayColor.rgb - 0.5) * contrastValue + 0.5;
+          displayColor.rgb *= brightnessValue;
+          float luma = dot(displayColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+          displayColor.rgb = mix(vec3(luma), displayColor.rgb, saturationValue);
+          displayColor.rgb = clamp(displayColor.rgb, 0.0, 1.0);
+          return sRGBTransferEOTF(displayColor);
+        }
 
         void main() {
           vec2 centered = vUv * 2.0 - 1.0;
@@ -55,8 +69,7 @@ class FlowerPhotoMaterial extends THREE.ShaderMaterial {
           }
 
           vec4 color = texture2D(photoMap, photoUv);
-          color.rgb = (color.rgb - 0.5) * contrast + 0.5;
-          color.rgb *= brightness;
+          color = applyCssLikeAdjustments(color, brightness, contrast, saturation);
           float borderMix = 1.0 - smoothstep(0.0, borderWidth, edge);
           vec3 finalColor = mix(color.rgb, borderColor, borderMix);
           gl_FragColor = vec4(finalColor, color.a * alpha * flowerOpacity);
@@ -96,6 +109,14 @@ class FlowerPhotoMaterial extends THREE.ShaderMaterial {
 
   set contrast(value: number) {
     this.uniforms.contrast.value = value;
+  }
+
+  get saturation() {
+    return this.uniforms.saturation.value as number;
+  }
+
+  set saturation(value: number) {
+    this.uniforms.saturation.value = value;
   }
 
   get petalCount() {
@@ -138,6 +159,7 @@ class AdjustedPhotoMaterial extends THREE.ShaderMaterial {
         photoMap: { value: null },
         brightness: { value: 1 },
         contrast: { value: 1 },
+        saturation: { value: 1 },
       },
       vertexShader: `
         varying vec2 vUv;
@@ -148,15 +170,27 @@ class AdjustedPhotoMaterial extends THREE.ShaderMaterial {
         }
       `,
       fragmentShader: `
+        #include <colorspace_pars_fragment>
+
         uniform sampler2D photoMap;
         uniform float brightness;
         uniform float contrast;
+        uniform float saturation;
         varying vec2 vUv;
+
+        vec4 applyCssLikeAdjustments(vec4 linearColor, float brightnessValue, float contrastValue, float saturationValue) {
+          vec4 displayColor = sRGBTransferOETF(linearColor);
+          displayColor.rgb = (displayColor.rgb - 0.5) * contrastValue + 0.5;
+          displayColor.rgb *= brightnessValue;
+          float luma = dot(displayColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+          displayColor.rgb = mix(vec3(luma), displayColor.rgb, saturationValue);
+          displayColor.rgb = clamp(displayColor.rgb, 0.0, 1.0);
+          return sRGBTransferEOTF(displayColor);
+        }
 
         void main() {
           vec4 color = texture2D(photoMap, vUv);
-          color.rgb = (color.rgb - 0.5) * contrast + 0.5;
-          color.rgb *= brightness;
+          color = applyCssLikeAdjustments(color, brightness, contrast, saturation);
           gl_FragColor = color;
           #include <colorspace_fragment>
         }
@@ -187,6 +221,14 @@ class AdjustedPhotoMaterial extends THREE.ShaderMaterial {
   set contrast(value: number) {
     this.uniforms.contrast.value = value;
   }
+
+  get saturation() {
+    return this.uniforms.saturation.value as number;
+  }
+
+  set saturation(value: number) {
+    this.uniforms.saturation.value = value;
+  }
 }
 
 extend({ FlowerPhotoMaterial, AdjustedPhotoMaterial });
@@ -198,6 +240,7 @@ declare module "@react-three/fiber" {
       flowerOpacity?: number;
       brightness?: number;
       contrast?: number;
+      saturation?: number;
       petalCount?: number;
       borderColor?: THREE.Color | string | number;
       borderWidth?: number;
@@ -207,6 +250,7 @@ declare module "@react-three/fiber" {
       photoMap?: THREE.Texture | null;
       brightness?: number;
       contrast?: number;
+      saturation?: number;
     };
   }
 }
@@ -214,6 +258,7 @@ declare module "@react-three/fiber" {
 interface PhotoAdjustments {
   brightness?: number;
   contrast?: number;
+  saturation?: number;
 }
 
 interface SharedPhotoProps {
@@ -281,6 +326,7 @@ export function TerrainPhotoFlower({
   const imageAspect = getTextureAspect(texture, width, height);
   const brightness = adjustmentScalar(adjustments?.brightness);
   const contrast = adjustmentScalar(adjustments?.contrast);
+  const saturation = adjustmentScalar(adjustments?.saturation);
   const headSize = HEAD_RADIUS * 2;
   const stemGeometry = useMemo(() => createInitialStemGeometry(), []);
   const baseGeometry = useMemo(() => new THREE.SphereGeometry(STEM_RADIUS * 1.45, 12, 8), []);
@@ -335,6 +381,7 @@ export function TerrainPhotoFlower({
             photoMap={texture}
             brightness={brightness}
             contrast={contrast}
+            saturation={saturation}
             petalCount={PETAL_LOBE_COUNT}
             flowerOpacity={0.96}
             borderColor="#ffffff"
@@ -379,6 +426,7 @@ export function OrbitingPhotoBanner({
   const aspect = getTextureAspect(texture, width, height);
   const brightness = adjustmentScalar(adjustments?.brightness);
   const contrast = adjustmentScalar(adjustments?.contrast);
+  const saturation = adjustmentScalar(adjustments?.saturation);
   const imageW = aspect >= 1 ? BANNER_MAX_WIDTH : BANNER_MAX_HEIGHT * aspect;
   const imageH = aspect >= 1 ? BANNER_MAX_WIDTH / aspect : BANNER_MAX_HEIGHT;
 
@@ -413,6 +461,7 @@ export function OrbitingPhotoBanner({
             photoMap={texture}
             brightness={brightness}
             contrast={contrast}
+            saturation={saturation}
             side={THREE.DoubleSide}
             toneMapped={false}
           />

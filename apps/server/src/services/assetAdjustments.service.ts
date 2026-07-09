@@ -10,20 +10,22 @@ import {
 export interface AssetAdjustments {
   brightness: number;
   contrast: number;
+  saturation: number;
 }
 
 type AdjustmentKind = keyof AssetAdjustments;
 
 const ADJUSTMENT_PREFIX = "artasia:adjust:";
-const ADJUSTMENT_PATTERN = /^artasia:adjust:(brightness|contrast):(\d{1,3})$/;
+const ADJUSTMENT_PATTERN = /^artasia:adjust:(brightness|contrast|saturation):(\d{1,3})$/;
 const ADJUSTMENT_MIN = 50;
 const ADJUSTMENT_MAX = 150;
 const ADJUSTMENT_NEUTRAL = 100;
-const ADJUSTMENT_KINDS: AdjustmentKind[] = ["brightness", "contrast"];
+const ADJUSTMENT_KINDS: AdjustmentKind[] = ["brightness", "contrast", "saturation"];
 
 export const DEFAULT_ASSET_ADJUSTMENTS: AssetAdjustments = {
   brightness: ADJUSTMENT_NEUTRAL,
   contrast: ADJUSTMENT_NEUTRAL,
+  saturation: ADJUSTMENT_NEUTRAL,
 };
 
 function tagKey(tag: ImmichTag) {
@@ -53,6 +55,7 @@ export function normalizeAssetAdjustments(value: unknown): AssetAdjustments {
   return {
     brightness: clampAdjustment(body.brightness),
     contrast: clampAdjustment(body.contrast),
+    saturation: clampAdjustment(body.saturation),
   };
 }
 

@@ -1,6 +1,7 @@
 export interface AssetAdjustments {
   brightness: number;
   contrast: number;
+  saturation: number;
 }
 
 export interface Photo {
