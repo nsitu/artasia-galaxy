@@ -68,6 +68,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [uploaderKey, setUploaderKey] = useState("");
   const [browsePartnerKey, setBrowsePartnerKey] = useState("");
+  const [uploadPartnerKey, setUploadPartnerKey] = useState("");
   const [browseContextFilter, setBrowseContextFilter] = useState<BrowseContextFilter>("all");
   const [placementKey, setPlacementKey] = useState("");
   const [activityTagFilter, setActivityTagFilter] = useState("");
@@ -259,8 +260,12 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     return placement.team_member_id === uploaderId || placement.secondary_team_member_id === uploaderId;
   }
 
+  function matchedAuthUploaderId() {
+    return authUser?.uploader_id ?? authUser?.uploader?.id ?? null;
+  }
+
   function selectMyAssets() {
-    const matchedUploaderId = authUser?.uploader_id ?? authUser?.uploader?.id ?? null;
+    const matchedUploaderId = matchedAuthUploaderId();
     if (!matchedUploaderId) {
       setError("No matching Artasia Team Member email was found for your account.");
       return;
@@ -268,6 +273,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
 
     setUploaderKey(String(matchedUploaderId));
     setBrowsePartnerKey("");
+    setUploadPartnerKey("");
     setPlacementKey("");
     setSelectedAsset(null);
     setItems([]);
@@ -286,9 +292,10 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
       ? options.placements.filter((placement) => placementIncludesUploader(placement, selectedUploader.id))
       : options.placements;
     const contextFilteredPlacements = uploaderFilteredPlacements.filter(placementMatchesBrowseContext);
-    if (workspaceMode !== "browse" || !browsePartnerKey) return contextFilteredPlacements;
-    return contextFilteredPlacements.filter((placement) => placement.partner_name?.trim() === browsePartnerKey);
-  }, [browseContextFilter, browsePartnerKey, options, selectedUploader, workspaceMode]);
+    const activePartnerKey = workspaceMode === "upload" ? uploadPartnerKey : browsePartnerKey;
+    if (!activePartnerKey) return contextFilteredPlacements;
+    return contextFilteredPlacements.filter((placement) => placement.partner_name?.trim() === activePartnerKey);
+  }, [browseContextFilter, browsePartnerKey, options, selectedUploader, uploadPartnerKey, workspaceMode]);
 
   const browsePartnerOptions = useMemo(() => {
     if (!options) return [];
@@ -308,6 +315,24 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([partnerName, count]) => ({ partnerName, count }));
   }, [browseContextFilter, options, selectedUploader, workspaceMode]);
+
+  const uploadPartnerOptions = useMemo(() => {
+    if (!options) return [];
+    const counts = new Map<string, number>();
+    const uploaderFilteredPlacements = selectedUploader
+      ? options.placements.filter((placement) => placementIncludesUploader(placement, selectedUploader.id))
+      : options.placements;
+
+    for (const placement of uploaderFilteredPlacements) {
+      const partnerName = placement.partner_name?.trim();
+      if (!partnerName) continue;
+      counts.set(partnerName, (counts.get(partnerName) ?? 0) + 1);
+    }
+
+    return Array.from(counts.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([partnerName, count]) => ({ partnerName, count }));
+  }, [options, selectedUploader]);
 
   const selectedPlacement = useMemo(() => {
     return filteredPlacements.find((placement) => String(placement.placement_id) === placementKey) ?? null;
@@ -344,6 +369,13 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     if (browsePartnerOptions.some((option) => option.partnerName === browsePartnerKey)) return;
     setBrowsePartnerKey("");
   }, [browsePartnerKey, browsePartnerOptions, workspaceMode]);
+
+  useEffect(() => {
+    if (workspaceMode !== "upload") return;
+    if (!uploadPartnerKey) return;
+    if (uploadPartnerOptions.some((option) => option.partnerName === uploadPartnerKey)) return;
+    setUploadPartnerKey("");
+  }, [uploadPartnerKey, uploadPartnerOptions, workspaceMode]);
 
   useEffect(() => {
     if (assetMode === "untagged") {
@@ -579,11 +611,6 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
       .then(setPlacementAssets)
       .catch((err) => setError((err as Error).message))
       .finally(() => setAssetsLoading(false));
-  }
-
-  function assetGalleryTitle() {
-    if (assetMode === "untagged") return "Uploads Needing Placement";
-    return selectedPlacement ? "Uploads" : "Tagged Uploads for Visible Placements";
   }
 
   function mediaUrl(url: string, assetId: string) {
@@ -1733,6 +1760,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
             type="button"
             onClick={() => {
               setWorkspaceMode("browse");
+              setUploadPartnerKey("");
               setSelectedAsset(null);
               setItems([]);
               setNotice(null);
@@ -1747,8 +1775,11 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
           <button
             type="button"
             onClick={() => {
+              const matchedUploaderId = matchedAuthUploaderId();
               setWorkspaceMode("upload");
               setBrowsePartnerKey("");
+              setUploadPartnerKey("");
+              if (matchedUploaderId) setUploaderKey(String(matchedUploaderId));
               setSelectedAsset(null);
               setAssetMode("placements");
               setNotice(null);
@@ -1771,6 +1802,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                 onChange={(e) => {
                   setUploaderKey(e.target.value);
                   setBrowsePartnerKey("");
+                  setUploadPartnerKey("");
                   setPlacementKey("");
                   setSelectedAsset(null);
                   setItems([]);
@@ -1787,6 +1819,29 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                 ))}
               </select>
             </label>
+
+            {workspaceMode === "upload" && (
+              <label style={labelStyle}>
+                Artasia Partner
+                <select
+                  value={uploadPartnerKey}
+                  onChange={(e) => {
+                    setUploadPartnerKey(e.target.value);
+                    setPlacementKey("");
+                    setSelectedAsset(null);
+                    setItems([]);
+                  }}
+                  style={inputStyle}
+                >
+                  <option value="">All Partners</option>
+                  {uploadPartnerOptions.map((option) => (
+                    <option key={option.partnerName} value={option.partnerName}>
+                      {option.partnerName} ({option.count})
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
 
             <label style={labelStyle}>
               {workspaceMode === "upload" ? "Program Week / Activity Tag" : "Program Week / Activity"}
@@ -2117,20 +2172,19 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
             ) : (
               <>
                 <div style={detailHeaderStyle}>
-                  <h2 style={detailTitleStyle}>Uploaded Assets</h2>
-                  <div style={countBadgeStyle}>
-                    {assetsLoading ? "..." : placementAssets.length} upload{placementAssets.length === 1 ? "" : "s"}
+                  <h2 style={detailTitleStyle}>Assets</h2>
+                  <div style={detailHeaderActionsStyle}>
+                    <div style={countBadgeStyle}>
+                      {assetsLoading ? "..." : placementAssets.length} upload{placementAssets.length === 1 ? "" : "s"}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={refreshVisibleAssets}
+                      style={secondaryButtonStyle}
+                    >
+                      Refresh
+                    </button>
                   </div>
-                </div>
-                <div style={assetGridHeaderStyle}>
-                  <h3 style={sectionTitleStyle}>{assetGalleryTitle()}</h3>
-                  <button
-                    type="button"
-                    onClick={refreshVisibleAssets}
-                    style={secondaryButtonStyle}
-                  >
-                    Refresh
-                  </button>
                 </div>
                 {renderAssetManager()}
                 {renderAssetGrid(
@@ -2432,6 +2486,14 @@ const detailMetaStyle: React.CSSProperties = {
   color: "#9aa3b3",
   fontSize: 12,
   marginTop: 5,
+};
+
+const detailHeaderActionsStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "flex-end",
+  gap: 8,
+  flexWrap: "wrap",
 };
 
 const countBadgeStyle: React.CSSProperties = {
