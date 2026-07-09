@@ -151,6 +151,24 @@ export async function updateAssetDescription(assetId: string, description: strin
   });
 }
 
+export async function deleteAssets(assetIds: string[]) {
+  if (assetIds.length === 0) return;
+
+  const invalidAssetIds = assetIds.filter((id) => !isValidUUID(id));
+  if (invalidAssetIds.length > 0) {
+    throw new Error(`Invalid asset ID format(s): ${invalidAssetIds.join(", ")}. Expected UUID format.`);
+  }
+
+  await immichRequest("/assets", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      force: true,
+      ids: assetIds,
+    }),
+  });
+}
+
 export async function searchAssets(params: {
   albumId?: string;
   albumIds?: string[];

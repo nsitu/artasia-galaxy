@@ -3,6 +3,7 @@ import {
   assignAssetActivityTag,
   assignAssetPlacement,
   assignAssetUploader,
+  deleteUploadAsset,
   fetchAuthUser,
   fetchDriveFiles,
   fetchDriveFolders,
@@ -51,6 +52,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   const [manageActivityTag, setManageActivityTag] = useState("");
   const [managePublished, setManagePublished] = useState(false);
   const [savingAsset, setSavingAsset] = useState(false);
+  const [deletingAsset, setDeletingAsset] = useState(false);
   const [assetsLoading, setAssetsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -515,6 +517,32 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     }
   }
 
+  async function deleteSelectedAsset() {
+    if (!selectedAsset) return;
+    if (!authUser?.authenticated) {
+      setError("Sign in to delete uploads.");
+      return;
+    }
+    const confirmed = window.confirm(
+      `Delete "${selectedAsset.fileName}" from Immich? This removes the asset entirely.`
+    );
+    if (!confirmed) return;
+
+    const assetId = selectedAsset.id;
+    setDeletingAsset(true);
+    setError(null);
+    try {
+      await deleteUploadAsset({ assetId });
+      closeAssetManager();
+      setPlacementAssets((current) => current.filter((asset) => asset.id !== assetId));
+      refreshVisibleAssets();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setDeletingAsset(false);
+    }
+  }
+
   async function signOut() {
     try {
       await logoutAuthUser();
@@ -872,7 +900,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
             <button
               type="button"
               onClick={saveSelectedAssetChanges}
-              disabled={savingAsset || !canSaveAsset}
+              disabled={savingAsset || deletingAsset || !canSaveAsset}
               style={primaryActionButtonStyle}
             >
               {savingAsset ? "Saving..." : "Save"}
@@ -880,7 +908,17 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
             <a href={selectedAsset.previewUrl} target="_blank" rel="noreferrer" style={secondaryLinkButtonStyle}>
               Preview
             </a>
-            <button type="button" onClick={closeAssetManager} style={secondaryButtonStyle}>
+            {authUser?.authenticated && (
+              <button
+                type="button"
+                onClick={deleteSelectedAsset}
+                disabled={savingAsset || deletingAsset}
+                style={dangerButtonStyle}
+              >
+                {deletingAsset ? "Deleting..." : "Delete"}
+              </button>
+            )}
+            <button type="button" onClick={closeAssetManager} disabled={deletingAsset} style={secondaryButtonStyle}>
               Close
             </button>
           </div>
@@ -1342,6 +1380,16 @@ const secondaryLinkButtonStyle: React.CSSProperties = {
   alignItems: "center",
   textDecoration: "none",
   color: "#ddd",
+};
+
+const dangerButtonStyle: React.CSSProperties = {
+  background: "rgba(255, 90, 90, 0.12)",
+  color: "#ffb0b0",
+  border: "1px solid rgba(255, 90, 90, 0.38)",
+  borderRadius: 4,
+  padding: "7px 10px",
+  cursor: "pointer",
+  whiteSpace: "nowrap",
 };
 
 const primaryActionButtonStyle: React.CSSProperties = {

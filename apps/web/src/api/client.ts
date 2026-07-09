@@ -306,6 +306,18 @@ export async function updateAssetCaption(params: {
   }
 }
 
+export async function deleteUploadAsset(params: {
+  assetId: string;
+}): Promise<void> {
+  const res = await fetch(`/api/v1/uploads/assets/${params.assetId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+}
+
 export async function fetchMapPlacements(): Promise<MapPlacement[]> {
   const res = await fetch("/api/v1/placements");
   if (!res.ok) {
