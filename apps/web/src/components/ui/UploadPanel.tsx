@@ -48,6 +48,7 @@ interface UploadItem {
 
 type NoticeTone = "success" | "warning";
 type BrowseContextFilter = "all" | "earlyon" | "nonEarlyon";
+type SiteScope = "select" | "all" | "placement";
 
 interface UploadPanelProps {
   initialError?: string | null;
@@ -75,6 +76,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   const [items, setItems] = useState<UploadItem[]>([]);
   const [placementAssets, setPlacementAssets] = useState<PlacementAsset[]>([]);
   const [assetMode, setAssetMode] = useState<"placements" | "untagged">("placements");
+  const [siteScope, setSiteScope] = useState<SiteScope>("select");
   const [workspaceMode, setWorkspaceMode] = useState<"browse" | "upload">("browse");
   const [selectedAsset, setSelectedAsset] = useState<PlacementAsset | null>(null);
   const [managePlacementKey, setManagePlacementKey] = useState("");
@@ -275,6 +277,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     setBrowsePartnerKey("");
     setUploadPartnerKey("");
     setPlacementKey("");
+    setSiteScope("select");
     setSelectedAsset(null);
     setItems([]);
     setNotice(null);
@@ -339,10 +342,11 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   }, [filteredPlacements, placementKey]);
 
   const visiblePlacementIds = useMemo(() => {
-    return selectedPlacement
-      ? [selectedPlacement.placement_id]
-      : filteredPlacements.map((placement) => placement.placement_id);
-  }, [filteredPlacements, selectedPlacement]);
+    if (assetMode === "untagged") return [];
+    if (siteScope === "all") return filteredPlacements.map((placement) => placement.placement_id);
+    if (siteScope === "placement" && selectedPlacement) return [selectedPlacement.placement_id];
+    return [];
+  }, [assetMode, filteredPlacements, selectedPlacement, siteScope]);
 
   useEffect(() => {
     if (!mediaRefreshAssetId) return;
@@ -358,10 +362,11 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   }, [mediaRefreshAssetId, mediaRefreshAttempt, assetMode, visiblePlacementIds, activityTagFilter]);
 
   useEffect(() => {
-    setPlacementKey((current) =>
-      filteredPlacements.some((placement) => String(placement.placement_id) === current) ? current : ""
-    );
-  }, [filteredPlacements]);
+    if (siteScope !== "placement") return;
+    if (filteredPlacements.some((placement) => String(placement.placement_id) === placementKey)) return;
+    setPlacementKey("");
+    setSiteScope("select");
+  }, [filteredPlacements, placementKey, siteScope]);
 
   useEffect(() => {
     if (workspaceMode !== "browse") return;
@@ -590,6 +595,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
 
   function selectPlacement(placement: UploadOptions["placements"][number]) {
     setPlacementKey(String(placement.placement_id));
+    setSiteScope("placement");
     setAssetMode("placements");
     setSelectedAsset(null);
     setItems([]);
@@ -599,9 +605,33 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     if (placement.team_member_id) setUploaderKey(String(placement.team_member_id));
   }
 
+  function selectAllSites() {
+    setPlacementKey("");
+    setSiteScope("all");
+    setAssetMode("placements");
+    setSelectedAsset(null);
+    setItems([]);
+    setNotice(null);
+    setError(null);
+  }
+
+  function returnToSiteSelection() {
+    setPlacementKey("");
+    setSiteScope("select");
+    setSelectedAsset(null);
+    setItems([]);
+    setNotice(null);
+  }
+
   function refreshVisibleAssets() {
     setAssetsLoading(true);
     const activityId = activityTagFilter ? parseInt(activityTagFilter, 10) : undefined;
+
+    if (assetMode !== "untagged" && visiblePlacementIds.length === 0) {
+      setPlacementAssets([]);
+      setAssetsLoading(false);
+      return;
+    }
 
     const request = assetMode === "untagged"
       ? fetchUntaggedPlacementAssets()
@@ -1374,6 +1404,54 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     );
   }
 
+  function renderSiteSelection() {
+    const showAllSites = workspaceMode === "browse" && assetMode === "placements";
+    return (
+      <div style={siteSelectionPanelStyle}>
+        <div style={detailHeaderStyle}>
+          <div>
+            <h2 style={detailTitleStyle}>
+              {workspaceMode === "upload" ? "Choose a destination site" : "Choose a site"}
+            </h2>
+            <div style={detailMetaStyle}>
+              {filteredPlacements.length} visible site{filteredPlacements.length === 1 ? "" : "s"}
+            </div>
+          </div>
+        </div>
+
+        <div style={siteChoiceGridStyle}>
+          {showAllSites && (
+            <button
+              type="button"
+              onClick={selectAllSites}
+              style={siteChoiceButtonStyle}
+            >
+              <span style={placementNameStyle}>All Sites</span>
+              <span style={placementMetaStyle}>
+                Browse uploads across {filteredPlacements.length} visible site{filteredPlacements.length === 1 ? "" : "s"}
+              </span>
+            </button>
+          )}
+          {filteredPlacements.map((placement) => (
+            <button
+              key={placement.placement_id}
+              type="button"
+              onClick={() => selectPlacement(placement)}
+              style={siteChoiceButtonStyle}
+            >
+              <span style={placementNameStyle}>{placementLabel(placement)}</span>
+              <span style={placementMetaStyle}>{placementMetaLabel(placement)}</span>
+            </button>
+          ))}
+        </div>
+
+        {filteredPlacements.length === 0 && (
+          <div style={emptyStateStyle}>No sites match the current filters.</div>
+        )}
+      </div>
+    );
+  }
+
   function renderAssetManager() {
     if (!selectedAsset) return null;
     const placementChanged = Boolean(managePlacementKey)
@@ -1761,6 +1839,8 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
             onClick={() => {
               setWorkspaceMode("browse");
               setUploadPartnerKey("");
+              setSiteScope("select");
+              setPlacementKey("");
               setSelectedAsset(null);
               setItems([]);
               setNotice(null);
@@ -1780,6 +1860,8 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
               setBrowsePartnerKey("");
               setUploadPartnerKey("");
               if (matchedUploaderId) setUploaderKey(String(matchedUploaderId));
+              setSiteScope("select");
+              setPlacementKey("");
               setSelectedAsset(null);
               setAssetMode("placements");
               setNotice(null);
@@ -1804,6 +1886,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                   setBrowsePartnerKey("");
                   setUploadPartnerKey("");
                   setPlacementKey("");
+                  setSiteScope("select");
                   setSelectedAsset(null);
                   setItems([]);
                   setNotice(null);
@@ -1828,6 +1911,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                   onChange={(e) => {
                     setUploadPartnerKey(e.target.value);
                     setPlacementKey("");
+                    setSiteScope("select");
                     setSelectedAsset(null);
                     setItems([]);
                   }}
@@ -1871,6 +1955,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                     setBrowseContextFilter(e.target.value as BrowseContextFilter);
                     setBrowsePartnerKey("");
                     setPlacementKey("");
+                    setSiteScope("select");
                     setSelectedAsset(null);
                     setItems([]);
                   }}
@@ -1891,6 +1976,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                   onChange={(e) => {
                     setBrowsePartnerKey(e.target.value);
                     setPlacementKey("");
+                    setSiteScope("select");
                     setSelectedAsset(null);
                     setItems([]);
                   }}
@@ -1919,6 +2005,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                       setBrowsePartnerKey("");
                     }
                     setPlacementKey("");
+                    setSiteScope("select");
                     setSelectedAsset(null);
                     setItems([]);
                   }}
@@ -1930,27 +2017,6 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
               </label>
             )}
 
-            <div style={menuHeaderStyle}>
-              <span>{workspaceMode === "upload" ? "Destination Site" : "Artasia Sites"}</span>
-              <span>{filteredPlacements.length}</span>
-            </div>
-
-            <div style={placementListStyle}>
-              {filteredPlacements.map((placement) => (
-                <button
-                  key={placement.placement_id}
-                  type="button"
-                  onClick={() => selectPlacement(placement)}
-                  style={{
-                    ...placementButtonStyle,
-                    ...(selectedPlacement?.placement_id === placement.placement_id ? selectedPlacementButtonStyle : {}),
-                  }}
-                >
-                  <span style={placementNameStyle}>{placementLabel(placement)}</span>
-                  <span style={placementMetaStyle}>{placementMetaLabel(placement)}</span>
-                </button>
-              ))}
-            </div>
           </aside>
 
           <section style={detailStyle}>
@@ -1964,9 +2030,16 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                         Owner: {selectedUploader?.name ?? "Select a team member"}
                         {activityTagFilter
                           ? ` | Activity: ${options?.activities.find((activity) => String(activity.id) === activityTagFilter)?.label ?? "Selected activity"}`
-                          : " | No activity tag"}
+                        : " | No activity tag"}
                       </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={returnToSiteSelection}
+                      style={secondaryButtonStyle}
+                    >
+                      Back to Sites
+                    </button>
                   </div>
 
                   <div style={uploadModeTabsStyle}>
@@ -2133,8 +2206,10 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                   )}
                 </>
               ) : (
-                <div style={emptyStateStyle}>Select a destination site before uploading.</div>
+                renderSiteSelection()
               )
+            ) : assetMode === "placements" && siteScope === "select" ? (
+              renderSiteSelection()
             ) : selectedPlacement ? (
               <>
                 <div style={detailHeaderStyle}>
@@ -2150,20 +2225,25 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                       <div style={detailMetaStyle}>{selectedPlacement.delivery_schedule}</div>
                     )}
                   </div>
-                  <div style={countBadgeStyle}>
-                    {assetsLoading ? "..." : placementAssets.length} upload{placementAssets.length === 1 ? "" : "s"}
+                  <div style={detailHeaderActionsStyle}>
+                    <div style={countBadgeStyle}>
+                      {assetsLoading ? "..." : placementAssets.length} upload{placementAssets.length === 1 ? "" : "s"}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={returnToSiteSelection}
+                      style={secondaryButtonStyle}
+                    >
+                      Back to Sites
+                    </button>
+                    <button
+                      type="button"
+                      onClick={refreshVisibleAssets}
+                      style={secondaryButtonStyle}
+                    >
+                      Refresh
+                    </button>
                   </div>
-                </div>
-
-                <div style={assetGridHeaderStyle}>
-                  <h3 style={sectionTitleStyle}>Uploads</h3>
-                  <button
-                    type="button"
-                    onClick={refreshVisibleAssets}
-                    style={secondaryButtonStyle}
-                  >
-                    Refresh
-                  </button>
                 </div>
 
                 {renderAssetManager()}
@@ -2172,11 +2252,20 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
             ) : (
               <>
                 <div style={detailHeaderStyle}>
-                  <h2 style={detailTitleStyle}>Assets</h2>
+                  <h2 style={detailTitleStyle}>{siteScope === "all" ? "All Sites" : "Assets"}</h2>
                   <div style={detailHeaderActionsStyle}>
                     <div style={countBadgeStyle}>
                       {assetsLoading ? "..." : placementAssets.length} upload{placementAssets.length === 1 ? "" : "s"}
                     </div>
+                    {siteScope === "all" && (
+                      <button
+                        type="button"
+                        onClick={returnToSiteSelection}
+                        style={secondaryButtonStyle}
+                      >
+                        Back to Sites
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={refreshVisibleAssets}
@@ -2415,17 +2504,15 @@ const placementMenuStyle: React.CSSProperties = {
   boxSizing: "border-box",
 };
 
-const menuHeaderStyle: React.CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  color: "#b9bfcc",
-  fontSize: 13,
+const siteSelectionPanelStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 14,
 };
 
-const placementListStyle: React.CSSProperties = {
+const siteChoiceGridStyle: React.CSSProperties = {
   display: "grid",
-  gap: 8,
-  paddingRight: 4,
+  gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+  gap: 10,
 };
 
 const placementButtonStyle: React.CSSProperties = {
@@ -2440,9 +2527,9 @@ const placementButtonStyle: React.CSSProperties = {
   cursor: "pointer",
 };
 
-const selectedPlacementButtonStyle: React.CSSProperties = {
-  borderColor: "rgba(232,237,248,0.65)",
-  background: "#202431",
+const siteChoiceButtonStyle: React.CSSProperties = {
+  ...placementButtonStyle,
+  minHeight: 72,
 };
 
 const placementNameStyle: React.CSSProperties = {
