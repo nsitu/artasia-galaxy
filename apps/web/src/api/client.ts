@@ -176,6 +176,8 @@ export interface PlacementAsset {
   archived?: boolean;
   trashed?: boolean;
   published?: boolean;
+  width?: number | null;
+  height?: number | null;
   placement_id?: number | null;
   placement_name?: string | null;
   activity_id?: number | null;
@@ -185,6 +187,24 @@ export interface PlacementAsset {
   uploader_album_id?: string | null;
   thumbnailUrl: string;
   previewUrl: string;
+}
+
+export interface CropParameters {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface AssetEdit {
+  id?: string;
+  action: "crop" | "rotate" | "mirror";
+  parameters: CropParameters | { angle: number } | { axis: "horizontal" | "vertical" };
+}
+
+export interface AssetEditsResponse {
+  assetId: string;
+  edits: AssetEdit[];
 }
 
 export async function fetchUploadOptions(): Promise<UploadOptions> {
@@ -299,6 +319,41 @@ export async function updateAssetCaption(params: {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ caption: params.caption }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+}
+
+export async function fetchAssetEdits(assetId: string): Promise<AssetEditsResponse> {
+  const res = await fetch(`/api/v1/uploads/assets/${assetId}/edits`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function cropUploadAsset(params: {
+  assetId: string;
+  crop: CropParameters;
+}): Promise<AssetEditsResponse> {
+  const res = await fetch(`/api/v1/uploads/assets/${params.assetId}/crop`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params.crop),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function resetUploadAssetEdits(assetId: string): Promise<void> {
+  const res = await fetch(`/api/v1/uploads/assets/${assetId}/edits`, {
+    method: "DELETE",
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));

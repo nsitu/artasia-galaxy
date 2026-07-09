@@ -3,7 +3,9 @@ import {
   assignAssetActivityTag,
   assignAssetPlacement,
   assignAssetUploader,
+  cropUploadAsset,
   deleteUploadAsset,
+  fetchAssetEdits,
   fetchAuthUser,
   fetchDriveFiles,
   fetchDriveFolders,
@@ -12,10 +14,12 @@ import {
   fetchUploadOptions,
   fetchUntaggedPlacementAssets,
   logoutAuthUser,
+  resetUploadAssetEdits,
   setAssetPublished,
   syncDriveFiles,
   uploadFiles,
   type AuthUser,
+  type CropParameters,
   type DriveFile,
   type DriveFolder,
   type UploadOptions,
@@ -36,6 +40,8 @@ interface UploadPanelProps {
   onSignedOut?: () => void;
 }
 
+type CropRect = CropParameters;
+
 export default function UploadPanel({ initialError, onSignedOut }: UploadPanelProps) {
   const [options, setOptions] = useState<UploadOptions | null>(null);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
@@ -53,9 +59,16 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   const [managePublished, setManagePublished] = useState(false);
   const [savingAsset, setSavingAsset] = useState(false);
   const [deletingAsset, setDeletingAsset] = useState(false);
+  const [cropEditing, setCropEditing] = useState(false);
+  const [cropRect, setCropRect] = useState<CropRect | null>(null);
+  const [cropLoading, setCropLoading] = useState(false);
+  const [cropSaving, setCropSaving] = useState(false);
+  const [cropRefreshKey, setCropRefreshKey] = useState(0);
   const [assetsLoading, setAssetsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const cropImageRef = useRef<HTMLImageElement | null>(null);
+  const cropStartRef = useRef<{ x: number; y: number } | null>(null);
   const uploadInProgressRef = useRef(false);
 
   // Drive import state
@@ -447,6 +460,9 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     setManageUploaderKey(asset.uploader_id ? String(asset.uploader_id) : "");
     setManageActivityTag(asset.activity_id ? String(asset.activity_id) : "");
     setManagePublished(Boolean(asset.published));
+    setCropEditing(false);
+    setCropRect(null);
+    setCropRefreshKey((current) => current + 1);
     setError(null);
   }
 
@@ -456,6 +472,8 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     setManageUploaderKey("");
     setManageActivityTag("");
     setManagePublished(false);
+    setCropEditing(false);
+    setCropRect(null);
   }
 
   async function saveSelectedAssetChanges() {
@@ -540,6 +558,150 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
       setError((err as Error).message);
     } finally {
       setDeletingAsset(false);
+    }
+  }
+
+  function imageDimensionsForCrop(asset: PlacementAsset) {
+    const width = asset.width ?? cropImageRef.current?.naturalWidth ?? 0;
+    const height = asset.height ?? cropImageRef.current?.naturalHeight ?? 0;
+    return { width, height };
+  }
+
+  function pointerToImagePoint(event: React.PointerEvent<HTMLElement>, asset: PlacementAsset) {
+    const image = cropImageRef.current;
+    if (!image) return null;
+    const bounds = image.getBoundingClientRect();
+    const dimensions = imageDimensionsForCrop(asset);
+    if (bounds.width <= 0 || bounds.height <= 0 || dimensions.width <= 0 || dimensions.height <= 0) return null;
+
+    const x = Math.max(0, Math.min(dimensions.width, ((event.clientX - bounds.left) / bounds.width) * dimensions.width));
+    const y = Math.max(0, Math.min(dimensions.height, ((event.clientY - bounds.top) / bounds.height) * dimensions.height));
+    return { x, y };
+  }
+
+  function defaultCropForAsset(asset: PlacementAsset): CropRect | null {
+    const dimensions = imageDimensionsForCrop(asset);
+    if (dimensions.width <= 0 || dimensions.height <= 0) return null;
+    const width = Math.round(dimensions.width * 0.8);
+    const height = Math.round(dimensions.height * 0.8);
+    return {
+      x: Math.round((dimensions.width - width) / 2),
+      y: Math.round((dimensions.height - height) / 2),
+      width,
+      height,
+    };
+  }
+
+  function isCropParameters(value: unknown): value is CropParameters {
+    if (!value || typeof value !== "object") return false;
+    const candidate = value as Partial<CropParameters>;
+    return ["x", "y", "width", "height"].every((key) => Number.isFinite(candidate[key as keyof CropParameters]));
+  }
+
+  async function startCropEditing() {
+    if (!selectedAsset || selectedAsset.type !== "IMAGE") return;
+    if (!authUser?.authenticated) {
+      setError("Sign in to crop uploads.");
+      return;
+    }
+
+    setCropLoading(true);
+    setError(null);
+    try {
+      const edits = await fetchAssetEdits(selectedAsset.id);
+      const cropEdit = edits.edits.find((edit) => edit.action === "crop" && isCropParameters(edit.parameters));
+      setCropRect(cropEdit && isCropParameters(cropEdit.parameters)
+        ? cropEdit.parameters
+        : defaultCropForAsset(selectedAsset));
+      setCropEditing(true);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setCropLoading(false);
+    }
+  }
+
+  function beginCropDrag(event: React.PointerEvent<HTMLDivElement>) {
+    if (!selectedAsset || !cropEditing || cropSaving) return;
+    const point = pointerToImagePoint(event, selectedAsset);
+    if (!point) return;
+    cropStartRef.current = point;
+    setCropRect({
+      x: Math.round(point.x),
+      y: Math.round(point.y),
+      width: 1,
+      height: 1,
+    });
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function updateCropDrag(event: React.PointerEvent<HTMLDivElement>) {
+    if (!selectedAsset || !cropStartRef.current || !cropEditing || cropSaving) return;
+    const point = pointerToImagePoint(event, selectedAsset);
+    if (!point) return;
+    const start = cropStartRef.current;
+    const x = Math.min(start.x, point.x);
+    const y = Math.min(start.y, point.y);
+    const width = Math.abs(point.x - start.x);
+    const height = Math.abs(point.y - start.y);
+    setCropRect({
+      x: Math.round(x),
+      y: Math.round(y),
+      width: Math.max(1, Math.round(width)),
+      height: Math.max(1, Math.round(height)),
+    });
+  }
+
+  function endCropDrag(event: React.PointerEvent<HTMLDivElement>) {
+    cropStartRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  function cropOverlayStyle(asset: PlacementAsset): React.CSSProperties {
+    const dimensions = imageDimensionsForCrop(asset);
+    if (!cropRect || dimensions.width <= 0 || dimensions.height <= 0) return { display: "none" };
+    return {
+      left: `${(cropRect.x / dimensions.width) * 100}%`,
+      top: `${(cropRect.y / dimensions.height) * 100}%`,
+      width: `${(cropRect.width / dimensions.width) * 100}%`,
+      height: `${(cropRect.height / dimensions.height) * 100}%`,
+    };
+  }
+
+  async function saveCrop() {
+    if (!selectedAsset || !cropRect) return;
+    setCropSaving(true);
+    setError(null);
+    try {
+      await cropUploadAsset({ assetId: selectedAsset.id, crop: cropRect });
+      setCropEditing(false);
+      setCropRefreshKey((current) => current + 1);
+      refreshVisibleAssets();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setCropSaving(false);
+    }
+  }
+
+  async function resetCrop() {
+    if (!selectedAsset) return;
+    const confirmed = window.confirm(`Reset all Immich edits for "${selectedAsset.fileName}"?`);
+    if (!confirmed) return;
+    setCropSaving(true);
+    setError(null);
+    try {
+      await resetUploadAssetEdits(selectedAsset.id);
+      setCropRect(defaultCropForAsset(selectedAsset));
+      setCropEditing(false);
+      setCropRefreshKey((current) => current + 1);
+      refreshVisibleAssets();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setCropSaving(false);
     }
   }
 
@@ -814,14 +976,39 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     const activityChanged = manageActivityTag !== (selectedAsset.activity_id ? String(selectedAsset.activity_id) : "");
     const publishedChanged = managePublished !== Boolean(selectedAsset.published);
     const canSaveAsset = placementChanged || uploaderChanged || activityChanged || publishedChanged;
+    const displayPreviewUrl = `${selectedAsset.previewUrl}&cropRefresh=${cropRefreshKey}`;
+    const cropSourceUrl = `/api/v1/assets/${selectedAsset.id}/preview?v=${encodeURIComponent(
+      `${selectedAsset.updatedAt}-${cropRefreshKey}`
+    )}`;
 
     return (
       <div style={managePanelStyle}>
         <div style={managePreviewStyle}>
           {selectedAsset.type === "VIDEO" ? (
             <video src={selectedAsset.previewUrl} controls style={manageMediaStyle} />
+          ) : cropEditing ? (
+            <div
+              style={cropStageStyle}
+              onPointerDown={beginCropDrag}
+              onPointerMove={updateCropDrag}
+              onPointerUp={endCropDrag}
+              onPointerCancel={endCropDrag}
+            >
+              <img
+                ref={cropImageRef}
+                src={cropSourceUrl}
+                alt=""
+                style={cropMediaStyle}
+                draggable={false}
+                onLoad={() => {
+                  if (!cropRect) setCropRect(defaultCropForAsset(selectedAsset));
+                }}
+              />
+              <div style={cropShadeStyle} />
+              <div style={{ ...cropBoxStyle, ...cropOverlayStyle(selectedAsset) }} />
+            </div>
           ) : (
-            <img src={selectedAsset.previewUrl} alt="" style={manageMediaStyle} />
+            <img src={displayPreviewUrl} alt="" style={manageMediaStyle} />
           )}
         </div>
         <div style={manageDetailsStyle}>
@@ -900,25 +1087,69 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
             <button
               type="button"
               onClick={saveSelectedAssetChanges}
-              disabled={savingAsset || deletingAsset || !canSaveAsset}
+              disabled={savingAsset || deletingAsset || cropSaving || !canSaveAsset}
               style={primaryActionButtonStyle}
             >
               {savingAsset ? "Saving..." : "Save"}
             </button>
-            <a href={selectedAsset.previewUrl} target="_blank" rel="noreferrer" style={secondaryLinkButtonStyle}>
+            {authUser?.authenticated && selectedAsset.type === "IMAGE" && (
+              cropEditing ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={saveCrop}
+                    disabled={cropSaving || !cropRect}
+                    style={primaryActionButtonStyle}
+                  >
+                    {cropSaving ? "Saving crop..." : "Save Crop"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCropEditing(false);
+                      setCropRect(null);
+                    }}
+                    disabled={cropSaving}
+                    style={secondaryButtonStyle}
+                  >
+                    Cancel Crop
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={startCropEditing}
+                    disabled={cropLoading || cropSaving || savingAsset || deletingAsset}
+                    style={secondaryButtonStyle}
+                  >
+                    {cropLoading ? "Loading Crop..." : "Crop"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={resetCrop}
+                    disabled={cropSaving || savingAsset || deletingAsset}
+                    style={secondaryButtonStyle}
+                  >
+                    Reset Edits
+                  </button>
+                </>
+              )
+            )}
+            <a href={displayPreviewUrl} target="_blank" rel="noreferrer" style={secondaryLinkButtonStyle}>
               Preview
             </a>
             {authUser?.authenticated && (
               <button
                 type="button"
                 onClick={deleteSelectedAsset}
-                disabled={savingAsset || deletingAsset}
+                disabled={savingAsset || deletingAsset || cropSaving}
                 style={dangerButtonStyle}
               >
                 {deletingAsset ? "Deleting..." : "Delete"}
               </button>
             )}
-            <button type="button" onClick={closeAssetManager} disabled={deletingAsset} style={secondaryButtonStyle}>
+            <button type="button" onClick={closeAssetManager} disabled={deletingAsset || cropSaving} style={secondaryButtonStyle}>
               Close
             </button>
           </div>
@@ -1603,6 +1834,44 @@ const manageMediaStyle: React.CSSProperties = {
   objectFit: "contain",
   borderRadius: 4,
   background: "#0c0e13",
+};
+
+const cropStageStyle: React.CSSProperties = {
+  position: "relative",
+  width: "100%",
+  maxHeight: 360,
+  display: "inline-block",
+  background: "#0c0e13",
+  borderRadius: 4,
+  overflow: "hidden",
+  touchAction: "none",
+  cursor: "crosshair",
+  userSelect: "none",
+};
+
+const cropMediaStyle: React.CSSProperties = {
+  display: "block",
+  width: "100%",
+  maxHeight: 360,
+  objectFit: "contain",
+  pointerEvents: "none",
+};
+
+const cropShadeStyle: React.CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  background: "rgba(0,0,0,0.24)",
+  pointerEvents: "none",
+};
+
+const cropBoxStyle: React.CSSProperties = {
+  position: "absolute",
+  border: "2px solid #e8edf8",
+  boxShadow: "0 0 0 9999px rgba(0,0,0,0.36)",
+  boxSizing: "border-box",
+  minWidth: 10,
+  minHeight: 10,
+  pointerEvents: "none",
 };
 
 const manageDetailsStyle: React.CSSProperties = {

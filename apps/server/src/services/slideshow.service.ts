@@ -108,7 +108,7 @@ function assetToPhoto(asset: ImmichAsset): Photo {
 
 function assetMediaUrl(asset: ImmichAsset, kind: "thumbnail" | "preview") {
   const version = encodeURIComponent(asset.updatedAt || asset.fileModifiedAt || asset.checksum || asset.id);
-  return `/api/v1/assets/${asset.id}/${kind}?v=${version}`;
+  return `/api/v1/assets/${asset.id}/${kind}?v=${version}&edited=true`;
 }
 
 function seededShuffle<T>(array: T[], seed: number): T[] {

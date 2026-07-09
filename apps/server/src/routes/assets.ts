@@ -47,11 +47,12 @@ router.get("/external-logo", async (req, res) => {
 
 router.get("/:id/thumbnail", async (req, res) => {
   try {
-    const immichRes = await getAssetThumbnail(req.params.id, "thumbnail");
+    const edited = req.query.edited === "true";
+    const immichRes = await getAssetThumbnail(req.params.id, "thumbnail", { edited });
 
     res.status(immichRes.status);
     res.setHeader("Content-Type", immichRes.headers.get("Content-Type") ?? "image/jpeg");
-    res.setHeader("Cache-Control", immichRes.ok ? "public, max-age=86400" : "no-store");
+    res.setHeader("Cache-Control", immichRes.ok && !edited ? "public, max-age=86400" : "no-store");
 
     if (immichRes.body) {
       const reader = immichRes.body.getReader();
@@ -71,11 +72,12 @@ router.get("/:id/thumbnail", async (req, res) => {
 
 router.get("/:id/preview", async (req, res) => {
   try {
-    const immichRes = await getAssetThumbnail(req.params.id, "preview");
+    const edited = req.query.edited === "true";
+    const immichRes = await getAssetThumbnail(req.params.id, "preview", { edited });
 
     res.status(immichRes.status);
     res.setHeader("Content-Type", immichRes.headers.get("Content-Type") ?? "image/jpeg");
-    res.setHeader("Cache-Control", immichRes.ok ? "public, max-age=86400" : "no-store");
+    res.setHeader("Cache-Control", immichRes.ok && !edited ? "public, max-age=86400" : "no-store");
 
     if (immichRes.body) {
       const reader = immichRes.body.getReader();

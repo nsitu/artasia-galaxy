@@ -110,10 +110,13 @@ export async function checkImmichHealth(): Promise<boolean> {
 
 export async function getAssetThumbnail(
   assetId: string,
-  size: "thumbnail" | "preview" = "preview"
+  size: "thumbnail" | "preview" = "preview",
+  options?: { edited?: boolean }
 ): Promise<Response> {
+  const params = new URLSearchParams({ size });
+  if (options?.edited) params.set("edited", "true");
   return immichRequest(
-    `/assets/${assetId}/thumbnail?size=${size}`,
+    `/assets/${assetId}/thumbnail?${params.toString()}`,
     undefined,
     { allowErrorStatus: true },
   );
@@ -148,6 +151,43 @@ export async function updateAssetDescription(assetId: string, description: strin
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ description }),
+  });
+}
+
+export interface ImmichCropParameters {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface ImmichAssetEditAction {
+  action: "crop" | "rotate" | "mirror";
+  parameters: ImmichCropParameters | { angle: number } | { axis: "horizontal" | "vertical" };
+}
+
+export interface ImmichAssetEdits {
+  assetId: string;
+  edits: Array<ImmichAssetEditAction & { id?: string }>;
+}
+
+export async function getAssetEdits(assetId: string): Promise<ImmichAssetEdits> {
+  const res = await immichRequest(`/assets/${assetId}/edits`);
+  return res.json();
+}
+
+export async function editAsset(assetId: string, edits: ImmichAssetEditAction[]): Promise<ImmichAssetEdits> {
+  const res = await immichRequest(`/assets/${assetId}/edits`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ edits }),
+  });
+  return res.json();
+}
+
+export async function removeAssetEdits(assetId: string) {
+  await immichRequest(`/assets/${assetId}/edits`, {
+    method: "DELETE",
   });
 }
 

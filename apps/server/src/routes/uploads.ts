@@ -5,13 +5,16 @@ import multer from "multer";
 import {
   addAssetsToAlbum,
   deleteAssets,
+  editAsset,
   ensureAlbum,
   getAsset,
+  getAssetEdits,
   getPublishedAlbum,
   getServerStatistics,
   listAlbums,
   listTags,
   removeAssetsFromAlbum,
+  removeAssetEdits,
   searchAssets,
   searchAssetIdsByTag,
   tagAsset,
@@ -226,6 +229,8 @@ function mapAdminAsset(
     uploader_id: uploaderAlbum?.uploaderId ?? null,
     uploader_name: uploaderAlbum?.uploaderName ?? null,
     uploader_album_id: uploaderAlbum?.id ?? null,
+    width: asset.exifInfo?.exifImageWidth ?? null,
+    height: asset.exifInfo?.exifImageHeight ?? null,
     thumbnailUrl: assetMediaUrl(asset, "thumbnail"),
     previewUrl: assetMediaUrl(asset, "preview"),
   };
@@ -233,7 +238,7 @@ function mapAdminAsset(
 
 function assetMediaUrl(asset: Awaited<ReturnType<typeof getAssetsForPlacementTagIds>>[number], kind: "thumbnail" | "preview") {
   const version = encodeURIComponent(asset.updatedAt || asset.fileModifiedAt || asset.checksum || asset.id);
-  return `/api/v1/assets/${asset.id}/${kind}?v=${version}`;
+  return `/api/v1/assets/${asset.id}/${kind}?v=${version}&edited=true`;
 }
 
 async function searchAssetsByAlbumId(albumId: string) {
@@ -695,6 +700,108 @@ router.post("/assets/:assetId/caption", async (req, res) => {
       asset_id: assetId,
       caption,
     });
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
+});
+
+router.get("/assets/:assetId/edits", async (req, res) => {
+  try {
+    const auth = await getAuthContext(req);
+    if (!auth.authenticated) {
+      res.status(401).json({ error: "Sign in to edit uploads." });
+      return;
+    }
+
+    const assetId = req.params.assetId.trim();
+    if (!assetId) {
+      res.status(400).json({ error: "Asset ID is required." });
+      return;
+    }
+
+    await getAsset(assetId);
+    res.json(await getAssetEdits(assetId));
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
+});
+
+router.put("/assets/:assetId/crop", async (req, res) => {
+  try {
+    const auth = await getAuthContext(req);
+    if (!auth.authenticated) {
+      res.status(401).json({ error: "Sign in to crop uploads." });
+      return;
+    }
+
+    const assetId = req.params.assetId.trim();
+    if (!assetId) {
+      res.status(400).json({ error: "Asset ID is required." });
+      return;
+    }
+
+    const crop = {
+      x: Math.round(Number(req.body?.x)),
+      y: Math.round(Number(req.body?.y)),
+      width: Math.round(Number(req.body?.width)),
+      height: Math.round(Number(req.body?.height)),
+    };
+    if (
+      !Number.isFinite(crop.x) ||
+      !Number.isFinite(crop.y) ||
+      !Number.isFinite(crop.width) ||
+      !Number.isFinite(crop.height) ||
+      crop.x < 0 ||
+      crop.y < 0 ||
+      crop.width < 1 ||
+      crop.height < 1
+    ) {
+      res.status(400).json({ error: "Choose a valid crop area." });
+      return;
+    }
+
+    const asset = await getAsset(assetId);
+    const imageWidth = asset.exifInfo?.exifImageWidth;
+    const imageHeight = asset.exifInfo?.exifImageHeight;
+    if (
+      imageWidth != null &&
+      imageHeight != null &&
+      (crop.x + crop.width > imageWidth || crop.y + crop.height > imageHeight)
+    ) {
+      res.status(400).json({ error: "Crop area is outside the image bounds." });
+      return;
+    }
+
+    const current = await getAssetEdits(assetId).catch(() => ({ assetId, edits: [] }));
+    const nonCropEdits = current.edits.filter((edit) => edit.action !== "crop");
+    const edits = await editAsset(assetId, [
+      { action: "crop", parameters: crop },
+      ...nonCropEdits.map((edit) => ({ action: edit.action, parameters: edit.parameters })),
+    ]);
+
+    res.json(edits);
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
+});
+
+router.delete("/assets/:assetId/edits", async (req, res) => {
+  try {
+    const auth = await getAuthContext(req);
+    if (!auth.authenticated) {
+      res.status(401).json({ error: "Sign in to reset upload edits." });
+      return;
+    }
+
+    const assetId = req.params.assetId.trim();
+    if (!assetId) {
+      res.status(400).json({ error: "Asset ID is required." });
+      return;
+    }
+
+    await getAsset(assetId);
+    await removeAssetEdits(assetId);
+    res.json({ ok: true, asset_id: assetId });
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });
   }
