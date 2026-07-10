@@ -2928,8 +2928,8 @@ export default function UploadPanel({
                 <span>Straighten {straightenDegrees.toFixed(1)}°</span>
                 <input
                   type="range"
-                  min={-15}
-                  max={15}
+                  min={-35}
+                  max={35}
                   step={0.1}
                   value={straightenDegrees}
                   disabled={cropSaving}
