@@ -51,7 +51,7 @@ type NoticeTone = "success" | "warning";
 type BrowseContextFilter = "all" | "earlyon" | "nonEarlyon";
 type DeliveryDayFilter = "" | "monday" | "tuesday" | "wednesday" | "thursday" | "friday";
 type SiteScope = "select" | "all" | "placement";
-type WorkspaceMode = "sites" | "browse" | "upload" | "import";
+type WorkspaceMode = "sites" | "browse" | "edit" | "upload" | "import";
 type PlacementMetaLine = { text: string; icon?: string; href?: string; variant?: "location" };
 
 interface UploadPanelProps {
@@ -531,7 +531,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
 
   const visiblePlacementIds = useMemo(() => {
     if (assetMode === "untagged") return [];
-    if (siteScope === "all" || (workspaceMode === "browse" && siteScope === "select")) {
+    if (siteScope === "all" || ((workspaceMode === "browse" || workspaceMode === "edit") && siteScope === "select")) {
       return filteredPlacements.map((placement) => placement.placement_id);
     }
     if (siteScope === "placement" && selectedPlacement) return [selectedPlacement.placement_id];
@@ -945,6 +945,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     setMediaRefreshAssetId(null);
     setMediaRefreshAttempt(0);
     setError(null);
+    setWorkspaceMode("edit");
   }
 
   function closeAssetManager() {
@@ -2383,6 +2384,24 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
           <button
             type="button"
             onClick={() => {
+              setWorkspaceMode("edit");
+              setSelectedAsset(null);
+              setItems([]);
+              setNotice(null);
+            }}
+            style={{
+              ...workspaceTabStyle,
+              ...(workspaceMode === "edit" ? workspaceTabActiveStyle : {}),
+            }}
+          >
+            <span style={workspaceTabContentStyle}>
+              <span style={materialSymbolStyle} aria-hidden="true">edit</span>
+              Edit
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
               setWorkspaceMode("upload");
               setBrowsePartnerKey("");
               setSelectedAsset(null);
@@ -2423,7 +2442,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
 
         <div className="atlas-admin-layout" style={adminLayoutStyle}>
           <aside className="atlas-admin-filters" style={placementMenuStyle}>
-            {workspaceMode === "browse" && (
+            {(workspaceMode === "browse" || workspaceMode === "edit") && (
               <label style={labelStyle}>
                 Artasia Site
                 <select
@@ -2641,7 +2660,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
               </div>
             )}
 
-            {workspaceMode === "browse" && (
+            {(workspaceMode === "browse" || workspaceMode === "edit") && (
               <label style={labelStyle}>
                 Assets
                 <select
@@ -2769,7 +2788,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                   </div>
                 </div>
 
-                {renderAssetManager()}
+                {workspaceMode === "edit" && renderAssetManager()}
                 {renderAssetGrid("No uploads tagged to this placement yet.")}
               </>
             ) : (
@@ -2791,7 +2810,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                     </button>
                   </div>
                 </div>
-                {renderAssetManager()}
+                {workspaceMode === "edit" && renderAssetManager()}
                 {renderAssetGrid(
                   assetMode === "untagged"
                     ? "No uploads need placement right now."
