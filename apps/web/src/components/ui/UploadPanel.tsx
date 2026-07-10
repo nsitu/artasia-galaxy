@@ -2593,7 +2593,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
 
           </aside>
 
-          <section className="atlas-admin-detail" style={detailStyle}>
+          <section className="atlas-admin-detail" style={workspaceMode === "sites" ? sitesDetailStyle : detailStyle}>
             {workspaceMode === "sites" ? (
               renderSiteSelection()
             ) : workspaceMode === "upload" ? (
@@ -3108,6 +3108,11 @@ const detailStyle: React.CSSProperties = {
   borderRadius: 6,
   padding: 14,
   overflow: "visible",
+};
+
+const sitesDetailStyle: React.CSSProperties = {
+  minWidth: 0,
+  minHeight: "calc(100vh - 154px)",
 };
 
 const detailHeaderStyle: React.CSSProperties = {
