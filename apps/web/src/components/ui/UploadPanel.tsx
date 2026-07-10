@@ -60,6 +60,7 @@ interface UploadPanelProps {
 }
 
 type CropRect = CropParameters;
+type CropHandle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
 const MEDIA_REFRESH_DELAYS_MS = [1500, 3000, 6000, 10000, 15000];
 const DEFAULT_ADJUSTMENTS: AssetAdjustments = { brightness: 100, contrast: 100, saturation: 100 };
 const MIN_ADJUSTMENT = 50;
@@ -124,6 +125,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   const inputRef = useRef<HTMLInputElement | null>(null);
   const cropImageRef = useRef<HTMLImageElement | null>(null);
   const cropStartRef = useRef<{ x: number; y: number } | null>(null);
+  const cropResizeRef = useRef<{ handle: CropHandle; start: { x: number; y: number }; rect: CropRect } | null>(null);
   const uploadInProgressRef = useRef(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
@@ -941,8 +943,10 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     setManageBrightness(adjustments.brightness);
     setManageContrast(adjustments.contrast);
     setManageSaturation(adjustments.saturation);
-    setCropEditing(false);
+    setCropEditing(asset.type === "IMAGE");
     setCropRect(null);
+    setCropSourceDimensions(null);
+    setStraightenDegrees(0);
     setCropRefreshKey((current) => current + 1);
     setMediaRefreshAssetId(null);
     setMediaRefreshAttempt(0);
@@ -1067,12 +1071,13 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
       manageBrightness !== selectedAdjustments.brightness ||
       manageContrast !== selectedAdjustments.contrast ||
       manageSaturation !== selectedAdjustments.saturation;
+    const pixelEditsChanged = hasPendingPixelEdits(selectedAsset);
 
-    if (!placementChanged && !uploaderChanged && !activityChanged && !publishedChanged && !captionChanged && !adjustmentChanged && !cropEditing) {
+    if (!placementChanged && !uploaderChanged && !activityChanged && !publishedChanged && !captionChanged && !adjustmentChanged && !pixelEditsChanged) {
       setError("There are no changes to save.");
       return;
     }
-    if (cropEditing && !cropRect) {
+    if (pixelEditsChanged && !cropRect) {
       setError("Choose a crop area before saving.");
       return;
     }
@@ -1099,7 +1104,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
       }
 
       let message = "Upload changes saved.";
-      if (cropEditing && cropRect) {
+      if (pixelEditsChanged && cropRect) {
         const crop = normalizeCropRect(selectedAsset, cropRect);
         const dimensions = imageDimensionsForCrop(selectedAsset);
         const result = await flattenUploadAsset({
@@ -1280,6 +1285,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
 
   function beginCropDrag(event: React.PointerEvent<HTMLDivElement>) {
     if (!selectedAsset || !cropEditing || cropSaving) return;
+    if (cropResizeRef.current) return;
     const point = pointerToImagePoint(event, selectedAsset);
     if (!point) return;
     cropStartRef.current = point;
@@ -1293,9 +1299,32 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   }
 
   function updateCropDrag(event: React.PointerEvent<HTMLDivElement>) {
-    if (!selectedAsset || !cropStartRef.current || !cropEditing || cropSaving) return;
+    if (!selectedAsset || !cropEditing || cropSaving) return;
     const point = pointerToImagePoint(event, selectedAsset);
     if (!point) return;
+    const resize = cropResizeRef.current;
+    if (resize) {
+      const { handle, rect } = resize;
+      const right = rect.x + rect.width;
+      const bottom = rect.y + rect.height;
+      let x = rect.x;
+      let y = rect.y;
+      let width = rect.width;
+      let height = rect.height;
+      if (handle.includes("w")) {
+        x = Math.min(point.x, right - 1);
+        width = right - x;
+      }
+      if (handle.includes("e")) width = Math.max(1, point.x - rect.x);
+      if (handle.includes("n")) {
+        y = Math.min(point.y, bottom - 1);
+        height = bottom - y;
+      }
+      if (handle.includes("s")) height = Math.max(1, point.y - rect.y);
+      setCropRect(normalizeCropRect(selectedAsset, { x, y, width, height }));
+      return;
+    }
+    if (!cropStartRef.current) return;
     const start = cropStartRef.current;
     const x = Math.min(start.x, point.x);
     const y = Math.min(start.y, point.y);
@@ -1311,9 +1340,24 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
 
   function endCropDrag(event: React.PointerEvent<HTMLDivElement>) {
     cropStartRef.current = null;
+    cropResizeRef.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
+  }
+
+  function beginCropResize(handle: CropHandle, event: React.PointerEvent<HTMLSpanElement>) {
+    if (!selectedAsset || !cropRect || cropSaving) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const point = pointerToImagePoint(event, selectedAsset);
+    if (!point) return;
+    cropResizeRef.current = {
+      handle,
+      start: point,
+      rect: normalizeCropRect(selectedAsset, cropRect),
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
   }
 
   function cropOverlayStyle(asset: PlacementAsset): React.CSSProperties {
@@ -1326,6 +1370,14 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
       width: `${(rect.width / dimensions.width) * 100}%`,
       height: `${(rect.height / dimensions.height) * 100}%`,
     };
+  }
+
+  function hasPendingPixelEdits(asset: PlacementAsset) {
+    if (Math.abs(straightenDegrees) > 0.0001) return true;
+    if (!cropRect) return false;
+    const dimensions = imageDimensionsForCrop(asset);
+    const rect = normalizeCropRect(asset, cropRect);
+    return rect.x > 1 || rect.y > 1 || Math.abs(rect.width - dimensions.width) > 1 || Math.abs(rect.height - dimensions.height) > 1;
   }
 
   async function saveCrop() {
@@ -1372,8 +1424,9 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     setError(null);
     try {
       await resetUploadAssetEdits(selectedAsset.id);
-      setCropRect(defaultCropForAsset(selectedAsset));
-      setCropEditing(false);
+      setStraightenDegrees(0);
+      setCropRect(defaultCropForAsset(selectedAsset, 0));
+      setCropEditing(true);
       queueMediaRefresh(selectedAsset.id);
       refreshVisibleAssets();
     } catch (err) {
@@ -2008,7 +2061,8 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
       manageContrast !== selectedAdjustments.contrast ||
       manageSaturation !== selectedAdjustments.saturation;
     const captionChanged = manageCaption.trim() !== (selectedAsset.description ?? "").trim();
-    const hasAnyChanges = placementChanged || uploaderChanged || activityChanged || publishedChanged || adjustmentChanged || captionChanged || cropEditing;
+    const pixelEditsChanged = hasPendingPixelEdits(selectedAsset);
+    const hasAnyChanges = placementChanged || uploaderChanged || activityChanged || publishedChanged || adjustmentChanged || captionChanged || pixelEditsChanged;
     const displayPreviewUrl = mediaUrl(selectedAsset.previewUrl, selectedAsset.id);
     const cropSourceUrl = `/api/v1/assets/${selectedAsset.id}/preview?v=${encodeURIComponent(
       `${selectedAsset.updatedAt}-${cropRefreshKey}`
@@ -2053,7 +2107,16 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                   }}
                 />
                 <div style={cropShadeStyle} />
-                <div style={{ ...cropBoxStyle, ...cropOverlayStyle(selectedAsset) }} />
+                <div style={{ ...cropBoxStyle, ...cropOverlayStyle(selectedAsset) }}>
+                  {(["nw", "n", "ne", "e", "se", "s", "sw", "w"] as CropHandle[]).map((handle) => (
+                    <span
+                      key={handle}
+                      aria-hidden="true"
+                      style={{ ...cropHandleStyle, ...cropHandlePositionStyles[handle] }}
+                      onPointerDown={(event) => beginCropResize(handle, event)}
+                    />
+                  ))}
+                </div>
               </div>
               <label style={adjustmentLabelStyle}>
                 <span>Straighten {straightenDegrees.toFixed(1)}°</span>
@@ -2086,22 +2149,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
           )}
         </div>
         <div style={manageDetailsStyle}>
-          <div style={manageHeaderStyle}>
-            <div>
-              <h3 style={sectionTitleStyle}>Manage Upload</h3>
-              <div style={assetNameStyle}>{selectedAsset.fileName}</div>
-              <div style={assetDateStyle}>{new Date(selectedAsset.createdAt).toLocaleString()}</div>
-              <div style={assetDateStyle}>
-                Site: {selectedAsset.placement_name ?? "No Artasia site"}
-              </div>
-              <div style={assetDateStyle}>
-                Album: {selectedAsset.uploader_name ?? "No team member album"}
-              </div>
-              <div style={assetDateStyle}>
-                Program Week: {selectedAsset.activity_label ?? "No activity tag"}
-              </div>
-            </div>
-          </div>
+          <h2 style={assetHeadingStyle}>{selectedAsset.fileName}</h2>
 
           <label style={labelStyle}>
             Artasia Site
@@ -2147,15 +2195,6 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                 </option>
               ))}
             </select>
-          </label>
-          <label style={checkboxLabelStyle}>
-            <input
-              type="checkbox"
-              checked={managePublished}
-              disabled={!authUser?.authenticated}
-              onChange={(e) => setManagePublished(e.target.checked)}
-            />
-            Published
           </label>
           <label style={labelStyle}>
             Caption / Description
@@ -2225,6 +2264,15 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
               </div>
             </div>
           )}
+          <label style={checkboxLabelStyle}>
+            <input
+              type="checkbox"
+              checked={managePublished}
+              disabled={!authUser?.authenticated}
+              onChange={(e) => setManagePublished(e.target.checked)}
+            />
+            Published
+          </label>
           <div style={manageActionsStyle}>
             <button
               type="button"
@@ -2232,48 +2280,18 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
               disabled={savingAsset || deletingAsset || cropSaving || adjustmentsSaving || captionSaving || !hasAnyChanges}
               style={primaryActionButtonStyle}
             >
-              {savingAsset ? (cropEditing ? "Saving & Creating Edited Copy..." : "Saving...") : "Save Changes"}
+              {savingAsset ? (pixelEditsChanged ? "Saving & Creating Edited Copy..." : "Saving...") : "Save Changes"}
             </button>
             {authUser?.authenticated && selectedAsset.type === "IMAGE" && (
-              cropEditing ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCropEditing(false);
-                      setCropRect(null);
-                      setCropSourceDimensions(null);
-                    }}
-                    disabled={cropSaving || captionSaving}
-                    style={secondaryButtonStyle}
-                  >
-                    Cancel Edit
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={startCropEditing}
-                    disabled={cropLoading || cropSaving || savingAsset || deletingAsset || adjustmentsSaving || captionSaving}
-                    style={secondaryButtonStyle}
-                  >
-                    {cropLoading ? "Loading Editor..." : "Crop & Straighten"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={resetCrop}
-                    disabled={cropSaving || savingAsset || deletingAsset || adjustmentsSaving || captionSaving}
-                    style={secondaryButtonStyle}
-                  >
-                    Reset Edits
-                  </button>
-                </>
-              )
+              <button
+                type="button"
+                onClick={resetCrop}
+                disabled={cropSaving || savingAsset || deletingAsset || adjustmentsSaving || captionSaving}
+                style={secondaryButtonStyle}
+              >
+                Reset Edits
+              </button>
             )}
-            <a href={displayPreviewUrl} target="_blank" rel="noreferrer" style={secondaryLinkButtonStyle}>
-              Preview
-            </a>
             {authUser?.authenticated && (
               <button
                 type="button"
@@ -2284,8 +2302,8 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                 {deletingAsset ? "Deleting..." : "Delete"}
               </button>
             )}
-            <button type="button" onClick={closeAssetManager} disabled={deletingAsset || cropSaving || adjustmentsSaving || captionSaving} style={secondaryButtonStyle}>
-              Close
+            <button type="button" onClick={closeAssetManager} disabled={deletingAsset || cropSaving || adjustmentsSaving || captionSaving || savingAsset} style={secondaryButtonStyle}>
+              Cancel
             </button>
           </div>
         </div>
@@ -2485,12 +2503,11 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
           <button
             type="button"
             onClick={() => {
-              setWorkspaceMode("import");
               setBrowsePartnerKey("");
               setSelectedAsset(null);
               setAssetMode("placements");
-              setNotice(null);
               setSelectedDriveFiles(new Set());
+              void openDriveImportDefault();
             }}
             style={{
               ...workspaceTabStyle,
@@ -3543,6 +3560,29 @@ const cropBoxStyle: React.CSSProperties = {
   pointerEvents: "none",
 };
 
+const cropHandleStyle: React.CSSProperties = {
+  position: "absolute",
+  width: 12,
+  height: 12,
+  border: "2px solid #202632",
+  borderRadius: 2,
+  background: "#f4f7fb",
+  boxSizing: "border-box",
+  pointerEvents: "auto",
+  zIndex: 2,
+};
+
+const cropHandlePositionStyles: Record<CropHandle, React.CSSProperties> = {
+  nw: { left: 0, top: 0, transform: "translate(-50%, -50%)", cursor: "nwse-resize" },
+  n: { left: "50%", top: 0, transform: "translate(-50%, -50%)", cursor: "ns-resize" },
+  ne: { right: 0, top: 0, transform: "translate(50%, -50%)", cursor: "nesw-resize" },
+  e: { right: 0, top: "50%", transform: "translate(50%, -50%)", cursor: "ew-resize" },
+  se: { right: 0, bottom: 0, transform: "translate(50%, 50%)", cursor: "nwse-resize" },
+  s: { left: "50%", bottom: 0, transform: "translate(-50%, 50%)", cursor: "ns-resize" },
+  sw: { left: 0, bottom: 0, transform: "translate(-50%, 50%)", cursor: "nesw-resize" },
+  w: { left: 0, top: "50%", transform: "translate(-50%, -50%)", cursor: "ew-resize" },
+};
+
 const manageDetailsStyle: React.CSSProperties = {
   display: "grid",
   gap: 12,
@@ -3613,6 +3653,14 @@ const assetNameStyle: React.CSSProperties = {
   overflow: "hidden",
   textOverflow: "ellipsis",
   whiteSpace: "nowrap",
+};
+
+const assetHeadingStyle: React.CSSProperties = {
+  margin: 0,
+  color: "#f2f2f2",
+  fontSize: 20,
+  lineHeight: 1.25,
+  overflowWrap: "anywhere",
 };
 
 const assetDateStyle: React.CSSProperties = {
