@@ -2013,6 +2013,8 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     const cropSourceUrl = `/api/v1/assets/${selectedAsset.id}/preview?v=${encodeURIComponent(
       `${selectedAsset.updatedAt}-${cropRefreshKey}`
     )}`;
+    const cropCanvasDimensions = rotatedImageDimensions(selectedAsset);
+    const cropSourceSize = sourceImageDimensions(selectedAsset);
 
     return (
       <div className="atlas-manage-panel" style={managePanelStyle}>
@@ -2024,7 +2026,8 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
               <div
                 style={{
                   ...cropStageStyle,
-                  aspectRatio: `${rotatedImageDimensions(selectedAsset).width} / ${rotatedImageDimensions(selectedAsset).height}`,
+                  width: `min(100%, ${Math.round(560 * cropCanvasDimensions.width / cropCanvasDimensions.height)}px)`,
+                  aspectRatio: `${cropCanvasDimensions.width} / ${cropCanvasDimensions.height}`,
                 }}
                 onPointerDown={beginCropDrag}
                 onPointerMove={updateCropDrag}
@@ -2037,8 +2040,8 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                   alt=""
                   style={{
                     ...cropMediaStyle,
-                    width: `${(sourceImageDimensions(selectedAsset).width / rotatedImageDimensions(selectedAsset).width) * 100}%`,
-                    height: `${(sourceImageDimensions(selectedAsset).height / rotatedImageDimensions(selectedAsset).height) * 100}%`,
+                    width: `${(cropSourceSize.width / cropCanvasDimensions.width) * 100}%`,
+                    height: `${(cropSourceSize.height / cropCanvasDimensions.height) * 100}%`,
                     transform: `translate(-50%, -50%) rotate(${straightenDegrees}deg)`,
                   }}
                   draggable={false}
