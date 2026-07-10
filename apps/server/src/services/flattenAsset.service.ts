@@ -12,6 +12,10 @@ import {
   updateAsset,
   uploadAsset,
 } from "../infra/ImmichClient.js";
+import {
+  getAssetAdjustments,
+  saveAssetAdjustments,
+} from "./assetAdjustments.service.js";
 
 const DATA_DIR = process.env.DATA_DIR ?? join(process.cwd(), "data");
 const FLATTEN_DIR = join(DATA_DIR, "flatten-jobs");
@@ -225,8 +229,21 @@ export async function flattenAsset(sourceAssetId: string, requestedRecipe: unkno
     await persistJob(job);
 
     await copyAssetRelationships(sourceAssetId, uploaded.id);
-    const tagIds = (source.tags ?? []).map((tag) => tag.id);
-    if (tagIds.length > 0) await tagAssets([uploaded.id], tagIds);
+
+    const sourceTags = source.tags ?? [];
+    const tagIds = sourceTags.map((tag) => tag.id);
+    if (tagIds.length > 0) {
+      await tagAssets([uploaded.id], tagIds);
+    }
+
+    const adjustments = await getAssetAdjustments(sourceAssetId);
+    if (
+      adjustments.brightness !== 100 ||
+      adjustments.contrast !== 100 ||
+      adjustments.saturation !== 100
+    ) {
+      await saveAssetAdjustments(uploaded.id, adjustments);
+    }
     const latitude = source.exifInfo?.latitude;
     const longitude = source.exifInfo?.longitude;
     await updateAsset(uploaded.id, {
