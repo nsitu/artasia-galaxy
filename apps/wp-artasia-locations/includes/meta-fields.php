@@ -232,6 +232,13 @@ function artasia_register_meta_fields(): void
         'show_in_rest' => true,
         'sanitize_callback' => 'artasia_sanitize_integer_meta',
     ]);
+    register_post_meta('artasia_partner', 'artasia_white_logo_id', [
+        'type'         => 'integer',
+        'single'       => true,
+        'default'      => 0,
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_integer_meta',
+    ]);
     register_post_meta('artasia_partner', 'artasia_notes', [
         'type'         => 'string',
         'single'       => true,

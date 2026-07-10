@@ -807,6 +807,8 @@ function artasia_partner_meta_box_html(WP_Post $post): void
     $website   = get_post_meta($post->ID, 'artasia_website', true);
     $logo_id   = intval(get_post_meta($post->ID, 'artasia_logo_id', true));
     $logo_url  = $logo_id ? wp_get_attachment_url($logo_id) : '';
+    $white_logo_id  = intval(get_post_meta($post->ID, 'artasia_white_logo_id', true));
+    $white_logo_url = $white_logo_id ? wp_get_attachment_url($white_logo_id) : '';
     $notes     = get_post_meta($post->ID, 'artasia_notes', true);
     $brand_color_one = get_post_meta($post->ID, 'artasia_brand_color_one', true);
     $brand_color_two = get_post_meta($post->ID, 'artasia_brand_color_two', true);
@@ -863,6 +865,21 @@ function artasia_partner_meta_box_html(WP_Post $post): void
                 <button type="button" class="button" id="artasia_partner_logo_select">Select Logo</button>
                 <button type="button" class="button" id="artasia_partner_logo_remove" <?php disabled(!$logo_id); ?>>Remove Logo</button>
                 <p class="description">SVG files work best with Inline CSS (Presentation Attributes) and explicit dimensions (Non Responsive). Set your Illustrator export settings accordingly.</p>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_partner_white_logo_id">White Logo</label></th>
+            <td>
+                <input type="hidden" id="artasia_partner_white_logo_id" name="artasia_white_logo_id" value="<?php echo esc_attr($white_logo_id); ?>" />
+                <div id="artasia_partner_white_logo_preview" class="artasia-logo-preview artasia-logo-preview--dark">
+                    <?php if ($white_logo_url) : ?>
+                        <img src="<?php echo esc_url($white_logo_url); ?>" alt="" />
+                    <?php endif; ?>
+                </div>
+                <br />
+                <button type="button" class="button" id="artasia_partner_white_logo_select">Select White Logo</button>
+                <button type="button" class="button" id="artasia_partner_white_logo_remove" <?php disabled(!$white_logo_id); ?>>Remove White Logo</button>
+                <p class="description">PNG or SVG. The dark preview background is for visibility and is not part of the uploaded logo.</p>
             </td>
         </tr>
         <tr>
@@ -925,6 +942,7 @@ function artasia_save_partner_meta(int $post_id): void
     update_post_meta($post_id, 'artasia_brand_color_one', artasia_sanitize_hex_color_meta($_POST['artasia_brand_color_one'] ?? ''));
     update_post_meta($post_id, 'artasia_brand_color_two', artasia_sanitize_hex_color_meta($_POST['artasia_brand_color_two'] ?? ''));
     update_post_meta($post_id, 'artasia_logo_id', artasia_validate_partner_logo_id(intval($_POST['artasia_logo_id'] ?? 0)));
+    update_post_meta($post_id, 'artasia_white_logo_id', artasia_validate_partner_logo_id(intval($_POST['artasia_white_logo_id'] ?? 0)));
     update_post_meta($post_id, 'artasia_notes', sanitize_textarea_field($_POST['artasia_notes'] ?? ''));
 }
 add_action('save_post_artasia_partner', 'artasia_save_partner_meta');

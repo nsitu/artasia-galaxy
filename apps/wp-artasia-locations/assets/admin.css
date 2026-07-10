@@ -16,6 +16,27 @@
   background: #fff;
 }
 
+.artasia-logo-preview--dark {
+  display: inline-block;
+  padding: 8px;
+  background: #3c434a;
+  border: 1px solid #2c3338;
+}
+
+.artasia-logo-preview--dark:empty {
+  display: none;
+}
+
+.artasia-logo-preview--dark img {
+  border: 0;
+  background: transparent;
+}
+
+.artasia-admin-logo-wrapper--dark {
+  padding: 8px;
+  background: #3c434a;
+}
+
 .artasia-admin-logo-wrapper {
   display: inline-flex;
   max-width: 200px;

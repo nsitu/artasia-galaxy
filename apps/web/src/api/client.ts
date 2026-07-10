@@ -374,7 +374,7 @@ export interface FlattenAssetResponse {
 export async function flattenUploadAsset(params: {
   assetId: string;
   straightenDegrees: number;
-  crop?: CropParameters;
+  cropNormalized?: CropParameters;
 }): Promise<FlattenAssetResponse> {
   const res = await fetch(`/api/v1/uploads/assets/${params.assetId}/flatten`, {
     method: "POST",
@@ -382,7 +382,7 @@ export async function flattenUploadAsset(params: {
     body: JSON.stringify({
       version: 1,
       straightenDegrees: params.straightenDegrees,
-      crop: params.crop,
+      cropNormalized: params.cropNormalized,
       cropSpace: "auto-oriented-rotated",
       output: { format: "jpeg", quality: 92 },
     }),

@@ -28,6 +28,7 @@ export interface FlattenRecipe {
   version: 1;
   straightenDegrees: number;
   crop?: FlattenCrop;
+  cropNormalized?: FlattenCrop;
   cropSpace: "auto-oriented-rotated";
   output?: { format: "jpeg"; quality?: number };
 }
@@ -108,8 +109,26 @@ function validateRecipe(value: unknown): FlattenRecipe {
       throw new Error("Choose a valid crop area.");
     }
   }
+  let cropNormalized: FlattenCrop | undefined;
+  if (recipe.cropNormalized) {
+    cropNormalized = {
+      x: Number(recipe.cropNormalized.x),
+      y: Number(recipe.cropNormalized.y),
+      width: Number(recipe.cropNormalized.width),
+      height: Number(recipe.cropNormalized.height),
+    };
+    if (
+      Object.values(cropNormalized).some((part) => !Number.isFinite(part)) ||
+      cropNormalized.x < 0 || cropNormalized.y < 0 ||
+      cropNormalized.width <= 0 || cropNormalized.height <= 0 ||
+      cropNormalized.x + cropNormalized.width > 1.000001 ||
+      cropNormalized.y + cropNormalized.height > 1.000001
+    ) {
+      throw new Error("Choose a valid normalized crop area.");
+    }
+  }
   const quality = Math.max(75, Math.min(100, Math.round(Number(recipe.output?.quality ?? 92))));
-  return { version: 1, straightenDegrees, crop, cropSpace: "auto-oriented-rotated", output: { format: "jpeg", quality } };
+  return { version: 1, straightenDegrees, crop, cropNormalized, cropSpace: "auto-oriented-rotated", output: { format: "jpeg", quality } };
 }
 
 function outputFilename(original: string) {
@@ -170,7 +189,16 @@ export async function flattenAsset(sourceAssetId: string, requestedRecipe: unkno
     const oriented = inputMetadata.autoOrient;
     if (!oriented.width || !oriented.height) throw new Error("The source image dimensions could not be read.");
     const rotated = rotatedDimensions(oriented.width, oriented.height, recipe.straightenDegrees);
-    const crop = recipe.crop ?? largestInnerRectangle(oriented.width, oriented.height, recipe.straightenDegrees);
+    const crop = recipe.cropNormalized
+      ? {
+          x: Math.max(0, Math.round(recipe.cropNormalized.x * rotated.width)),
+          y: Math.max(0, Math.round(recipe.cropNormalized.y * rotated.height)),
+          width: Math.max(1, Math.round(recipe.cropNormalized.width * rotated.width)),
+          height: Math.max(1, Math.round(recipe.cropNormalized.height * rotated.height)),
+        }
+      : recipe.crop ?? largestInnerRectangle(oriented.width, oriented.height, recipe.straightenDegrees);
+    crop.width = Math.min(crop.width, rotated.width - crop.x);
+    crop.height = Math.min(crop.height, rotated.height - crop.y);
     if (crop.x + crop.width > rotated.width || crop.y + crop.height > rotated.height) {
       throw new Error("The crop area is outside the straightened image bounds.");
     }

@@ -148,6 +148,7 @@ function artasia_get_expanded_placements(): WP_REST_Response
         ]);
         foreach ($partner_query->posts as $partner) {
             $logo_id = intval(get_post_meta($partner->ID, 'artasia_logo_id', true));
+            $white_logo_id = intval(get_post_meta($partner->ID, 'artasia_white_logo_id', true));
             $partner_lookup[$partner->ID] = [
                 'id'      => $partner->ID,
                 'name'    => $partner->post_title,
@@ -156,6 +157,7 @@ function artasia_get_expanded_placements(): WP_REST_Response
                 'brand_color_one' => get_post_meta($partner->ID, 'artasia_brand_color_one', true) ?: '',
                 'brand_color_two' => get_post_meta($partner->ID, 'artasia_brand_color_two', true) ?: '',
                 'logo'    => artasia_get_partner_logo_response($logo_id),
+                'white_logo' => artasia_get_partner_logo_response($white_logo_id),
             ];
         }
     }

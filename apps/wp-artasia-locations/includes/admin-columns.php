@@ -198,6 +198,7 @@ function artasia_partner_columns(array $columns): array
         $new[$key] = $label;
         if ($key === 'title') {
             $new['artasia_logo'] = 'Logo';
+            $new['artasia_white_logo'] = 'White Logo';
             $new['artasia_partner_type'] = 'Type';
             $new['artasia_website']       = 'Website';
         }
@@ -219,6 +220,17 @@ function artasia_partner_column(string $column, int $post_id): void
                 }
             }
             echo '—';
+            break;
+        case 'artasia_white_logo':
+            $logo_id = intval(get_post_meta($post_id, 'artasia_white_logo_id', true));
+            if ($logo_id) {
+                $logo = wp_get_attachment_image($logo_id, [200, 150], false, ['class' => 'artasia-admin-logo']);
+                if ($logo) {
+                    echo '<div class="artasia-admin-logo-wrapper artasia-admin-logo-wrapper--dark">' . $logo . '</div>';
+                    break;
+                }
+            }
+            echo '&mdash;';
             break;
         case 'artasia_partner_type':
             echo esc_html(get_post_meta($post_id, 'artasia_partner_type', true) ?: '—');

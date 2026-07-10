@@ -77,6 +77,17 @@ jQuery(function ($) {
   });
 
   setupImagePicker({
+    inputSelector: '#artasia_partner_white_logo_id',
+    previewSelector: '#artasia_partner_white_logo_preview',
+    selectSelector: '#artasia_partner_white_logo_select',
+    removeSelector: '#artasia_partner_white_logo_remove',
+    title: 'Select Artasia Partner White Logo',
+    buttonText: 'Use this logo',
+    allowedMimeTypes: ['image/png', 'image/svg+xml'],
+    invalidMessage: 'Please choose a PNG or SVG logo.'
+  });
+
+  setupImagePicker({
     inputSelector: '#artasia_people_photo_id',
     previewSelector: '#artasia_people_photo_preview',
     selectSelector: '#artasia_people_photo_select',

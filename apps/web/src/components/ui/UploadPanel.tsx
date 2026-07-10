@@ -105,6 +105,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   const [deletingAsset, setDeletingAsset] = useState(false);
   const [cropEditing, setCropEditing] = useState(false);
   const [cropRect, setCropRect] = useState<CropRect | null>(null);
+  const [cropSourceDimensions, setCropSourceDimensions] = useState<{ width: number; height: number } | null>(null);
   const [straightenDegrees, setStraightenDegrees] = useState(0);
   const [cropLoading, setCropLoading] = useState(false);
   const [cropSaving, setCropSaving] = useState(false);
@@ -1103,6 +1104,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   }
 
   function sourceImageDimensions(asset: PlacementAsset) {
+    if (cropEditing && cropSourceDimensions) return cropSourceDimensions;
     const width = asset.width ?? cropImageRef.current?.naturalWidth ?? 0;
     const height = asset.height ?? cropImageRef.current?.naturalHeight ?? 0;
     return { width, height };
@@ -1197,6 +1199,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
 
     setError(null);
     setStraightenDegrees(0);
+    setCropSourceDimensions(null);
     setCropRect(defaultCropForAsset(selectedAsset, 0));
     setCropEditing(true);
   }
@@ -1259,7 +1262,16 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
       const result = await flattenUploadAsset({
         assetId: selectedAsset.id,
         straightenDegrees,
-        crop: normalizeCropRect(selectedAsset, cropRect),
+        cropNormalized: (() => {
+          const crop = normalizeCropRect(selectedAsset, cropRect);
+          const dimensions = imageDimensionsForCrop(selectedAsset);
+          return {
+            x: crop.x / dimensions.width,
+            y: crop.y / dimensions.height,
+            width: crop.width / dimensions.width,
+            height: crop.height / dimensions.height,
+          };
+        })(),
       });
       setNotice({ tone: "success", message: `Created ${result.width}×${result.height} edited copy and archived the original.` });
       closeAssetManager();
@@ -1940,7 +1952,10 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                   }}
                   draggable={false}
                   onLoad={() => {
-                    if (!cropRect) setCropRect(defaultCropForAsset(selectedAsset));
+                    const image = cropImageRef.current;
+                    if (!image?.naturalWidth || !image.naturalHeight) return;
+                    setCropSourceDimensions({ width: image.naturalWidth, height: image.naturalHeight });
+                    setCropRect({ x: 0, y: 0, width: image.naturalWidth, height: image.naturalHeight });
                   }}
                 />
                 <div style={cropShadeStyle} />
@@ -2167,6 +2182,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                     onClick={() => {
                       setCropEditing(false);
                       setCropRect(null);
+                      setCropSourceDimensions(null);
                     }}
                     disabled={cropSaving || captionSaving}
                     style={secondaryButtonStyle}
