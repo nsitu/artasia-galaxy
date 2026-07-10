@@ -199,11 +199,15 @@ export async function flattenAsset(sourceAssetId: string, requestedRecipe: unkno
     await copyAssetRelationships(sourceAssetId, uploaded.id);
     const tagIds = (source.tags ?? []).map((tag) => tag.id);
     if (tagIds.length > 0) await tagAssets([uploaded.id], tagIds);
+    const latitude = source.exifInfo?.latitude;
+    const longitude = source.exifInfo?.longitude;
     await updateAsset(uploaded.id, {
       description: source.exifInfo?.description ?? "",
       isFavorite: source.isFavorite,
-      latitude: source.exifInfo?.latitude,
-      longitude: source.exifInfo?.longitude,
+      ...(typeof latitude === "number" && Number.isFinite(latitude) &&
+      typeof longitude === "number" && Number.isFinite(longitude)
+        ? { latitude, longitude }
+        : {}),
       dateTimeOriginal: source.fileCreatedAt,
       visibility: "timeline",
     });
