@@ -189,7 +189,7 @@ export async function flattenAsset(sourceAssetId: string, requestedRecipe: unkno
     if (!original.ok || !original.body) throw new Error(`Unable to download source asset (${original.status}).`);
     await pipeline(Readable.fromWeb(original.body as never), createWriteStream(inputPath));
 
-    const inputMetadata = await sharp(inputPath).metadata();
+    const inputMetadata = await sharp(inputPath, { limitInputPixels: 268_402_689, failOnError: false }).metadata();
     const oriented = inputMetadata.autoOrient;
     if (!oriented.width || !oriented.height) throw new Error("The source image dimensions could not be read.");
     const rotated = rotatedDimensions(oriented.width, oriented.height, recipe.straightenDegrees);
@@ -207,7 +207,7 @@ export async function flattenAsset(sourceAssetId: string, requestedRecipe: unkno
       throw new Error("The crop area is outside the straightened image bounds.");
     }
 
-    const result = await sharp(inputPath, { limitInputPixels: 268_402_689 })
+    const result = await sharp(inputPath, { limitInputPixels: 268_402_689, failOnError: false })
       .autoOrient()
       .rotate(recipe.straightenDegrees, { background: { r: 0, g: 0, b: 0, alpha: 1 } })
       .extract({ left: crop.x, top: crop.y, width: crop.width, height: crop.height })
