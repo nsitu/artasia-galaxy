@@ -30,7 +30,7 @@ async function convertHeifToJpeg(inputPath: string) {
     await execFile("magick", ["convert", inputPath, outputPath]);
   } catch (err) {
     try {
-      await execFile("convert", [inputPath, outputPath]);
+      await execFile("magick", ["convert", inputPath, outputPath]);
     } catch (innerErr) {
       throw new Error(`HEIF fallback conversion failed: ${(innerErr as Error).message}`);
     }
@@ -199,7 +199,8 @@ export async function flattenAsset(sourceAssetId: string, requestedRecipe: unkno
   };
   await persistJob(job);
   const tempDir = await mkdtemp(join(FLATTEN_DIR, "work-"));
-  const inputPath = join(tempDir, "source");
+  const sourceExtension = extname(source.originalFileName) || ".heic";
+  const inputPath = join(tempDir, `source${sourceExtension}`);
   const outputPath = join(tempDir, "rendered.jpg");
 
   try {
