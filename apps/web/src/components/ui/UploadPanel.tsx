@@ -1053,6 +1053,77 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     }
   }
 
+  async function saveAllAssetChanges() {
+    if (!selectedAsset || !authUser?.authenticated) return;
+    const placementChanged = Boolean(managePlacementKey)
+      && managePlacementKey !== (selectedAsset.placement_id ? String(selectedAsset.placement_id) : "");
+    const uploaderChanged = Boolean(manageUploaderKey)
+      && manageUploaderKey !== (selectedAsset.uploader_id ? String(selectedAsset.uploader_id) : "");
+    const activityChanged = manageActivityTag !== (selectedAsset.activity_id ? String(selectedAsset.activity_id) : "");
+    const publishedChanged = managePublished !== Boolean(selectedAsset.published);
+    const captionChanged = manageCaption.trim() !== (selectedAsset.description ?? "").trim();
+    const selectedAdjustments = normalizeAdjustments(selectedAsset.adjustments);
+    const adjustmentChanged =
+      manageBrightness !== selectedAdjustments.brightness ||
+      manageContrast !== selectedAdjustments.contrast ||
+      manageSaturation !== selectedAdjustments.saturation;
+
+    if (!placementChanged && !uploaderChanged && !activityChanged && !publishedChanged && !captionChanged && !adjustmentChanged && !cropEditing) {
+      setError("There are no changes to save.");
+      return;
+    }
+    if (cropEditing && !cropRect) {
+      setError("Choose a crop area before saving.");
+      return;
+    }
+
+    setSavingAsset(true);
+    setError(null);
+    try {
+      const assetId = selectedAsset.id;
+      if (placementChanged) await assignAssetPlacement({ assetId, placementId: parseInt(managePlacementKey, 10) });
+      if (uploaderChanged) await assignAssetUploader({ assetId, uploaderId: parseInt(manageUploaderKey, 10) });
+      if (activityChanged) {
+        await assignAssetActivityTag({
+          assetId,
+          activityId: manageActivityTag ? parseInt(manageActivityTag, 10) : null,
+        });
+      }
+      if (publishedChanged) await setAssetPublished({ assetId, published: managePublished });
+      if (captionChanged) await updateAssetCaption({ assetId, caption: manageCaption.trim() });
+      if (adjustmentChanged) {
+        await updateUploadAssetAdjustments({
+          assetId,
+          adjustments: { brightness: manageBrightness, contrast: manageContrast, saturation: manageSaturation },
+        });
+      }
+
+      let message = "Upload changes saved.";
+      if (cropEditing && cropRect) {
+        const crop = normalizeCropRect(selectedAsset, cropRect);
+        const dimensions = imageDimensionsForCrop(selectedAsset);
+        const result = await flattenUploadAsset({
+          assetId,
+          straightenDegrees,
+          cropNormalized: {
+            x: crop.x / dimensions.width,
+            y: crop.y / dimensions.height,
+            width: crop.width / dimensions.width,
+            height: crop.height / dimensions.height,
+          },
+        });
+        message = `Upload changes saved. Created ${result.width}Ã—${result.height} edited copy and archived the original.`;
+      }
+
+      closeAssetManager();
+      setNotice({ tone: "success", message });
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSavingAsset(false);
+    }
+  }
+
   async function saveManagedCaption() {
     if (!selectedAsset) return;
     if (!authUser?.authenticated) {
@@ -1343,7 +1414,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   function resetAdjustments() {
     setManageBrightness(DEFAULT_ADJUSTMENTS.brightness);
     setManageContrast(DEFAULT_ADJUSTMENTS.contrast);
-    void saveAdjustments(DEFAULT_ADJUSTMENTS);
+    setManageSaturation(DEFAULT_ADJUSTMENTS.saturation);
   }
 
   async function signOut() {
@@ -1931,20 +2002,20 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
       && manageUploaderKey !== (selectedAsset.uploader_id ? String(selectedAsset.uploader_id) : "");
     const activityChanged = manageActivityTag !== (selectedAsset.activity_id ? String(selectedAsset.activity_id) : "");
     const publishedChanged = managePublished !== Boolean(selectedAsset.published);
-    const canSaveAsset = placementChanged || uploaderChanged || activityChanged || publishedChanged;
     const selectedAdjustments = normalizeAdjustments(selectedAsset.adjustments);
     const adjustmentChanged =
       manageBrightness !== selectedAdjustments.brightness ||
       manageContrast !== selectedAdjustments.contrast ||
       manageSaturation !== selectedAdjustments.saturation;
     const captionChanged = manageCaption.trim() !== (selectedAsset.description ?? "").trim();
+    const hasAnyChanges = placementChanged || uploaderChanged || activityChanged || publishedChanged || adjustmentChanged || captionChanged || cropEditing;
     const displayPreviewUrl = mediaUrl(selectedAsset.previewUrl, selectedAsset.id);
     const cropSourceUrl = `/api/v1/assets/${selectedAsset.id}/preview?v=${encodeURIComponent(
       `${selectedAsset.updatedAt}-${cropRefreshKey}`
     )}`;
 
     return (
-      <div style={managePanelStyle}>
+      <div className="atlas-manage-panel" style={managePanelStyle}>
         <div style={managePreviewStyle}>
           {selectedAsset.type === "VIDEO" ? (
             <video src={selectedAsset.previewUrl} controls style={manageMediaStyle} />
@@ -2098,20 +2169,6 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
               style={captionTextareaStyle}
             />
           </label>
-          <div style={captionManagerActionsStyle}>
-            <button
-              type="button"
-              onClick={() => void saveManagedCaption()}
-              disabled={!authUser?.authenticated || captionSaving || savingAsset || deletingAsset || cropSaving || adjustmentsSaving || !captionChanged}
-              style={secondaryButtonStyle}
-            >
-              {captionSaving ? "Saving Caption..." : "Save Caption"}
-            </button>
-            {captionSaveStatus === "saved" && <span style={captionStatusStyle}>Saved</span>}
-            {captionSaveStatus === "failed" && (
-              <span style={captionErrorStyle}>{captionSaveError ?? "Caption failed"}</span>
-            )}
-          </div>
           {authUser?.authenticated && selectedAsset.type === "IMAGE" && (
             <div style={adjustmentPanelStyle}>
               <label style={adjustmentLabelStyle}>
@@ -2156,18 +2213,6 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
               <div style={manageActionsStyle}>
                 <button
                   type="button"
-                  onClick={() => saveAdjustments({
-                    brightness: manageBrightness,
-                    contrast: manageContrast,
-                    saturation: manageSaturation,
-                  })}
-                  disabled={adjustmentsLoading || adjustmentsSaving || cropSaving || savingAsset || deletingAsset || captionSaving || !adjustmentChanged}
-                  style={secondaryButtonStyle}
-                >
-                  {adjustmentsSaving ? "Saving Adjustments..." : "Save Adjustments"}
-                </button>
-                <button
-                  type="button"
                   onClick={resetAdjustments}
                   disabled={adjustmentsLoading || adjustmentsSaving || cropSaving || savingAsset || deletingAsset || captionSaving}
                   style={secondaryButtonStyle}
@@ -2180,23 +2225,15 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
           <div style={manageActionsStyle}>
             <button
               type="button"
-              onClick={saveSelectedAssetChanges}
-              disabled={savingAsset || deletingAsset || cropSaving || adjustmentsSaving || captionSaving || !canSaveAsset}
+              onClick={saveAllAssetChanges}
+              disabled={savingAsset || deletingAsset || cropSaving || adjustmentsSaving || captionSaving || !hasAnyChanges}
               style={primaryActionButtonStyle}
             >
-              {savingAsset ? "Saving..." : "Save"}
+              {savingAsset ? (cropEditing ? "Saving & Creating Edited Copy..." : "Saving...") : "Save Changes"}
             </button>
             {authUser?.authenticated && selectedAsset.type === "IMAGE" && (
               cropEditing ? (
                 <>
-                  <button
-                    type="button"
-                    onClick={saveCrop}
-                    disabled={cropSaving || captionSaving || !cropRect}
-                    style={primaryActionButtonStyle}
-                  >
-                    {cropSaving ? "Creating Edited Copy..." : "Save Crop & Straighten"}
-                  </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -2272,6 +2309,11 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
 
             .atlas-admin-detail {
               min-height: 0 !important;
+            }
+
+            .atlas-manage-panel {
+              grid-template-columns: 1fr !important;
+              gap: 20px !important;
             }
 
             .atlas-site-grid {
@@ -2713,7 +2755,10 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
 
           </aside>}
 
-          <section className="atlas-admin-detail" style={workspaceMode === "sites" ? sitesDetailStyle : detailStyle}>
+          <section
+            className="atlas-admin-detail"
+            style={workspaceMode === "sites" ? sitesDetailStyle : workspaceMode === "edit" ? editDetailStyle : detailStyle}
+          >
             {workspaceMode === "sites" ? (
               renderSiteSelection()
             ) : workspaceMode === "edit" ? (
@@ -3230,6 +3275,12 @@ const detailStyle: React.CSSProperties = {
   overflow: "visible",
 };
 
+const editDetailStyle: React.CSSProperties = {
+  minWidth: 0,
+  minHeight: "calc(100vh - 154px)",
+  padding: "8px 0 24px",
+};
+
 const sitesDetailStyle: React.CSSProperties = {
   minWidth: 0,
   minHeight: "calc(100vh - 154px)",
@@ -3420,13 +3471,9 @@ const sectionTitleStyle: React.CSSProperties = {
 
 const managePanelStyle: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "minmax(180px, 280px) 1fr",
-  gap: 14,
-  background: "#171a22",
-  border: "1px solid rgba(232,237,248,0.28)",
-  borderRadius: 6,
-  padding: 12,
-  marginBottom: 12,
+  gridTemplateColumns: "minmax(340px, 46%) minmax(0, 1fr)",
+  gap: 28,
+  alignItems: "start",
 };
 
 const managePreviewStyle: React.CSSProperties = {
@@ -3435,7 +3482,7 @@ const managePreviewStyle: React.CSSProperties = {
 
 const manageMediaStyle: React.CSSProperties = {
   width: "100%",
-  maxHeight: 280,
+  maxHeight: 560,
   objectFit: "contain",
   borderRadius: 4,
   background: "#0c0e13",
@@ -3445,7 +3492,7 @@ const cropStageStyle: React.CSSProperties = {
   position: "relative",
   width: "100%",
   maxWidth: "100%",
-  maxHeight: 360,
+  maxHeight: 560,
   display: "block",
   background: "#0c0e13",
   borderRadius: 4,
@@ -3516,10 +3563,6 @@ const manageActionsStyle: React.CSSProperties = {
 const adjustmentPanelStyle: React.CSSProperties = {
   display: "grid",
   gap: 10,
-  padding: 10,
-  background: "rgba(255,255,255,0.04)",
-  border: "1px solid rgba(255,255,255,0.1)",
-  borderRadius: 4,
 };
 
 const adjustmentLabelStyle: React.CSSProperties = {
