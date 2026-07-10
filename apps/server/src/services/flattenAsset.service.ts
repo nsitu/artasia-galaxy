@@ -1,8 +1,10 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { createWriteStream } from "node:fs";
+import { createReadStream, createWriteStream } from "node:fs";
 import { basename, extname, join } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
+import { execFile as execFileCallback } from "node:child_process";
+import { promisify } from "node:util";
 import sharp from "sharp";
 import {
   copyAssetRelationships,
@@ -20,6 +22,22 @@ import {
 const DATA_DIR = process.env.DATA_DIR ?? join(process.cwd(), "data");
 const FLATTEN_DIR = join(DATA_DIR, "flatten-jobs");
 const MAX_STRAIGHTEN_DEGREES = 15;
+const execFile = promisify(execFileCallback);
+
+async function convertHeifToJpeg(inputPath: string) {
+  const outputPath = `${inputPath}.jpg`;
+  try {
+    await execFile("magick", ["convert", inputPath, outputPath]);
+  } catch (err) {
+    try {
+      await execFile("convert", [inputPath, outputPath]);
+    } catch (innerErr) {
+      throw new Error(`HEIF fallback conversion failed: ${(innerErr as Error).message}`);
+    }
+  }
+
+  await pipeline(createReadStream(outputPath), createWriteStream(inputPath));
+}
 
 export interface FlattenCrop {
   x: number;
@@ -189,8 +207,16 @@ export async function flattenAsset(sourceAssetId: string, requestedRecipe: unkno
     if (!original.ok || !original.body) throw new Error(`Unable to download source asset (${original.status}).`);
     await pipeline(Readable.fromWeb(original.body as never), createWriteStream(inputPath));
 
-    const inputMetadata = await sharp(inputPath, { limitInputPixels: 268_402_689, failOnError: false } as any).metadata();
-    const oriented = inputMetadata.autoOrient;
+    let metadata;
+    try {
+      metadata = await sharp(inputPath, { limitInputPixels: 268_402_689, failOnError: false } as any).metadata();
+    } catch (err) {
+      // Fallback for malformed HEIF/HEIC images: convert to JPEG with ImageMagick first.
+      await convertHeifToJpeg(inputPath);
+      metadata = await sharp(inputPath, { limitInputPixels: 268_402_689 } as any).metadata();
+    }
+
+    const oriented = metadata.autoOrient;
     if (!oriented.width || !oriented.height) throw new Error("The source image dimensions could not be read.");
     const rotated = rotatedDimensions(oriented.width, oriented.height, recipe.straightenDegrees);
     const crop = recipe.cropNormalized

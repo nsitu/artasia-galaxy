@@ -26,6 +26,8 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV DATA_DIR=/data
 
+RUN apk add --no-cache imagemagick
+
 WORKDIR /app
 
 COPY package.json package-lock.json ./
