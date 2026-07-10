@@ -26,7 +26,7 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV DATA_DIR=/data
 
-RUN apk add --no-cache imagemagick
+RUN apk add --no-cache imagemagick libheif libde265
 
 WORKDIR /app
 
