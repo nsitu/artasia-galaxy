@@ -4,6 +4,12 @@ import App from "./App";
 import { loadMaterialSymbols } from "./modules/iconLoader";
 
 loadMaterialSymbols([
+  "reset_brightness",
+  "reset_colors",
+  "reset_shadow",
+  "reset_exposure",
+
+  "reset_settings",
   "edit",
   "schedule",
   "person",

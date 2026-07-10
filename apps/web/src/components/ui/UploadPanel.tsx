@@ -1521,12 +1521,6 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     }
   }
 
-  function resetAdjustments() {
-    setManageBrightness(DEFAULT_ADJUSTMENTS.brightness);
-    setManageContrast(DEFAULT_ADJUSTMENTS.contrast);
-    setManageSaturation(DEFAULT_ADJUSTMENTS.saturation);
-  }
-
   async function signOut() {
     try {
       await logoutAuthUser();
@@ -2276,7 +2270,19 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
           {authUser?.authenticated && selectedAsset.type === "IMAGE" && (
             <div style={adjustmentPanelStyle}>
               <label style={adjustmentLabelStyle}>
-                <span>Brightness {manageBrightness}%</span>
+                <span style={adjustmentLabelRowStyle}>
+                  <span>Brightness {manageBrightness}%</span>
+                  <button
+                    type="button"
+                    aria-label="Reset brightness"
+                    title="Reset brightness"
+                    onClick={() => setManageBrightness(DEFAULT_ADJUSTMENTS.brightness)}
+                    disabled={adjustmentsLoading || savingAsset}
+                    style={adjustmentResetButtonStyle}
+                  >
+                    reset_brightness
+                  </button>
+                </span>
                 <input
                   type="range"
                   min={MIN_ADJUSTMENT}
@@ -2289,7 +2295,19 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                 />
               </label>
               <label style={adjustmentLabelStyle}>
-                <span>Contrast {manageContrast}%</span>
+                <span style={adjustmentLabelRowStyle}>
+                  <span>Contrast {manageContrast}%</span>
+                  <button
+                    type="button"
+                    aria-label="Reset contrast"
+                    title="Reset contrast"
+                    onClick={() => setManageContrast(DEFAULT_ADJUSTMENTS.contrast)}
+                    disabled={adjustmentsLoading || savingAsset}
+                    style={adjustmentResetButtonStyle}
+                  >
+                    reset_exposure
+                  </button>
+                </span>
                 <input
                   type="range"
                   min={MIN_ADJUSTMENT}
@@ -2302,7 +2320,19 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                 />
               </label>
               <label style={adjustmentLabelStyle}>
-                <span>Saturation {manageSaturation}%</span>
+                <span style={adjustmentLabelRowStyle}>
+                  <span>Saturation {manageSaturation}%</span>
+                  <button
+                    type="button"
+                    aria-label="Reset saturation"
+                    title="Reset saturation"
+                    onClick={() => setManageSaturation(DEFAULT_ADJUSTMENTS.saturation)}
+                    disabled={adjustmentsLoading || savingAsset}
+                    style={adjustmentResetButtonStyle}
+                  >
+                    reset_colors
+                  </button>
+                </span>
                 <input
                   type="range"
                   min={MIN_ADJUSTMENT}
@@ -2314,16 +2344,6 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                   style={rangeInputStyle}
                 />
               </label>
-              <div style={manageActionsStyle}>
-                <button
-                  type="button"
-                  onClick={resetAdjustments}
-                  disabled={adjustmentsLoading || adjustmentsSaving || cropSaving || savingAsset || deletingAsset || captionSaving}
-                  style={secondaryButtonStyle}
-                >
-                  Reset Adjustments
-                </button>
-              </div>
             </div>
           )}
           <label style={checkboxLabelStyle}>
@@ -3675,6 +3695,27 @@ const adjustmentLabelStyle: React.CSSProperties = {
   gap: 6,
   color: "#cfd6e2",
   fontSize: 13,
+};
+
+const adjustmentLabelRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 10,
+};
+
+const adjustmentResetButtonStyle: React.CSSProperties = {
+  border: 0,
+  padding: 2,
+  background: "transparent",
+  color: "#cfd6e2",
+  cursor: "pointer",
+  fontFamily: "'Material Symbols Outlined'",
+  fontSize: 20,
+  fontWeight: 400,
+  lineHeight: 1,
+  fontStyle: "normal",
+  fontVariationSettings: "'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 20",
 };
 
 const rangeInputStyle: React.CSSProperties = {
