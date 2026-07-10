@@ -39,7 +39,13 @@ interface UploadItem {
   file?: File;
   fileName: string;
   fileSize?: number;
-  status: "queued" | "uploading" | "processing" | "completed" | "failed" | "retrying";
+  status:
+    | "queued"
+    | "uploading"
+    | "processing"
+    | "completed"
+    | "failed"
+    | "retrying";
   progress: number;
   error?: string;
   assetId?: string;
@@ -50,97 +56,191 @@ interface UploadItem {
 
 type NoticeTone = "success" | "warning";
 type BrowseContextFilter = "all" | "earlyon" | "nonEarlyon";
-type DeliveryDayFilter = "" | "monday" | "tuesday" | "wednesday" | "thursday" | "friday";
+type DeliveryDayFilter =
+  | ""
+  | "monday"
+  | "tuesday"
+  | "wednesday"
+  | "thursday"
+  | "friday";
 type SiteScope = "select" | "all" | "placement";
 type WorkspaceMode = "sites" | "browse" | "edit" | "upload" | "import";
-type PlacementMetaLine = { text: string; icon?: string; href?: string; variant?: "location" };
+type PlacementMetaLine = {
+  text: string;
+  icon?: string;
+  href?: string;
+  variant?: "location";
+};
 
 interface UploadPanelProps {
   initialError?: string | null;
   initialAssetId?: string;
+  adminPath?: string;
   onSignedOut?: () => void;
 }
 
 type CropRect = CropParameters;
 type CropHandle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
 const MEDIA_REFRESH_DELAYS_MS = [1500, 3000, 6000, 10000, 15000];
-const DEFAULT_ADJUSTMENTS: AssetAdjustments = { brightness: 100, contrast: 100, saturation: 100 };
+const DEFAULT_ADJUSTMENTS: AssetAdjustments = {
+  brightness: 100,
+  contrast: 100,
+  saturation: 100,
+};
 const MIN_ADJUSTMENT = 50;
 const MAX_ADJUSTMENT = 150;
 const UPLOAD_ACCEPT_TYPES = "image/*,video/*,.heic,.heif,image/heic,image/heif";
 const DEFAULT_SHARED_DRIVE_NAME = "artasia 2026";
 const DEFAULT_SHARED_DRIVE_FOLDER = "documentation";
-const DELIVERY_DAY_OPTIONS: Array<{ value: DeliveryDayFilter; label: string }> = [
-  { value: "", label: "All Delivery Days" },
-  { value: "monday", label: "Monday" },
-  { value: "tuesday", label: "Tuesday" },
-  { value: "wednesday", label: "Wednesday" },
-  { value: "thursday", label: "Thursday" },
-  { value: "friday", label: "Friday" },
-];
+const DELIVERY_DAY_OPTIONS: Array<{ value: DeliveryDayFilter; label: string }> =
+  [
+    { value: "", label: "All Delivery Days" },
+    { value: "monday", label: "Monday" },
+    { value: "tuesday", label: "Tuesday" },
+    { value: "wednesday", label: "Wednesday" },
+    { value: "thursday", label: "Thursday" },
+    { value: "friday", label: "Friday" },
+  ];
 
-export default function UploadPanel({ initialError, initialAssetId, onSignedOut }: UploadPanelProps) {
+export default function UploadPanel({
+  initialError,
+  initialAssetId,
+  adminPath,
+  onSignedOut,
+}: UploadPanelProps) {
   const [options, setOptions] = useState<UploadOptions | null>(null);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [uploaderKey, setUploaderKey] = useState("");
   const [browsePartnerKey, setBrowsePartnerKey] = useState("");
-  const [browseContextFilter, setBrowseContextFilter] = useState<BrowseContextFilter>("all");
-  const [deliveryDayFilter, setDeliveryDayFilter] = useState<DeliveryDayFilter>("");
+  const [browseContextFilter, setBrowseContextFilter] =
+    useState<BrowseContextFilter>("all");
+  const [deliveryDayFilter, setDeliveryDayFilter] =
+    useState<DeliveryDayFilter>("");
   const [timeOfDayFilter, setTimeOfDayFilter] = useState("");
   const [ageRangeFilter, setAgeRangeFilter] = useState("");
   const [placementKey, setPlacementKey] = useState("");
   const [activityTagFilter, setActivityTagFilter] = useState("");
   const [items, setItems] = useState<UploadItem[]>([]);
   const [placementAssets, setPlacementAssets] = useState<PlacementAsset[]>([]);
-  const [assetMode, setAssetMode] = useState<"placements" | "untagged">("placements");
+  const [assetMode, setAssetMode] = useState<"placements" | "untagged">(
+    "placements",
+  );
   const [siteScope, setSiteScope] = useState<SiteScope>("select");
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("sites");
-  const [selectedAsset, setSelectedAsset] = useState<PlacementAsset | null>(null);
+  const [selectedAsset, setSelectedAsset] = useState<PlacementAsset | null>(
+    null,
+  );
   const [managePlacementKey, setManagePlacementKey] = useState("");
   const [manageUploaderKey, setManageUploaderKey] = useState("");
   const [manageActivityTag, setManageActivityTag] = useState("");
   const [managePublished, setManagePublished] = useState(false);
   const [manageCaption, setManageCaption] = useState("");
   const [captionSaving, setCaptionSaving] = useState(false);
-  const [captionSaveStatus, setCaptionSaveStatus] = useState<"idle" | "saved" | "failed">("idle");
+  const [captionSaveStatus, setCaptionSaveStatus] = useState<
+    "idle" | "saved" | "failed"
+  >("idle");
   const [captionSaveError, setCaptionSaveError] = useState<string | null>(null);
   const [savingAsset, setSavingAsset] = useState(false);
   const [deletingAsset, setDeletingAsset] = useState(false);
   const [cropEditing, setCropEditing] = useState(false);
   const [cropRect, setCropRect] = useState<CropRect | null>(null);
-  const [cropSourceDimensions, setCropSourceDimensions] = useState<{ width: number; height: number } | null>(null);
+  const [cropSourceDimensions, setCropSourceDimensions] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
   const [straightenDegrees, setStraightenDegrees] = useState(0);
   const [cropLoading, setCropLoading] = useState(false);
   const [cropSaving, setCropSaving] = useState(false);
-  const [manageBrightness, setManageBrightness] = useState(DEFAULT_ADJUSTMENTS.brightness);
-  const [manageContrast, setManageContrast] = useState(DEFAULT_ADJUSTMENTS.contrast);
-  const [manageSaturation, setManageSaturation] = useState(DEFAULT_ADJUSTMENTS.saturation);
+  const [manageBrightness, setManageBrightness] = useState(
+    DEFAULT_ADJUSTMENTS.brightness,
+  );
+  const [manageContrast, setManageContrast] = useState(
+    DEFAULT_ADJUSTMENTS.contrast,
+  );
+  const [manageSaturation, setManageSaturation] = useState(
+    DEFAULT_ADJUSTMENTS.saturation,
+  );
   const [adjustmentsLoading, setAdjustmentsLoading] = useState(false);
   const [adjustmentsSaving, setAdjustmentsSaving] = useState(false);
   const [cropRefreshKey, setCropRefreshKey] = useState(0);
-  const [mediaRefreshAssetId, setMediaRefreshAssetId] = useState<string | null>(null);
+  const [mediaRefreshAssetId, setMediaRefreshAssetId] = useState<string | null>(
+    null,
+  );
   const [mediaRefreshAttempt, setMediaRefreshAttempt] = useState(0);
   const [assetsLoading, setAssetsLoading] = useState(false);
-  const [directAssetLoading, setDirectAssetLoading] = useState(Boolean(initialAssetId));
-  const [notice, setNotice] = useState<{ tone: NoticeTone; message: string } | null>(null);
+  const [directAssetLoading, setDirectAssetLoading] = useState(
+    Boolean(initialAssetId),
+  );
+  const [notice, setNotice] = useState<{
+    tone: NoticeTone;
+    message: string;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const cropImageRef = useRef<HTMLImageElement | null>(null);
   const cropStartRef = useRef<{ x: number; y: number } | null>(null);
-  const cropResizeRef = useRef<{ handle: CropHandle; start: { x: number; y: number }; rect: CropRect } | null>(null);
-  const cropMoveRef = useRef<{ start: { x: number; y: number }; rect: CropRect } | null>(null);
+
+  const appPath = adminPath ?? window.location.pathname;
+
+  function routeWorkspaceMode(path: string): WorkspaceMode {
+    if (path === "/admin" || path === "/admin/sites") return "sites";
+    if (path === "/admin/browse") return "browse";
+    if (path === "/admin/upload") return "upload";
+    if (path === "/admin/import") return "import";
+    if (path.startsWith("/admin/edit")) return "edit";
+    if (/^\/edit\/[0-9a-f-]{36}$/i.test(path)) return "edit";
+    return "sites";
+  }
+
+  useEffect(() => {
+    const nextMode = routeWorkspaceMode(appPath);
+    if (nextMode === workspaceMode) {
+      if (
+        nextMode === "import" &&
+        window.location.pathname === "/admin/import"
+      ) {
+        void openDriveImportDefault();
+      }
+      return;
+    }
+
+    setWorkspaceMode(nextMode);
+    setSelectedAsset(null);
+    setItems([]);
+    setNotice(null);
+
+    if (nextMode === "import") {
+      void openDriveImportDefault();
+    }
+  }, [appPath]);
+
+  const cropResizeRef = useRef<{
+    handle: CropHandle;
+    start: { x: number; y: number };
+    rect: CropRect;
+  } | null>(null);
+  const cropMoveRef = useRef<{
+    start: { x: number; y: number };
+    rect: CropRect;
+  } | null>(null);
   const uploadInProgressRef = useRef(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   // Drive import state
-  const [driveType, setDriveType] = useState<"chooser" | "myDrive" | "sharedDrives">("chooser");
+  const [driveType, setDriveType] = useState<
+    "chooser" | "myDrive" | "sharedDrives"
+  >("chooser");
   const [currentDriveId, setCurrentDriveId] = useState<string | undefined>();
   const [driveFolders, setDriveFolders] = useState<DriveFolder[]>([]);
   const [driveFiles, setDriveFiles] = useState<DriveFile[]>([]);
   const [selectedDriveFolder, setSelectedDriveFolder] = useState("root");
-  const [folderPath, setFolderPath] = useState<Array<{ id: string; name: string }>>([]);
-  const [selectedDriveFiles, setSelectedDriveFiles] = useState<Set<string>>(new Set());
+  const [folderPath, setFolderPath] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+  const [selectedDriveFiles, setSelectedDriveFiles] = useState<Set<string>>(
+    new Set(),
+  );
   const [driveSyncing, setDriveSyncing] = useState(false);
   const [driveLoading, setDriveLoading] = useState(false);
   const [driveDefaultOpening, setDriveDefaultOpening] = useState(false);
@@ -150,7 +250,10 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
   }
 
   function groupedPlacementsByPartner(placements: UploadOptions["placements"]) {
-    const collator = new Intl.Collator(undefined, { sensitivity: "base", numeric: true });
+    const collator = new Intl.Collator(undefined, {
+      sensitivity: "base",
+      numeric: true,
+    });
     const groups = new Map<string, UploadOptions["placements"]>();
     for (const placement of placements) {
       const partner = placement.partner_name?.trim() || "No Partner";
@@ -162,7 +265,9 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
       .sort(([partnerA], [partnerB]) => collator.compare(partnerA, partnerB))
       .map(([partner, group]) => ({
         partner,
-        placements: [...group].sort((a, b) => collator.compare(placementLabel(a), placementLabel(b))),
+        placements: [...group].sort((a, b) =>
+          collator.compare(placementLabel(a), placementLabel(b)),
+        ),
       }));
   }
 
@@ -170,30 +275,49 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
     const people = [
       placement.team_member_name ?? "Unassigned",
       placement.secondary_team_member_name,
-    ].filter(Boolean).join(" + ");
+    ]
+      .filter(Boolean)
+      .join(" + ");
     return [
       placement.partner_name,
       people,
       placement.delivery_schedule,
       placement.participant_age ? `(${placement.participant_age})` : undefined,
-    ].filter(Boolean).join(" · ");
+    ]
+      .filter(Boolean)
+      .join(" · ");
   }
 
   function placementMetaLines(placement: UploadOptions["placements"][number]) {
     const people = [
       placement.team_member_name ?? "Unassigned",
       placement.secondary_team_member_name,
-    ].filter(Boolean).join(" + ");
+    ]
+      .filter(Boolean)
+      .join(" + ");
     const ageRange = formatParticipantAge(placement.participant_age);
-    const address = placement.address?.trim()
-      || [placement.place_name, placement.place_city].filter(Boolean).join(", ");
-    const locationDisplay = formatPlacementLocationDisplay(placement.partner_name, placement.place_name, address);
+    const address =
+      placement.address?.trim() ||
+      [placement.place_name, placement.place_city].filter(Boolean).join(", ");
+    const locationDisplay = formatPlacementLocationDisplay(
+      placement.partner_name,
+      placement.place_name,
+      address,
+    );
 
     const lines: Array<PlacementMetaLine | null> = [
       people ? { text: people, icon: "person" } : null,
-      placement.delivery_schedule ? { text: placement.delivery_schedule, icon: "schedule" } : null,
+      placement.delivery_schedule
+        ? { text: placement.delivery_schedule, icon: "schedule" }
+        : null,
       ageRange ? { text: ageRange, icon: "child_hat" } : null,
-      locationDisplay ? { text: locationDisplay, href: googleMapsUrl(address), variant: "location" } : null,
+      locationDisplay
+        ? {
+            text: locationDisplay,
+            href: googleMapsUrl(address),
+            variant: "location",
+          }
+        : null,
     ];
 
     return lines.filter((line): line is PlacementMetaLine => Boolean(line));
@@ -205,13 +329,20 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
     return /\d/.test(trimmed) ? `Ages ${trimmed}` : trimmed;
   }
 
-  function formatPlacementLocationDisplay(partnerName?: string, placeName?: string, address?: string) {
+  function formatPlacementLocationDisplay(
+    partnerName?: string,
+    placeName?: string,
+    address?: string,
+  ) {
     const trimmedAddress = address?.trim();
     const trimmedPlaceName = placeName?.trim();
     const trimmedPartnerName = partnerName?.trim();
     const lines = [
       trimmedPartnerName,
-      trimmedPlaceName && !trimmedAddress?.toLocaleLowerCase().includes(trimmedPlaceName.toLocaleLowerCase())
+      trimmedPlaceName &&
+      !trimmedAddress
+        ?.toLocaleLowerCase()
+        .includes(trimmedPlaceName.toLocaleLowerCase())
         ? trimmedPlaceName
         : undefined,
       trimmedAddress,
@@ -222,7 +353,9 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
 
   function googleMapsUrl(address: string) {
     const queryBase = address.trim();
-    const query = /\bontario\b|\bon\b/i.test(queryBase) ? queryBase : `${queryBase}, Ontario`;
+    const query = /\bontario\b|\bon\b/i.test(queryBase)
+      ? queryBase
+      : `${queryBase}, Ontario`;
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
   }
 
@@ -244,7 +377,8 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
   useEffect(() => {
     if (!initialAssetId) {
       setDirectAssetLoading(false);
-      if (window.location.pathname === "/admin" && selectedAsset) {
+      const baseAdminPaths = ["/admin", "/admin/browse"];
+      if (baseAdminPaths.includes(window.location.pathname) && selectedAsset) {
         closeAssetManager();
         setWorkspaceMode("browse");
       }
@@ -292,7 +426,9 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
   }
 
   function placementViewerUrl(placement: UploadOptions["placements"][number]) {
-    const slug = placement.placement_slug?.trim() || slugifyPlacementName(placement.placement_name);
+    const slug =
+      placement.placement_slug?.trim() ||
+      slugifyPlacementName(placement.placement_name);
     return slug ? `/sites/${encodeURIComponent(slug)}` : "/";
   }
 
@@ -322,7 +458,8 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
     }
 
     document.addEventListener("pointerdown", onDocumentPointerDown);
-    return () => document.removeEventListener("pointerdown", onDocumentPointerDown);
+    return () =>
+      document.removeEventListener("pointerdown", onDocumentPointerDown);
   }, []);
 
   const menuItems = useMemo(
@@ -330,7 +467,7 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
       { href: "/", label: "Viewer" },
       { href: "/partners", label: "Partners" },
     ],
-    []
+    [],
   );
 
   // Load Drive folders when switching to Import tab or changing drive type
@@ -369,7 +506,13 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
       })
       .catch((err) => setError((err as Error).message))
       .finally(() => setDriveLoading(false));
-  }, [workspaceMode, driveType, selectedDriveFolder, currentDriveId, driveDefaultOpening]);
+  }, [
+    workspaceMode,
+    driveType,
+    selectedDriveFolder,
+    currentDriveId,
+    driveDefaultOpening,
+  ]);
 
   // Load files for current Drive folder
   useEffect(() => {
@@ -388,18 +531,36 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
 
     setDriveLoading(true);
     fetchDriveFiles(selectedDriveFolder, undefined, currentDriveId)
-      .then(({ files }) => setDriveFiles(files.filter((file) => !file.isFolder)))
+      .then(({ files }) =>
+        setDriveFiles(files.filter((file) => !file.isFolder)),
+      )
       .catch((err) => setError((err as Error).message))
       .finally(() => setDriveLoading(false));
-  }, [workspaceMode, driveType, selectedDriveFolder, currentDriveId, driveDefaultOpening]);
+  }, [
+    workspaceMode,
+    driveType,
+    selectedDriveFolder,
+    currentDriveId,
+    driveDefaultOpening,
+  ]);
 
   const selectedUploader = useMemo(() => {
     if (!options) return null;
-    return options.uploaders.find((uploader) => String(uploader.id) === uploaderKey) ?? null;
+    return (
+      options.uploaders.find(
+        (uploader) => String(uploader.id) === uploaderKey,
+      ) ?? null
+    );
   }, [options, uploaderKey]);
 
-  function placementIncludesUploader(placement: UploadOptions["placements"][number], uploaderId: number) {
-    return placement.team_member_id === uploaderId || placement.secondary_team_member_id === uploaderId;
+  function placementIncludesUploader(
+    placement: UploadOptions["placements"][number],
+    uploaderId: number,
+  ) {
+    return (
+      placement.team_member_id === uploaderId ||
+      placement.secondary_team_member_id === uploaderId
+    );
   }
 
   function matchedAuthUploaderId() {
@@ -409,7 +570,9 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
   function selectMySites() {
     const matchedUploaderId = matchedAuthUploaderId();
     if (!matchedUploaderId) {
-      setError("No matching Artasia Team Member email was found for your account.");
+      setError(
+        "No matching Artasia Team Member email was found for your account.",
+      );
       return;
     }
 
@@ -424,22 +587,37 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
     setError(null);
   }
 
-  function placementMatchesBrowseContext(placement: UploadOptions["placements"][number]) {
-    if (workspaceMode === "upload" || workspaceMode === "import" || browseContextFilter === "all") return true;
-    return browseContextFilter === "earlyon" ? placement.is_earlyon : !placement.is_earlyon;
+  function placementMatchesBrowseContext(
+    placement: UploadOptions["placements"][number],
+  ) {
+    if (
+      workspaceMode === "upload" ||
+      workspaceMode === "import" ||
+      browseContextFilter === "all"
+    )
+      return true;
+    return browseContextFilter === "earlyon"
+      ? placement.is_earlyon
+      : !placement.is_earlyon;
   }
 
-  function placementMatchesDeliveryDay(placement: UploadOptions["placements"][number]) {
+  function placementMatchesDeliveryDay(
+    placement: UploadOptions["placements"][number],
+  ) {
     if (workspaceMode !== "sites" || !deliveryDayFilter) return true;
     return placement.delivery_weekday === deliveryDayFilter;
   }
 
-  function placementMatchesTimeOfDay(placement: UploadOptions["placements"][number]) {
+  function placementMatchesTimeOfDay(
+    placement: UploadOptions["placements"][number],
+  ) {
     if (workspaceMode !== "sites" || !timeOfDayFilter) return true;
     return placement.delivery_start_time === timeOfDayFilter;
   }
 
-  function placementMatchesAgeRange(placement: UploadOptions["placements"][number]) {
+  function placementMatchesAgeRange(
+    placement: UploadOptions["placements"][number],
+  ) {
     if (workspaceMode !== "sites" || !ageRangeFilter) return true;
     return placement.participant_age?.trim() === ageRangeFilter;
   }
@@ -456,23 +634,46 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
 
   const filteredPlacements = useMemo(() => {
     if (!options) return [];
-    const uploaderFilteredPlacements = selectedUploader && workspaceMode !== "upload" && workspaceMode !== "import"
-      ? options.placements.filter((placement) => placementIncludesUploader(placement, selectedUploader.id))
-      : options.placements;
+    const uploaderFilteredPlacements =
+      selectedUploader &&
+      workspaceMode !== "upload" &&
+      workspaceMode !== "import"
+        ? options.placements.filter((placement) =>
+            placementIncludesUploader(placement, selectedUploader.id),
+          )
+        : options.placements;
     const contextFilteredPlacements = uploaderFilteredPlacements
       .filter(placementMatchesBrowseContext)
       .filter(placementMatchesDeliveryDay)
       .filter(placementMatchesTimeOfDay)
       .filter(placementMatchesAgeRange);
-    if (workspaceMode === "upload" || workspaceMode === "import" || !browsePartnerKey) return contextFilteredPlacements;
-    return contextFilteredPlacements.filter((placement) => placement.partner_name?.trim() === browsePartnerKey);
-  }, [ageRangeFilter, browseContextFilter, browsePartnerKey, deliveryDayFilter, options, selectedUploader, timeOfDayFilter, workspaceMode]);
+    if (
+      workspaceMode === "upload" ||
+      workspaceMode === "import" ||
+      !browsePartnerKey
+    )
+      return contextFilteredPlacements;
+    return contextFilteredPlacements.filter(
+      (placement) => placement.partner_name?.trim() === browsePartnerKey,
+    );
+  }, [
+    ageRangeFilter,
+    browseContextFilter,
+    browsePartnerKey,
+    deliveryDayFilter,
+    options,
+    selectedUploader,
+    timeOfDayFilter,
+    workspaceMode,
+  ]);
 
   const browsePartnerOptions = useMemo(() => {
     if (!options) return [];
     const counts = new Map<string, number>();
     const uploaderFilteredPlacements = selectedUploader
-      ? options.placements.filter((placement) => placementIncludesUploader(placement, selectedUploader.id))
+      ? options.placements.filter((placement) =>
+          placementIncludesUploader(placement, selectedUploader.id),
+        )
       : options.placements;
     const contextFilteredPlacements = uploaderFilteredPlacements
       .filter(placementMatchesBrowseContext)
@@ -489,7 +690,15 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
     return Array.from(counts.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([partnerName, count]) => ({ partnerName, count }));
-  }, [ageRangeFilter, browseContextFilter, deliveryDayFilter, options, selectedUploader, timeOfDayFilter, workspaceMode]);
+  }, [
+    ageRangeFilter,
+    browseContextFilter,
+    deliveryDayFilter,
+    options,
+    selectedUploader,
+    timeOfDayFilter,
+    workspaceMode,
+  ]);
 
   const timeOfDayOptions = useMemo(() => {
     if (!options) return [];
@@ -524,7 +733,13 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
     return Array.from(ageRanges)
       .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
       .map((value) => ({ value, label: formatParticipantAge(value) }));
-  }, [browseContextFilter, deliveryDayFilter, options, timeOfDayFilter, workspaceMode]);
+  }, [
+    browseContextFilter,
+    deliveryDayFilter,
+    options,
+    timeOfDayFilter,
+    workspaceMode,
+  ]);
 
   const browseUploaderOptions = useMemo(() => {
     if (!options) return [];
@@ -534,7 +749,11 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
       .filter(placementMatchesDeliveryDay)
       .filter(placementMatchesTimeOfDay)
       .filter(placementMatchesAgeRange)
-      .filter((placement) => !browsePartnerKey || placement.partner_name?.trim() === browsePartnerKey);
+      .filter(
+        (placement) =>
+          !browsePartnerKey ||
+          placement.partner_name?.trim() === browsePartnerKey,
+      );
     const counts = new Map<number, number>();
 
     for (const placement of placements) {
@@ -552,25 +771,47 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
       .filter((uploader) => counts.has(uploader.id))
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((uploader) => ({ uploader, count: counts.get(uploader.id) ?? 0 }));
-  }, [ageRangeFilter, browseContextFilter, browsePartnerKey, deliveryDayFilter, options, timeOfDayFilter, workspaceMode]);
+  }, [
+    ageRangeFilter,
+    browseContextFilter,
+    browsePartnerKey,
+    deliveryDayFilter,
+    options,
+    timeOfDayFilter,
+    workspaceMode,
+  ]);
 
   const selectedPlacement = useMemo(() => {
     if (!options || !placementKey) return null;
-    return options.placements.find((placement) => String(placement.placement_id) === placementKey) ?? null;
+    return (
+      options.placements.find(
+        (placement) => String(placement.placement_id) === placementKey,
+      ) ?? null
+    );
   }, [options, placementKey]);
 
   const browsePlacementOptions = useMemo(() => {
-    const placements = selectedPlacement
-      && !filteredPlacements.some((placement) => placement.placement_id === selectedPlacement.placement_id)
-      ? [selectedPlacement, ...filteredPlacements]
-      : filteredPlacements;
+    const placements =
+      selectedPlacement &&
+      !filteredPlacements.some(
+        (placement) =>
+          placement.placement_id === selectedPlacement.placement_id,
+      )
+        ? [selectedPlacement, ...filteredPlacements]
+        : filteredPlacements;
 
-    return [...placements].sort((a, b) => placementLabel(a).localeCompare(placementLabel(b)));
+    return [...placements].sort((a, b) =>
+      placementLabel(a).localeCompare(placementLabel(b)),
+    );
   }, [filteredPlacements, selectedPlacement]);
 
   const selectedActivityLabel = useMemo(() => {
     if (!options || !activityTagFilter) return null;
-    return options.activities.find((activity) => String(activity.id) === activityTagFilter)?.label ?? null;
+    return (
+      options.activities.find(
+        (activity) => String(activity.id) === activityTagFilter,
+      )?.label ?? null
+    );
   }, [activityTagFilter, options]);
 
   const browseBreadcrumbParents = useMemo(() => {
@@ -582,23 +823,33 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
   }, [browsePartnerKey, selectedActivityLabel, selectedUploader]);
 
   const hasActiveSiteFilters = Boolean(
-    uploaderKey
-    || browseContextFilter !== "all"
-    || deliveryDayFilter
-    || timeOfDayFilter
-    || ageRangeFilter
-    || browsePartnerKey
+    uploaderKey ||
+    browseContextFilter !== "all" ||
+    deliveryDayFilter ||
+    timeOfDayFilter ||
+    ageRangeFilter ||
+    browsePartnerKey,
   );
 
   const visiblePlacementIds = useMemo(() => {
     if (workspaceMode === "edit") return [];
     if (assetMode === "untagged") return [];
-    if (siteScope === "all" || (workspaceMode === "browse" && siteScope === "select")) {
+    if (
+      siteScope === "all" ||
+      (workspaceMode === "browse" && siteScope === "select")
+    ) {
       return filteredPlacements.map((placement) => placement.placement_id);
     }
-    if (siteScope === "placement" && selectedPlacement) return [selectedPlacement.placement_id];
+    if (siteScope === "placement" && selectedPlacement)
+      return [selectedPlacement.placement_id];
     return [];
-  }, [assetMode, filteredPlacements, selectedPlacement, siteScope, workspaceMode]);
+  }, [
+    assetMode,
+    filteredPlacements,
+    selectedPlacement,
+    siteScope,
+    workspaceMode,
+  ]);
 
   useEffect(() => {
     if (!mediaRefreshAssetId) return;
@@ -611,7 +862,13 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
     }, MEDIA_REFRESH_DELAYS_MS[mediaRefreshAttempt]);
 
     return () => window.clearTimeout(timeoutId);
-  }, [mediaRefreshAssetId, mediaRefreshAttempt, assetMode, visiblePlacementIds, activityTagFilter]);
+  }, [
+    mediaRefreshAssetId,
+    mediaRefreshAttempt,
+    assetMode,
+    visiblePlacementIds,
+    activityTagFilter,
+  ]);
 
   useEffect(() => {
     if (siteScope !== "placement") return;
@@ -623,14 +880,20 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
   useEffect(() => {
     if (workspaceMode === "upload" || workspaceMode === "import") return;
     if (!browsePartnerKey) return;
-    if (browsePartnerOptions.some((option) => option.partnerName === browsePartnerKey)) return;
+    if (
+      browsePartnerOptions.some(
+        (option) => option.partnerName === browsePartnerKey,
+      )
+    )
+      return;
     setBrowsePartnerKey("");
   }, [browsePartnerKey, browsePartnerOptions, workspaceMode]);
 
   useEffect(() => {
     if (workspaceMode !== "sites") return;
     if (!timeOfDayFilter) return;
-    if (timeOfDayOptions.some((option) => option.value === timeOfDayFilter)) return;
+    if (timeOfDayOptions.some((option) => option.value === timeOfDayFilter))
+      return;
     setTimeOfDayFilter("");
     setPlacementKey("");
     setSiteScope("select");
@@ -641,7 +904,8 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
   useEffect(() => {
     if (workspaceMode !== "sites") return;
     if (!ageRangeFilter) return;
-    if (ageRangeOptions.some((option) => option.value === ageRangeFilter)) return;
+    if (ageRangeOptions.some((option) => option.value === ageRangeFilter))
+      return;
     setAgeRangeFilter("");
     setPlacementKey("");
     setSiteScope("select");
@@ -652,7 +916,12 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
   useEffect(() => {
     if (workspaceMode === "upload" || workspaceMode === "import") return;
     if (!uploaderKey) return;
-    if (browseUploaderOptions.some((option) => String(option.uploader.id) === uploaderKey)) return;
+    if (
+      browseUploaderOptions.some(
+        (option) => String(option.uploader.id) === uploaderKey,
+      )
+    )
+      return;
     setUploaderKey("");
     setPlacementKey("");
     setSiteScope("select");
@@ -688,7 +957,10 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
 
     let cancelled = false;
     setAssetsLoading(true);
-    fetchPlacementAssetSet(visiblePlacementIds, activityTagFilter ? parseInt(activityTagFilter, 10) : undefined)
+    fetchPlacementAssetSet(
+      visiblePlacementIds,
+      activityTagFilter ? parseInt(activityTagFilter, 10) : undefined,
+    )
       .then((assets) => {
         if (!cancelled) setPlacementAssets(assets);
       })
@@ -741,8 +1013,9 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
     }
 
     uploadInProgressRef.current = true;
-    const queued = items.filter((item) =>
-      item.file && (item.status === "queued" || item.status === "failed")
+    const queued = items.filter(
+      (item) =>
+        item.file && (item.status === "queued" || item.status === "failed"),
     );
     try {
       for (const item of queued) {
@@ -757,15 +1030,17 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
                   progress: 0,
                   error: undefined,
                 }
-              : entry
-          )
+              : entry,
+          ),
         );
 
         try {
           const results = await uploadFiles({
             files: [file],
             location: selectedPlacement,
-            activityId: activityTagFilter ? parseInt(activityTagFilter, 10) : undefined,
+            activityId: activityTagFilter
+              ? parseInt(activityTagFilter, 10)
+              : undefined,
             onProgress: (progress) => {
               setItems((current) =>
                 current.map((entry) =>
@@ -775,8 +1050,8 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
                         status: progress >= 100 ? "processing" : "uploading",
                         progress,
                       }
-                    : entry
-                )
+                    : entry,
+                ),
               );
             },
           });
@@ -786,23 +1061,28 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
             current.map((entry) =>
               entry.id === item.id
                 ? result?.status === "completed"
-                  ? { ...entry, status: "completed", progress: 100, assetId: result.assetId }
+                  ? {
+                      ...entry,
+                      status: "completed",
+                      progress: 100,
+                      assetId: result.assetId,
+                    }
                   : {
                       ...entry,
                       status: "failed",
                       progress: 100,
                       error: result?.error ?? "Upload failed",
                     }
-                : entry
-            )
+                : entry,
+            ),
           );
         } catch (err) {
           setItems((current) =>
             current.map((entry) =>
               entry.id === item.id
                 ? { ...entry, status: "failed", error: (err as Error).message }
-                : entry
-            )
+                : entry,
+            ),
           );
         }
       }
@@ -826,8 +1106,8 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
               captionStatus: "idle",
               captionError: undefined,
             }
-          : item
-      )
+          : item,
+      ),
     );
   }
 
@@ -838,8 +1118,8 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
       current.map((entry) =>
         entry.id === item.id
           ? { ...entry, captionStatus: "saving", captionError: undefined }
-          : entry
-      )
+          : entry,
+      ),
     );
 
     try {
@@ -847,18 +1127,27 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
       setItems((current) =>
         current.map((entry) =>
           entry.id === item.id
-            ? { ...entry, caption, captionStatus: "saved", captionError: undefined }
-            : entry
-        )
+            ? {
+                ...entry,
+                caption,
+                captionStatus: "saved",
+                captionError: undefined,
+              }
+            : entry,
+        ),
       );
       refreshVisibleAssets();
     } catch (err) {
       setItems((current) =>
         current.map((entry) =>
           entry.id === item.id
-            ? { ...entry, captionStatus: "failed", captionError: (err as Error).message }
-            : entry
-        )
+            ? {
+                ...entry,
+                captionStatus: "failed",
+                captionError: (err as Error).message,
+              }
+            : entry,
+        ),
       );
     }
   }
@@ -917,7 +1206,9 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
 
   function refreshVisibleAssets() {
     setAssetsLoading(true);
-    const activityId = activityTagFilter ? parseInt(activityTagFilter, 10) : undefined;
+    const activityId = activityTagFilter
+      ? parseInt(activityTagFilter, 10)
+      : undefined;
 
     if (assetMode !== "untagged" && visiblePlacementIds.length === 0) {
       setPlacementAssets([]);
@@ -925,9 +1216,10 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
       return;
     }
 
-    const request = assetMode === "untagged"
-      ? fetchUntaggedPlacementAssets()
-      : fetchPlacementAssetSet(visiblePlacementIds, activityId);
+    const request =
+      assetMode === "untagged"
+        ? fetchUntaggedPlacementAssets()
+        : fetchPlacementAssetSet(visiblePlacementIds, activityId);
 
     request
       .then(setPlacementAssets)
@@ -941,45 +1233,61 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
       : url;
   }
 
-  function normalizeAdjustments(adjustments?: AssetAdjustments | null): AssetAdjustments {
+  function normalizeAdjustments(
+    adjustments?: AssetAdjustments | null,
+  ): AssetAdjustments {
     return {
-      brightness: clampAdjustment(adjustments?.brightness ?? DEFAULT_ADJUSTMENTS.brightness),
-      contrast: clampAdjustment(adjustments?.contrast ?? DEFAULT_ADJUSTMENTS.contrast),
-      saturation: clampAdjustment(adjustments?.saturation ?? DEFAULT_ADJUSTMENTS.saturation),
+      brightness: clampAdjustment(
+        adjustments?.brightness ?? DEFAULT_ADJUSTMENTS.brightness,
+      ),
+      contrast: clampAdjustment(
+        adjustments?.contrast ?? DEFAULT_ADJUSTMENTS.contrast,
+      ),
+      saturation: clampAdjustment(
+        adjustments?.saturation ?? DEFAULT_ADJUSTMENTS.saturation,
+      ),
     };
   }
 
   function clampAdjustment(value: number) {
     if (!Number.isFinite(value)) return DEFAULT_ADJUSTMENTS.brightness;
-    return Math.max(MIN_ADJUSTMENT, Math.min(MAX_ADJUSTMENT, Math.round(value)));
+    return Math.max(
+      MIN_ADJUSTMENT,
+      Math.min(MAX_ADJUSTMENT, Math.round(value)),
+    );
   }
 
-  function adjustmentFilterStyle(adjustments?: AssetAdjustments | null): React.CSSProperties {
+  function adjustmentFilterStyle(
+    adjustments?: AssetAdjustments | null,
+  ): React.CSSProperties {
     const normalized = normalizeAdjustments(adjustments);
     return {
       filter: `brightness(${normalized.brightness / 100}) contrast(${normalized.contrast / 100}) saturate(${normalized.saturation / 100})`,
     };
   }
 
-  function updateAssetAdjustments(assetId: string, adjustments: AssetAdjustments) {
+  function updateAssetAdjustments(
+    assetId: string,
+    adjustments: AssetAdjustments,
+  ) {
     setPlacementAssets((current) =>
       current.map((asset) =>
-        asset.id === assetId ? { ...asset, adjustments } : asset
-      )
+        asset.id === assetId ? { ...asset, adjustments } : asset,
+      ),
     );
     setSelectedAsset((current) =>
-      current?.id === assetId ? { ...current, adjustments } : current
+      current?.id === assetId ? { ...current, adjustments } : current,
     );
   }
 
   function updateAssetDescription(assetId: string, description: string) {
     setPlacementAssets((current) =>
       current.map((asset) =>
-        asset.id === assetId ? { ...asset, description } : asset
-      )
+        asset.id === assetId ? { ...asset, description } : asset,
+      ),
     );
     setSelectedAsset((current) =>
-      current?.id === assetId ? { ...current, description } : current
+      current?.id === assetId ? { ...current, description } : current,
     );
   }
 
@@ -1022,7 +1330,7 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
       setPlacementKey(String(asset.placement_id));
       setSiteScope("placement");
     }
-    if (updateUrl) setApplicationPath(`/edit/${asset.id}`);
+    if (updateUrl) setApplicationPath(`/admin/edit/${asset.id}`);
   }
 
   function closeAssetManager() {
@@ -1047,11 +1355,16 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
   function cancelAssetManager() {
     closeAssetManager();
     setWorkspaceMode("browse");
-    setApplicationPath("/admin", true);
+    setApplicationPath("/admin/browse", true);
   }
 
   useEffect(() => {
-    if (!selectedAsset || selectedAsset.type !== "IMAGE" || !authUser?.authenticated) return;
+    if (
+      !selectedAsset ||
+      selectedAsset.type !== "IMAGE" ||
+      !authUser?.authenticated
+    )
+      return;
     let cancelled = false;
     setAdjustmentsLoading(true);
     fetchUploadAssetAdjustments(selectedAsset.id)
@@ -1077,17 +1390,35 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
 
   async function saveSelectedAssetChanges() {
     if (!selectedAsset) return;
-    const placementId = managePlacementKey ? parseInt(managePlacementKey, 10) : null;
-    const uploaderId = manageUploaderKey ? parseInt(manageUploaderKey, 10) : null;
-    const placementChanged = Boolean(managePlacementKey)
-      && managePlacementKey !== (selectedAsset.placement_id ? String(selectedAsset.placement_id) : "");
-    const uploaderChanged = Boolean(manageUploaderKey)
-      && manageUploaderKey !== (selectedAsset.uploader_id ? String(selectedAsset.uploader_id) : "");
-    const activityTagChanged = manageActivityTag !== (selectedAsset.activity_id ? String(selectedAsset.activity_id) : "");
-    const publishedChanged = managePublished !== Boolean(selectedAsset.published);
+    const placementId = managePlacementKey
+      ? parseInt(managePlacementKey, 10)
+      : null;
+    const uploaderId = manageUploaderKey
+      ? parseInt(manageUploaderKey, 10)
+      : null;
+    const placementChanged =
+      Boolean(managePlacementKey) &&
+      managePlacementKey !==
+        (selectedAsset.placement_id ? String(selectedAsset.placement_id) : "");
+    const uploaderChanged =
+      Boolean(manageUploaderKey) &&
+      manageUploaderKey !==
+        (selectedAsset.uploader_id ? String(selectedAsset.uploader_id) : "");
+    const activityTagChanged =
+      manageActivityTag !==
+      (selectedAsset.activity_id ? String(selectedAsset.activity_id) : "");
+    const publishedChanged =
+      managePublished !== Boolean(selectedAsset.published);
 
-    if (!placementChanged && !uploaderChanged && !activityTagChanged && !publishedChanged) {
-      setError("Choose a placement, team member album, program week, or publication status to save.");
+    if (
+      !placementChanged &&
+      !uploaderChanged &&
+      !activityTagChanged &&
+      !publishedChanged
+    ) {
+      setError(
+        "Choose a placement, team member album, program week, or publication status to save.",
+      );
       return;
     }
     if (placementChanged && (!placementId || !Number.isFinite(placementId))) {
@@ -1116,7 +1447,9 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
       if (activityTagChanged) {
         await assignAssetActivityTag({
           assetId: selectedAsset.id,
-          activityId: manageActivityTag ? parseInt(manageActivityTag, 10) : null,
+          activityId: manageActivityTag
+            ? parseInt(manageActivityTag, 10)
+            : null,
         });
       }
       if (publishedChanged) {
@@ -1136,13 +1469,21 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
 
   async function saveAllAssetChanges() {
     if (!selectedAsset || !authUser?.authenticated) return;
-    const placementChanged = Boolean(managePlacementKey)
-      && managePlacementKey !== (selectedAsset.placement_id ? String(selectedAsset.placement_id) : "");
-    const uploaderChanged = Boolean(manageUploaderKey)
-      && manageUploaderKey !== (selectedAsset.uploader_id ? String(selectedAsset.uploader_id) : "");
-    const activityChanged = manageActivityTag !== (selectedAsset.activity_id ? String(selectedAsset.activity_id) : "");
-    const publishedChanged = managePublished !== Boolean(selectedAsset.published);
-    const captionChanged = manageCaption.trim() !== (selectedAsset.description ?? "").trim();
+    const placementChanged =
+      Boolean(managePlacementKey) &&
+      managePlacementKey !==
+        (selectedAsset.placement_id ? String(selectedAsset.placement_id) : "");
+    const uploaderChanged =
+      Boolean(manageUploaderKey) &&
+      manageUploaderKey !==
+        (selectedAsset.uploader_id ? String(selectedAsset.uploader_id) : "");
+    const activityChanged =
+      manageActivityTag !==
+      (selectedAsset.activity_id ? String(selectedAsset.activity_id) : "");
+    const publishedChanged =
+      managePublished !== Boolean(selectedAsset.published);
+    const captionChanged =
+      manageCaption.trim() !== (selectedAsset.description ?? "").trim();
     const selectedAdjustments = normalizeAdjustments(selectedAsset.adjustments);
     const adjustmentChanged =
       manageBrightness !== selectedAdjustments.brightness ||
@@ -1150,7 +1491,15 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
       manageSaturation !== selectedAdjustments.saturation;
     const pixelEditsChanged = hasPendingPixelEdits(selectedAsset);
 
-    if (!placementChanged && !uploaderChanged && !activityChanged && !publishedChanged && !captionChanged && !adjustmentChanged && !pixelEditsChanged) {
+    if (
+      !placementChanged &&
+      !uploaderChanged &&
+      !activityChanged &&
+      !publishedChanged &&
+      !captionChanged &&
+      !adjustmentChanged &&
+      !pixelEditsChanged
+    ) {
       setError("There are no changes to save.");
       return;
     }
@@ -1163,20 +1512,36 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
     setError(null);
     try {
       const assetId = selectedAsset.id;
-      if (placementChanged) await assignAssetPlacement({ assetId, placementId: parseInt(managePlacementKey, 10) });
-      if (uploaderChanged) await assignAssetUploader({ assetId, uploaderId: parseInt(manageUploaderKey, 10) });
+      if (placementChanged)
+        await assignAssetPlacement({
+          assetId,
+          placementId: parseInt(managePlacementKey, 10),
+        });
+      if (uploaderChanged)
+        await assignAssetUploader({
+          assetId,
+          uploaderId: parseInt(manageUploaderKey, 10),
+        });
       if (activityChanged) {
         await assignAssetActivityTag({
           assetId,
-          activityId: manageActivityTag ? parseInt(manageActivityTag, 10) : null,
+          activityId: manageActivityTag
+            ? parseInt(manageActivityTag, 10)
+            : null,
         });
       }
-      if (publishedChanged) await setAssetPublished({ assetId, published: managePublished });
-      if (captionChanged) await updateAssetCaption({ assetId, caption: manageCaption.trim() });
+      if (publishedChanged)
+        await setAssetPublished({ assetId, published: managePublished });
+      if (captionChanged)
+        await updateAssetCaption({ assetId, caption: manageCaption.trim() });
       if (adjustmentChanged) {
         await updateUploadAssetAdjustments({
           assetId,
-          adjustments: { brightness: manageBrightness, contrast: manageContrast, saturation: manageSaturation },
+          adjustments: {
+            brightness: manageBrightness,
+            contrast: manageContrast,
+            saturation: manageSaturation,
+          },
         });
       }
 
@@ -1242,7 +1607,7 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
       return;
     }
     const confirmed = window.confirm(
-      `Delete "${selectedAsset.fileName}" from Immich? This removes the asset entirely.`
+      `Delete "${selectedAsset.fileName}" from Immich? This removes the asset entirely.`,
     );
     if (!confirmed) return;
 
@@ -1252,7 +1617,9 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
     try {
       await deleteUploadAsset({ assetId });
       closeAssetManager();
-      setPlacementAssets((current) => current.filter((asset) => asset.id !== assetId));
+      setPlacementAssets((current) =>
+        current.filter((asset) => asset.id !== assetId),
+      );
       refreshVisibleAssets();
     } catch (err) {
       setError((err as Error).message);
@@ -1268,12 +1635,27 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
     return { width, height };
   }
 
-  function rotatedImageDimensions(asset: PlacementAsset, degrees = straightenDegrees) {
+  function rotatedImageDimensions(
+    asset: PlacementAsset,
+    degrees = straightenDegrees,
+  ) {
     const source = sourceImageDimensions(asset);
-    const radians = Math.abs(degrees) * Math.PI / 180;
+    const radians = (Math.abs(degrees) * Math.PI) / 180;
     return {
-      width: Math.max(1, Math.round(Math.abs(source.width * Math.cos(radians)) + Math.abs(source.height * Math.sin(radians)))),
-      height: Math.max(1, Math.round(Math.abs(source.width * Math.sin(radians)) + Math.abs(source.height * Math.cos(radians)))),
+      width: Math.max(
+        1,
+        Math.round(
+          Math.abs(source.width * Math.cos(radians)) +
+            Math.abs(source.height * Math.sin(radians)),
+        ),
+      ),
+      height: Math.max(
+        1,
+        Math.round(
+          Math.abs(source.width * Math.sin(radians)) +
+            Math.abs(source.height * Math.cos(radians)),
+        ),
+      ),
     };
   }
 
@@ -1289,29 +1671,60 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
     return {
       x,
       y,
-      width: Math.max(1, Math.min(Math.round(rect.width), dimensions.width - x)),
-      height: Math.max(1, Math.min(Math.round(rect.height), dimensions.height - y)),
+      width: Math.max(
+        1,
+        Math.min(Math.round(rect.width), dimensions.width - x),
+      ),
+      height: Math.max(
+        1,
+        Math.min(Math.round(rect.height), dimensions.height - y),
+      ),
     };
   }
 
-  function pointerToImagePoint(event: React.PointerEvent<HTMLElement>, asset: PlacementAsset) {
+  function pointerToImagePoint(
+    event: React.PointerEvent<HTMLElement>,
+    asset: PlacementAsset,
+  ) {
     const image = cropImageRef.current;
     if (!image) return null;
     const bounds = image.getBoundingClientRect();
     const dimensions = imageDimensionsForCrop(asset);
-    if (bounds.width <= 0 || bounds.height <= 0 || dimensions.width <= 0 || dimensions.height <= 0) return null;
+    if (
+      bounds.width <= 0 ||
+      bounds.height <= 0 ||
+      dimensions.width <= 0 ||
+      dimensions.height <= 0
+    )
+      return null;
 
-    const x = Math.max(0, Math.min(dimensions.width, ((event.clientX - bounds.left) / bounds.width) * dimensions.width));
-    const y = Math.max(0, Math.min(dimensions.height, ((event.clientY - bounds.top) / bounds.height) * dimensions.height));
+    const x = Math.max(
+      0,
+      Math.min(
+        dimensions.width,
+        ((event.clientX - bounds.left) / bounds.width) * dimensions.width,
+      ),
+    );
+    const y = Math.max(
+      0,
+      Math.min(
+        dimensions.height,
+        ((event.clientY - bounds.top) / bounds.height) * dimensions.height,
+      ),
+    );
     return { x, y };
   }
 
-  function defaultCropForAsset(asset: PlacementAsset, degrees = straightenDegrees): CropRect | null {
+  function defaultCropForAsset(
+    asset: PlacementAsset,
+    degrees = straightenDegrees,
+  ): CropRect | null {
     const source = sourceImageDimensions(asset);
     const rotated = rotatedImageDimensions(asset, degrees);
     if (source.width <= 0 || source.height <= 0) return null;
-    const angle = Math.abs(degrees % 180) * Math.PI / 180;
-    if (angle < 1e-8) return { x: 0, y: 0, width: source.width, height: source.height };
+    const angle = (Math.abs(degrees % 180) * Math.PI) / 180;
+    if (angle < 1e-8)
+      return { x: 0, y: 0, width: source.width, height: source.height };
     const sin = Math.abs(Math.sin(angle));
     const cos = Math.abs(Math.cos(angle));
     const longSide = Math.max(source.width, source.height);
@@ -1345,7 +1758,9 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
   function isCropParameters(value: unknown): value is CropParameters {
     if (!value || typeof value !== "object") return false;
     const candidate = value as Partial<CropParameters>;
-    return ["x", "y", "width", "height"].every((key) => Number.isFinite(candidate[key as keyof CropParameters]));
+    return ["x", "y", "width", "height"].every((key) =>
+      Number.isFinite(candidate[key as keyof CropParameters]),
+    );
   }
 
   async function startCropEditing() {
@@ -1368,12 +1783,14 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
     const point = pointerToImagePoint(event, selectedAsset);
     if (!point) return;
     cropStartRef.current = point;
-    setCropRect(normalizeCropRect(selectedAsset, {
-      x: Math.round(point.x),
-      y: Math.round(point.y),
-      width: 1,
-      height: 1,
-    }));
+    setCropRect(
+      normalizeCropRect(selectedAsset, {
+        x: Math.round(point.x),
+        y: Math.round(point.y),
+        width: 1,
+        height: 1,
+      }),
+    );
     event.currentTarget.setPointerCapture(event.pointerId);
   }
 
@@ -1410,7 +1827,14 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
         x: move.rect.x + point.x - move.start.x,
         y: move.rect.y + point.y - move.start.y,
       };
-      setCropRect(preserveCropAcrossRotation(selectedAsset, desired, straightenDegrees, straightenDegrees));
+      setCropRect(
+        preserveCropAcrossRotation(
+          selectedAsset,
+          desired,
+          straightenDegrees,
+          straightenDegrees,
+        ),
+      );
       return;
     }
     if (!cropStartRef.current) return;
@@ -1419,12 +1843,14 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
     const y = Math.min(start.y, point.y);
     const width = Math.abs(point.x - start.x);
     const height = Math.abs(point.y - start.y);
-    setCropRect(normalizeCropRect(selectedAsset, {
-      x: Math.round(x),
-      y: Math.round(y),
-      width: Math.max(1, Math.round(width)),
-      height: Math.max(1, Math.round(height)),
-    }));
+    setCropRect(
+      normalizeCropRect(selectedAsset, {
+        x: Math.round(x),
+        y: Math.round(y),
+        width: Math.max(1, Math.round(width)),
+        height: Math.max(1, Math.round(height)),
+      }),
+    );
   }
 
   function endCropDrag(event: React.PointerEvent<HTMLDivElement>) {
@@ -1436,7 +1862,10 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
     }
   }
 
-  function beginCropResize(handle: CropHandle, event: React.PointerEvent<HTMLSpanElement>) {
+  function beginCropResize(
+    handle: CropHandle,
+    event: React.PointerEvent<HTMLSpanElement>,
+  ) {
     if (!selectedAsset || !cropRect || cropSaving) return;
     event.preventDefault();
     event.stopPropagation();
@@ -1465,7 +1894,8 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
 
   function cropOverlayStyle(asset: PlacementAsset): React.CSSProperties {
     const dimensions = imageDimensionsForCrop(asset);
-    if (!cropRect || dimensions.width <= 0 || dimensions.height <= 0) return { display: "none" };
+    if (!cropRect || dimensions.width <= 0 || dimensions.height <= 0)
+      return { display: "none" };
     const rect = normalizeCropRect(asset, cropRect);
     return {
       left: `${(rect.x / dimensions.width) * 100}%`,
@@ -1480,7 +1910,12 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
     if (!cropRect) return false;
     const dimensions = imageDimensionsForCrop(asset);
     const rect = normalizeCropRect(asset, cropRect);
-    return rect.x > 1 || rect.y > 1 || Math.abs(rect.width - dimensions.width) > 1 || Math.abs(rect.height - dimensions.height) > 1;
+    return (
+      rect.x > 1 ||
+      rect.y > 1 ||
+      Math.abs(rect.width - dimensions.width) > 1 ||
+      Math.abs(rect.height - dimensions.height) > 1
+    );
   }
 
   async function saveCrop() {
@@ -1502,7 +1937,10 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
           };
         })(),
       });
-      setNotice({ tone: "success", message: `Created ${result.width}×${result.height} edited copy and archived the original.` });
+      setNotice({
+        tone: "success",
+        message: `Created ${result.width}×${result.height} edited copy and archived the original.`,
+      });
       closeAssetManager();
       refreshVisibleAssets();
     } catch (err) {
@@ -1515,9 +1953,16 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
   function changeStraightenDegrees(value: number) {
     if (!selectedAsset) return;
     const previousDegrees = straightenDegrees;
-    setCropRect((current) => current
-      ? preserveCropAcrossRotation(selectedAsset, current, previousDegrees, value)
-      : defaultCropForAsset(selectedAsset, value));
+    setCropRect((current) =>
+      current
+        ? preserveCropAcrossRotation(
+            selectedAsset,
+            current,
+            previousDegrees,
+            value,
+          )
+        : defaultCropForAsset(selectedAsset, value),
+    );
     setStraightenDegrees(value);
   }
 
@@ -1533,11 +1978,14 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
     if (source.width <= 0 || source.height <= 0) return rect;
 
     const normalizedCenterX = (rect.x + rect.width / 2) / previousCanvas.width;
-    const normalizedCenterY = (rect.y + rect.height / 2) / previousCanvas.height;
-    let halfWidth = (rect.width / previousCanvas.width) * nextCanvas.width / 2;
-    let halfHeight = (rect.height / previousCanvas.height) * nextCanvas.height / 2;
+    const normalizedCenterY =
+      (rect.y + rect.height / 2) / previousCanvas.height;
+    let halfWidth =
+      ((rect.width / previousCanvas.width) * nextCanvas.width) / 2;
+    let halfHeight =
+      ((rect.height / previousCanvas.height) * nextCanvas.height) / 2;
 
-    const radians = nextDegrees * Math.PI / 180;
+    const radians = (nextDegrees * Math.PI) / 180;
     const cos = Math.cos(radians);
     const sin = Math.sin(radians);
     const absCos = Math.abs(cos);
@@ -1555,10 +2003,18 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
     halfWidth *= fitScale;
     halfHeight *= fitScale;
 
-    const limitU = Math.max(0, safeSourceHalfWidth - (halfWidth * absCos + halfHeight * absSin));
-    const limitV = Math.max(0, safeSourceHalfHeight - (halfWidth * absSin + halfHeight * absCos));
-    const desiredX = normalizedCenterX * nextCanvas.width - nextCanvas.width / 2;
-    const desiredY = normalizedCenterY * nextCanvas.height - nextCanvas.height / 2;
+    const limitU = Math.max(
+      0,
+      safeSourceHalfWidth - (halfWidth * absCos + halfHeight * absSin),
+    );
+    const limitV = Math.max(
+      0,
+      safeSourceHalfHeight - (halfWidth * absSin + halfHeight * absCos),
+    );
+    const desiredX =
+      normalizedCenterX * nextCanvas.width - nextCanvas.width / 2;
+    const desiredY =
+      normalizedCenterY * nextCanvas.height - nextCanvas.height / 2;
 
     // Transform into the unrotated image axes, clamp there, then rotate back.
     const desiredU = desiredX * cos + desiredY * sin;
@@ -1578,7 +2034,9 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
 
   async function resetCrop() {
     if (!selectedAsset) return;
-    const confirmed = window.confirm(`Reset all Immich edits for "${selectedAsset.fileName}"?`);
+    const confirmed = window.confirm(
+      `Reset all Immich edits for "${selectedAsset.fileName}"?`,
+    );
     if (!confirmed) return;
     setCropSaving(true);
     setError(null);
@@ -1658,10 +2116,16 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
         id: `drive-${result.fileId}-${crypto.randomUUID()}`,
         source: "drive",
         fileName: result.fileName,
-        status: result.status === "success" && result.assetId ? "completed" : "failed",
+        status:
+          result.status === "success" && result.assetId
+            ? "completed"
+            : "failed",
         progress: 100,
         assetId: result.assetId,
-        error: result.status === "failed" ? result.error ?? "Import failed" : undefined,
+        error:
+          result.status === "failed"
+            ? (result.error ?? "Import failed")
+            : undefined,
       }));
 
       if (importedItems.length > 0) {
@@ -1684,7 +2148,7 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
       } else {
         setNotice(null);
         setError(
-          `Failed to import files: ${results.map((r) => `${r.fileName}: ${r.error}`).join(", ")}`
+          `Failed to import files: ${results.map((r) => `${r.fileName}: ${r.error}`).join(", ")}`,
         );
       }
     } catch (err) {
@@ -1723,11 +2187,17 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
       // Clicking on a Shared Drive from the list
       setCurrentDriveId(folder.driveId);
       setSelectedDriveFolder("root");
-      setFolderPath((current) => [...current, { id: folder.id, name: folder.name }]);
+      setFolderPath((current) => [
+        ...current,
+        { id: folder.id, name: folder.name },
+      ]);
     } else {
       // Clicking on a folder within My Drive or within a Shared Drive
       setSelectedDriveFolder(folder.id);
-      setFolderPath((current) => [...current, { id: folder.id, name: folder.name }]);
+      setFolderPath((current) => [
+        ...current,
+        { id: folder.id, name: folder.name },
+      ]);
     }
   }
 
@@ -1766,7 +2236,7 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
     try {
       const sharedDrives = await fetchDriveFolders("sharedDrives", "root");
       const defaultDrive = (sharedDrives.folders ?? []).find((folder) =>
-        normalizeDriveName(folder.name).includes(DEFAULT_SHARED_DRIVE_NAME)
+        normalizeDriveName(folder.name).includes(DEFAULT_SHARED_DRIVE_NAME),
       );
 
       if (!defaultDrive) {
@@ -1774,9 +2244,14 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
         return;
       }
 
-      const rootFolders = await fetchDriveFolders("sharedDrives", "root", defaultDrive.id);
+      const rootFolders = await fetchDriveFolders(
+        "sharedDrives",
+        "root",
+        defaultDrive.id,
+      );
       const documentationFolder = (rootFolders.folders ?? []).find(
-        (folder) => normalizeDriveName(folder.name) === DEFAULT_SHARED_DRIVE_FOLDER
+        (folder) =>
+          normalizeDriveName(folder.name) === DEFAULT_SHARED_DRIVE_FOLDER,
       );
 
       if (!documentationFolder) {
@@ -1793,7 +2268,10 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
         { id: documentationFolder.id, name: documentationFolder.name },
       ]);
     } catch (err) {
-      console.warn("[drive] Failed to open default Artasia Documentation folder", err);
+      console.warn(
+        "[drive] Failed to open default Artasia Documentation folder",
+        err,
+      );
       resetDriveFolderPath();
     } finally {
       setDriveDefaultOpening(false);
@@ -1810,23 +2288,39 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
 
   function renderAssetCard(asset: PlacementAsset) {
     return (
-      <button key={asset.id} type="button" onClick={() => openAssetManager(asset)} style={assetCardStyle}>
+      <button
+        key={asset.id}
+        type="button"
+        onClick={() => openAssetManager(asset)}
+        style={assetCardStyle}
+      >
         <img
           src={mediaUrl(asset.thumbnailUrl, asset.id)}
           alt=""
-          style={{ ...assetImageStyle, ...adjustmentFilterStyle(asset.adjustments) }}
+          style={{
+            ...assetImageStyle,
+            ...adjustmentFilterStyle(asset.adjustments),
+          }}
         />
         <span style={assetNameStyle}>{asset.fileName}</span>
-        <span style={assetDateStyle}>{asset.uploader_name ?? "No team member album"}</span>
-        <span style={assetDateStyle}>{new Date(asset.createdAt).toLocaleDateString()}</span>
+        <span style={assetDateStyle}>
+          {asset.uploader_name ?? "No team member album"}
+        </span>
+        <span style={assetDateStyle}>
+          {new Date(asset.createdAt).toLocaleDateString()}
+        </span>
       </button>
     );
   }
 
   function renderAssetGrid(emptyMessage: string) {
-    if (assetsLoading) return <div style={emptyStateStyle}>Loading uploads...</div>;
-    if (placementAssets.length === 0) return <div style={emptyStateStyle}>{emptyMessage}</div>;
-    return <div style={assetGridStyle}>{placementAssets.map(renderAssetCard)}</div>;
+    if (assetsLoading)
+      return <div style={emptyStateStyle}>Loading uploads...</div>;
+    if (placementAssets.length === 0)
+      return <div style={emptyStateStyle}>{emptyMessage}</div>;
+    return (
+      <div style={assetGridStyle}>{placementAssets.map(renderAssetCard)}</div>
+    );
   }
 
   function renderUploadItems() {
@@ -1852,22 +2346,37 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
             <div style={queueItemContentStyle}>
               <div style={queueItemMainStyle}>
                 <div style={{ color: "#eee" }}>{item.fileName}</div>
-                <div style={{ color: item.status === "failed" ? "#f88" : "#888", fontSize: 12 }}>
+                <div
+                  style={{
+                    color: item.status === "failed" ? "#f88" : "#888",
+                    fontSize: 12,
+                  }}
+                >
                   {typeof item.fileSize === "number" && (
                     <>
                       <span>{formatBytes(item.fileSize)}</span>
-                      <span style={queueMetaSeparatorStyle} aria-hidden="true" />
+                      <span
+                        style={queueMetaSeparatorStyle}
+                        aria-hidden="true"
+                      />
                     </>
                   )}
                   {item.status === "completed" ? (
                     <span style={completedStatusStyle}>
                       <CheckIcon />
-                      {item.source === "drive" ? "import completed" : "upload completed"}
+                      {item.source === "drive"
+                        ? "import completed"
+                        : "upload completed"}
                     </span>
-                  ) : item.status}
+                  ) : (
+                    item.status
+                  )}
                   {item.error && (
                     <>
-                      <span style={queueMetaSeparatorStyle} aria-hidden="true" />
+                      <span
+                        style={queueMetaSeparatorStyle}
+                        aria-hidden="true"
+                      />
                       <span>{item.error}</span>
                     </>
                   )}
@@ -1880,9 +2389,14 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
                     setItems((current) =>
                       current.map((entry) =>
                         entry.id === item.id
-                          ? { ...entry, status: "queued", progress: 0, error: undefined }
-                          : entry
-                      )
+                          ? {
+                              ...entry,
+                              status: "queued",
+                              progress: 0,
+                              error: undefined,
+                            }
+                          : entry,
+                      ),
                     );
                   }}
                   style={retryButtonStyle}
@@ -1891,7 +2405,9 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
                 </button>
               ) : item.status !== "completed" ? (
                 <div style={progressTrackStyle}>
-                  <div style={{ ...progressBarStyle, width: `${item.progress}%` }} />
+                  <div
+                    style={{ ...progressBarStyle, width: `${item.progress}%` }}
+                  />
                 </div>
               ) : null}
               {item.assetId && (
@@ -1901,7 +2417,9 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
                     <input
                       type="text"
                       value={item.caption ?? ""}
-                      onChange={(event) => updateItemCaption(item.id, event.target.value)}
+                      onChange={(event) =>
+                        updateItemCaption(item.id, event.target.value)
+                      }
                       placeholder="Optional caption"
                       style={captionInputStyle}
                     />
@@ -1914,9 +2432,13 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
                       {item.captionStatus === "saving" ? "Saving..." : "Save"}
                     </button>
                   </div>
-                  {item.captionStatus === "saved" && <span style={captionStatusStyle}>Saved</span>}
+                  {item.captionStatus === "saved" && (
+                    <span style={captionStatusStyle}>Saved</span>
+                  )}
                   {item.captionStatus === "failed" && (
-                    <span style={captionErrorStyle}>{item.captionError ?? "Caption failed"}</span>
+                    <span style={captionErrorStyle}>
+                      {item.captionError ?? "Caption failed"}
+                    </span>
                   )}
                 </label>
               )}
@@ -1934,7 +2456,10 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
         {folderPath.length > 0 && (
           <div style={{ ...driveBrowserHeaderStyle, gap: 4, overflow: "auto" }}>
             {folderPath.map((breadcrumb, index) => (
-              <div key={breadcrumb.id} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <div
+                key={breadcrumb.id}
+                style={{ display: "flex", alignItems: "center", gap: 4 }}
+              >
                 <button
                   type="button"
                   onClick={() => {
@@ -1945,7 +2470,9 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
                       } else {
                         setCurrentDriveId(undefined);
                         setSelectedDriveFolder("root");
-                        setFolderPath([{ id: "__shared_drives__", name: "Shared Drives" }]);
+                        setFolderPath([
+                          { id: "__shared_drives__", name: "Shared Drives" },
+                        ]);
                       }
                     } else {
                       const newPath = folderPath.slice(0, index + 1);
@@ -1960,16 +2487,24 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
                   }}
                   style={{
                     background: "transparent",
-                    color: selectedDriveFolder === breadcrumb.id ? "#d8e7ff" : "#9aa3b3",
+                    color:
+                      selectedDriveFolder === breadcrumb.id
+                        ? "#d8e7ff"
+                        : "#9aa3b3",
                     border: "none",
                     cursor: "pointer",
                     padding: 0,
-                    textDecoration: selectedDriveFolder === breadcrumb.id ? "underline" : "none",
+                    textDecoration:
+                      selectedDriveFolder === breadcrumb.id
+                        ? "underline"
+                        : "none",
                   }}
                 >
                   {breadcrumb.name}
                 </button>
-                {index < folderPath.length - 1 && <span style={{ color: "#666" }}>/</span>}
+                {index < folderPath.length - 1 && (
+                  <span style={{ color: "#666" }}>/</span>
+                )}
               </div>
             ))}
           </div>
@@ -1979,7 +2514,9 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
         {driveLoading || driveDefaultOpening ? (
           <div style={emptyStateStyle}>Loading...</div>
         ) : driveFolders.length === 0 && driveFiles.length === 0 ? (
-          <div style={emptyStateStyle}>No folders or files in this location</div>
+          <div style={emptyStateStyle}>
+            No folders or files in this location
+          </div>
         ) : (
           <div style={driveFileListStyle}>
             {/* Folders (for hierarchy navigation) */}
@@ -2016,15 +2553,31 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
                 />
                 <div style={driveFileThumbStyle}>
                   {file.thumbnailLink ? (
-                    <img src={file.thumbnailLink} alt="" style={driveFileThumbImageStyle} loading="lazy" />
+                    <img
+                      src={file.thumbnailLink}
+                      alt=""
+                      style={driveFileThumbImageStyle}
+                      loading="lazy"
+                    />
                   ) : (
-                    <span style={driveFileTypeStyle}>{file.isVideo ? "VID" : "IMG"}</span>
+                    <span style={driveFileTypeStyle}>
+                      {file.isVideo ? "VID" : "IMG"}
+                    </span>
                   )}
                 </div>
-                <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <span
+                  style={{
+                    flex: 1,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
                   {file.name}
                 </span>
-                <span style={assetDateStyle}>{file.isVideo ? "Video" : "Image"}</span>
+                <span style={assetDateStyle}>
+                  {file.isVideo ? "Video" : "Image"}
+                </span>
               </div>
             ))}
           </div>
@@ -2046,7 +2599,11 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
             <button
               type="button"
               onClick={syncSelectedDriveFiles}
-              disabled={selectedDriveFiles.size === 0 || driveSyncing || !authUser?.authenticated}
+              disabled={
+                selectedDriveFiles.size === 0 ||
+                driveSyncing ||
+                !authUser?.authenticated
+              }
               style={primaryActionButtonStyle}
             >
               {driveSyncing
@@ -2064,10 +2621,7 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
       <div style={siteSelectionPanelStyle}>
         <div className="atlas-site-grid" style={siteChoiceGridStyle}>
           {filteredPlacements.map((placement) => (
-            <div
-              key={placement.placement_id}
-              style={siteChoiceCardStyle}
-            >
+            <div key={placement.placement_id} style={siteChoiceCardStyle}>
               <div style={siteCardContentStyle}>
                 {(placement.partner_logo?.url || placement.is_earlyon) && (
                   <div style={siteLogoRowStyle}>
@@ -2089,48 +2643,98 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
                     )}
                   </div>
                 )}
-                <span style={placementNameStyle}>{placementLabel(placement)}</span>
+                <span style={placementNameStyle}>
+                  {placementLabel(placement)}
+                </span>
                 <span style={placementMetaGroupStyle}>
-                  {placementMetaLines(placement).map((line) => (
+                  {placementMetaLines(placement).map((line) =>
                     line.href ? (
                       <a
                         key={line.text}
                         href={line.href}
                         target="_blank"
                         rel="noreferrer"
-                        style={line.variant === "location" ? placementLocationLinkStyle : placementMetaLinkStyle}
+                        style={
+                          line.variant === "location"
+                            ? placementLocationLinkStyle
+                            : placementMetaLinkStyle
+                        }
                       >
-                        {line.icon && <span style={placementMetaIconStyle} aria-hidden="true">{line.icon}</span>}
+                        {line.icon && (
+                          <span
+                            style={placementMetaIconStyle}
+                            aria-hidden="true"
+                          >
+                            {line.icon}
+                          </span>
+                        )}
                         {line.text}
                       </a>
                     ) : (
                       <span key={line.text} style={placementMetaStyle}>
-                        {line.icon && <span style={placementMetaIconStyle} aria-hidden="true">{line.icon}</span>}
+                        {line.icon && (
+                          <span
+                            style={placementMetaIconStyle}
+                            aria-hidden="true"
+                          >
+                            {line.icon}
+                          </span>
+                        )}
                         {line.text}
                       </span>
-                    )
-                  ))}
+                    ),
+                  )}
                 </span>
               </div>
               <div style={siteActionRowStyle}>
-                <button type="button" onClick={() => browsePlacement(placement)} style={siteActionButtonStyle}>
-                  <span style={siteActionIconStyle} aria-hidden="true">browse</span>
+                <button
+                  type="button"
+                  onClick={() => browsePlacement(placement)}
+                  style={siteActionButtonStyle}
+                >
+                  <span style={siteActionIconStyle} aria-hidden="true">
+                    browse
+                  </span>
                   Browse
                 </button>
-                <button type="button" onClick={() => uploadToPlacement(placement)} style={siteActionButtonStyle}>
-                  <span style={siteActionIconStyle} aria-hidden="true">upload</span>
+                <button
+                  type="button"
+                  onClick={() => uploadToPlacement(placement)}
+                  style={siteActionButtonStyle}
+                >
+                  <span style={siteActionIconStyle} aria-hidden="true">
+                    upload
+                  </span>
                   Upload
                 </button>
-                <button type="button" onClick={() => importToPlacement(placement)} style={siteActionButtonStyle}>
-                  <span style={siteActionIconStyle} aria-hidden="true">add_to_drive</span>
+                <button
+                  type="button"
+                  onClick={() => importToPlacement(placement)}
+                  style={siteActionButtonStyle}
+                >
+                  <span style={siteActionIconStyle} aria-hidden="true">
+                    add_to_drive
+                  </span>
                   Import
                 </button>
-                <a href={placementViewerUrl(placement)} style={siteActionLinkStyle}>
-                  <span style={siteActionIconStyle} aria-hidden="true">open_in_new</span>
+                <a
+                  href={placementViewerUrl(placement)}
+                  style={siteActionLinkStyle}
+                >
+                  <span style={siteActionIconStyle} aria-hidden="true">
+                    open_in_new
+                  </span>
                   View
                 </a>
-                <a href={placementEditUrl(placement)} target="_blank" rel="noreferrer" style={siteActionLinkStyle}>
-                  <span style={siteActionIconStyle} aria-hidden="true">edit</span>
+                <a
+                  href={placementEditUrl(placement)}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={siteActionLinkStyle}
+                >
+                  <span style={siteActionIconStyle} aria-hidden="true">
+                    edit
+                  </span>
                   Edit
                 </a>
               </div>
@@ -2206,23 +2810,41 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
 
   function renderAssetManager() {
     if (!selectedAsset) return null;
-    const placementChanged = Boolean(managePlacementKey)
-      && managePlacementKey !== (selectedAsset.placement_id ? String(selectedAsset.placement_id) : "");
-    const uploaderChanged = Boolean(manageUploaderKey)
-      && manageUploaderKey !== (selectedAsset.uploader_id ? String(selectedAsset.uploader_id) : "");
-    const activityChanged = manageActivityTag !== (selectedAsset.activity_id ? String(selectedAsset.activity_id) : "");
-    const publishedChanged = managePublished !== Boolean(selectedAsset.published);
+    const placementChanged =
+      Boolean(managePlacementKey) &&
+      managePlacementKey !==
+        (selectedAsset.placement_id ? String(selectedAsset.placement_id) : "");
+    const uploaderChanged =
+      Boolean(manageUploaderKey) &&
+      manageUploaderKey !==
+        (selectedAsset.uploader_id ? String(selectedAsset.uploader_id) : "");
+    const activityChanged =
+      manageActivityTag !==
+      (selectedAsset.activity_id ? String(selectedAsset.activity_id) : "");
+    const publishedChanged =
+      managePublished !== Boolean(selectedAsset.published);
     const selectedAdjustments = normalizeAdjustments(selectedAsset.adjustments);
     const adjustmentChanged =
       manageBrightness !== selectedAdjustments.brightness ||
       manageContrast !== selectedAdjustments.contrast ||
       manageSaturation !== selectedAdjustments.saturation;
-    const captionChanged = manageCaption.trim() !== (selectedAsset.description ?? "").trim();
+    const captionChanged =
+      manageCaption.trim() !== (selectedAsset.description ?? "").trim();
     const pixelEditsChanged = hasPendingPixelEdits(selectedAsset);
-    const hasAnyChanges = placementChanged || uploaderChanged || activityChanged || publishedChanged || adjustmentChanged || captionChanged || pixelEditsChanged;
-    const displayPreviewUrl = mediaUrl(selectedAsset.previewUrl, selectedAsset.id);
+    const hasAnyChanges =
+      placementChanged ||
+      uploaderChanged ||
+      activityChanged ||
+      publishedChanged ||
+      adjustmentChanged ||
+      captionChanged ||
+      pixelEditsChanged;
+    const displayPreviewUrl = mediaUrl(
+      selectedAsset.previewUrl,
+      selectedAsset.id,
+    );
     const cropSourceUrl = `/api/v1/assets/${selectedAsset.id}/preview?v=${encodeURIComponent(
-      `${selectedAsset.updatedAt}-${cropRefreshKey}`
+      `${selectedAsset.updatedAt}-${cropRefreshKey}`,
     )}`;
     const cropCanvasDimensions = rotatedImageDimensions(selectedAsset);
     const cropSourceSize = sourceImageDimensions(selectedAsset);
@@ -2231,13 +2853,17 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
       <div className="atlas-manage-panel" style={managePanelStyle}>
         <div style={managePreviewStyle}>
           {selectedAsset.type === "VIDEO" ? (
-            <video src={selectedAsset.previewUrl} controls style={manageMediaStyle} />
+            <video
+              src={selectedAsset.previewUrl}
+              controls
+              style={manageMediaStyle}
+            />
           ) : cropEditing ? (
             <div style={cropEditorStyle}>
               <div
                 style={{
                   ...cropStageStyle,
-                  width: `min(100%, ${Math.round(560 * cropCanvasDimensions.width / cropCanvasDimensions.height)}px)`,
+                  width: `min(100%, ${Math.round((560 * cropCanvasDimensions.width) / cropCanvasDimensions.height)}px)`,
                   aspectRatio: `${cropCanvasDimensions.width} / ${cropCanvasDimensions.height}`,
                 }}
                 onPointerDown={beginCropDrag}
@@ -2264,19 +2890,35 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
                   onLoad={() => {
                     const image = cropImageRef.current;
                     if (!image?.naturalWidth || !image.naturalHeight) return;
-                    setCropSourceDimensions({ width: image.naturalWidth, height: image.naturalHeight });
-                    setCropRect({ x: 0, y: 0, width: image.naturalWidth, height: image.naturalHeight });
+                    setCropSourceDimensions({
+                      width: image.naturalWidth,
+                      height: image.naturalHeight,
+                    });
+                    setCropRect({
+                      x: 0,
+                      y: 0,
+                      width: image.naturalWidth,
+                      height: image.naturalHeight,
+                    });
                   }}
                 />
                 <div
-                  style={{ ...cropBoxStyle, ...cropOverlayStyle(selectedAsset) }}
+                  style={{
+                    ...cropBoxStyle,
+                    ...cropOverlayStyle(selectedAsset),
+                  }}
                   onPointerDown={beginCropMove}
                 >
-                  {(["nw", "n", "ne", "e", "se", "s", "sw", "w"] as CropHandle[]).map((handle) => (
+                  {(
+                    ["nw", "n", "ne", "e", "se", "s", "sw", "w"] as CropHandle[]
+                  ).map((handle) => (
                     <span
                       key={handle}
                       aria-hidden="true"
-                      style={{ ...cropHandleStyle, ...cropHandlePositionStyles[handle] }}
+                      style={{
+                        ...cropHandleStyle,
+                        ...cropHandlePositionStyles[handle],
+                      }}
                       onPointerDown={(event) => beginCropResize(handle, event)}
                     />
                   ))}
@@ -2291,11 +2933,16 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
                   step={0.1}
                   value={straightenDegrees}
                   disabled={cropSaving}
-                  onChange={(event) => changeStraightenDegrees(Number(event.target.value))}
+                  onChange={(event) =>
+                    changeStraightenDegrees(Number(event.target.value))
+                  }
                   style={rangeInputStyle}
                 />
               </label>
-              <div style={cropHintStyle}>Drag over the preview to choose a crop. Changing the angle resets to the largest clean rectangle.</div>
+              <div style={cropHintStyle}>
+                Drag over the preview to choose a crop. Changing the angle
+                resets to the largest clean rectangle.
+              </div>
             </div>
           ) : (
             <img
@@ -2323,15 +2970,20 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
               style={inputStyle}
             >
               <option value="">Select a placement</option>
-              {groupedPlacementsByPartner(options?.placements ?? []).map((group) => (
-                <optgroup key={group.partner} label={group.partner}>
-                  {group.placements.map((placement) => (
-                    <option key={placement.placement_id} value={String(placement.placement_id)}>
-                      {placementLabel(placement)}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
+              {groupedPlacementsByPartner(options?.placements ?? []).map(
+                (group) => (
+                  <optgroup key={group.partner} label={group.partner}>
+                    {group.placements.map((placement) => (
+                      <option
+                        key={placement.placement_id}
+                        value={String(placement.placement_id)}
+                      >
+                        {placementLabel(placement)}
+                      </option>
+                    ))}
+                  </optgroup>
+                ),
+              )}
             </select>
           </label>
           <label style={labelStyle}>
@@ -2388,7 +3040,9 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
                     type="button"
                     aria-label="Reset brightness"
                     title="Reset brightness"
-                    onClick={() => setManageBrightness(DEFAULT_ADJUSTMENTS.brightness)}
+                    onClick={() =>
+                      setManageBrightness(DEFAULT_ADJUSTMENTS.brightness)
+                    }
                     disabled={adjustmentsLoading || savingAsset}
                     style={adjustmentResetButtonStyle}
                   >
@@ -2402,7 +3056,9 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
                   step={1}
                   value={manageBrightness}
                   disabled={adjustmentsLoading || adjustmentsSaving}
-                  onChange={(e) => setManageBrightness(clampAdjustment(Number(e.target.value)))}
+                  onChange={(e) =>
+                    setManageBrightness(clampAdjustment(Number(e.target.value)))
+                  }
                   style={rangeInputStyle}
                 />
               </label>
@@ -2413,7 +3069,9 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
                     type="button"
                     aria-label="Reset contrast"
                     title="Reset contrast"
-                    onClick={() => setManageContrast(DEFAULT_ADJUSTMENTS.contrast)}
+                    onClick={() =>
+                      setManageContrast(DEFAULT_ADJUSTMENTS.contrast)
+                    }
                     disabled={adjustmentsLoading || savingAsset}
                     style={adjustmentResetButtonStyle}
                   >
@@ -2427,7 +3085,9 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
                   step={1}
                   value={manageContrast}
                   disabled={adjustmentsLoading || adjustmentsSaving}
-                  onChange={(e) => setManageContrast(clampAdjustment(Number(e.target.value)))}
+                  onChange={(e) =>
+                    setManageContrast(clampAdjustment(Number(e.target.value)))
+                  }
                   style={rangeInputStyle}
                 />
               </label>
@@ -2438,7 +3098,9 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
                     type="button"
                     aria-label="Reset saturation"
                     title="Reset saturation"
-                    onClick={() => setManageSaturation(DEFAULT_ADJUSTMENTS.saturation)}
+                    onClick={() =>
+                      setManageSaturation(DEFAULT_ADJUSTMENTS.saturation)
+                    }
                     disabled={adjustmentsLoading || savingAsset}
                     style={adjustmentResetButtonStyle}
                   >
@@ -2452,7 +3114,9 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
                   step={1}
                   value={manageSaturation}
                   disabled={adjustmentsLoading || adjustmentsSaving}
-                  onChange={(e) => setManageSaturation(clampAdjustment(Number(e.target.value)))}
+                  onChange={(e) =>
+                    setManageSaturation(clampAdjustment(Number(e.target.value)))
+                  }
                   style={rangeInputStyle}
                 />
               </label>
@@ -2471,16 +3135,33 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
             <button
               type="button"
               onClick={saveAllAssetChanges}
-              disabled={savingAsset || deletingAsset || cropSaving || adjustmentsSaving || captionSaving || !hasAnyChanges}
+              disabled={
+                savingAsset ||
+                deletingAsset ||
+                cropSaving ||
+                adjustmentsSaving ||
+                captionSaving ||
+                !hasAnyChanges
+              }
               style={primaryActionButtonStyle}
             >
-              {savingAsset ? (pixelEditsChanged ? "Saving & Creating Edited Copy..." : "Saving...") : "Save Changes"}
+              {savingAsset
+                ? pixelEditsChanged
+                  ? "Saving & Creating Edited Copy..."
+                  : "Saving..."
+                : "Save Changes"}
             </button>
             {authUser?.authenticated && selectedAsset.type === "IMAGE" && (
               <button
                 type="button"
                 onClick={resetCrop}
-                disabled={cropSaving || savingAsset || deletingAsset || adjustmentsSaving || captionSaving}
+                disabled={
+                  cropSaving ||
+                  savingAsset ||
+                  deletingAsset ||
+                  adjustmentsSaving ||
+                  captionSaving
+                }
                 style={secondaryButtonStyle}
               >
                 Reset Edits
@@ -2490,13 +3171,30 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
               <button
                 type="button"
                 onClick={deleteSelectedAsset}
-                disabled={savingAsset || deletingAsset || cropSaving || adjustmentsSaving || captionSaving}
+                disabled={
+                  savingAsset ||
+                  deletingAsset ||
+                  cropSaving ||
+                  adjustmentsSaving ||
+                  captionSaving
+                }
                 style={dangerButtonStyle}
               >
                 {deletingAsset ? "Deleting..." : "Delete"}
               </button>
             )}
-            <button type="button" onClick={cancelAssetManager} disabled={deletingAsset || cropSaving || adjustmentsSaving || captionSaving || savingAsset} style={secondaryButtonStyle}>
+            <button
+              type="button"
+              onClick={cancelAssetManager}
+              disabled={
+                deletingAsset ||
+                cropSaving ||
+                adjustmentsSaving ||
+                captionSaving ||
+                savingAsset
+              }
+              style={secondaryButtonStyle}
+            >
               Cancel
             </button>
           </div>
@@ -2549,7 +3247,6 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
             <img src="/artasia.svg" alt="Artasia" style={logoStyle} />
             <div>
               <h1 style={titleStyle}>Atlas Admin</h1>
-               
             </div>
           </div>
           <div ref={menuRef} style={navMenuWrapStyle}>
@@ -2590,7 +3287,11 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
           {authUser?.authenticated ? (
             <>
               <span>
-                Hello, {authUser.uploader_name ?? authUser.uploader?.name ?? authUser.name ?? "Artasia user"}
+                Hello,{" "}
+                {authUser.uploader_name ??
+                  authUser.uploader?.name ??
+                  authUser.name ??
+                  "Artasia user"}
                 {authUser.email ? ` (${authUser.email})` : ""}
               </span>
               <div style={authActionGroupStyle}>
@@ -2602,22 +3303,41 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
                 >
                   My Sites
                 </button>
-                <button type="button" onClick={signOut} style={secondaryButtonStyle}>
+                <button
+                  type="button"
+                  onClick={signOut}
+                  style={secondaryButtonStyle}
+                >
                   Sign out
                 </button>
               </div>
             </>
           ) : (
             <>
-              <span>Sign in with Google to preselect your Artasia Team Member.</span>
-              <a href="/api/v1/auth/google/start" style={primaryLinkButtonStyle}>
+              <span>
+                Sign in with Google to preselect your Artasia Team Member.
+              </span>
+              <a
+                href="/api/v1/auth/google/start"
+                style={primaryLinkButtonStyle}
+              >
                 Sign in with Google
               </a>
             </>
           )}
         </div>
 
-        {notice && <div style={notice.tone === "success" ? successNoticeStyle : warningNoticeStyle}>{notice.message}</div>}
+        {notice && (
+          <div
+            style={
+              notice.tone === "success"
+                ? successNoticeStyle
+                : warningNoticeStyle
+            }
+          >
+            {notice.message}
+          </div>
+        )}
         {error && <div style={errorStyle}>{error}</div>}
 
         <div className="atlas-workspace-tabs" style={workspaceTabsStyle}>
@@ -2628,6 +3348,7 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
               setSelectedAsset(null);
               setItems([]);
               setNotice(null);
+              setApplicationPath("/admin", true);
             }}
             style={{
               ...workspaceTabStyle,
@@ -2635,7 +3356,9 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
             }}
           >
             <span style={workspaceTabContentStyle}>
-              <span style={materialSymbolStyle} aria-hidden="true">location_on</span>
+              <span style={materialSymbolStyle} aria-hidden="true">
+                location_on
+              </span>
               Sites
             </span>
           </button>
@@ -2646,7 +3369,7 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
               setSelectedAsset(null);
               setItems([]);
               setNotice(null);
-              setApplicationPath("/admin", true);
+              setApplicationPath("/admin/browse", true);
             }}
             style={{
               ...workspaceTabStyle,
@@ -2654,7 +3377,9 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
             }}
           >
             <span style={workspaceTabContentStyle}>
-              <span style={materialSymbolStyle} aria-hidden="true">browse</span>
+              <span style={materialSymbolStyle} aria-hidden="true">
+                browse
+              </span>
               Browse
             </span>
           </button>
@@ -2665,6 +3390,7 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
               setSelectedAsset(null);
               setItems([]);
               setNotice(null);
+              setApplicationPath("/admin", true);
             }}
             style={{
               ...workspaceTabStyle,
@@ -2672,7 +3398,9 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
             }}
           >
             <span style={workspaceTabContentStyle}>
-              <span style={materialSymbolStyle} aria-hidden="true">edit</span>
+              <span style={materialSymbolStyle} aria-hidden="true">
+                edit
+              </span>
               Edit
             </span>
           </button>
@@ -2684,6 +3412,7 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
               setSelectedAsset(null);
               setAssetMode("placements");
               setNotice(null);
+              setApplicationPath("/admin/upload", true);
             }}
             style={{
               ...workspaceTabStyle,
@@ -2691,7 +3420,9 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
             }}
           >
             <span style={workspaceTabContentStyle}>
-              <span style={materialSymbolStyle} aria-hidden="true">upload</span>
+              <span style={materialSymbolStyle} aria-hidden="true">
+                upload
+              </span>
               Upload
             </span>
           </button>
@@ -2703,6 +3434,7 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
               setAssetMode("placements");
               setSelectedDriveFiles(new Set());
               void openDriveImportDefault();
+              setApplicationPath("/admin/import", true);
             }}
             style={{
               ...workspaceTabStyle,
@@ -2710,7 +3442,9 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
             }}
           >
             <span style={workspaceTabContentStyle}>
-              <span style={materialSymbolStyle} aria-hidden="true">add_to_drive</span>
+              <span style={materialSymbolStyle} aria-hidden="true">
+                add_to_drive
+              </span>
               Import
             </span>
           </button>
@@ -2718,268 +3452,320 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
 
         <div
           className="atlas-admin-layout"
-          style={workspaceMode === "edit" ? { ...adminLayoutStyle, gridTemplateColumns: "minmax(0, 1fr)" } : adminLayoutStyle}
+          style={
+            workspaceMode === "edit"
+              ? { ...adminLayoutStyle, gridTemplateColumns: "minmax(0, 1fr)" }
+              : adminLayoutStyle
+          }
         >
-          {workspaceMode !== "edit" && <aside className="atlas-admin-filters" style={placementMenuStyle}>
-            {workspaceMode === "browse" && (
-              <label style={labelStyle}>
-                Artasia Site
-                <select
-                  value={assetMode === "untagged" || !selectedPlacement ? "" : String(selectedPlacement.placement_id)}
-                  onChange={(e) => {
-                    const nextPlacementKey = e.target.value;
-                    if (!nextPlacementKey) {
-                      setPlacementKey("");
-                      setSiteScope("all");
-                      setAssetMode("placements");
-                    } else {
-                      setPlacementKey(nextPlacementKey);
-                      setSiteScope("placement");
-                      setAssetMode("placements");
-                    }
-                    setSelectedAsset(null);
-                    setItems([]);
-                    setNotice(null);
-                  }}
-                  style={inputStyle}
-                >
-                  <option value="">All Sites</option>
-                  {browsePlacementOptions.map((placement) => (
-                    <option key={placement.placement_id} value={String(placement.placement_id)}>
-                      {placementLabel(placement)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-
-            {workspaceMode !== "upload" && workspaceMode !== "import" && (
-              <label style={labelStyle}>
-                Team Member
-                <select
-                  value={uploaderKey}
-                  onChange={(e) => {
-                    setUploaderKey(e.target.value);
-                    setBrowsePartnerKey("");
-                    setPlacementKey("");
-                    setSiteScope("select");
-                    setSelectedAsset(null);
-                    setItems([]);
-                    setNotice(null);
-                    setError(null);
-                  }}
-                  style={inputStyle}
-                >
-                  <option value="">All Team Members</option>
-                  {browseUploaderOptions.map((option) => (
-                    <option key={option.uploader.id} value={String(option.uploader.id)}>
-                      {option.uploader.name} ({option.count})
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-
-            {workspaceMode !== "sites" && (
-              <>
+          {workspaceMode !== "edit" && (
+            <aside className="atlas-admin-filters" style={placementMenuStyle}>
+              {workspaceMode === "browse" && (
                 <label style={labelStyle}>
-                  {workspaceMode === "upload" || workspaceMode === "import" ? "Program Week / Activity Tag" : "Program Week / Activity"}
+                  Artasia Site
                   <select
-                    value={activityTagFilter}
+                    value={
+                      assetMode === "untagged" || !selectedPlacement
+                        ? ""
+                        : String(selectedPlacement.placement_id)
+                    }
                     onChange={(e) => {
-                      setActivityTagFilter(e.target.value);
+                      const nextPlacementKey = e.target.value;
+                      if (!nextPlacementKey) {
+                        setPlacementKey("");
+                        setSiteScope("all");
+                        setAssetMode("placements");
+                      } else {
+                        setPlacementKey(nextPlacementKey);
+                        setSiteScope("placement");
+                        setAssetMode("placements");
+                      }
                       setSelectedAsset(null);
+                      setItems([]);
+                      setNotice(null);
                     }}
                     style={inputStyle}
                   >
-                    <option value="">{workspaceMode === "upload" || workspaceMode === "import" ? "No activity tag" : "All Activities"}</option>
-                    {(options?.activities ?? []).map((activity) => (
-                      <option key={activity.id} value={String(activity.id)}>
-                        {activity.label}
+                    <option value="">All Sites</option>
+                    {browsePlacementOptions.map((placement) => (
+                      <option
+                        key={placement.placement_id}
+                        value={String(placement.placement_id)}
+                      >
+                        {placementLabel(placement)}
                       </option>
                     ))}
                   </select>
                 </label>
-                {(workspaceMode === "upload" || workspaceMode === "import") && !activityTagFilter && (
-                  <div style={activityWarningStyle}>
-                    <span style={activityWarningIconStyle} aria-hidden="true">warning</span>
-                    Please add an activity tag first.
-                  </div>
-                )}
-              </>
-            )}
+              )}
 
-            {workspaceMode !== "upload" && workspaceMode !== "import" && (
-              <label style={labelStyle}>
-                Program Context
-                <select
-                  value={browseContextFilter}
-                  onChange={(e) => {
-                    setBrowseContextFilter(e.target.value as BrowseContextFilter);
-                    setBrowsePartnerKey("");
-                    setPlacementKey("");
-                    setSiteScope("select");
-                    setSelectedAsset(null);
-                    setItems([]);
-                  }}
-                  style={inputStyle}
-                >
-                  <option value="all">All Sites (EarlyON and Regular)</option>
-                  <option value="earlyon">EarlyON Sites Only</option>
-                  <option value="nonEarlyon">Regular Sites Only</option>
-                </select>
-              </label>
-            )}
-
-            {workspaceMode !== "upload" && workspaceMode !== "import" && (
-              <label style={labelStyle}>
-                Artasia Partner
-                <select
-                  value={browsePartnerKey}
-                  onChange={(e) => {
-                    setBrowsePartnerKey(e.target.value);
-                    setPlacementKey("");
-                    setSiteScope("select");
-                    setSelectedAsset(null);
-                    setItems([]);
-                  }}
-                  style={inputStyle}
-                >
-                  <option value="">All Partners</option>
-                  {browsePartnerOptions.map((option) => (
-                    <option key={option.partnerName} value={option.partnerName}>
-                      {option.partnerName} ({option.count})
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-
-            {workspaceMode === "sites" && (
-              <label style={labelStyle}>
-                Delivery Day
-                <select
-                  value={deliveryDayFilter}
-                  onChange={(e) => {
-                    setDeliveryDayFilter(e.target.value as DeliveryDayFilter);
-                    setPlacementKey("");
-                    setSiteScope("select");
-                    setSelectedAsset(null);
-                    setItems([]);
-                  }}
-                  style={inputStyle}
-                >
-                  {DELIVERY_DAY_OPTIONS.map((option) => (
-                    <option key={option.value || "all"} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-
-            {workspaceMode === "sites" && (
-              <label style={labelStyle}>
-                Time of Day
-                <select
-                  value={timeOfDayFilter}
-                  onChange={(e) => {
-                    setTimeOfDayFilter(e.target.value);
-                    setPlacementKey("");
-                    setSiteScope("select");
-                    setSelectedAsset(null);
-                    setItems([]);
-                  }}
-                  style={inputStyle}
-                >
-                  <option value="">All Times</option>
-                  {timeOfDayOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-
-            {workspaceMode === "sites" && (
-              <label style={labelStyle}>
-                Age Range
-                <select
-                  value={ageRangeFilter}
-                  onChange={(e) => {
-                    setAgeRangeFilter(e.target.value);
-                    setPlacementKey("");
-                    setSiteScope("select");
-                    setSelectedAsset(null);
-                    setItems([]);
-                  }}
-                  style={inputStyle}
-                >
-                  <option value="">All Age Ranges</option>
-                  {ageRangeOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-
-            {workspaceMode === "sites" && hasActiveSiteFilters && (
-              <button type="button" onClick={clearSiteFilters} style={clearFiltersButtonStyle}>
-                <span style={siteActionIconStyle} aria-hidden="true">filter_alt_off</span>
-                Clear Filters
-              </button>
-            )}
-
-            {workspaceMode === "sites" && (
-              <div style={sidebarSummaryStyle}>
-                {filteredPlacements.length} visible site{filteredPlacements.length === 1 ? "" : "s"}
-              </div>
-            )}
-
-            {workspaceMode === "browse" && (
-              <label style={labelStyle}>
-                Assets
-                <select
-                  value={assetMode}
-                  onChange={(e) => {
-                    const nextAssetMode = e.target.value as "placements" | "untagged";
-                    setAssetMode(nextAssetMode);
-                    if (nextAssetMode === "untagged") {
-                      setUploaderKey("");
-                      setActivityTagFilter("");
-                      setBrowseContextFilter("all");
-                      setTimeOfDayFilter("");
-                      setAgeRangeFilter("");
+              {workspaceMode !== "upload" && workspaceMode !== "import" && (
+                <label style={labelStyle}>
+                  Team Member
+                  <select
+                    value={uploaderKey}
+                    onChange={(e) => {
+                      setUploaderKey(e.target.value);
                       setBrowsePartnerKey("");
-                    }
-                    setPlacementKey("");
-                    setSiteScope("select");
-                    setSelectedAsset(null);
-                    setItems([]);
-                  }}
-                  style={inputStyle}
-                >
-                  <option value="placements">Tagged assets</option>
-                  <option value="untagged">Untagged assets</option>
-                </select>
-              </label>
-            )}
+                      setPlacementKey("");
+                      setSiteScope("select");
+                      setSelectedAsset(null);
+                      setItems([]);
+                      setNotice(null);
+                      setError(null);
+                    }}
+                    style={inputStyle}
+                  >
+                    <option value="">All Team Members</option>
+                    {browseUploaderOptions.map((option) => (
+                      <option
+                        key={option.uploader.id}
+                        value={String(option.uploader.id)}
+                      >
+                        {option.uploader.name} ({option.count})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
 
-          </aside>}
+              {workspaceMode !== "sites" && (
+                <>
+                  <label style={labelStyle}>
+                    {workspaceMode === "upload" || workspaceMode === "import"
+                      ? "Program Week / Activity Tag"
+                      : "Program Week / Activity"}
+                    <select
+                      value={activityTagFilter}
+                      onChange={(e) => {
+                        setActivityTagFilter(e.target.value);
+                        setSelectedAsset(null);
+                      }}
+                      style={inputStyle}
+                    >
+                      <option value="">
+                        {workspaceMode === "upload" ||
+                        workspaceMode === "import"
+                          ? "No activity tag"
+                          : "All Activities"}
+                      </option>
+                      {(options?.activities ?? []).map((activity) => (
+                        <option key={activity.id} value={String(activity.id)}>
+                          {activity.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {(workspaceMode === "upload" || workspaceMode === "import") &&
+                    !activityTagFilter && (
+                      <div style={activityWarningStyle}>
+                        <span
+                          style={activityWarningIconStyle}
+                          aria-hidden="true"
+                        >
+                          warning
+                        </span>
+                        Please add an activity tag first.
+                      </div>
+                    )}
+                </>
+              )}
+
+              {workspaceMode !== "upload" && workspaceMode !== "import" && (
+                <label style={labelStyle}>
+                  Program Context
+                  <select
+                    value={browseContextFilter}
+                    onChange={(e) => {
+                      setBrowseContextFilter(
+                        e.target.value as BrowseContextFilter,
+                      );
+                      setBrowsePartnerKey("");
+                      setPlacementKey("");
+                      setSiteScope("select");
+                      setSelectedAsset(null);
+                      setItems([]);
+                    }}
+                    style={inputStyle}
+                  >
+                    <option value="all">All Sites (EarlyON and Regular)</option>
+                    <option value="earlyon">EarlyON Sites Only</option>
+                    <option value="nonEarlyon">Regular Sites Only</option>
+                  </select>
+                </label>
+              )}
+
+              {workspaceMode !== "upload" && workspaceMode !== "import" && (
+                <label style={labelStyle}>
+                  Artasia Partner
+                  <select
+                    value={browsePartnerKey}
+                    onChange={(e) => {
+                      setBrowsePartnerKey(e.target.value);
+                      setPlacementKey("");
+                      setSiteScope("select");
+                      setSelectedAsset(null);
+                      setItems([]);
+                    }}
+                    style={inputStyle}
+                  >
+                    <option value="">All Partners</option>
+                    {browsePartnerOptions.map((option) => (
+                      <option
+                        key={option.partnerName}
+                        value={option.partnerName}
+                      >
+                        {option.partnerName} ({option.count})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              {workspaceMode === "sites" && (
+                <label style={labelStyle}>
+                  Delivery Day
+                  <select
+                    value={deliveryDayFilter}
+                    onChange={(e) => {
+                      setDeliveryDayFilter(e.target.value as DeliveryDayFilter);
+                      setPlacementKey("");
+                      setSiteScope("select");
+                      setSelectedAsset(null);
+                      setItems([]);
+                    }}
+                    style={inputStyle}
+                  >
+                    {DELIVERY_DAY_OPTIONS.map((option) => (
+                      <option key={option.value || "all"} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              {workspaceMode === "sites" && (
+                <label style={labelStyle}>
+                  Time of Day
+                  <select
+                    value={timeOfDayFilter}
+                    onChange={(e) => {
+                      setTimeOfDayFilter(e.target.value);
+                      setPlacementKey("");
+                      setSiteScope("select");
+                      setSelectedAsset(null);
+                      setItems([]);
+                    }}
+                    style={inputStyle}
+                  >
+                    <option value="">All Times</option>
+                    {timeOfDayOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              {workspaceMode === "sites" && (
+                <label style={labelStyle}>
+                  Age Range
+                  <select
+                    value={ageRangeFilter}
+                    onChange={(e) => {
+                      setAgeRangeFilter(e.target.value);
+                      setPlacementKey("");
+                      setSiteScope("select");
+                      setSelectedAsset(null);
+                      setItems([]);
+                    }}
+                    style={inputStyle}
+                  >
+                    <option value="">All Age Ranges</option>
+                    {ageRangeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              {workspaceMode === "sites" && hasActiveSiteFilters && (
+                <button
+                  type="button"
+                  onClick={clearSiteFilters}
+                  style={clearFiltersButtonStyle}
+                >
+                  <span style={siteActionIconStyle} aria-hidden="true">
+                    filter_alt_off
+                  </span>
+                  Clear Filters
+                </button>
+              )}
+
+              {workspaceMode === "sites" && (
+                <div style={sidebarSummaryStyle}>
+                  {filteredPlacements.length} visible site
+                  {filteredPlacements.length === 1 ? "" : "s"}
+                </div>
+              )}
+
+              {workspaceMode === "browse" && (
+                <label style={labelStyle}>
+                  Assets
+                  <select
+                    value={assetMode}
+                    onChange={(e) => {
+                      const nextAssetMode = e.target.value as
+                        | "placements"
+                        | "untagged";
+                      setAssetMode(nextAssetMode);
+                      if (nextAssetMode === "untagged") {
+                        setUploaderKey("");
+                        setActivityTagFilter("");
+                        setBrowseContextFilter("all");
+                        setTimeOfDayFilter("");
+                        setAgeRangeFilter("");
+                        setBrowsePartnerKey("");
+                      }
+                      setPlacementKey("");
+                      setSiteScope("select");
+                      setSelectedAsset(null);
+                      setItems([]);
+                    }}
+                    style={inputStyle}
+                  >
+                    <option value="placements">Tagged assets</option>
+                    <option value="untagged">Untagged assets</option>
+                  </select>
+                </label>
+              )}
+            </aside>
+          )}
 
           <section
             className="atlas-admin-detail"
-            style={workspaceMode === "sites" ? sitesDetailStyle : workspaceMode === "edit" ? editDetailStyle : detailStyle}
+            style={
+              workspaceMode === "sites"
+                ? sitesDetailStyle
+                : workspaceMode === "edit"
+                  ? editDetailStyle
+                  : detailStyle
+            }
           >
             {workspaceMode === "sites" ? (
               renderSiteSelection()
             ) : workspaceMode === "edit" ? (
-              directAssetLoading
-                ? <div style={emptyStateStyle}>Loading upload...</div>
-                : selectedAsset ? renderAssetManager() : renderChooseAssetToEditPrompt()
+              directAssetLoading ? (
+                <div style={emptyStateStyle}>Loading upload...</div>
+              ) : selectedAsset ? (
+                renderAssetManager()
+              ) : (
+                renderChooseAssetToEditPrompt()
+              )
             ) : workspaceMode === "upload" ? (
               selectedPlacement ? (
                 <>
@@ -3006,7 +3792,9 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
                     }}
                   >
                     Drop images or videos here
-                    <span style={{ color: "#777", marginTop: 6 }}>or click to choose files</span>
+                    <span style={{ color: "#777", marginTop: 6 }}>
+                      or click to choose files
+                    </span>
                     <input
                       ref={inputRef}
                       type="file"
@@ -3049,7 +3837,10 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
               <>
                 <div style={detailHeaderStyle}>
                   <div>
-                    {renderSiteBreadcrumb(placementLabel(selectedPlacement), browseBreadcrumbParents)}
+                    {renderSiteBreadcrumb(
+                      placementLabel(selectedPlacement),
+                      browseBreadcrumbParents,
+                    )}
                     <div style={detailMetaStyle}>
                       Lead: {selectedPlacement.team_member_name ?? "Unassigned"}
                       {selectedPlacement.secondary_team_member_name
@@ -3057,12 +3848,15 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
                         : ""}
                     </div>
                     {selectedPlacement.delivery_schedule && (
-                      <div style={detailMetaStyle}>{selectedPlacement.delivery_schedule}</div>
+                      <div style={detailMetaStyle}>
+                        {selectedPlacement.delivery_schedule}
+                      </div>
                     )}
                   </div>
                   <div style={detailHeaderActionsStyle}>
                     <div style={countBadgeStyle}>
-                      {assetsLoading ? "..." : placementAssets.length} upload{placementAssets.length === 1 ? "" : "s"}
+                      {assetsLoading ? "..." : placementAssets.length} upload
+                      {placementAssets.length === 1 ? "" : "s"}
                     </div>
                     <button
                       type="button"
@@ -3079,12 +3873,15 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
             ) : (
               <>
                 <div style={detailHeaderStyle}>
-                  {assetMode === "placements"
-                    ? renderSiteBreadcrumb("All Sites", browseBreadcrumbParents)
-                    : <h2 style={detailTitleStyle}>Assets</h2>}
+                  {assetMode === "placements" ? (
+                    renderSiteBreadcrumb("All Sites", browseBreadcrumbParents)
+                  ) : (
+                    <h2 style={detailTitleStyle}>Assets</h2>
+                  )}
                   <div style={detailHeaderActionsStyle}>
                     <div style={countBadgeStyle}>
-                      {assetsLoading ? "..." : placementAssets.length} upload{placementAssets.length === 1 ? "" : "s"}
+                      {assetsLoading ? "..." : placementAssets.length} upload
+                      {placementAssets.length === 1 ? "" : "s"}
                     </div>
                     <button
                       type="button"
@@ -3098,7 +3895,7 @@ export default function UploadPanel({ initialError, initialAssetId, onSignedOut 
                 {renderAssetGrid(
                   assetMode === "untagged"
                     ? "No uploads need placement right now."
-                    : "No uploads tagged to the visible placements yet."
+                    : "No uploads tagged to the visible placements yet.",
                 )}
               </>
             )}
@@ -3595,7 +4392,8 @@ const uploadControlsStyle: React.CSSProperties = {
 
 const fieldGridStyle: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "minmax(150px, 0.85fr) minmax(260px, 1.4fr) minmax(150px, 0.85fr)",
+  gridTemplateColumns:
+    "minmax(150px, 0.85fr) minmax(260px, 1.4fr) minmax(150px, 0.85fr)",
   gap: 12,
   alignItems: "end",
 };
@@ -3764,14 +4562,54 @@ const cropHandleStyle: React.CSSProperties = {
 };
 
 const cropHandlePositionStyles: Record<CropHandle, React.CSSProperties> = {
-  nw: { left: 0, top: 0, transform: "translate(-50%, -50%)", cursor: "nwse-resize" },
-  n: { left: "50%", top: 0, transform: "translate(-50%, -50%)", cursor: "ns-resize" },
-  ne: { right: 0, top: 0, transform: "translate(50%, -50%)", cursor: "nesw-resize" },
-  e: { right: 0, top: "50%", transform: "translate(50%, -50%)", cursor: "ew-resize" },
-  se: { right: 0, bottom: 0, transform: "translate(50%, 50%)", cursor: "nwse-resize" },
-  s: { left: "50%", bottom: 0, transform: "translate(-50%, 50%)", cursor: "ns-resize" },
-  sw: { left: 0, bottom: 0, transform: "translate(-50%, 50%)", cursor: "nesw-resize" },
-  w: { left: 0, top: "50%", transform: "translate(-50%, -50%)", cursor: "ew-resize" },
+  nw: {
+    left: 0,
+    top: 0,
+    transform: "translate(-50%, -50%)",
+    cursor: "nwse-resize",
+  },
+  n: {
+    left: "50%",
+    top: 0,
+    transform: "translate(-50%, -50%)",
+    cursor: "ns-resize",
+  },
+  ne: {
+    right: 0,
+    top: 0,
+    transform: "translate(50%, -50%)",
+    cursor: "nesw-resize",
+  },
+  e: {
+    right: 0,
+    top: "50%",
+    transform: "translate(50%, -50%)",
+    cursor: "ew-resize",
+  },
+  se: {
+    right: 0,
+    bottom: 0,
+    transform: "translate(50%, 50%)",
+    cursor: "nwse-resize",
+  },
+  s: {
+    left: "50%",
+    bottom: 0,
+    transform: "translate(-50%, 50%)",
+    cursor: "ns-resize",
+  },
+  sw: {
+    left: 0,
+    bottom: 0,
+    transform: "translate(-50%, 50%)",
+    cursor: "nesw-resize",
+  },
+  w: {
+    left: 0,
+    top: "50%",
+    transform: "translate(-50%, -50%)",
+    cursor: "ew-resize",
+  },
 };
 
 const manageDetailsStyle: React.CSSProperties = {
