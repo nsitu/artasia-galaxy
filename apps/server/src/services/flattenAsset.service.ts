@@ -25,12 +25,13 @@ const MAX_STRAIGHTEN_DEGREES = 15;
 const execFile = promisify(execFileCallback);
 
 async function convertHeifToJpeg(inputPath: string) {
-  const outputPath = `${inputPath}.jpg`;
+  const extension = extname(inputPath);
+  const outputPath = extension ? `${inputPath.slice(0, -extension.length)}.jpg` : `${inputPath}.jpg`;
   try {
-    await execFile("magick", ["convert", inputPath, outputPath]);
+    await execFile("magick", [inputPath, outputPath]);
   } catch (err) {
     try {
-      await execFile("magick", ["convert", inputPath, outputPath]);
+      await execFile("convert", [inputPath, outputPath]);
     } catch (innerErr) {
       throw new Error(`HEIF fallback conversion failed: ${(innerErr as Error).message}`);
     }
