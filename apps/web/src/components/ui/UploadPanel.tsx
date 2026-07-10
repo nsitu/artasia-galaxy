@@ -530,8 +530,9 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   );
 
   const visiblePlacementIds = useMemo(() => {
+    if (workspaceMode === "edit") return [];
     if (assetMode === "untagged") return [];
-    if (siteScope === "all" || ((workspaceMode === "browse" || workspaceMode === "edit") && siteScope === "select")) {
+    if (siteScope === "all" || (workspaceMode === "browse" && siteScope === "select")) {
       return filteredPlacements.map((placement) => placement.placement_id);
     }
     if (siteScope === "placement" && selectedPlacement) return [selectedPlacement.placement_id];
@@ -599,6 +600,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   }, [browseUploaderOptions, uploaderKey, workspaceMode]);
 
   useEffect(() => {
+    if (workspaceMode === "edit") return;
     if (assetMode === "untagged") {
       let cancelled = false;
       setAssetsLoading(true);
@@ -639,7 +641,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     return () => {
       cancelled = true;
     };
-  }, [assetMode, visiblePlacementIds, activityTagFilter]);
+  }, [assetMode, visiblePlacementIds, activityTagFilter, workspaceMode]);
 
   function addFiles(fileList: FileList | File[]) {
     if (!selectedPlacement) {
@@ -1904,6 +1906,23 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     );
   }
 
+  function renderChooseAssetToEditPrompt() {
+    return (
+      <div style={emptyStateStyle}>
+        Choose an image or video from Browse to edit its upload details.
+        <div style={promptActionStyle}>
+          <button
+            type="button"
+            onClick={() => setWorkspaceMode("browse")}
+            style={secondaryButtonStyle}
+          >
+            Go to Browse
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   function renderAssetManager() {
     if (!selectedAsset) return null;
     const placementChanged = Boolean(managePlacementKey)
@@ -2440,9 +2459,12 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
           </button>
         </div>
 
-        <div className="atlas-admin-layout" style={adminLayoutStyle}>
-          <aside className="atlas-admin-filters" style={placementMenuStyle}>
-            {(workspaceMode === "browse" || workspaceMode === "edit") && (
+        <div
+          className="atlas-admin-layout"
+          style={workspaceMode === "edit" ? { ...adminLayoutStyle, gridTemplateColumns: "minmax(0, 1fr)" } : adminLayoutStyle}
+        >
+          {workspaceMode !== "edit" && <aside className="atlas-admin-filters" style={placementMenuStyle}>
+            {workspaceMode === "browse" && (
               <label style={labelStyle}>
                 Artasia Site
                 <select
@@ -2660,7 +2682,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
               </div>
             )}
 
-            {(workspaceMode === "browse" || workspaceMode === "edit") && (
+            {workspaceMode === "browse" && (
               <label style={labelStyle}>
                 Assets
                 <select
@@ -2689,11 +2711,13 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
               </label>
             )}
 
-          </aside>
+          </aside>}
 
           <section className="atlas-admin-detail" style={workspaceMode === "sites" ? sitesDetailStyle : detailStyle}>
             {workspaceMode === "sites" ? (
               renderSiteSelection()
+            ) : workspaceMode === "edit" ? (
+              selectedAsset ? renderAssetManager() : renderChooseAssetToEditPrompt()
             ) : workspaceMode === "upload" ? (
               selectedPlacement ? (
                 <>
@@ -2788,7 +2812,6 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                   </div>
                 </div>
 
-                {workspaceMode === "edit" && renderAssetManager()}
                 {renderAssetGrid("No uploads tagged to this placement yet.")}
               </>
             ) : (
@@ -2810,7 +2833,6 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                     </button>
                   </div>
                 </div>
-                {workspaceMode === "edit" && renderAssetManager()}
                 {renderAssetGrid(
                   assetMode === "untagged"
                     ? "No uploads need placement right now."
