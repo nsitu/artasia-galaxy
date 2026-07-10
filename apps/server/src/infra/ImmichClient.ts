@@ -42,6 +42,8 @@ export interface ImmichAsset {
     name: string;
     birthDate?: string;
   }>;
+  tags?: ImmichTag[];
+  visibility?: "archive" | "timeline" | "hidden" | "locked";
   checksum: string;
 }
 
@@ -154,6 +156,38 @@ export async function updateAssetDescription(assetId: string, description: strin
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ description }),
+  });
+}
+
+export async function updateAsset(assetId: string, params: {
+  description?: string;
+  isFavorite?: boolean;
+  latitude?: number;
+  longitude?: number;
+  dateTimeOriginal?: string;
+  visibility?: "archive" | "timeline" | "hidden" | "locked";
+}) {
+  const res = await immichRequest(`/assets/${assetId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+  return res.json() as Promise<ImmichAsset>;
+}
+
+export async function copyAssetRelationships(sourceId: string, targetId: string) {
+  await immichRequest("/assets/copy", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sourceId,
+      targetId,
+      albums: true,
+      favorite: true,
+      sharedLinks: true,
+      sidecar: true,
+      stack: true,
+    }),
   });
 }
 

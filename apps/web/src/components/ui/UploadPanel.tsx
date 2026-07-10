@@ -9,6 +9,7 @@ import {
   fetchAuthUser,
   fetchDriveFiles,
   fetchDriveFolders,
+  flattenUploadAsset,
   fetchPlacementAssetSet,
   fetchPlacementAssets,
   fetchUploadOptions,
@@ -104,6 +105,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   const [deletingAsset, setDeletingAsset] = useState(false);
   const [cropEditing, setCropEditing] = useState(false);
   const [cropRect, setCropRect] = useState<CropRect | null>(null);
+  const [straightenDegrees, setStraightenDegrees] = useState(0);
   const [cropLoading, setCropLoading] = useState(false);
   const [cropSaving, setCropSaving] = useState(false);
   const [manageBrightness, setManageBrightness] = useState(DEFAULT_ADJUSTMENTS.brightness);
@@ -1100,10 +1102,23 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     }
   }
 
-  function imageDimensionsForCrop(asset: PlacementAsset) {
+  function sourceImageDimensions(asset: PlacementAsset) {
     const width = asset.width ?? cropImageRef.current?.naturalWidth ?? 0;
     const height = asset.height ?? cropImageRef.current?.naturalHeight ?? 0;
     return { width, height };
+  }
+
+  function rotatedImageDimensions(asset: PlacementAsset, degrees = straightenDegrees) {
+    const source = sourceImageDimensions(asset);
+    const radians = Math.abs(degrees) * Math.PI / 180;
+    return {
+      width: Math.max(1, Math.round(Math.abs(source.width * Math.cos(radians)) + Math.abs(source.height * Math.sin(radians)))),
+      height: Math.max(1, Math.round(Math.abs(source.width * Math.sin(radians)) + Math.abs(source.height * Math.cos(radians)))),
+    };
+  }
+
+  function imageDimensionsForCrop(asset: PlacementAsset) {
+    return rotatedImageDimensions(asset);
   }
 
   function normalizeCropRect(asset: PlacementAsset, rect: CropRect): CropRect {
@@ -1131,17 +1146,40 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     return { x, y };
   }
 
-  function defaultCropForAsset(asset: PlacementAsset): CropRect | null {
-    const dimensions = imageDimensionsForCrop(asset);
-    if (dimensions.width <= 0 || dimensions.height <= 0) return null;
-    const width = Math.round(dimensions.width * 0.8);
-    const height = Math.round(dimensions.height * 0.8);
-    return normalizeCropRect(asset, {
-      x: Math.round((dimensions.width - width) / 2),
-      y: Math.round((dimensions.height - height) / 2),
+  function defaultCropForAsset(asset: PlacementAsset, degrees = straightenDegrees): CropRect | null {
+    const source = sourceImageDimensions(asset);
+    const rotated = rotatedImageDimensions(asset, degrees);
+    if (source.width <= 0 || source.height <= 0) return null;
+    const angle = Math.abs(degrees % 180) * Math.PI / 180;
+    if (angle < 1e-8) return { x: 0, y: 0, width: source.width, height: source.height };
+    const sin = Math.abs(Math.sin(angle));
+    const cos = Math.abs(Math.cos(angle));
+    const longSide = Math.max(source.width, source.height);
+    const shortSide = Math.min(source.width, source.height);
+    let width: number;
+    let height: number;
+    if (shortSide <= 2 * sin * cos * longSide || Math.abs(sin - cos) < 1e-8) {
+      const halfShort = 0.5 * shortSide;
+      if (source.width >= source.height) {
+        width = halfShort / sin;
+        height = halfShort / cos;
+      } else {
+        width = halfShort / cos;
+        height = halfShort / sin;
+      }
+    } else {
+      const cos2 = cos * cos - sin * sin;
+      width = (source.width * cos - source.height * sin) / cos2;
+      height = (source.height * cos - source.width * sin) / cos2;
+    }
+    width = Math.max(1, Math.min(rotated.width, Math.floor(width)));
+    height = Math.max(1, Math.min(rotated.height, Math.floor(height)));
+    return {
+      x: Math.floor((rotated.width - width) / 2),
+      y: Math.floor((rotated.height - height) / 2),
       width,
       height,
-    });
+    };
   }
 
   function isCropParameters(value: unknown): value is CropParameters {
@@ -1157,20 +1195,10 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
       return;
     }
 
-    setCropLoading(true);
     setError(null);
-    try {
-      const edits = await fetchAssetEdits(selectedAsset.id);
-      const cropEdit = edits.edits.find((edit) => edit.action === "crop" && isCropParameters(edit.parameters));
-      setCropRect(cropEdit && isCropParameters(cropEdit.parameters)
-        ? cropEdit.parameters
-        : defaultCropForAsset(selectedAsset));
-      setCropEditing(true);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setCropLoading(false);
-    }
+    setStraightenDegrees(0);
+    setCropRect(defaultCropForAsset(selectedAsset, 0));
+    setCropEditing(true);
   }
 
   function beginCropDrag(event: React.PointerEvent<HTMLDivElement>) {
@@ -1228,15 +1256,26 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     setCropSaving(true);
     setError(null);
     try {
-      await cropUploadAsset({ assetId: selectedAsset.id, crop: normalizeCropRect(selectedAsset, cropRect) });
-      setCropEditing(false);
-      queueMediaRefresh(selectedAsset.id);
+      const result = await flattenUploadAsset({
+        assetId: selectedAsset.id,
+        straightenDegrees,
+        crop: normalizeCropRect(selectedAsset, cropRect),
+      });
+      setNotice({ tone: "success", message: `Created ${result.width}×${result.height} edited copy and archived the original.` });
+      closeAssetManager();
       refreshVisibleAssets();
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setCropSaving(false);
     }
+  }
+
+  function changeStraightenDegrees(value: number) {
+    if (!selectedAsset) return;
+    setStraightenDegrees(value);
+    // A new angle creates a new coordinate space; reset to its largest clean rectangle.
+    setCropRect(defaultCropForAsset(selectedAsset, value));
   }
 
   async function resetCrop() {
@@ -1878,25 +1917,49 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
           {selectedAsset.type === "VIDEO" ? (
             <video src={selectedAsset.previewUrl} controls style={manageMediaStyle} />
           ) : cropEditing ? (
-            <div
-              style={cropStageStyle}
-              onPointerDown={beginCropDrag}
-              onPointerMove={updateCropDrag}
-              onPointerUp={endCropDrag}
-              onPointerCancel={endCropDrag}
-            >
-              <img
-                ref={cropImageRef}
-                src={cropSourceUrl}
-                alt=""
-                style={cropMediaStyle}
-                draggable={false}
-                onLoad={() => {
-                  if (!cropRect) setCropRect(defaultCropForAsset(selectedAsset));
+            <div style={cropEditorStyle}>
+              <div
+                style={{
+                  ...cropStageStyle,
+                  aspectRatio: `${rotatedImageDimensions(selectedAsset).width} / ${rotatedImageDimensions(selectedAsset).height}`,
                 }}
-              />
-              <div style={cropShadeStyle} />
-              <div style={{ ...cropBoxStyle, ...cropOverlayStyle(selectedAsset) }} />
+                onPointerDown={beginCropDrag}
+                onPointerMove={updateCropDrag}
+                onPointerUp={endCropDrag}
+                onPointerCancel={endCropDrag}
+              >
+                <img
+                  ref={cropImageRef}
+                  src={cropSourceUrl}
+                  alt=""
+                  style={{
+                    ...cropMediaStyle,
+                    width: `${(sourceImageDimensions(selectedAsset).width / rotatedImageDimensions(selectedAsset).width) * 100}%`,
+                    height: `${(sourceImageDimensions(selectedAsset).height / rotatedImageDimensions(selectedAsset).height) * 100}%`,
+                    transform: `translate(-50%, -50%) rotate(${straightenDegrees}deg)`,
+                  }}
+                  draggable={false}
+                  onLoad={() => {
+                    if (!cropRect) setCropRect(defaultCropForAsset(selectedAsset));
+                  }}
+                />
+                <div style={cropShadeStyle} />
+                <div style={{ ...cropBoxStyle, ...cropOverlayStyle(selectedAsset) }} />
+              </div>
+              <label style={adjustmentLabelStyle}>
+                <span>Straighten {straightenDegrees.toFixed(1)}°</span>
+                <input
+                  type="range"
+                  min={-15}
+                  max={15}
+                  step={0.1}
+                  value={straightenDegrees}
+                  disabled={cropSaving}
+                  onChange={(event) => changeStraightenDegrees(Number(event.target.value))}
+                  style={rangeInputStyle}
+                />
+              </label>
+              <div style={cropHintStyle}>Drag over the preview to choose a crop. Changing the angle resets to the largest clean rectangle.</div>
             </div>
           ) : (
             <img
@@ -2097,7 +2160,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                     disabled={cropSaving || captionSaving || !cropRect}
                     style={primaryActionButtonStyle}
                   >
-                    {cropSaving ? "Saving crop..." : "Save Crop"}
+                    {cropSaving ? "Creating Edited Copy..." : "Save Crop & Straighten"}
                   </button>
                   <button
                     type="button"
@@ -2108,7 +2171,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                     disabled={cropSaving || captionSaving}
                     style={secondaryButtonStyle}
                   >
-                    Cancel Crop
+                    Cancel Edit
                   </button>
                 </>
               ) : (
@@ -2119,7 +2182,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                     disabled={cropLoading || cropSaving || savingAsset || deletingAsset || adjustmentsSaving || captionSaving}
                     style={secondaryButtonStyle}
                   >
-                    {cropLoading ? "Loading Crop..." : "Crop"}
+                    {cropLoading ? "Loading Editor..." : "Crop & Straighten"}
                   </button>
                   <button
                     type="button"
@@ -3323,7 +3386,7 @@ const manageMediaStyle: React.CSSProperties = {
 
 const cropStageStyle: React.CSSProperties = {
   position: "relative",
-  width: "fit-content",
+  width: "100%",
   maxWidth: "100%",
   maxHeight: 360,
   display: "block",
@@ -3336,12 +3399,24 @@ const cropStageStyle: React.CSSProperties = {
 };
 
 const cropMediaStyle: React.CSSProperties = {
+  position: "absolute",
+  left: "50%",
+  top: "50%",
   display: "block",
-  width: "auto",
-  height: "auto",
-  maxWidth: "100%",
-  maxHeight: 360,
+  maxWidth: "none",
+  maxHeight: "none",
   pointerEvents: "none",
+};
+
+const cropEditorStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 10,
+};
+
+const cropHintStyle: React.CSSProperties = {
+  color: "#aeb7c8",
+  fontSize: 12,
+  lineHeight: 1.4,
 };
 
 const cropShadeStyle: React.CSSProperties = {

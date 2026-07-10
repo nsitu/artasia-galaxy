@@ -1,0 +1,232 @@
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createWriteStream } from "node:fs";
+import { basename, extname, join } from "node:path";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+import sharp from "sharp";
+import {
+  copyAssetRelationships,
+  getAsset,
+  getAssetOriginal,
+  tagAssets,
+  updateAsset,
+  uploadAsset,
+} from "../infra/ImmichClient.js";
+
+const DATA_DIR = process.env.DATA_DIR ?? join(process.cwd(), "data");
+const FLATTEN_DIR = join(DATA_DIR, "flatten-jobs");
+const MAX_STRAIGHTEN_DEGREES = 15;
+
+export interface FlattenCrop {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface FlattenRecipe {
+  version: 1;
+  straightenDegrees: number;
+  crop?: FlattenCrop;
+  cropSpace: "auto-oriented-rotated";
+  output?: { format: "jpeg"; quality?: number };
+}
+
+type JobState = "prepared" | "rendered" | "uploaded" | "relationships_copied" | "verified" | "source_archived" | "complete" | "failed";
+
+interface FlattenJob {
+  id: string;
+  sourceAssetId: string;
+  targetAssetId?: string;
+  recipe: FlattenRecipe;
+  state: JobState;
+  createdAt: string;
+  updatedAt: string;
+  error?: string;
+}
+
+function rotatedDimensions(width: number, height: number, degrees: number) {
+  const radians = Math.abs(degrees) * Math.PI / 180;
+  return {
+    width: Math.max(1, Math.round(Math.abs(width * Math.cos(radians)) + Math.abs(height * Math.sin(radians)))),
+    height: Math.max(1, Math.round(Math.abs(width * Math.sin(radians)) + Math.abs(height * Math.cos(radians)))),
+  };
+}
+
+// Largest centered axis-aligned rectangle contained by a rotated rectangle.
+function largestInnerRectangle(width: number, height: number, degrees: number): FlattenCrop {
+  const angle = Math.abs(degrees % 180) * Math.PI / 180;
+  if (angle < 1e-8) return { x: 0, y: 0, width, height };
+  const sin = Math.abs(Math.sin(angle));
+  const cos = Math.abs(Math.cos(angle));
+  const longSide = Math.max(width, height);
+  const shortSide = Math.min(width, height);
+  let innerWidth: number;
+  let innerHeight: number;
+
+  if (shortSide <= 2 * sin * cos * longSide || Math.abs(sin - cos) < 1e-8) {
+    const x = 0.5 * shortSide;
+    if (width >= height) {
+      innerWidth = x / sin;
+      innerHeight = x / cos;
+    } else {
+      innerWidth = x / cos;
+      innerHeight = x / sin;
+    }
+  } else {
+    const cos2 = cos * cos - sin * sin;
+    innerWidth = (width * cos - height * sin) / cos2;
+    innerHeight = (height * cos - width * sin) / cos2;
+  }
+
+  const rotated = rotatedDimensions(width, height, degrees);
+  const cropWidth = Math.max(1, Math.min(rotated.width, Math.floor(innerWidth)));
+  const cropHeight = Math.max(1, Math.min(rotated.height, Math.floor(innerHeight)));
+  return {
+    x: Math.floor((rotated.width - cropWidth) / 2),
+    y: Math.floor((rotated.height - cropHeight) / 2),
+    width: cropWidth,
+    height: cropHeight,
+  };
+}
+
+function validateRecipe(value: unknown): FlattenRecipe {
+  const recipe = value && typeof value === "object" ? value as Partial<FlattenRecipe> : {};
+  const straightenDegrees = Number(recipe.straightenDegrees ?? 0);
+  if (!Number.isFinite(straightenDegrees) || Math.abs(straightenDegrees) > MAX_STRAIGHTEN_DEGREES) {
+    throw new Error(`Straightening must be between -${MAX_STRAIGHTEN_DEGREES} and ${MAX_STRAIGHTEN_DEGREES} degrees.`);
+  }
+  let crop: FlattenCrop | undefined;
+  if (recipe.crop) {
+    crop = {
+      x: Math.round(Number(recipe.crop.x)),
+      y: Math.round(Number(recipe.crop.y)),
+      width: Math.round(Number(recipe.crop.width)),
+      height: Math.round(Number(recipe.crop.height)),
+    };
+    if (Object.values(crop).some((part) => !Number.isFinite(part)) || crop.x < 0 || crop.y < 0 || crop.width < 1 || crop.height < 1) {
+      throw new Error("Choose a valid crop area.");
+    }
+  }
+  const quality = Math.max(75, Math.min(100, Math.round(Number(recipe.output?.quality ?? 92))));
+  return { version: 1, straightenDegrees, crop, cropSpace: "auto-oriented-rotated", output: { format: "jpeg", quality } };
+}
+
+function outputFilename(original: string) {
+  const extension = extname(original);
+  const stem = basename(original, extension);
+  return `${stem}-artasia-edit.jpg`;
+}
+
+async function persistJob(job: FlattenJob) {
+  job.updatedAt = new Date().toISOString();
+  await mkdir(FLATTEN_DIR, { recursive: true });
+  await writeFile(join(FLATTEN_DIR, `${job.id}.json`), JSON.stringify(job, null, 2), "utf8");
+}
+
+async function waitForReplacement(assetId: string, width: number, height: number, expectedTagIds: string[]) {
+  let lastDimensions = "unavailable";
+  for (let attempt = 0; attempt < 15; attempt += 1) {
+    const target = await getAsset(assetId);
+    lastDimensions = `${target.width ?? "?"}x${target.height ?? "?"}`;
+    const targetTagIds = new Set((target.tags ?? []).map((tag) => tag.id));
+    if (
+      target.type === "IMAGE" &&
+      target.width === width &&
+      target.height === height &&
+      expectedTagIds.every((tagId) => targetTagIds.has(tagId))
+    ) {
+      return target;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+  }
+  throw new Error(`Replacement verification failed: expected ${width}x${height} with ${expectedTagIds.length} tags, received ${lastDimensions}.`);
+}
+
+export async function flattenAsset(sourceAssetId: string, requestedRecipe: unknown) {
+  const recipe = validateRecipe(requestedRecipe);
+  const source = await getAsset(sourceAssetId);
+  if (source.type !== "IMAGE") throw new Error("Only image assets can be flattened.");
+
+  const job: FlattenJob = {
+    id: `${Date.now()}-${sourceAssetId}`,
+    sourceAssetId,
+    recipe,
+    state: "prepared",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  await persistJob(job);
+  const tempDir = await mkdtemp(join(FLATTEN_DIR, "work-"));
+  const inputPath = join(tempDir, "source");
+  const outputPath = join(tempDir, "rendered.jpg");
+
+  try {
+    const original = await getAssetOriginal(sourceAssetId);
+    if (!original.ok || !original.body) throw new Error(`Unable to download source asset (${original.status}).`);
+    await pipeline(Readable.fromWeb(original.body as never), createWriteStream(inputPath));
+
+    const inputMetadata = await sharp(inputPath).metadata();
+    const oriented = inputMetadata.autoOrient;
+    if (!oriented.width || !oriented.height) throw new Error("The source image dimensions could not be read.");
+    const rotated = rotatedDimensions(oriented.width, oriented.height, recipe.straightenDegrees);
+    const crop = recipe.crop ?? largestInnerRectangle(oriented.width, oriented.height, recipe.straightenDegrees);
+    if (crop.x + crop.width > rotated.width || crop.y + crop.height > rotated.height) {
+      throw new Error("The crop area is outside the straightened image bounds.");
+    }
+
+    const result = await sharp(inputPath, { limitInputPixels: 268_402_689 })
+      .autoOrient()
+      .rotate(recipe.straightenDegrees, { background: { r: 0, g: 0, b: 0, alpha: 1 } })
+      .extract({ left: crop.x, top: crop.y, width: crop.width, height: crop.height })
+      .jpeg({ quality: recipe.output?.quality ?? 92, chromaSubsampling: "4:4:4" })
+      .withMetadata({ orientation: 1 })
+      .toFile(outputPath);
+    job.state = "rendered";
+    await persistJob(job);
+
+    const uploaded = await uploadAsset({
+      filePath: outputPath,
+      filename: outputFilename(source.originalFileName),
+      mimeType: "image/jpeg",
+      createdAt: new Date(source.fileCreatedAt),
+      modifiedAt: new Date(),
+    });
+    job.targetAssetId = uploaded.id;
+    job.state = "uploaded";
+    await persistJob(job);
+
+    await copyAssetRelationships(sourceAssetId, uploaded.id);
+    const tagIds = (source.tags ?? []).map((tag) => tag.id);
+    if (tagIds.length > 0) await tagAssets([uploaded.id], tagIds);
+    await updateAsset(uploaded.id, {
+      description: source.exifInfo?.description ?? "",
+      isFavorite: source.isFavorite,
+      latitude: source.exifInfo?.latitude,
+      longitude: source.exifInfo?.longitude,
+      dateTimeOriginal: source.fileCreatedAt,
+      visibility: "timeline",
+    });
+    job.state = "relationships_copied";
+    await persistJob(job);
+
+    await waitForReplacement(uploaded.id, result.width, result.height, tagIds);
+    job.state = "verified";
+    await persistJob(job);
+
+    await updateAsset(sourceAssetId, { visibility: "archive" });
+    job.state = "source_archived";
+    await persistJob(job);
+    job.state = "complete";
+    await persistJob(job);
+
+    return { sourceAssetId, assetId: uploaded.id, width: result.width, height: result.height, archivedSource: true };
+  } catch (error) {
+    job.state = "failed";
+    job.error = (error as Error).message;
+    await persistJob(job);
+    throw error;
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+}

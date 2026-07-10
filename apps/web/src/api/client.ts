@@ -363,6 +363,37 @@ export async function cropUploadAsset(params: {
   return res.json();
 }
 
+export interface FlattenAssetResponse {
+  asset_id: string;
+  source_asset_id: string;
+  width: number;
+  height: number;
+  archivedSource: boolean;
+}
+
+export async function flattenUploadAsset(params: {
+  assetId: string;
+  straightenDegrees: number;
+  crop?: CropParameters;
+}): Promise<FlattenAssetResponse> {
+  const res = await fetch(`/api/v1/uploads/assets/${params.assetId}/flatten`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      version: 1,
+      straightenDegrees: params.straightenDegrees,
+      crop: params.crop,
+      cropSpace: "auto-oriented-rotated",
+      output: { format: "jpeg", quality: 92 },
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
 export async function resetUploadAssetEdits(assetId: string): Promise<void> {
   const res = await fetch(`/api/v1/uploads/assets/${assetId}/edits`, {
     method: "DELETE",

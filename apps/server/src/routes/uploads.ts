@@ -32,6 +32,7 @@ import {
   type AssetAdjustments,
 } from "../services/assetAdjustments.service.js";
 import { getAuthContext } from "../services/auth.service.js";
+import { flattenAsset } from "../services/flattenAsset.service.js";
 import {
   findConfiguredPlacement,
   findConfiguredUploader,
@@ -881,6 +882,29 @@ router.put("/assets/:assetId/crop", async (req, res) => {
     res.json(edits);
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });
+  }
+});
+
+router.post("/assets/:assetId/flatten", async (req, res) => {
+  try {
+    const auth = await getAuthContext(req);
+    if (!auth.authenticated) {
+      res.status(401).json({ error: "Sign in to straighten or crop uploads." });
+      return;
+    }
+
+    const assetId = req.params.assetId.trim();
+    if (!assetId) {
+      res.status(400).json({ error: "Asset ID is required." });
+      return;
+    }
+
+    const result = await flattenAsset(assetId, req.body);
+    res.json({ ok: true, ...result, asset_id: result.assetId, source_asset_id: result.sourceAssetId });
+  } catch (err) {
+    const message = (err as Error).message;
+    const status = /valid|between|outside|Only image|dimensions/i.test(message) ? 400 : 502;
+    res.status(status).json({ error: message });
   }
 });
 
