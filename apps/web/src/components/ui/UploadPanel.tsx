@@ -146,6 +146,23 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     return location.placement_name;
   }
 
+  function groupedPlacementsByPartner(placements: UploadOptions["placements"]) {
+    const collator = new Intl.Collator(undefined, { sensitivity: "base", numeric: true });
+    const groups = new Map<string, UploadOptions["placements"]>();
+    for (const placement of placements) {
+      const partner = placement.partner_name?.trim() || "No Partner";
+      const group = groups.get(partner) ?? [];
+      group.push(placement);
+      groups.set(partner, group);
+    }
+    return Array.from(groups.entries())
+      .sort(([partnerA], [partnerB]) => collator.compare(partnerA, partnerB))
+      .map(([partner, group]) => ({
+        partner,
+        placements: [...group].sort((a, b) => collator.compare(placementLabel(a), placementLabel(b))),
+      }));
+  }
+
   function placementMetaLabel(placement: UploadOptions["placements"][number]) {
     const people = [
       placement.team_member_name ?? "Unassigned",
@@ -2247,10 +2264,14 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
               style={inputStyle}
             >
               <option value="">Select a placement</option>
-              {(options?.placements ?? []).map((placement) => (
-                <option key={placement.placement_id} value={String(placement.placement_id)}>
-                  {placementLabel(placement)}
-                </option>
+              {groupedPlacementsByPartner(options?.placements ?? []).map((group) => (
+                <optgroup key={group.partner} label={group.partner}>
+                  {group.placements.map((placement) => (
+                    <option key={placement.placement_id} value={String(placement.placement_id)}>
+                      {placementLabel(placement)}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </label>
