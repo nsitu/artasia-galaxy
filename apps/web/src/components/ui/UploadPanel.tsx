@@ -126,6 +126,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   const cropImageRef = useRef<HTMLImageElement | null>(null);
   const cropStartRef = useRef<{ x: number; y: number } | null>(null);
   const cropResizeRef = useRef<{ handle: CropHandle; start: { x: number; y: number }; rect: CropRect } | null>(null);
+  const cropMoveRef = useRef<{ start: { x: number; y: number }; rect: CropRect } | null>(null);
   const uploadInProgressRef = useRef(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
@@ -973,6 +974,11 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     setMediaRefreshAttempt(0);
   }
 
+  function cancelAssetManager() {
+    closeAssetManager();
+    setWorkspaceMode("browse");
+  }
+
   useEffect(() => {
     if (!selectedAsset || selectedAsset.type !== "IMAGE" || !authUser?.authenticated) return;
     let cancelled = false;
@@ -1285,7 +1291,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
 
   function beginCropDrag(event: React.PointerEvent<HTMLDivElement>) {
     if (!selectedAsset || !cropEditing || cropSaving) return;
-    if (cropResizeRef.current) return;
+    if (cropResizeRef.current || cropMoveRef.current) return;
     const point = pointerToImagePoint(event, selectedAsset);
     if (!point) return;
     cropStartRef.current = point;
@@ -1324,6 +1330,16 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
       setCropRect(normalizeCropRect(selectedAsset, { x, y, width, height }));
       return;
     }
+    const move = cropMoveRef.current;
+    if (move) {
+      const desired = {
+        ...move.rect,
+        x: move.rect.x + point.x - move.start.x,
+        y: move.rect.y + point.y - move.start.y,
+      };
+      setCropRect(preserveCropAcrossRotation(selectedAsset, desired, straightenDegrees, straightenDegrees));
+      return;
+    }
     if (!cropStartRef.current) return;
     const start = cropStartRef.current;
     const x = Math.min(start.x, point.x);
@@ -1341,6 +1357,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   function endCropDrag(event: React.PointerEvent<HTMLDivElement>) {
     cropStartRef.current = null;
     cropResizeRef.current = null;
+    cropMoveRef.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
@@ -1354,6 +1371,19 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     if (!point) return;
     cropResizeRef.current = {
       handle,
+      start: point,
+      rect: normalizeCropRect(selectedAsset, cropRect),
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function beginCropMove(event: React.PointerEvent<HTMLDivElement>) {
+    if (!selectedAsset || !cropRect || cropSaving) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const point = pointerToImagePoint(event, selectedAsset);
+    if (!point) return;
+    cropMoveRef.current = {
       start: point,
       rect: normalizeCropRect(selectedAsset, cropRect),
     };
@@ -2162,8 +2192,10 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                     setCropRect({ x: 0, y: 0, width: image.naturalWidth, height: image.naturalHeight });
                   }}
                 />
-                <div style={cropShadeStyle} />
-                <div style={{ ...cropBoxStyle, ...cropOverlayStyle(selectedAsset) }}>
+                <div
+                  style={{ ...cropBoxStyle, ...cropOverlayStyle(selectedAsset) }}
+                  onPointerDown={beginCropMove}
+                >
                   {(["nw", "n", "ne", "e", "se", "s", "sw", "w"] as CropHandle[]).map((handle) => (
                     <span
                       key={handle}
@@ -2384,7 +2416,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                 {deletingAsset ? "Deleting..." : "Delete"}
               </button>
             )}
-            <button type="button" onClick={closeAssetManager} disabled={deletingAsset || cropSaving || adjustmentsSaving || captionSaving || savingAsset} style={secondaryButtonStyle}>
+            <button type="button" onClick={cancelAssetManager} disabled={deletingAsset || cropSaving || adjustmentsSaving || captionSaving || savingAsset} style={secondaryButtonStyle}>
               Cancel
             </button>
           </div>
@@ -3625,13 +3657,6 @@ const cropHintStyle: React.CSSProperties = {
   lineHeight: 1.4,
 };
 
-const cropShadeStyle: React.CSSProperties = {
-  position: "absolute",
-  inset: 0,
-  background: "rgba(0,0,0,0.24)",
-  pointerEvents: "none",
-};
-
 const cropBoxStyle: React.CSSProperties = {
   position: "absolute",
   border: "2px solid #e8edf8",
@@ -3639,7 +3664,8 @@ const cropBoxStyle: React.CSSProperties = {
   boxSizing: "border-box",
   minWidth: 10,
   minHeight: 10,
-  pointerEvents: "none",
+  pointerEvents: "auto",
+  cursor: "move",
 };
 
 const cropHandleStyle: React.CSSProperties = {
