@@ -27,10 +27,19 @@ const execFile = promisify(execFileCallback);
 async function convertHeifToJpeg(inputPath: string) {
   const extension = extname(inputPath);
   const outputPath = extension ? `${inputPath.slice(0, -extension.length)}.jpg` : `${inputPath}.jpg`;
+
   try {
-    await execFile("magick", [inputPath, outputPath]);
+    await execFile("heif-convert", [inputPath, outputPath]);
   } catch (err) {
-    throw new Error(`HEIF fallback conversion failed: ${(err as Error).message}`);
+    try {
+      await execFile("magick", [inputPath, outputPath]);
+    } catch (innerErr) {
+      try {
+        await execFile("ffmpeg", ["-y", "-i", inputPath, outputPath]);
+      } catch (finalErr) {
+        throw new Error(`HEIF fallback conversion failed: ${(finalErr as Error).message}`);
+      }
+    }
   }
 
   await pipeline(createReadStream(outputPath), createWriteStream(inputPath));
