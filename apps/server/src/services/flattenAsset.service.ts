@@ -30,11 +30,7 @@ async function convertHeifToJpeg(inputPath: string) {
   try {
     await execFile("magick", [inputPath, outputPath]);
   } catch (err) {
-    try {
-      await execFile("convert", [inputPath, outputPath]);
-    } catch (innerErr) {
-      throw new Error(`HEIF fallback conversion failed: ${(innerErr as Error).message}`);
-    }
+    throw new Error(`HEIF fallback conversion failed: ${(err as Error).message}`);
   }
 
   await pipeline(createReadStream(outputPath), createWriteStream(inputPath));
