@@ -1411,9 +1411,66 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
 
   function changeStraightenDegrees(value: number) {
     if (!selectedAsset) return;
+    const previousDegrees = straightenDegrees;
+    setCropRect((current) => current
+      ? preserveCropAcrossRotation(selectedAsset, current, previousDegrees, value)
+      : defaultCropForAsset(selectedAsset, value));
     setStraightenDegrees(value);
-    // A new angle creates a new coordinate space; reset to its largest clean rectangle.
-    setCropRect(defaultCropForAsset(selectedAsset, value));
+  }
+
+  function preserveCropAcrossRotation(
+    asset: PlacementAsset,
+    rect: CropRect,
+    previousDegrees: number,
+    nextDegrees: number,
+  ): CropRect {
+    const source = sourceImageDimensions(asset);
+    const previousCanvas = rotatedImageDimensions(asset, previousDegrees);
+    const nextCanvas = rotatedImageDimensions(asset, nextDegrees);
+    if (source.width <= 0 || source.height <= 0) return rect;
+
+    const normalizedCenterX = (rect.x + rect.width / 2) / previousCanvas.width;
+    const normalizedCenterY = (rect.y + rect.height / 2) / previousCanvas.height;
+    let halfWidth = (rect.width / previousCanvas.width) * nextCanvas.width / 2;
+    let halfHeight = (rect.height / previousCanvas.height) * nextCanvas.height / 2;
+
+    const radians = nextDegrees * Math.PI / 180;
+    const cos = Math.cos(radians);
+    const sin = Math.sin(radians);
+    const absCos = Math.abs(cos);
+    const absSin = Math.abs(sin);
+    const safeSourceHalfWidth = Math.max(0.5, source.width / 2 - 1);
+    const safeSourceHalfHeight = Math.max(0.5, source.height / 2 - 1);
+
+    const horizontalExtent = halfWidth * absCos + halfHeight * absSin;
+    const verticalExtent = halfWidth * absSin + halfHeight * absCos;
+    const fitScale = Math.min(
+      1,
+      horizontalExtent > 0 ? safeSourceHalfWidth / horizontalExtent : 1,
+      verticalExtent > 0 ? safeSourceHalfHeight / verticalExtent : 1,
+    );
+    halfWidth *= fitScale;
+    halfHeight *= fitScale;
+
+    const limitU = Math.max(0, safeSourceHalfWidth - (halfWidth * absCos + halfHeight * absSin));
+    const limitV = Math.max(0, safeSourceHalfHeight - (halfWidth * absSin + halfHeight * absCos));
+    const desiredX = normalizedCenterX * nextCanvas.width - nextCanvas.width / 2;
+    const desiredY = normalizedCenterY * nextCanvas.height - nextCanvas.height / 2;
+
+    // Transform into the unrotated image axes, clamp there, then rotate back.
+    const desiredU = desiredX * cos + desiredY * sin;
+    const desiredV = -desiredX * sin + desiredY * cos;
+    const clampedU = Math.max(-limitU, Math.min(limitU, desiredU));
+    const clampedV = Math.max(-limitV, Math.min(limitV, desiredV));
+    const centerX = clampedU * cos - clampedV * sin + nextCanvas.width / 2;
+    const centerY = clampedU * sin + clampedV * cos + nextCanvas.height / 2;
+
+    return {
+      x: centerX - halfWidth,
+      y: centerY - halfHeight,
+      width: halfWidth * 2,
+      height: halfHeight * 2,
+    };
   }
 
   async function resetCrop() {
@@ -2094,6 +2151,11 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
                   alt=""
                   style={{
                     ...cropMediaStyle,
+                    ...adjustmentFilterStyle({
+                      brightness: manageBrightness,
+                      contrast: manageContrast,
+                      saturation: manageSaturation,
+                    }),
                     width: `${(cropSourceSize.width / cropCanvasDimensions.width) * 100}%`,
                     height: `${(cropSourceSize.height / cropCanvasDimensions.height) * 100}%`,
                     transform: `translate(-50%, -50%) rotate(${straightenDegrees}deg)`,
