@@ -27,13 +27,18 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const usesDocumentScroll = path === "/admin" || path === "/partners";
+    const usesDocumentScroll = path === "/admin" || path === "/partners" || /^\/edit\/[0-9a-f-]{36}$/i.test(path);
     document.documentElement.classList.toggle("document-scroll-page", usesDocumentScroll);
     return () => document.documentElement.classList.remove("document-scroll-page");
   }, [path]);
 
   if (path === "/admin") {
     return <UploadPanel initialError={adminAuthError} />;
+  }
+
+  const editMatch = path.match(/^\/edit\/([0-9a-f-]{36})$/i);
+  if (editMatch) {
+    return <UploadPanel initialError={adminAuthError} initialAssetId={editMatch[1]} />;
   }
 
   if (path === "/partners") {

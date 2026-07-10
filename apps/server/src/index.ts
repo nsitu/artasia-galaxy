@@ -75,6 +75,16 @@ if (existsSync(publicDir)) {
     res.sendFile(path.join(publicDir, "index.html"));
   });
 
+  app.get(/^\/edit\/[0-9a-f-]{36}$/i, (req, res) => {
+    if (!readAuthSession(req)) {
+      const returnTo = encodeURIComponent(req.path);
+      res.redirect(`/api/v1/auth/google/start?returnTo=${returnTo}`);
+      return;
+    }
+
+    res.sendFile(path.join(publicDir, "index.html"));
+  });
+
   app.get(/.*/, (req, res) => {
     if (req.path.startsWith("/api")) return;
     res.sendFile(path.join(publicDir, "index.html"));

@@ -570,6 +570,28 @@ router.get("/assets/untagged", async (_req, res) => {
   }
 });
 
+router.get("/assets/:assetId", async (req, res) => {
+  try {
+    const auth = await getAuthContext(req);
+    if (!auth.authenticated) {
+      res.status(401).json({ error: "Sign in to edit uploads." });
+      return;
+    }
+
+    const assetId = req.params.assetId.trim();
+    const asset = await getAsset(assetId);
+    const [mapped] = await mapAssetsWithUploaderAlbums([asset]);
+    if (!mapped) {
+      res.status(404).json({ error: "Upload was not found." });
+      return;
+    }
+    res.json({ asset: mapped });
+  } catch (err) {
+    const message = (err as Error).message;
+    res.status(/404|not found/i.test(message) ? 404 : 502).json({ error: message });
+  }
+});
+
 router.post("/assets/:assetId/placement", async (req, res) => {
   try {
     const placementId = parseInt(String(req.body?.placement_id ?? ""), 10);

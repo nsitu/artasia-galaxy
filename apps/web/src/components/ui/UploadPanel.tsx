@@ -14,6 +14,7 @@ import {
   fetchPlacementAssets,
   fetchUploadOptions,
   fetchUploadAssetAdjustments,
+  fetchUploadAsset,
   fetchUntaggedPlacementAssets,
   logoutAuthUser,
   resetUploadAssetEdits,
@@ -56,6 +57,7 @@ type PlacementMetaLine = { text: string; icon?: string; href?: string; variant?:
 
 interface UploadPanelProps {
   initialError?: string | null;
+  initialAssetId?: string;
   onSignedOut?: () => void;
 }
 
@@ -77,7 +79,7 @@ const DELIVERY_DAY_OPTIONS: Array<{ value: DeliveryDayFilter; label: string }> =
   { value: "friday", label: "Friday" },
 ];
 
-export default function UploadPanel({ initialError, onSignedOut }: UploadPanelProps) {
+export default function UploadPanel({ initialError, initialAssetId, onSignedOut }: UploadPanelProps) {
   const [options, setOptions] = useState<UploadOptions | null>(null);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [uploaderKey, setUploaderKey] = useState("");
@@ -119,6 +121,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   const [mediaRefreshAssetId, setMediaRefreshAssetId] = useState<string | null>(null);
   const [mediaRefreshAttempt, setMediaRefreshAttempt] = useState(0);
   const [assetsLoading, setAssetsLoading] = useState(false);
+  const [directAssetLoading, setDirectAssetLoading] = useState(Boolean(initialAssetId));
   const [notice, setNotice] = useState<{ tone: NoticeTone; message: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -237,6 +240,44 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
       })
       .catch((err) => setError((err as Error).message));
   }, [options]);
+
+  useEffect(() => {
+    if (!initialAssetId) {
+      setDirectAssetLoading(false);
+      if (window.location.pathname === "/admin" && selectedAsset) {
+        closeAssetManager();
+        setWorkspaceMode("browse");
+      }
+      return;
+    }
+    setWorkspaceMode("edit");
+    if (selectedAsset?.id === initialAssetId) {
+      setDirectAssetLoading(false);
+      return;
+    }
+    if (!authUser) return;
+    if (!authUser.authenticated) {
+      setDirectAssetLoading(false);
+      setError("Sign in to edit this upload.");
+      return;
+    }
+
+    let cancelled = false;
+    setDirectAssetLoading(true);
+    fetchUploadAsset(initialAssetId)
+      .then((asset) => {
+        if (!cancelled) openAssetManager(asset, false);
+      })
+      .catch((err) => {
+        if (!cancelled) setError((err as Error).message);
+      })
+      .finally(() => {
+        if (!cancelled) setDirectAssetLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [initialAssetId, authUser?.authenticated, selectedAsset?.id]);
 
   function formatBytes(bytes: number) {
     if (bytes < 1024) return `${bytes} B`;
@@ -948,7 +989,14 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     setCropRefreshKey((current) => current + 1);
   }
 
-  function openAssetManager(asset: PlacementAsset) {
+  function setApplicationPath(path: string, replace = false) {
+    if (window.location.pathname === path) return;
+    if (replace) window.history.replaceState(null, "", path);
+    else window.history.pushState(null, "", path);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  }
+
+  function openAssetManager(asset: PlacementAsset, updateUrl = true) {
     const adjustments = normalizeAdjustments(asset.adjustments);
     setSelectedAsset(asset);
     setManagePlacementKey(asset.placement_id ? String(asset.placement_id) : "");
@@ -970,6 +1018,11 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
     setMediaRefreshAttempt(0);
     setError(null);
     setWorkspaceMode("edit");
+    if (asset.placement_id) {
+      setPlacementKey(String(asset.placement_id));
+      setSiteScope("placement");
+    }
+    if (updateUrl) setApplicationPath(`/edit/${asset.id}`);
   }
 
   function closeAssetManager() {
@@ -994,6 +1047,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   function cancelAssetManager() {
     closeAssetManager();
     setWorkspaceMode("browse");
+    setApplicationPath("/admin", true);
   }
 
   useEffect(() => {
@@ -1140,10 +1194,12 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
             height: crop.height / dimensions.height,
           },
         });
-        message = `Upload changes saved. Created ${result.width}Ã—${result.height} edited copy and archived the original.`;
+        message = `Upload changes saved. Created ${result.width}×${result.height} edited copy and archived the original.`;
       }
 
       closeAssetManager();
+      setWorkspaceMode("browse");
+      setApplicationPath("/admin", true);
       setNotice({ tone: "success", message });
     } catch (err) {
       setError((err as Error).message);
@@ -2135,7 +2191,10 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
         <div style={promptActionStyle}>
           <button
             type="button"
-            onClick={() => setWorkspaceMode("browse")}
+            onClick={() => {
+              setWorkspaceMode("browse");
+              setApplicationPath("/admin", true);
+            }}
             style={secondaryButtonStyle}
           >
             Go to Browse
@@ -2587,6 +2646,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
               setSelectedAsset(null);
               setItems([]);
               setNotice(null);
+              setApplicationPath("/admin", true);
             }}
             style={{
               ...workspaceTabStyle,
@@ -2917,7 +2977,9 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
             {workspaceMode === "sites" ? (
               renderSiteSelection()
             ) : workspaceMode === "edit" ? (
-              selectedAsset ? renderAssetManager() : renderChooseAssetToEditPrompt()
+              directAssetLoading
+                ? <div style={emptyStateStyle}>Loading upload...</div>
+                : selectedAsset ? renderAssetManager() : renderChooseAssetToEditPrompt()
             ) : workspaceMode === "upload" ? (
               selectedPlacement ? (
                 <>

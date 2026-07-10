@@ -11,17 +11,23 @@ import {
 
 const router = Router();
 
-function redirectWithError(res: Response, message: string) {
-  const params = new URLSearchParams({ auth: "error", message });
-  res.redirect(`/admin?${params.toString()}`);
+function safeReturnTo(value: unknown) {
+  if (typeof value !== "string") return "/admin";
+  return /^\/edit\/[0-9a-f-]{36}$/i.test(value) ? value : "/admin";
 }
 
-router.get("/google/start", (_req, res) => {
+function redirectWithError(res: Response, message: string, returnTo = "/admin") {
+  const params = new URLSearchParams({ auth: "error", message });
+  res.redirect(`${safeReturnTo(returnTo)}?${params.toString()}`);
+}
+
+router.get("/google/start", (req, res) => {
   try {
     const auth = createGoogleAuthUrl();
     setOAuthStateCookie(res, {
       state: auth.state,
       nonce: auth.nonce,
+      returnTo: safeReturnTo(req.query.returnTo),
       exp: Date.now() + 10 * 60 * 1000,
     });
     res.redirect(auth.url);
@@ -31,10 +37,12 @@ router.get("/google/start", (_req, res) => {
 });
 
 router.get("/google/callback", async (req, res) => {
+  let returnTo = "/admin";
   try {
     const code = typeof req.query.code === "string" ? req.query.code : "";
     const state = typeof req.query.state === "string" ? req.query.state : "";
     const oauthState = readOAuthState(req);
+    returnTo = safeReturnTo(oauthState?.returnTo);
 
     clearAuthCookies(res);
 
@@ -49,9 +57,9 @@ router.get("/google/callback", async (req, res) => {
       refreshToken: profile.refreshToken || undefined,
     };
     setAuthSession(res, sessionPayload);
-    res.redirect("/admin?auth=success");
+    res.redirect(`${returnTo}?auth=success`);
   } catch (err) {
-    redirectWithError(res, (err as Error).message);
+    redirectWithError(res, (err as Error).message, returnTo);
   }
 });
 

@@ -2,7 +2,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { Canvas, useThree } from "@react-three/fiber";
 import { MapControls, Preload } from "@react-three/drei";
 import * as THREE from "three";
-import { fetchUploadOptions, type ActivityOption, type MapPlacement } from "../../api/client";
+import { fetchAuthUser, fetchUploadOptions, type ActivityOption, type AuthUser, type MapPlacement } from "../../api/client";
 import { useGalleryStore } from "../../stores/galleryStore";
 import LoadingIndicator from "../ui/LoadingIndicator";
 import TerrainGallery, {
@@ -51,12 +51,27 @@ export default function ArtScene() {
   const [activityFilterOptions, setActivityFilterOptions] = useState<ActivityOption[]>([]);
   const [selectedActivityFilter, setSelectedActivityFilter] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [webglError, setWebglError] = useState<string | null>(() => getWebGL2SupportError());
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     fetchPhotos();
   }, [fetchPhotos]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAuthUser()
+      .then((user) => {
+        if (!cancelled) setAuthUser(user);
+      })
+      .catch(() => {
+        if (!cancelled) setAuthUser({ authenticated: false });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -245,6 +260,15 @@ export default function ArtScene() {
             <div style={photoLightboxDescriptionStyle}>
               {selectedDescription || "No description metadata."}
             </div>
+            {authUser?.authenticated && (
+              <a
+                href={`/edit/${selectedPhoto.id}`}
+                style={photoLightboxEditLinkStyle}
+                onClick={(event) => event.stopPropagation()}
+              >
+                Edit
+              </a>
+            )}
           </div>
           <button
             onClick={() => selectPhoto(null)}
@@ -709,6 +733,15 @@ const photoLightboxDescriptionStyle: React.CSSProperties = {
   color: "#c7ccd6",
   whiteSpace: "pre-wrap",
   overflowWrap: "anywhere",
+};
+
+const photoLightboxEditLinkStyle: React.CSSProperties = {
+  display: "inline-block",
+  marginTop: 9,
+  color: "#fff",
+  fontWeight: 700,
+  textDecoration: "underline",
+  textUnderlineOffset: 3,
 };
 
 const photoLightboxCloseStyle: React.CSSProperties = {

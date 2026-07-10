@@ -263,6 +263,16 @@ export async function fetchUntaggedPlacementAssets(): Promise<PlacementAsset[]> 
   return body.assets ?? [];
 }
 
+export async function fetchUploadAsset(assetId: string): Promise<PlacementAsset> {
+  const res = await fetch(`/api/v1/uploads/assets/${encodeURIComponent(assetId)}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  const body = await res.json() as { asset: PlacementAsset };
+  return body.asset;
+}
+
 export async function assignAssetPlacement(params: {
   assetId: string;
   placementId: number;

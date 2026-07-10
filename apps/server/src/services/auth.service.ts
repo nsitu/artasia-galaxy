@@ -30,6 +30,7 @@ export interface AuthContext {
 interface OAuthStatePayload {
   state: string;
   nonce: string;
+  returnTo?: string;
   exp: number;
 }
 
