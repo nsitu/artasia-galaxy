@@ -1730,7 +1730,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
   function renderSiteSelection() {
     return (
       <div style={siteSelectionPanelStyle}>
-        <div style={siteChoiceGridStyle}>
+        <div className="atlas-site-grid" style={siteChoiceGridStyle}>
           {filteredPlacements.map((placement) => (
             <div
               key={placement.placement_id}
@@ -2156,6 +2156,37 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
 
   return (
     <main style={pageStyle}>
+      <style>
+        {`
+          @media (max-width: 760px) {
+            .atlas-admin-layout {
+              display: grid !important;
+              grid-template-columns: 1fr !important;
+              gap: 18px !important;
+            }
+
+            .atlas-admin-filters {
+              max-height: none !important;
+              overflow: visible !important;
+              padding: 0 !important;
+            }
+
+            .atlas-admin-detail {
+              min-height: 0 !important;
+            }
+
+            .atlas-site-grid {
+              grid-template-columns: 1fr !important;
+            }
+
+            .atlas-workspace-tabs {
+              overflow-x: auto !important;
+              overflow-y: hidden !important;
+              -webkit-overflow-scrolling: touch;
+            }
+          }
+        `}
+      </style>
       <section style={panelStyle}>
         <div style={headerStyle}>
           <div style={headerBrandStyle}>
@@ -2233,7 +2264,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
         {notice && <div style={notice.tone === "success" ? successNoticeStyle : warningNoticeStyle}>{notice.message}</div>}
         {error && <div style={errorStyle}>{error}</div>}
 
-        <div style={workspaceTabsStyle}>
+        <div className="atlas-workspace-tabs" style={workspaceTabsStyle}>
           <button
             type="button"
             onClick={() => {
@@ -2311,8 +2342,8 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
           </button>
         </div>
 
-        <div style={adminLayoutStyle}>
-          <aside style={placementMenuStyle}>
+        <div className="atlas-admin-layout" style={adminLayoutStyle}>
+          <aside className="atlas-admin-filters" style={placementMenuStyle}>
             {workspaceMode === "browse" && (
               <label style={labelStyle}>
                 Artasia Site
@@ -2562,7 +2593,7 @@ export default function UploadPanel({ initialError, onSignedOut }: UploadPanelPr
 
           </aside>
 
-          <section style={detailStyle}>
+          <section className="atlas-admin-detail" style={detailStyle}>
             {workspaceMode === "sites" ? (
               renderSiteSelection()
             ) : workspaceMode === "upload" ? (
