@@ -2525,6 +2525,9 @@ export default function UploadPanel({
                 key={folder.id}
                 style={{
                   ...driveFileItemStyle,
+                  display: "flex",
+                  alignItems: "center",
+                  gridColumn: "1 / -1",
                   background: "rgba(255,255,255,0.08)",
                   cursor: "pointer",
                   fontWeight: 500,
@@ -2544,14 +2547,14 @@ export default function UploadPanel({
                 style={driveFileItemStyle}
                 onClick={() => toggleDriveFileSelection(file.id)}
               >
-                <input
-                  type="checkbox"
-                  checked={selectedDriveFiles.has(file.id)}
-                  onChange={() => toggleDriveFileSelection(file.id)}
-                  onClick={(e) => e.stopPropagation()}
-                  style={{ marginRight: 8, cursor: "pointer" }}
-                />
                 <div style={driveFileThumbStyle}>
+                  <input
+                    type="checkbox"
+                    checked={selectedDriveFiles.has(file.id)}
+                    onChange={() => toggleDriveFileSelection(file.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    style={driveFileCheckboxStyle}
+                  />
                   {file.thumbnailLink ? (
                     <img
                       src={file.thumbnailLink}
@@ -2565,19 +2568,20 @@ export default function UploadPanel({
                     </span>
                   )}
                 </div>
-                <span
-                  style={{
-                    flex: 1,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {file.name}
-                </span>
-                <span style={assetDateStyle}>
-                  {file.isVideo ? "Video" : "Image"}
-                </span>
+                <div style={driveFileMetaStyle}>
+                  <span
+                    style={{
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {file.name}
+                  </span>
+                  <span style={assetDateStyle}>
+                    {file.isVideo ? "Video" : "Image"}
+                  </span>
+                </div>
               </div>
             ))}
           </div>
@@ -3928,7 +3932,6 @@ const pageStyle: React.CSSProperties = {
   padding: "22px 24px 28px",
   boxSizing: "border-box",
   fontFamily: "system-ui, sans-serif",
-  overflowY: "auto",
 };
 
 const panelStyle: React.CSSProperties = {
@@ -4114,8 +4117,6 @@ const placementMenuStyle: React.CSSProperties = {
   display: "grid",
   gap: 12,
   minWidth: 0,
-  maxHeight: "calc(100vh - 200px)",
-  overflow: "auto",
   padding: "1rem",
   boxSizing: "border-box",
 };
@@ -4956,17 +4957,16 @@ const driveBrowserHeaderStyle: React.CSSProperties = {
 
 const driveFileListStyle: React.CSSProperties = {
   display: "grid",
+  gridTemplateColumns: "repeat(auto-fill, minmax(236px, 1fr))",
   gap: 8,
-  maxHeight: 400,
-  overflow: "auto",
   border: "1px solid rgba(255,255,255,0.12)",
   borderRadius: 4,
   padding: 8,
 };
 
 const driveFileItemStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
+  display: "grid",
+  gridTemplateRows: "220px auto",
   gap: 8,
   padding: 8,
   background: "rgba(255,255,255,0.05)",
@@ -4977,15 +4977,32 @@ const driveFileItemStyle: React.CSSProperties = {
 };
 
 const driveFileThumbStyle: React.CSSProperties = {
+  position: "relative",
   width: 220,
   height: 220,
-  flex: "0 0 220px",
   display: "grid",
   placeItems: "center",
   overflow: "hidden",
   borderRadius: 4,
   background: "rgba(255,255,255,0.08)",
   border: "1px solid rgba(255,255,255,0.12)",
+};
+
+const driveFileCheckboxStyle: React.CSSProperties = {
+  position: "absolute",
+  top: 8,
+  left: 8,
+  margin: 0,
+  cursor: "pointer",
+  zIndex: 1,
+};
+
+const driveFileMetaStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 8,
+  minWidth: 0,
 };
 
 const driveFileThumbImageStyle: React.CSSProperties = {
