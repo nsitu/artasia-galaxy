@@ -112,6 +112,7 @@ export default function UploadPanel({
   const [options, setOptions] = useState<UploadOptions | null>(null);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [uploaderKey, setUploaderKey] = useState("");
+  const [driveOwnerKey, setDriveOwnerKey] = useState("");
   const [browsePartnerKey, setBrowsePartnerKey] = useState("");
   const [browseContextFilter, setBrowseContextFilter] =
     useState<BrowseContextFilter>("all");
@@ -792,6 +793,13 @@ export default function UploadPanel({
     );
   }, [options, placementKey]);
 
+  const driveOwnerOptions = useMemo(() => {
+    if (!options || !selectedPlacement) return [];
+    return options.uploaders.filter((uploader) =>
+      placementIncludesUploader(selectedPlacement, uploader.id),
+    );
+  }, [options, selectedPlacement]);
+
   const browsePlacementOptions = useMemo(() => {
     const placements =
       selectedPlacement &&
@@ -1192,6 +1200,7 @@ export default function UploadPanel({
 
   function importToPlacement(placement: UploadOptions["placements"][number]) {
     setBrowsePartnerKey("");
+    setDriveOwnerKey("");
     selectPlacement(placement);
     setWorkspaceMode("import");
     void openDriveImportDefault();
@@ -2145,6 +2154,7 @@ export default function UploadPanel({
         fileIds: Array.from(selectedDriveFiles),
         placementId: placementKey ? parseInt(placementKey, 10) : null,
         activityId: activityTagFilter ? parseInt(activityTagFilter, 10) : null,
+        uploaderId: driveOwnerKey ? parseInt(driveOwnerKey, 10) : null,
       });
 
       const succeeded = results.filter((r) => r.status === "success").length;
@@ -3640,6 +3650,36 @@ export default function UploadPanel({
                 </>
               )}
 
+              {workspaceMode === "import" && selectedPlacement && (
+                <label style={labelStyle}>
+                  Asset Owner
+                  <select
+                    value={driveOwnerKey}
+                    onChange={(event) => setDriveOwnerKey(event.target.value)}
+                    style={inputStyle}
+                  >
+                    <option value="">
+                      {selectedPlacement.team_member_name
+                        ? `Primary team member: ${selectedPlacement.team_member_name}`
+                        : "No primary team member assigned"}
+                    </option>
+                    {driveOwnerOptions
+                      .filter(
+                        (uploader) =>
+                          uploader.id !== selectedPlacement.team_member_id,
+                      )
+                      .map((uploader) => (
+                        <option key={uploader.id} value={String(uploader.id)}>
+                          {uploader.name}
+                        </option>
+                      ))}
+                  </select>
+                  <span style={fieldHelpStyle}>
+                    Defaults to this site&apos;s primary team member.
+                  </span>
+                </label>
+              )}
+
               {workspaceMode !== "upload" && workspaceMode !== "import" && (
                 <label style={labelStyle}>
                   Program Context
@@ -4470,6 +4510,12 @@ const labelStyle: React.CSSProperties = {
   fontSize: 13,
   color: "#aaa",
   minWidth: 0,
+};
+
+const fieldHelpStyle: React.CSSProperties = {
+  color: "#8490a3",
+  fontSize: 11,
+  lineHeight: 1.35,
 };
 
 const activityWarningStyle: React.CSSProperties = {

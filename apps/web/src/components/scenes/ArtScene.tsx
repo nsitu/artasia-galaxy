@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { fetchAuthUser, fetchUploadOptions, type ActivityOption, type AuthUser, type MapPlacement } from "../../api/client";
 import { useGalleryStore } from "../../stores/galleryStore";
 import LoadingIndicator from "../ui/LoadingIndicator";
+import WelcomeOverlay from "../ui/WelcomeOverlay";
 import TerrainGallery, {
   FocusedPlacementOverlay,
   type PartnerFilterOption,
@@ -28,6 +29,7 @@ const TERRAIN_GL_OPTIONS = {
   powerPreference: "default" as WebGLPowerPreference,
   failIfMajorPerformanceCaveat: false,
 };
+type IntroPhase = "loading" | "ready" | "exiting" | "complete";
 
 type TerrainMapControls = {
   target: THREE.Vector3;
@@ -35,6 +37,10 @@ type TerrainMapControls = {
 };
 
 export default function ArtScene() {
+  const [showWelcomeIntro] = useState(() => window.location.pathname === "/");
+  const [introPhase, setIntroPhase] = useState<IntroPhase>(() =>
+    showWelcomeIntro ? "loading" : "complete",
+  );
   const fetchPhotos = useGalleryStore((s) => s.fetchPhotos);
   const photos = useGalleryStore((s) => s.photos);
   const selectedPhotoIndex = useGalleryStore((s) => s.selectedPhotoIndex);
@@ -54,6 +60,19 @@ export default function ArtScene() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [webglError, setWebglError] = useState<string | null>(() => getWebGL2SupportError());
   const menuRef = useRef<HTMLDivElement | null>(null);
+
+  const handleIntroReady = useCallback(() => {
+    setIntroPhase((current) => current === "loading" ? "ready" : current);
+  }, []);
+
+  const handleStartExploring = useCallback(() => {
+    if (!showWelcomeIntro || introPhase !== "ready") return;
+    setIntroPhase("exiting");
+  }, [introPhase, showWelcomeIntro]);
+
+  const handleIntroComplete = useCallback(() => {
+    setIntroPhase((current) => current === "exiting" ? "complete" : current);
+  }, []);
 
   useEffect(() => {
     fetchPhotos();
@@ -140,9 +159,15 @@ export default function ArtScene() {
   return (
     <div style={{ width: "100vw", height: "100vh", position: "relative" }}>
       <div style={topNavStyle}>
-        <a href="/" aria-label="Artasia home" style={homeLogoLinkStyle}>
-          <img src="/artasia.svg" alt="" style={homeLogoImageStyle} />
-        </a>
+        <div style={homeBrandStyle}>
+          <a href="/" aria-label="Artasia home" style={homeLogoLinkStyle}>
+            <img src="/artasia.svg" alt="" style={homeLogoImageStyle} />
+          </a>
+          <div style={homePartnerLogoRowStyle} aria-label="Artasia partners">
+            <img src="/spider.png" alt="Spider" style={homeSpiderLogoStyle} />
+            <img src="/atlas.svg" alt="Atlas" style={homeAtlasLogoStyle} />
+          </div>
+        </div>
 
         <div style={topControlGroupStyle}>
           {backAction && (
@@ -302,6 +327,10 @@ export default function ArtScene() {
           <ambientLight intensity={0.8} />
           <Suspense fallback={null}>
             <TerrainGallery
+              introEnabled={showWelcomeIntro}
+              introPhase={introPhase}
+              onIntroReady={handleIntroReady}
+              onIntroComplete={handleIntroComplete}
               onNoticeChange={setTerrainNotice}
               onBackActionChange={handleBackActionChange}
               onFocusedPlacementChange={setFocusedPlacementDetails}
@@ -313,11 +342,12 @@ export default function ArtScene() {
             />
             <MapControls
               makeDefault
+              enabled={!showWelcomeIntro || introPhase === "complete"}
               enableDamping
               dampingFactor={0.08}
               enablePan={false}
-              enableZoom
-              enableRotate
+              enableZoom={!showWelcomeIntro || introPhase === "complete"}
+              enableRotate={!showWelcomeIntro || introPhase === "complete"}
               minDistance={1.5}
               maxDistance={80}
               minPolarAngle={TERRAIN_MIN_TILT}
@@ -326,10 +356,18 @@ export default function ArtScene() {
               maxAzimuthAngle={TERRAIN_MAP_HEADING}
               mouseButtons={TERRAIN_MAP_MOUSE_BUTTONS}
             />
-            <GroundPlanePanControls />
+            <GroundPlanePanControls enabled={!showWelcomeIntro || introPhase === "complete"} />
             <Preload all />
           </Suspense>
         </Canvas>
+      )}
+
+      {showWelcomeIntro && introPhase !== "complete" && (
+        <WelcomeOverlay
+          exiting={introPhase === "exiting"}
+          ready={introPhase === "ready"}
+          onStart={handleStartExploring}
+        />
       )}
     </div>
   );
@@ -372,13 +410,13 @@ function WebGLFallback({ message }: { message: string }) {
   );
 }
 
-function GroundPlanePanControls() {
+function GroundPlanePanControls({ enabled }: { enabled: boolean }) {
   const camera = useThree((state) => state.camera);
   const gl = useThree((state) => state.gl);
   const controls = useThree((state) => (state as unknown as { controls?: TerrainMapControls }).controls);
 
   useEffect(() => {
-    if (!controls?.target) return;
+    if (!enabled || !controls?.target) return;
 
     const element = gl.domElement;
     const terrainControls = controls;
@@ -471,7 +509,7 @@ function GroundPlanePanControls() {
       element.removeEventListener("pointercancel", onPointerUp);
       element.removeEventListener("contextmenu", onContextMenu);
     };
-  }, [camera, controls, gl]);
+  }, [camera, controls, enabled, gl]);
 
   return null;
 }
@@ -621,6 +659,34 @@ const homeLogoLinkStyle: React.CSSProperties = {
   display: "grid",
   placeItems: "center",
   pointerEvents: "auto",
+};
+
+const homeBrandStyle: React.CSSProperties = {
+  flex: "0 1 auto",
+  minWidth: 0,
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+};
+
+const homePartnerLogoRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  minWidth: 0,
+  pointerEvents: "none",
+};
+
+const homeSpiderLogoStyle: React.CSSProperties = {
+  width: "clamp(40px, 8vw, 60px)",
+  height: 64,
+  objectFit: "contain",
+};
+
+const homeAtlasLogoStyle: React.CSSProperties = {
+  width: "clamp(60px, 12vw, 92px)",
+  height: 30,
+  objectFit: "contain",
 };
 
 const homeLogoImageStyle: React.CSSProperties = {
