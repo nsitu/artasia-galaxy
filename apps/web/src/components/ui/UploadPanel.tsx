@@ -4977,9 +4977,9 @@ const driveFileItemStyle: React.CSSProperties = {
 };
 
 const driveFileThumbStyle: React.CSSProperties = {
-  width: 44,
-  height: 44,
-  flex: "0 0 44px",
+  width: 220,
+  height: 220,
+  flex: "0 0 220px",
   display: "grid",
   placeItems: "center",
   overflow: "hidden",
