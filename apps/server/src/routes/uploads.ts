@@ -925,7 +925,7 @@ router.post("/assets/:assetId/flatten", async (req, res) => {
     res.json({ ok: true, ...result, asset_id: result.assetId, source_asset_id: result.sourceAssetId });
   } catch (err) {
     const message = (err as Error).message;
-    const status = /valid|between|outside|Only image|dimensions/i.test(message) ? 400 : 502;
+    const status = /valid|between|outside|rotation|Only image|dimensions/i.test(message) ? 400 : 502;
     res.status(status).json({ error: message });
   }
 });

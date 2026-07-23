@@ -28,6 +28,7 @@ import {
   type CropParameters,
   type DriveFile,
   type DriveFolder,
+  type RotationDegrees,
   type UploadOptions,
   type PlacementAsset,
 } from "../../api/client";
@@ -149,6 +150,7 @@ export default function UploadPanel({
     height: number;
   } | null>(null);
   const [straightenDegrees, setStraightenDegrees] = useState(0);
+  const [rotationDegrees, setRotationDegrees] = useState<RotationDegrees>(0);
   const [cropLoading, setCropLoading] = useState(false);
   const [cropSaving, setCropSaving] = useState(false);
   const [manageBrightness, setManageBrightness] = useState(
@@ -1321,6 +1323,7 @@ export default function UploadPanel({
     setCropRect(null);
     setCropSourceDimensions(null);
     setStraightenDegrees(0);
+    setRotationDegrees(0);
     setCropRefreshKey((current) => current + 1);
     setMediaRefreshAssetId(null);
     setMediaRefreshAttempt(0);
@@ -1348,6 +1351,8 @@ export default function UploadPanel({
     setManageSaturation(DEFAULT_ADJUSTMENTS.saturation);
     setCropEditing(false);
     setCropRect(null);
+    setStraightenDegrees(0);
+    setRotationDegrees(0);
     setMediaRefreshAssetId(null);
     setMediaRefreshAttempt(0);
   }
@@ -1551,6 +1556,7 @@ export default function UploadPanel({
         const dimensions = imageDimensionsForCrop(selectedAsset);
         const result = await flattenUploadAsset({
           assetId,
+          rotationDegrees,
           straightenDegrees,
           cropNormalized: {
             x: crop.x / dimensions.width,
@@ -1637,7 +1643,7 @@ export default function UploadPanel({
 
   function rotatedImageDimensions(
     asset: PlacementAsset,
-    degrees = straightenDegrees,
+    degrees = effectiveRotationDegrees(),
   ) {
     const source = sourceImageDimensions(asset);
     const radians = (Math.abs(degrees) * Math.PI) / 180;
@@ -1717,7 +1723,7 @@ export default function UploadPanel({
 
   function defaultCropForAsset(
     asset: PlacementAsset,
-    degrees = straightenDegrees,
+    degrees = effectiveRotationDegrees(),
   ): CropRect | null {
     const source = sourceImageDimensions(asset);
     const rotated = rotatedImageDimensions(asset, degrees);
@@ -1772,6 +1778,7 @@ export default function UploadPanel({
 
     setError(null);
     setStraightenDegrees(0);
+    setRotationDegrees(0);
     setCropSourceDimensions(null);
     setCropRect(defaultCropForAsset(selectedAsset, 0));
     setCropEditing(true);
@@ -1906,7 +1913,9 @@ export default function UploadPanel({
   }
 
   function hasPendingPixelEdits(asset: PlacementAsset) {
-    if (Math.abs(straightenDegrees) > 0.0001) return true;
+    if (rotationDegrees !== 0 || Math.abs(straightenDegrees) > 0.0001) {
+      return true;
+    }
     if (!cropRect) return false;
     const dimensions = imageDimensionsForCrop(asset);
     const rect = normalizeCropRect(asset, cropRect);
@@ -1925,6 +1934,7 @@ export default function UploadPanel({
     try {
       const result = await flattenUploadAsset({
         assetId: selectedAsset.id,
+        rotationDegrees,
         straightenDegrees,
         cropNormalized: (() => {
           const crop = normalizeCropRect(selectedAsset, cropRect);
@@ -1952,18 +1962,44 @@ export default function UploadPanel({
 
   function changeStraightenDegrees(value: number) {
     if (!selectedAsset) return;
-    const previousDegrees = straightenDegrees;
+    const previousDegrees = effectiveRotationDegrees();
+    const nextDegrees = effectiveRotationDegrees(value);
     setCropRect((current) =>
       current
         ? preserveCropAcrossRotation(
             selectedAsset,
             current,
             previousDegrees,
-            value,
+            nextDegrees,
           )
-        : defaultCropForAsset(selectedAsset, value),
+        : defaultCropForAsset(selectedAsset, nextDegrees),
     );
     setStraightenDegrees(value);
+  }
+
+  function changeRotationDegrees(delta: 90 | -90) {
+    if (!selectedAsset) return;
+    const nextRotation = ((rotationDegrees + delta + 360) % 360) as RotationDegrees;
+    const previousDegrees = effectiveRotationDegrees();
+    const nextDegrees = effectiveRotationDegrees(straightenDegrees, nextRotation);
+    setCropRect((current) =>
+      current
+        ? preserveCropAcrossRotation(
+            selectedAsset,
+            current,
+            previousDegrees,
+            nextDegrees,
+          )
+        : defaultCropForAsset(selectedAsset, nextDegrees),
+    );
+    setRotationDegrees(nextRotation);
+  }
+
+  function effectiveRotationDegrees(
+    straighten = straightenDegrees,
+    rotation = rotationDegrees,
+  ) {
+    return rotation + straighten;
   }
 
   function preserveCropAcrossRotation(
@@ -2043,6 +2079,7 @@ export default function UploadPanel({
     try {
       await resetUploadAssetEdits(selectedAsset.id);
       setStraightenDegrees(0);
+      setRotationDegrees(0);
       setCropRect(defaultCropForAsset(selectedAsset, 0));
       setCropEditing(true);
       queueMediaRefresh(selectedAsset.id);
@@ -2544,7 +2581,12 @@ export default function UploadPanel({
             {driveFiles.map((file) => (
               <div
                 key={file.id}
-                style={driveFileItemStyle}
+                style={{
+                  ...driveFileItemStyle,
+                  ...(selectedDriveFiles.has(file.id)
+                    ? driveFileItemSelectedStyle
+                    : {}),
+                }}
                 onClick={() => toggleDriveFileSelection(file.id)}
               >
                 <div style={driveFileThumbStyle}>
@@ -2888,7 +2930,7 @@ export default function UploadPanel({
                     }),
                     width: `${(cropSourceSize.width / cropCanvasDimensions.width) * 100}%`,
                     height: `${(cropSourceSize.height / cropCanvasDimensions.height) * 100}%`,
-                    transform: `translate(-50%, -50%) rotate(${straightenDegrees}deg)`,
+                    transform: `translate(-50%, -50%) rotate(${effectiveRotationDegrees()}deg)`,
                   }}
                   draggable={false}
                   onLoad={() => {
@@ -2928,6 +2970,28 @@ export default function UploadPanel({
                   ))}
                 </div>
               </div>
+              <div style={rotationControlStyle}>
+                <span>Rotate</span>
+                <button
+                  type="button"
+                  onClick={() => changeRotationDegrees(-90)}
+                  disabled={cropSaving}
+                  style={secondaryButtonStyle}
+                >
+                  Left 90°
+                </button>
+                <button
+                  type="button"
+                  onClick={() => changeRotationDegrees(90)}
+                  disabled={cropSaving}
+                  style={secondaryButtonStyle}
+                >
+                  Right 90°
+                </button>
+                <span style={rotationValueStyle}>
+                  {rotationDegrees === 270 ? "-90°" : `${rotationDegrees}°`}
+                </span>
+              </div>
               <label style={adjustmentLabelStyle}>
                 <span>Straighten {straightenDegrees.toFixed(1)}°</span>
                 <input
@@ -2944,8 +3008,9 @@ export default function UploadPanel({
                 />
               </label>
               <div style={cropHintStyle}>
-                Drag over the preview to choose a crop. Changing the angle
-                resets to the largest clean rectangle.
+                Use the rotation buttons for right-angle changes, then use
+                straighten for fine adjustments. Drag over the preview to
+                choose a crop.
               </div>
             </div>
           ) : (
@@ -4533,6 +4598,19 @@ const cropEditorStyle: React.CSSProperties = {
   gap: 10,
 };
 
+const rotationControlStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  flexWrap: "wrap",
+  gap: 8,
+};
+
+const rotationValueStyle: React.CSSProperties = {
+  color: "#aeb7c8",
+  fontSize: 12,
+  minWidth: 34,
+};
+
 const cropHintStyle: React.CSSProperties = {
   color: "#aeb7c8",
   fontSize: 12,
@@ -4970,10 +5048,18 @@ const driveFileItemStyle: React.CSSProperties = {
   gap: 8,
   padding: 8,
   background: "rgba(255,255,255,0.05)",
+  border: "1px solid rgba(255,255,255,0.12)",
   borderRadius: 4,
   cursor: "pointer",
   fontSize: 13,
   color: "#d8e7ff",
+  transition: "background 120ms ease, border-color 120ms ease, box-shadow 120ms ease",
+};
+
+const driveFileItemSelectedStyle: React.CSSProperties = {
+  background: "rgba(120, 170, 255, 0.18)",
+  borderColor: "rgba(216, 231, 255, 0.9)",
+  boxShadow: "0 0 0 2px rgba(120, 170, 255, 0.24)",
 };
 
 const driveFileThumbStyle: React.CSSProperties = {
@@ -4992,8 +5078,11 @@ const driveFileCheckboxStyle: React.CSSProperties = {
   position: "absolute",
   top: 8,
   left: 8,
+  width: 20,
+  height: 20,
   margin: 0,
   cursor: "pointer",
+  accentColor: "#9ec1ff",
   zIndex: 1,
 };
 

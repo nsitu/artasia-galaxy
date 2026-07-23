@@ -381,8 +381,11 @@ export interface FlattenAssetResponse {
   archivedSource: boolean;
 }
 
+export type RotationDegrees = 0 | 90 | 180 | 270;
+
 export async function flattenUploadAsset(params: {
   assetId: string;
+  rotationDegrees: RotationDegrees;
   straightenDegrees: number;
   cropNormalized?: CropParameters;
 }): Promise<FlattenAssetResponse> {
@@ -391,6 +394,7 @@ export async function flattenUploadAsset(params: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       version: 1,
+      rotationDegrees: params.rotationDegrees,
       straightenDegrees: params.straightenDegrees,
       cropNormalized: params.cropNormalized,
       cropSpace: "auto-oriented-rotated",

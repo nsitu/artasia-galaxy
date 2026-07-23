@@ -22,6 +22,7 @@ import {
 const DATA_DIR = process.env.DATA_DIR ?? join(process.cwd(), "data");
 const FLATTEN_DIR = join(DATA_DIR, "flatten-jobs");
 const MAX_STRAIGHTEN_DEGREES = 35;
+const RIGHT_ANGLE_ROTATIONS = [0, 90, 180, 270] as const;
 const execFile = promisify(execFileCallback);
 
 async function convertHeifToJpeg(inputPath: string) {
@@ -54,6 +55,7 @@ export interface FlattenCrop {
 
 export interface FlattenRecipe {
   version: 1;
+  rotationDegrees: (typeof RIGHT_ANGLE_ROTATIONS)[number];
   straightenDegrees: number;
   crop?: FlattenCrop;
   cropNormalized?: FlattenCrop;
@@ -121,6 +123,10 @@ function largestInnerRectangle(width: number, height: number, degrees: number): 
 
 function validateRecipe(value: unknown): FlattenRecipe {
   const recipe = value && typeof value === "object" ? value as Partial<FlattenRecipe> : {};
+  const rotationDegrees = Number(recipe.rotationDegrees ?? 0);
+  if (!RIGHT_ANGLE_ROTATIONS.includes(rotationDegrees as (typeof RIGHT_ANGLE_ROTATIONS)[number])) {
+    throw new Error("Rotation must be one of 0, 90, 180, or 270 degrees.");
+  }
   const straightenDegrees = Number(recipe.straightenDegrees ?? 0);
   if (!Number.isFinite(straightenDegrees) || Math.abs(straightenDegrees) > MAX_STRAIGHTEN_DEGREES) {
     throw new Error(`Straightening must be between -${MAX_STRAIGHTEN_DEGREES} and ${MAX_STRAIGHTEN_DEGREES} degrees.`);
@@ -156,7 +162,15 @@ function validateRecipe(value: unknown): FlattenRecipe {
     }
   }
   const quality = Math.max(75, Math.min(100, Math.round(Number(recipe.output?.quality ?? 92))));
-  return { version: 1, straightenDegrees, crop, cropNormalized, cropSpace: "auto-oriented-rotated", output: { format: "jpeg", quality } };
+  return {
+    version: 1,
+    rotationDegrees: rotationDegrees as (typeof RIGHT_ANGLE_ROTATIONS)[number],
+    straightenDegrees,
+    crop,
+    cropNormalized,
+    cropSpace: "auto-oriented-rotated",
+    output: { format: "jpeg", quality },
+  };
 }
 
 function outputFilename(original: string) {
@@ -225,7 +239,8 @@ export async function flattenAsset(sourceAssetId: string, requestedRecipe: unkno
 
     const oriented = metadata.autoOrient;
     if (!oriented.width || !oriented.height) throw new Error("The source image dimensions could not be read.");
-    const rotated = rotatedDimensions(oriented.width, oriented.height, recipe.straightenDegrees);
+    const totalRotationDegrees = recipe.rotationDegrees + recipe.straightenDegrees;
+    const rotated = rotatedDimensions(oriented.width, oriented.height, totalRotationDegrees);
     const crop = recipe.cropNormalized
       ? {
           x: Math.max(0, Math.round(recipe.cropNormalized.x * rotated.width)),
@@ -242,7 +257,7 @@ export async function flattenAsset(sourceAssetId: string, requestedRecipe: unkno
 
     const result = await sharp(inputPath, { limitInputPixels: 268_402_689, failOnError: false } as any)
       .autoOrient()
-      .rotate(recipe.straightenDegrees, { background: { r: 0, g: 0, b: 0, alpha: 1 } })
+      .rotate(totalRotationDegrees, { background: { r: 0, g: 0, b: 0, alpha: 1 } })
       .extract({ left: crop.x, top: crop.y, width: crop.width, height: crop.height })
       .jpeg({ quality: recipe.output?.quality ?? 92, chromaSubsampling: "4:4:4" })
       .withMetadata({ orientation: 1 })
