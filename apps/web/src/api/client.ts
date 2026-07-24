@@ -6,6 +6,8 @@ export interface AssetAdjustments {
 
 export interface Photo {
   id: string;
+  mediaKind: "image" | "audio";
+  audioUrl?: string;
   thumbnailUrl: string;
   previewUrl: string;
   width: number;

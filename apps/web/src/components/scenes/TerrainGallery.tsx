@@ -7,7 +7,11 @@ import {
   type Photo,
 } from "../../api/client";
 import { useGalleryStore } from "../../stores/galleryStore";
-import { OrbitingPhotoBanner, TerrainPhotoFlower } from "./TerrainPhotoMarker";
+import {
+  OrbitingAudioMarker,
+  OrbitingPhotoBanner,
+  TerrainPhotoFlower,
+} from "./TerrainPhotoMarker";
 import PlaceMarker from "./PlaceMarker";
 import {
   createMaxDetailTerrainRequest,
@@ -543,6 +547,7 @@ export default function TerrainGallery({
   const fetchPhotos = useGalleryStore((s) => s.fetchPhotos);
   const fetchPlacementFocus = useGalleryStore((s) => s.fetchPlacementFocus);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
   const [terrain, setTerrain] = useState<THREE.Group | null>(null);
   const [projection, setProjection] = useState<ThreeGeoProjection | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -604,7 +609,9 @@ export default function TerrainGallery({
     return photoScope.mode === "regional" ? photos : [];
   }, [focusedPlacement, photoScope, photos, selectedActivityId]);
   const geoPhotos = useMemo(() => {
-    return getGeoPhotos(photosForCurrentView);
+    return getGeoPhotos(
+      photosForCurrentView.filter((photo) => photo.mediaKind === "image"),
+    );
   }, [photosForCurrentView]);
   const geoPlacements = useMemo(
     () =>
@@ -674,6 +681,14 @@ export default function TerrainGallery({
     ] as [number, number, number];
 
     return photosForCurrentView.map((photo, index) => {
+      if (photo.mediaKind === "audio") {
+        return {
+          kind: "orbit",
+          photo,
+          index,
+          center: placementCenter,
+        };
+      }
       const lat = photo.exifInfo?.latitude;
       const lng = photo.exifInfo?.longitude;
       if (Number.isFinite(lat) && Number.isFinite(lng)) {
@@ -713,6 +728,17 @@ export default function TerrainGallery({
       };
     });
   }, [focusedPlacement, photosForCurrentView, projection, terrain]);
+
+  useEffect(() => {
+    if (
+      playingAudioId &&
+      !photosForCurrentView.some(
+        (photo) => photo.id === playingAudioId && photo.mediaKind === "audio",
+      )
+    ) {
+      setPlayingAudioId(null);
+    }
+  }, [photosForCurrentView, playingAudioId]);
   const placementLayout = useMemo(() => {
     if (!projection) return [];
     const projected = visiblePlacements.flatMap((placement) => {
@@ -1329,7 +1355,24 @@ export default function TerrainGallery({
       {sceneReadyForMarkers &&
         showPhotoPins &&
         localPhotoLayout.map((item) =>
-          item.kind === "flower" ? (
+          item.photo.mediaKind === "audio" && item.photo.audioUrl ? (
+            <OrbitingAudioMarker
+              key={item.photo.id}
+              id={item.photo.id}
+              audioUrl={item.photo.audioUrl}
+              center={item.kind === "orbit" ? item.center : item.position}
+              isPlaying={playingAudioId === item.photo.id}
+              isHighlighted={item.index === hoveredIndex}
+              onPlaybackStart={() => setPlayingAudioId(item.photo.id)}
+              onPlaybackStop={() =>
+                setPlayingAudioId((current) =>
+                  current === item.photo.id ? null : current,
+                )
+              }
+              onPointerEnter={() => setHoveredIndex(item.index)}
+              onPointerLeave={() => setHoveredIndex(null)}
+            />
+          ) : item.kind === "flower" ? (
             <TerrainPhotoFlower
               key={item.photo.id}
               id={item.photo.id}
