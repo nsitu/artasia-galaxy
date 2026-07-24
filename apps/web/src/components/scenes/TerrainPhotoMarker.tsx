@@ -481,6 +481,12 @@ const ORBIT_MIN_UNITS = 0.72;
 const ORBIT_MAX_UNITS = 2.15;
 const ORBIT_HEIGHT = 0.72;
 const ORBIT_SPEED = 0.16;
+const CUTOUT_BORDER_COLORS = [
+  "#8e1d58",
+  "#eee111",
+  "#ec008c",
+  "#f28b20",
+] as const;
 const STEM_COLOR = new THREE.Color("#49d05a");
 const STEM_SELECTED_COLOR = new THREE.Color("#9df7a8");
 const STEM_HOVER_EMISSIVE = new THREE.Color("#d7ff8f");
@@ -632,6 +638,13 @@ export function OrbitingPhotoBanner({
     speed: stableRange(`${id}:speed`, ORBIT_SPEED * 0.75, ORBIT_SPEED * 1.25),
   }), [id]);
   const cutout = useMemo(() => createCutoutCorners(id), [id]);
+  const borderColor = useMemo(() => {
+    const index = Math.min(
+      CUTOUT_BORDER_COLORS.length - 1,
+      Math.floor(stableRange(`${id}:cutout:border-color`, 0, CUTOUT_BORDER_COLORS.length)),
+    );
+    return CUTOUT_BORDER_COLORS[index];
+  }, [id]);
   const [cx, cy, cz] = center;
   const aspect = getTextureAspect(texture, width, height);
   const brightness = adjustmentScalar(adjustments?.brightness);
@@ -689,7 +702,7 @@ export function OrbitingPhotoBanner({
             cornerBottomRight={cutout.bottomRight}
             cornerTopRight={cutout.topRight}
             cornerTopLeft={cutout.topLeft}
-            borderColor="#ffffff"
+            borderColor={borderColor}
             borderWidth={0.04}
             dashLength={0.11}
             dashGap={0.065}
@@ -814,6 +827,15 @@ export function OrbitingAudioMarker({
             onPointerLeave();
           }}
         >
+          <mesh position={[0, 0, -0.001]}>
+            <circleGeometry args={[0.225, 48]} />
+            <meshBasicMaterial
+              transparent
+              opacity={0}
+              depthWrite={false}
+              color="#ffffff"
+            />
+          </mesh>
           <mesh>
             <ringGeometry args={[0.16, 0.205, 48]} />
             <meshBasicMaterial color={color} side={THREE.DoubleSide} toneMapped={false} />
