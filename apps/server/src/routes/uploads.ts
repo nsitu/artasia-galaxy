@@ -33,6 +33,12 @@ import {
 } from "../services/assetAdjustments.service.js";
 import { getAuthContext } from "../services/auth.service.js";
 import { flattenAsset } from "../services/flattenAsset.service.js";
+import { isAudioAsset, parseImmichDuration } from "../services/audioAsset.service.js";
+import { getAudioWaveform } from "../services/audioWaveform.service.js";
+import {
+  createAudioTrimJob,
+  getAudioTrimJob,
+} from "../services/trimAudioAsset.service.js";
 import {
   findConfiguredPlacement,
   findConfiguredUploader,
@@ -222,6 +228,7 @@ interface AssetManagementAssignment {
   activityId?: number;
   activityLabel?: string;
   published?: boolean;
+  isAudio?: boolean;
 }
 
 function isFlippedOrientation(orientation?: string | null) {
@@ -269,6 +276,12 @@ function mapAdminAsset(
   return {
     id: asset.id,
     type: asset.type,
+    mediaKind: assignment?.isAudio || isAudioAsset(asset)
+      ? "audio"
+      : asset.type === "VIDEO"
+        ? "video"
+        : "image",
+    durationSeconds: parseImmichDuration(asset.duration),
     fileName: asset.originalFileName,
     description: asset.exifInfo?.description ?? "",
     createdAt: asset.fileCreatedAt,
@@ -432,6 +445,21 @@ async function getManagementAssignments(assetIds: string[]) {
       const current = assignments.get(assetId) ?? {};
       current.activityId = activity.id;
       current.activityLabel = activity.label;
+      assignments.set(assetId, current);
+    }
+  }
+
+  const audioTag = tags.find((tag) => {
+    const name = tag.name.trim().toLowerCase();
+    const value = tag.value.trim().toLowerCase();
+    return name === "media:audio" || value === "media:audio";
+  });
+  if (audioTag) {
+    const audioAssetIds = await searchAssetIdsByTag(audioTag.id);
+    for (const assetId of audioAssetIds) {
+      if (!assetIdSet.has(assetId)) continue;
+      const current = assignments.get(assetId) ?? {};
+      current.isAudio = true;
       assignments.set(assetId, current);
     }
   }
@@ -930,6 +958,63 @@ router.post("/assets/:assetId/flatten", async (req, res) => {
     const message = (err as Error).message;
     const status = /valid|between|outside|rotation|Only image|dimensions/i.test(message) ? 400 : 502;
     res.status(status).json({ error: message });
+  }
+});
+
+router.get("/assets/:assetId/waveform", async (req, res) => {
+  try {
+    const auth = await getAuthContext(req);
+    if (!auth.authenticated) {
+      res.status(401).json({ error: "Sign in to view audio waveforms." });
+      return;
+    }
+    res.json(await getAudioWaveform(req.params.assetId.trim()));
+  } catch (err) {
+    const message = (err as Error).message;
+    const status = /only|duration|valid/i.test(message) ? 400 : 502;
+    res.status(status).json({ error: message });
+  }
+});
+
+router.post("/assets/:assetId/trim", async (req, res) => {
+  try {
+    const auth = await getAuthContext(req);
+    if (!auth.authenticated) {
+      res.status(401).json({ error: "Sign in to trim audio." });
+      return;
+    }
+    const job = await createAudioTrimJob(
+      req.params.assetId.trim(),
+      req.body?.startSeconds,
+      req.body?.endSeconds,
+    );
+    res.status(202).json({ job });
+  } catch (err) {
+    const message = (err as Error).message;
+    const status = /already running/i.test(message)
+      ? 409
+      : /only|duration|range|seconds/i.test(message)
+        ? 400
+        : 502;
+    res.status(status).json({ error: message });
+  }
+});
+
+router.get("/audio-trim-jobs/:jobId", async (req, res) => {
+  try {
+    const auth = await getAuthContext(req);
+    if (!auth.authenticated) {
+      res.status(401).json({ error: "Sign in to view audio trim jobs." });
+      return;
+    }
+    const job = await getAudioTrimJob(req.params.jobId);
+    if (!job) {
+      res.status(404).json({ error: "Audio trim job was not found." });
+      return;
+    }
+    res.json({ job });
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
   }
 });
 

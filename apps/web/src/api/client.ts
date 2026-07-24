@@ -180,6 +180,8 @@ export interface UploadResult {
 export interface PlacementAsset {
   id: string;
   type: "IMAGE" | "VIDEO";
+  mediaKind: "image" | "video" | "audio";
+  durationSeconds: number;
   fileName: string;
   description?: string;
   createdAt: string;
@@ -407,6 +409,75 @@ export async function flattenUploadAsset(params: {
     throw new Error(body.error ?? `HTTP ${res.status}`);
   }
   return res.json();
+}
+
+export interface AudioWaveform {
+  assetId: string;
+  durationSeconds: number;
+  sampleCount: number;
+  peaks: number[];
+}
+
+export interface AudioTrimJob {
+  id: string;
+  sourceAssetId: string;
+  targetAssetId?: string;
+  startSeconds: number;
+  endSeconds: number;
+  durationSeconds: number;
+  state:
+    | "prepared"
+    | "downloading"
+    | "rendering"
+    | "uploaded"
+    | "relationships_copied"
+    | "verified"
+    | "source_archived"
+    | "complete"
+    | "failed";
+  progress: number;
+  message: string;
+  error?: string;
+}
+
+export async function fetchAudioWaveform(assetId: string): Promise<AudioWaveform> {
+  const res = await fetch(`/api/v1/uploads/assets/${assetId}/waveform`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function createAudioTrim(params: {
+  assetId: string;
+  startSeconds: number;
+  endSeconds: number;
+}): Promise<AudioTrimJob> {
+  const res = await fetch(`/api/v1/uploads/assets/${params.assetId}/trim`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      startSeconds: params.startSeconds,
+      endSeconds: params.endSeconds,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  const body = await res.json() as { job: AudioTrimJob };
+  return body.job;
+}
+
+export async function fetchAudioTrimJob(jobId: string): Promise<AudioTrimJob> {
+  const res = await fetch(`/api/v1/uploads/audio-trim-jobs/${encodeURIComponent(jobId)}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  const body = await res.json() as { job: AudioTrimJob };
+  return body.job;
 }
 
 export async function resetUploadAssetEdits(assetId: string): Promise<void> {

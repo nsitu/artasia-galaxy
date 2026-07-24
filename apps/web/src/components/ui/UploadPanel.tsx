@@ -3,9 +3,11 @@ import {
   assignAssetActivityTag,
   assignAssetPlacement,
   assignAssetUploader,
+  createAudioTrim,
   cropUploadAsset,
   deleteUploadAsset,
   fetchAssetEdits,
+  fetchAudioTrimJob,
   fetchAuthUser,
   fetchDriveFiles,
   fetchDriveFolders,
@@ -24,6 +26,7 @@ import {
   updateUploadAssetAdjustments,
   uploadFiles,
   type AssetAdjustments,
+  type AudioTrimJob,
   type AuthUser,
   type CropParameters,
   type DriveFile,
@@ -32,6 +35,7 @@ import {
   type UploadOptions,
   type PlacementAsset,
 } from "../../api/client";
+import AudioTrimEditor from "./AudioTrimEditor";
 import RetryableUploadThumbnail from "./RetryableUploadThumbnail";
 
 interface UploadItem {
@@ -143,6 +147,10 @@ export default function UploadPanel({
   >("idle");
   const [captionSaveError, setCaptionSaveError] = useState<string | null>(null);
   const [savingAsset, setSavingAsset] = useState(false);
+  const [audioTrimStart, setAudioTrimStart] = useState(0);
+  const [audioTrimEnd, setAudioTrimEnd] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const [audioTrimStatus, setAudioTrimStatus] = useState<string | null>(null);
   const [deletingAsset, setDeletingAsset] = useState(false);
   const [cropEditing, setCropEditing] = useState(false);
   const [cropRect, setCropRect] = useState<CropRect | null>(null);
@@ -1333,6 +1341,11 @@ export default function UploadPanel({
     setCropSourceDimensions(null);
     setStraightenDegrees(0);
     setRotationDegrees(0);
+    const duration = asset.mediaKind === "audio" ? asset.durationSeconds : 0;
+    setAudioDuration(duration);
+    setAudioTrimStart(0);
+    setAudioTrimEnd(duration);
+    setAudioTrimStatus(null);
     setCropRefreshKey((current) => current + 1);
     setMediaRefreshAssetId(null);
     setMediaRefreshAttempt(0);
@@ -1362,6 +1375,10 @@ export default function UploadPanel({
     setCropRect(null);
     setStraightenDegrees(0);
     setRotationDegrees(0);
+    setAudioDuration(0);
+    setAudioTrimStart(0);
+    setAudioTrimEnd(0);
+    setAudioTrimStatus(null);
     setMediaRefreshAssetId(null);
     setMediaRefreshAttempt(0);
   }
@@ -1504,6 +1521,11 @@ export default function UploadPanel({
       manageContrast !== selectedAdjustments.contrast ||
       manageSaturation !== selectedAdjustments.saturation;
     const pixelEditsChanged = hasPendingPixelEdits(selectedAsset);
+    const audioTrimChanged =
+      selectedAsset.mediaKind === "audio" &&
+      audioDuration > 0 &&
+      (audioTrimStart > 0.005 ||
+        Math.abs(audioTrimEnd - audioDuration) > 0.005);
 
     if (
       !placementChanged &&
@@ -1512,13 +1534,23 @@ export default function UploadPanel({
       !publishedChanged &&
       !captionChanged &&
       !adjustmentChanged &&
-      !pixelEditsChanged
+      !pixelEditsChanged &&
+      !audioTrimChanged
     ) {
       setError("There are no changes to save.");
       return;
     }
     if (pixelEditsChanged && !cropRect) {
       setError("Choose a crop area before saving.");
+      return;
+    }
+    if (
+      audioTrimChanged &&
+      (audioTrimStart < 0 ||
+        audioTrimEnd > audioDuration + 0.05 ||
+        audioTrimEnd - audioTrimStart < 0.5)
+    ) {
+      setError("Choose an audio selection of at least 0.50 seconds.");
       return;
     }
 
@@ -1576,6 +1608,28 @@ export default function UploadPanel({
         });
         message = `Upload changes saved. Created ${result.width}×${result.height} edited copy and archived the original.`;
       }
+      if (audioTrimChanged) {
+        setAudioTrimStatus("Preparing audio trim…");
+        let trimJob: AudioTrimJob = await createAudioTrim({
+          assetId,
+          startSeconds: audioTrimStart,
+          endSeconds: audioTrimEnd,
+        });
+        for (;;) {
+          setAudioTrimStatus(
+            `${trimJob.message}${trimJob.state === "rendering" ? ` (${Math.round(trimJob.progress)}%)` : "…"}`,
+          );
+          if (trimJob.state === "complete") break;
+          if (trimJob.state === "failed") {
+            throw new Error(
+              `Metadata was saved, but the audio trim failed. The original audio remains active. ${trimJob.error ?? ""}`.trim(),
+            );
+          }
+          await new Promise((resolve) => window.setTimeout(resolve, 1_000));
+          trimJob = await fetchAudioTrimJob(trimJob.id);
+        }
+        message = `Upload changes saved. Created a ${trimJob.durationSeconds.toFixed(2)} second trimmed copy and archived the original.`;
+      }
 
       closeAssetManager();
       setWorkspaceMode("browse");
@@ -1585,6 +1639,7 @@ export default function UploadPanel({
       setError((err as Error).message);
     } finally {
       setSavingAsset(false);
+      setAudioTrimStatus(null);
     }
   }
 
@@ -2893,6 +2948,11 @@ export default function UploadPanel({
     const captionChanged =
       manageCaption.trim() !== (selectedAsset.description ?? "").trim();
     const pixelEditsChanged = hasPendingPixelEdits(selectedAsset);
+    const audioTrimChanged =
+      selectedAsset.mediaKind === "audio" &&
+      audioDuration > 0 &&
+      (audioTrimStart > 0.005 ||
+        Math.abs(audioTrimEnd - audioDuration) > 0.005);
     const hasAnyChanges =
       placementChanged ||
       uploaderChanged ||
@@ -2900,7 +2960,8 @@ export default function UploadPanel({
       publishedChanged ||
       adjustmentChanged ||
       captionChanged ||
-      pixelEditsChanged;
+      pixelEditsChanged ||
+      audioTrimChanged;
     const displayPreviewUrl = mediaUrl(
       selectedAsset.previewUrl,
       selectedAsset.id,
@@ -2914,7 +2975,28 @@ export default function UploadPanel({
     return (
       <div className="atlas-manage-panel" style={managePanelStyle}>
         <div style={managePreviewStyle}>
-          {selectedAsset.type === "VIDEO" ? (
+          {selectedAsset.mediaKind === "audio" ? (
+            <AudioTrimEditor
+              asset={selectedAsset}
+              startSeconds={audioTrimStart}
+              endSeconds={audioTrimEnd}
+              disabled={savingAsset}
+              onChange={(start, end) => {
+                setAudioTrimStart(start);
+                setAudioTrimEnd(end);
+              }}
+              onDuration={(duration) => {
+                if (!Number.isFinite(duration) || duration <= 0) return;
+                setAudioDuration(duration);
+                setAudioTrimEnd((current) =>
+                  current <= 0 ||
+                  Math.abs(current - selectedAsset.durationSeconds) < 0.1
+                    ? duration
+                    : Math.min(current, duration),
+                );
+              }}
+            />
+          ) : selectedAsset.type === "VIDEO" ? (
             <video
               src={selectedAsset.originalUrl}
               controls
@@ -3218,6 +3300,11 @@ export default function UploadPanel({
             Published
           </label>
           <div style={manageActionsStyle}>
+            {savingAsset && audioTrimStatus && (
+              <div style={audioTrimStatusStyle}>
+                <span>{audioTrimStatus}</span>
+              </div>
+            )}
             <button
               type="button"
               onClick={saveAllAssetChanges}
@@ -3232,7 +3319,9 @@ export default function UploadPanel({
               style={primaryActionButtonStyle}
             >
               {savingAsset
-                ? pixelEditsChanged
+                ? audioTrimChanged
+                  ? "Saving & Trimming Audio..."
+                  : pixelEditsChanged
                   ? "Saving & Creating Edited Copy..."
                   : "Saving..."
                 : "Save Changes"}
@@ -4762,6 +4851,15 @@ const manageActionsStyle: React.CSSProperties = {
   display: "flex",
   gap: 8,
   flexWrap: "wrap",
+};
+
+const audioTrimStatusStyle: React.CSSProperties = {
+  flex: "1 0 100%",
+  color: "#d8e7ff",
+  background: "rgba(120,170,255,0.12)",
+  border: "1px solid rgba(120,170,255,0.28)",
+  borderRadius: 4,
+  padding: "9px 10px",
 };
 
 const adjustmentPanelStyle: React.CSSProperties = {

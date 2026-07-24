@@ -20,8 +20,7 @@ loadMaterialSymbols([
   "location_on",
   "filter_alt_off",
   "warning",
-  "child_hat",
-  "edit",
+  "child_hat"
 ]);
 
 createRoot(document.getElementById("root")!).render(
