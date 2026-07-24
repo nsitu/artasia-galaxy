@@ -12,7 +12,14 @@ const IMAGE_MIME_TYPES = [
   "image/heif",
 ];
 const VIDEO_MIME_TYPES = ["video/mp4", "video/quicktime", "video/x-msvideo"];
-const SUPPORTED_MIME_TYPES = [...IMAGE_MIME_TYPES, ...VIDEO_MIME_TYPES];
+const AUDIO_MIME_TYPES = [
+  "audio/mpeg",
+  "audio/mp3",
+  "audio/mp4",
+  "audio/m4a",
+  "audio/x-m4a",
+];
+const SUPPORTED_MIME_TYPES = [...IMAGE_MIME_TYPES, ...VIDEO_MIME_TYPES, ...AUDIO_MIME_TYPES];
 
 interface DriveFile {
   id: string;
@@ -190,7 +197,9 @@ export class GoogleDriveClient {
     name: string;
     mimeType: string;
     size?: number;
+    modifiedTime?: string;
     isSupported: boolean;
+    isAudio: boolean;
   }> {
     const file = await this.getFile(fileId);
     const isSupported = SUPPORTED_MIME_TYPES.includes(file.mimeType);
@@ -198,7 +207,9 @@ export class GoogleDriveClient {
       name: file.name,
       mimeType: file.mimeType,
       size: file.size ? parseInt(file.size as unknown as string) : undefined,
+      modifiedTime: file.modifiedTime,
       isSupported,
+      isAudio: GoogleDriveClient.isAudio(file.mimeType),
     };
   }
 
@@ -214,6 +225,13 @@ export class GoogleDriveClient {
    */
   static isVideo(mimeType: string): boolean {
     return VIDEO_MIME_TYPES.includes(mimeType);
+  }
+
+  /**
+   * Check if a MIME type is supported audio
+   */
+  static isAudio(mimeType: string): boolean {
+    return AUDIO_MIME_TYPES.includes(mimeType);
   }
 
   /**

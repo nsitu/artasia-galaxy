@@ -7,10 +7,13 @@ import {
 import {
   addAssetsToAlbum,
   ensureAlbum,
+  uploadAsset,
   uploadAssetStream,
   tagAsset,
 } from "../infra/ImmichClient.js";
 import { getUploadConfig } from "../services/uploadConfig.service.js";
+import { prepareAudioAsVideo } from "../services/audioToVideo.service.js";
+import { UPLOAD_LIMITS } from "../services/uploadLimits.js";
 
 const router = Router();
 
@@ -97,6 +100,7 @@ interface DriveFileInfo {
   isFolder: boolean;
   isImage: boolean;
   isVideo: boolean;
+  isAudio: boolean;
 }
 
 interface DriveListResponse {
@@ -145,6 +149,7 @@ router.get("/files", async (req: Request, res: Response) => {
         isFolder: GoogleDriveClient.isFolder(file.mimeType),
         isImage: GoogleDriveClient.isImage(file.mimeType),
         isVideo: GoogleDriveClient.isVideo(file.mimeType),
+        isAudio: GoogleDriveClient.isAudio(file.mimeType),
       })),
       nextPageToken,
     };
@@ -261,9 +266,11 @@ router.post("/sync", async (req: Request, res: Response) => {
     const results: DriveSyncResult[] = [];
 
     for (const fileId of fileIds) {
+      let fileName = "Unknown";
       try {
         // Get file info
         const fileInfo = await client.getFileInfo(fileId);
+        fileName = fileInfo.name;
 
         if (!fileInfo.isSupported) {
           results.push({
@@ -271,6 +278,20 @@ router.post("/sync", async (req: Request, res: Response) => {
             fileName: fileInfo.name,
             status: "failed",
             error: `Unsupported file type: ${fileInfo.mimeType}`,
+          });
+          continue;
+        }
+
+        if (
+          fileInfo.isAudio &&
+          fileInfo.size &&
+          fileInfo.size > UPLOAD_LIMITS.maxFileBytes
+        ) {
+          results.push({
+            fileId,
+            fileName: fileInfo.name,
+            status: "failed",
+            error: `Audio file exceeds the ${Math.round(UPLOAD_LIMITS.maxFileBytes / (1024 * 1024))}MB limit`,
           });
           continue;
         }
@@ -291,14 +312,46 @@ router.post("/sync", async (req: Request, res: Response) => {
 
         // Create unique device asset ID using Drive file ID
         const deviceAssetId = `artasia-galaxy:drive:${fileId}`;
+        const fileDate = fileInfo.modifiedTime
+          ? new Date(fileInfo.modifiedTime)
+          : undefined;
 
-        // Upload to Immich
-        const uploadResult = await uploadAssetStream({
-          stream,
-          filename: fileInfo.name,
-          mimeType: fileInfo.mimeType,
-          deviceAssetId,
-        });
+        let uploadResult;
+        if (fileInfo.isAudio) {
+          console.log(`[Drive] converting audio file ${fileId} to MP4`);
+          const prepared = await prepareAudioAsVideo({
+            stream,
+            originalName: fileInfo.name,
+          });
+          try {
+            console.log(
+              `[Drive] converted audio file ${fileId}: ${Math.round(prepared.durationSeconds)}s, ${prepared.outputBytes} bytes`,
+            );
+            uploadResult = await uploadAsset({
+              filePath: prepared.filePath,
+              filename: prepared.filename,
+              mimeType: prepared.mimeType,
+              deviceAssetId,
+              createdAt: fileDate,
+              modifiedAt: fileDate,
+            });
+          } finally {
+            await prepared.cleanup().catch((err) => {
+              console.warn(
+                `[Drive] failed to clean up audio conversion for ${fileId}: ${(err as Error).message}`,
+              );
+            });
+          }
+        } else {
+          uploadResult = await uploadAssetStream({
+            stream,
+            filename: fileInfo.name,
+            mimeType: fileInfo.mimeType,
+            deviceAssetId,
+            createdAt: fileDate,
+            modifiedAt: fileDate,
+          });
+        }
 
         if (!uploadResult.id) {
           results.push({
@@ -311,7 +364,11 @@ router.post("/sync", async (req: Request, res: Response) => {
         }
 
         // Apply tags
-        const allTags = [...placementTags, ...activityTags];
+        const allTags = [
+          ...placementTags,
+          ...activityTags,
+          ...(fileInfo.isAudio ? ["media:audio"] : []),
+        ];
         if (allTags.length > 0) {
           await tagAsset(uploadResult.id, allTags);
         }
@@ -330,7 +387,7 @@ router.post("/sync", async (req: Request, res: Response) => {
       } catch (err) {
         results.push({
           fileId,
-          fileName: "Unknown",
+          fileName,
           status: "failed",
           error: (err as Error).message,
         });

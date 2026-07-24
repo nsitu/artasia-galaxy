@@ -510,6 +510,7 @@ export async function uploadAsset(params: {
   filePath: string;
   filename: string;
   mimeType: string;
+  deviceAssetId?: string;
   createdAt?: Date;
   modifiedAt?: Date;
 }): Promise<ImmichUploadResponse> {
@@ -518,7 +519,7 @@ export async function uploadAsset(params: {
   const form = new FormData();
   const blob = await openAsBlob(params.filePath, { type: params.mimeType });
   const checksum = await sha1File(params.filePath);
-  const deviceAssetId = `artasia-galaxy:${checksum}`;
+  const deviceAssetId = params.deviceAssetId ?? `artasia-galaxy:${checksum}`;
 
   form.append("assetData", blob, params.filename);
   form.append("deviceAssetId", deviceAssetId);

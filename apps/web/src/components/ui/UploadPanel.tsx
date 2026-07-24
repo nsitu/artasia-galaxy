@@ -2616,7 +2616,7 @@ export default function UploadPanel({
                     />
                   ) : (
                     <span style={driveFileTypeStyle}>
-                      {file.isVideo ? "VID" : "IMG"}
+                      {file.isAudio ? "AUD" : file.isVideo ? "VID" : "IMG"}
                     </span>
                   )}
                 </div>
@@ -2631,7 +2631,7 @@ export default function UploadPanel({
                     {file.name}
                   </span>
                   <span style={assetDateStyle}>
-                    {file.isVideo ? "Video" : "Image"}
+                    {file.isAudio ? "Audio (imports as video)" : file.isVideo ? "Video" : "Image"}
                   </span>
                 </div>
               </div>

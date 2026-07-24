@@ -535,6 +535,7 @@ export interface DriveFile {
   isFolder: boolean;
   isImage: boolean;
   isVideo: boolean;
+  isAudio: boolean;
 }
 
 export interface DriveFoldersResponse {
