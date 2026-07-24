@@ -129,9 +129,14 @@ export async function getAssetThumbnail(
 
 export async function getAssetOriginal(
   assetId: string,
+  options?: { range?: string; allowErrorStatus?: boolean },
 ): Promise<Response> {
   return immichRequest(
     `/assets/${assetId}/original`,
+    options?.range
+      ? { headers: { Range: options.range } }
+      : undefined,
+    { allowErrorStatus: options?.allowErrorStatus },
   );
 }
 

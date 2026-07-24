@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getAssetThumbnail } from "../infra/ImmichClient.js";
+import { getAssetOriginal, getAssetThumbnail } from "../infra/ImmichClient.js";
 import { getWordPressConfig } from "../infra/WordPressClient.js";
 
 const router = Router();
@@ -91,6 +91,44 @@ router.get("/:id/preview", async (req, res) => {
   } catch (err) {
     const msg = (err as Error).message;
     console.error(`[preview] ${req.params.id}: ${msg}`);
+    res.status(502).json({ error: msg });
+  }
+});
+
+router.get("/:id/original", async (req, res) => {
+  try {
+    const range = typeof req.headers.range === "string" ? req.headers.range : undefined;
+    const immichRes = await getAssetOriginal(req.params.id, {
+      range,
+      allowErrorStatus: true,
+    });
+
+    res.status(immichRes.status);
+    for (const header of [
+      "content-type",
+      "content-length",
+      "content-range",
+      "accept-ranges",
+      "etag",
+      "last-modified",
+    ]) {
+      const value = immichRes.headers.get(header);
+      if (value) res.setHeader(header, value);
+    }
+    res.setHeader("Cache-Control", "private, max-age=3600");
+
+    if (immichRes.body) {
+      const reader = immichRes.body.getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        res.write(value);
+      }
+    }
+    res.end();
+  } catch (err) {
+    const msg = (err as Error).message;
+    console.error(`[original] ${req.params.id}: ${msg}`);
     res.status(502).json({ error: msg });
   }
 });

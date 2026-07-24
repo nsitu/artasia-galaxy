@@ -198,6 +198,7 @@ export interface PlacementAsset {
   uploader_album_id?: string | null;
   thumbnailUrl: string;
   previewUrl: string;
+  originalUrl: string;
   adjustments?: AssetAdjustments;
 }
 

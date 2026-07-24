@@ -288,6 +288,9 @@ function mapAdminAsset(
     adjustments: adjustments ?? { ...DEFAULT_ASSET_ADJUSTMENTS },
     thumbnailUrl: assetMediaUrl(asset, "thumbnail"),
     previewUrl: assetMediaUrl(asset, "preview"),
+    originalUrl: `/api/v1/assets/${asset.id}/original?v=${encodeURIComponent(
+      asset.updatedAt || asset.fileModifiedAt || asset.checksum || asset.id,
+    )}`,
   };
 }
 

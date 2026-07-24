@@ -2614,9 +2614,15 @@ export default function UploadPanel({
                       style={driveFileThumbImageStyle}
                       loading="lazy"
                     />
+                  ) : file.isAudio ? (
+                    <img
+                      src="/audio-icon.png"
+                      alt=""
+                      style={driveFileThumbImageStyle}
+                    />
                   ) : (
                     <span style={driveFileTypeStyle}>
-                      {file.isAudio ? "AUD" : file.isVideo ? "VID" : "IMG"}
+                      {file.isVideo ? "VID" : "IMG"}
                     </span>
                   )}
                 </div>
@@ -2910,8 +2916,9 @@ export default function UploadPanel({
         <div style={managePreviewStyle}>
           {selectedAsset.type === "VIDEO" ? (
             <video
-              src={selectedAsset.previewUrl}
+              src={selectedAsset.originalUrl}
               controls
+              preload="metadata"
               style={manageMediaStyle}
             />
           ) : cropEditing ? (
