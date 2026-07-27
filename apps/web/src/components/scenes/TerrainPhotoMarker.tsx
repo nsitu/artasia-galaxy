@@ -481,6 +481,8 @@ const ORBIT_MIN_UNITS = 0.72;
 const ORBIT_MAX_UNITS = 2.15;
 const ORBIT_HEIGHT = 0.72;
 const ORBIT_SPEED = 0.16;
+const ORBIT_SPEED_MIN = ORBIT_SPEED * 0.5;
+const ORBIT_SPEED_MAX = ORBIT_SPEED * 1.5;
 const CUTOUT_BORDER_COLORS = [
   "#8e1d58",
   "#eee111",
@@ -635,7 +637,7 @@ export function OrbitingPhotoBanner({
   const orbit = useMemo(() => ({
     radius: stableRange(`${id}:radius`, ORBIT_MIN_UNITS, ORBIT_MAX_UNITS),
     phase: stableRange(`${id}:phase`, 0, Math.PI * 2),
-    speed: stableRange(`${id}:speed`, ORBIT_SPEED * 0.75, ORBIT_SPEED * 1.25),
+    speed: stableRange(`${id}:speed`, ORBIT_SPEED_MIN, ORBIT_SPEED_MAX),
   }), [id]);
   const cutout = useMemo(() => createCutoutCorners(id), [id]);
   const borderColor = useMemo(() => {
@@ -739,7 +741,7 @@ export function OrbitingAudioMarker({
   const orbit = useMemo(() => ({
     radius: stableRange(`${id}:radius`, ORBIT_MIN_UNITS, ORBIT_MAX_UNITS),
     phase: stableRange(`${id}:phase`, 0, Math.PI * 2),
-    speed: stableRange(`${id}:speed`, ORBIT_SPEED * 0.75, ORBIT_SPEED * 1.25),
+    speed: stableRange(`${id}:speed`, ORBIT_SPEED_MIN, ORBIT_SPEED_MAX),
   }), [id]);
   const triangle = useMemo(() => {
     const shape = new THREE.Shape();
