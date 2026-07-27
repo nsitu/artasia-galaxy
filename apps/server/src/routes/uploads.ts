@@ -425,66 +425,33 @@ async function buildSiteActivityStats(): Promise<SiteActivityStatsResponse> {
     publishedAlbum.id,
     { compact: true },
   );
-  const placementIds = new Set(
-    config.placements.map((placement) => placement.placement_id),
+  const activePublishedAssets = publishedAssets.filter(
+    (asset) => !asset.isArchived && !asset.isTrashed,
   );
-  const activityIds = new Set(
-    config.activities.map((activity) => activity.id),
-  );
-  const placementIdByLegacyLabel = new Map(
-    config.placements.map((placement) => [
-      placement.placement_name.trim().toLowerCase(),
-      placement.placement_id,
-    ]),
-  );
-  const activityIdByLegacyLabel = new Map(
-    config.activities.map((activity) => [
-      activity.label.trim().toLowerCase(),
-      activity.id,
-    ]),
+  const assignments = await getManagementAssignments(
+    activePublishedAssets.map((asset) => asset.id),
+    { includeAudio: false },
   );
   const totals = new Map<number, number>();
   const counts = new Map<number, Map<number, number>>();
 
-  for (const asset of publishedAssets) {
-    if (asset.isArchived || asset.isTrashed) continue;
-    const tagKeys = new Set(
-      (asset.tags ?? []).flatMap((tag) => [tag.name, tag.value])
-        .map((value) => value.trim().toLowerCase())
-        .filter(Boolean),
+  for (const asset of activePublishedAssets) {
+    const assignment = assignments.get(asset.id);
+    if (assignment?.placementId == null) continue;
+
+    totals.set(
+      assignment.placementId,
+      (totals.get(assignment.placementId) ?? 0) + 1,
     );
-    const assetPlacementIds = new Set<number>();
-    const assetActivityIds = new Set<number>();
+    if (assignment.activityId == null) continue;
 
-    for (const key of tagKeys) {
-      const placementMatch = key.match(/^placement:(\d+)$/);
-      const placementId = placementMatch
-        ? Number(placementMatch[1])
-        : placementIdByLegacyLabel.get(key);
-      if (placementId != null && placementIds.has(placementId)) {
-        assetPlacementIds.add(placementId);
-      }
-
-      const activityMatch = key.match(/^activity:(\d+)$/);
-      const activityId = activityMatch
-        ? Number(activityMatch[1])
-        : activityIdByLegacyLabel.get(key);
-      if (activityId != null && activityIds.has(activityId)) {
-        assetActivityIds.add(activityId);
-      }
-    }
-
-    for (const placementId of assetPlacementIds) {
-      totals.set(placementId, (totals.get(placementId) ?? 0) + 1);
-      const placementCounts = counts.get(placementId) ?? new Map<number, number>();
-      for (const activityId of assetActivityIds) {
-        placementCounts.set(
-          activityId,
-          (placementCounts.get(activityId) ?? 0) + 1,
-        );
-      }
-      counts.set(placementId, placementCounts);
-    }
+    const placementCounts =
+      counts.get(assignment.placementId) ?? new Map<number, number>();
+    placementCounts.set(
+      assignment.activityId,
+      (placementCounts.get(assignment.activityId) ?? 0) + 1,
+    );
+    counts.set(assignment.placementId, placementCounts);
   }
 
   const sites: SiteActivityStatsResponse["sites"] = {};
@@ -569,7 +536,10 @@ async function getUploaderAlbumMemberships(assetId: string, uploaderAlbums: Uplo
   return memberships;
 }
 
-async function getManagementAssignments(assetIds: string[]) {
+async function getManagementAssignments(
+  assetIds: string[],
+  options?: { includeAudio?: boolean },
+) {
   const assignments = new Map<string, AssetManagementAssignment>();
   if (assetIds.length === 0) return assignments;
 
@@ -638,11 +608,14 @@ async function getManagementAssignments(assetIds: string[]) {
     }
   }
 
-  const audioTag = tags.find((tag) => {
-    const name = tag.name.trim().toLowerCase();
-    const value = tag.value.trim().toLowerCase();
-    return name === "media:audio" || value === "media:audio";
-  });
+  const audioTag =
+    options?.includeAudio === false
+      ? undefined
+      : tags.find((tag) => {
+          const name = tag.name.trim().toLowerCase();
+          const value = tag.value.trim().toLowerCase();
+          return name === "media:audio" || value === "media:audio";
+        });
   if (audioTag) {
     const audioAssetIds = await searchAdminAssetIdsByTag(audioTag.id);
     for (const assetId of audioAssetIds) {
