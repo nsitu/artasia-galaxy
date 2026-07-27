@@ -1,5 +1,5 @@
-// Loads Material Symbols Outlined as a variable font from Google CDN.
-// The font supports variable axes: opsz (20-48), wght (100-700), FILL (0-1), GRAD (-50-200).
+// Public subsets use the filled Material Symbols instance for scene markers.
+// Admin still loads the complete variable font for browsing every symbol.
 const MATERIAL_SYMBOLS_LINK_ID = "material-symbols-outlined-font";
 const MATERIAL_SYMBOLS_FONT = '"Material Symbols Outlined"';
 const loadedIconNames = new Set<string>();
@@ -47,7 +47,8 @@ export async function loadMaterialSymbols(iconNames: string[] = ["home"]) {
     return;
   }
   const baseUrl = "https://fonts.googleapis.com/css2";
-  const fontFamily = "Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200";
+  const fontFamily =
+    "Material+Symbols+Outlined:opsz,wght,FILL,GRAD@48,400,1,0";
 
   for (const name of requestedIconNames) loadedIconNames.add(name);
 

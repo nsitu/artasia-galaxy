@@ -33,6 +33,37 @@ const TERRAIN_GL_OPTIONS = {
 type IntroPhase = "loading" | "ready" | "exiting" | "complete";
 const PARTNER_PATH_PREFIX = "/partners/";
 
+function getContrastingTextColour(backgroundColour: string): string | undefined {
+  const hex = backgroundColour.trim().replace(/^#/, "");
+  const expandedHex = /^[0-9a-f]{3}$/i.test(hex)
+    ? hex.split("").map((character) => character.repeat(2)).join("")
+    : hex;
+
+  if (!/^[0-9a-f]{6}$/i.test(expandedHex)) return undefined;
+
+  const [red, green, blue] = [0, 2, 4].map((offset) => {
+    const channel = Number.parseInt(expandedHex.slice(offset, offset + 2), 16) / 255;
+    return channel <= 0.04045
+      ? channel / 12.92
+      : ((channel + 0.055) / 1.055) ** 2.4;
+  });
+  const luminance = (0.2126 * red) + (0.7152 * green) + (0.0722 * blue);
+  const whiteContrast = 1.05 / (luminance + 0.05);
+  const blackContrast = (luminance + 0.05) / 0.05;
+
+  return whiteContrast >= blackContrast ? "#fff" : "#000";
+}
+
+function getActivityColourStyle(colour?: string): React.CSSProperties {
+  if (!colour?.trim()) return {};
+
+  const textColour = getContrastingTextColour(colour);
+  return {
+    backgroundColor: colour,
+    ...(textColour ? { color: textColour } : {}),
+  };
+}
+
 type TerrainMapControls = {
   target: THREE.Vector3;
   update?: () => void;
@@ -260,9 +291,7 @@ export default function ArtScene() {
                 onChange={(event) => setSelectedActivityFilter(event.target.value)}
                 style={{
                   ...filterSelectStyle,
-                  ...(selectedActivityColour
-                    ? { color: selectedActivityColour }
-                    : {}),
+                  ...getActivityColourStyle(selectedActivityColour),
                 }}
               >
                 <option value="" style={filterOptionStyle}>All Activities</option>
@@ -272,7 +301,7 @@ export default function ArtScene() {
                     value={String(option.id)}
                     style={{
                       ...filterOptionStyle,
-                      ...(option.colour ? { color: option.colour } : {}),
+                      ...getActivityColourStyle(option.colour),
                     }}
                   >
                     {option.label}

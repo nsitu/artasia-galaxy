@@ -912,13 +912,9 @@ export function OrbitingAudioMarker({
               color="#ffffff"
             />
           </mesh>
-          <mesh>
-            <ringGeometry args={[0.16, 0.205, 48]} />
-            <meshBasicMaterial color={color} side={THREE.DoubleSide} toneMapped={false} />
-          </mesh>
           {assignedIconTexture ? (
             <mesh position={[0, 0, 0.002]}>
-              <planeGeometry args={[0.25, 0.25]} />
+              <planeGeometry args={[0.36, 0.36]} />
               <meshBasicMaterial
                 map={assignedIconTexture}
                 color={color}
@@ -930,10 +926,24 @@ export function OrbitingAudioMarker({
               />
             </mesh>
           ) : (
-            <mesh position={[0.018, 0, 0.002]}>
-              <shapeGeometry args={[triangle]} />
-              <meshBasicMaterial color={color} side={THREE.DoubleSide} toneMapped={false} />
-            </mesh>
+            <>
+              <mesh>
+                <ringGeometry args={[0.16, 0.205, 48]} />
+                <meshBasicMaterial
+                  color={color}
+                  side={THREE.DoubleSide}
+                  toneMapped={false}
+                />
+              </mesh>
+              <mesh position={[0.018, 0, 0.002]}>
+                <shapeGeometry args={[triangle]} />
+                <meshBasicMaterial
+                  color={color}
+                  side={THREE.DoubleSide}
+                  toneMapped={false}
+                />
+              </mesh>
+            </>
           )}
         </group>
       </Billboard>
