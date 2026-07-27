@@ -6,6 +6,7 @@ import { fetchAuthUser, fetchUploadOptions, type ActivityOption, type AuthUser, 
 import { useGalleryStore } from "../../stores/galleryStore";
 import LoadingIndicator from "../ui/LoadingIndicator";
 import WelcomeOverlay from "../ui/WelcomeOverlay";
+import { loadMaterialSymbols } from "../../modules/iconLoader";
 import TerrainGallery, {
   FocusedPlacementOverlay,
   type PartnerFilterOption,
@@ -81,6 +82,15 @@ export default function ArtScene() {
   useEffect(() => {
     fetchPhotos();
   }, [fetchPhotos]);
+
+  useEffect(() => {
+    const assignedIconNames = photos.flatMap((photo) =>
+      photo.iconName ? [photo.iconName] : [],
+    );
+    if (assignedIconNames.length > 0) {
+      loadMaterialSymbols(assignedIconNames);
+    }
+  }, [photos]);
 
   useEffect(() => {
     let cancelled = false;

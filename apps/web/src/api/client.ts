@@ -16,6 +16,8 @@ export interface Photo {
   createdAt: string;
   fileName: string;
   isFavorite: boolean;
+  iconName?: string;
+  activityIds?: number[];
   useGpsLocation?: boolean;
   adjustments?: AssetAdjustments;
   exifInfo?: {
@@ -202,6 +204,7 @@ export interface PlacementAsset {
   placement_name?: string | null;
   activity_id?: number | null;
   activity_label?: string | null;
+  iconName?: string | null;
   uploader_id?: number | null;
   uploader_name?: string | null;
   uploader_album_id?: string | null;
@@ -342,6 +345,21 @@ export async function assignAssetActivityTag(params: {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ activity_id: params.activityId }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+}
+
+export async function setAssetIcon(params: {
+  assetId: string;
+  iconName: string | null;
+}): Promise<void> {
+  const res = await fetch(`/api/v1/uploads/assets/${params.assetId}/icon`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ icon_name: params.iconName }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));

@@ -1235,6 +1235,13 @@ export default function TerrainGallery({
     !isPreparingTerrain && geoPhotos.length === 0 && geoPlacements.length === 0;
 
   const notice = useMemo<TerrainNotice | null>(() => {
+    if (focusedPlacement && galleryLoading) {
+      return {
+        label: "Loading artworks",
+        detail: `Fetching assets for ${focusedPlacement.placement_name}.`,
+      };
+    }
+
     if (isPreparingTerrain) {
       return {
         label: galleryLoading ? "Loading gallery" : "Preparing terrain",
@@ -1265,6 +1272,7 @@ export default function TerrainGallery({
     return null;
   }, [
     error,
+    focusedPlacement,
     galleryLoading,
     hasNoTerrainLocations,
     isPreparingTerrain,

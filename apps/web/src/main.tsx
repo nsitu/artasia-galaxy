@@ -1,9 +1,12 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
-import { loadMaterialSymbols } from "./modules/iconLoader";
+import {
+  loadAllMaterialSymbols,
+  loadMaterialSymbols,
+} from "./modules/iconLoader";
 
-loadMaterialSymbols([
+const coreIconNames = [
   "reset_brightness",
   "reset_colors",
   "reset_shadow",
@@ -21,8 +24,18 @@ loadMaterialSymbols([
   "filter_alt_off",
   "warning",
   "child_hat",
-  "close"
-]);
+  "close",
+];
+
+if (
+  window.location.pathname === "/admin" ||
+  window.location.pathname.startsWith("/admin/") ||
+  /^\/edit\/[0-9a-f-]{36}$/i.test(window.location.pathname)
+) {
+  loadAllMaterialSymbols();
+} else {
+  loadMaterialSymbols(coreIconNames);
+}
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

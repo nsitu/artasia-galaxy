@@ -281,6 +281,7 @@ interface AssetManagementAssignment {
   placementName?: string;
   activityId?: number;
   activityLabel?: string;
+  iconName?: string;
   published?: boolean;
   isAudio?: boolean;
 }
@@ -351,6 +352,7 @@ function mapAdminAsset(
     placement_name: assignment?.placementName ?? null,
     activity_id: assignment?.activityId ?? null,
     activity_label: assignment?.activityLabel ?? null,
+    iconName: assignment?.iconName ?? null,
     uploader_id: uploaderAlbum?.uploaderId ?? null,
     uploader_name: uploaderAlbum?.uploaderName ?? null,
     uploader_album_id: uploaderAlbum?.id ?? null,
@@ -430,7 +432,7 @@ async function buildSiteActivityStats(): Promise<SiteActivityStatsResponse> {
   );
   const assignments = await getManagementAssignments(
     activePublishedAssets.map((asset) => asset.id),
-    { includeAudio: false },
+    { includeAudio: false, includeIcons: false },
   );
   const totals = new Map<number, number>();
   const counts = new Map<number, Map<number, number>>();
@@ -538,7 +540,7 @@ async function getUploaderAlbumMemberships(assetId: string, uploaderAlbums: Uplo
 
 async function getManagementAssignments(
   assetIds: string[],
-  options?: { includeAudio?: boolean },
+  options?: { includeAudio?: boolean; includeIcons?: boolean },
 ) {
   const assignments = new Map<string, AssetManagementAssignment>();
   if (assetIds.length === 0) return assignments;
@@ -606,6 +608,26 @@ async function getManagementAssignments(
       current.activityLabel = activity.label;
       assignments.set(assetId, current);
     }
+  }
+
+  if (options?.includeIcons !== false) {
+    const iconTags = tags.flatMap((tag) => {
+      const name = [tag.name, tag.value]
+        .map((value) => value.trim().toLowerCase())
+        .find((value) => /^icon:[a-z0-9_]+$/.test(value));
+      return name ? [{ id: tag.id, iconName: name.slice("icon:".length) }] : [];
+    });
+    await Promise.all(
+      iconTags.map(async ({ id, iconName }) => {
+        const taggedAssetIds = await searchAdminAssetIdsByTag(id);
+        for (const assetId of taggedAssetIds) {
+          if (!assetIdSet.has(assetId)) continue;
+          const current = assignments.get(assetId) ?? {};
+          current.iconName = iconName;
+          assignments.set(assetId, current);
+        }
+      }),
+    );
   }
 
   const audioTag =
@@ -935,6 +957,52 @@ router.post("/assets/:assetId/activity-tag", async (req, res) => {
     invalidateSiteActivityStats();
 
     res.json({ ok: true, asset_id: assetId, activity_id: activityId });
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
+});
+
+router.post("/assets/:assetId/icon", async (req, res) => {
+  try {
+    const auth = await getAuthContext(req);
+    if (!auth.authenticated) {
+      res.status(401).json({ error: "Sign in to assign an asset icon." });
+      return;
+    }
+
+    const assetId = req.params.assetId.trim();
+    if (!assetId) {
+      res.status(400).json({ error: "Asset ID is required." });
+      return;
+    }
+
+    const rawIconName = req.body?.icon_name;
+    const iconName =
+      rawIconName == null || rawIconName === ""
+        ? null
+        : String(rawIconName).trim().toLowerCase();
+    if (iconName && !/^[a-z0-9_]+$/.test(iconName)) {
+      res.status(400).json({ error: "Select a valid Material Symbol." });
+      return;
+    }
+
+    await getAsset(assetId);
+    const tags = await listTags();
+    const existingIconTagIds = tags
+      .filter((tag) =>
+        [tag.name, tag.value].some((value) =>
+          /^icon:[a-z0-9_]+$/i.test(value.trim()),
+        ),
+      )
+      .map((tag) => tag.id);
+    if (existingIconTagIds.length > 0) {
+      await untagAssets([assetId], existingIconTagIds);
+    }
+    if (iconName) {
+      await tagAsset(assetId, [`icon:${iconName}`]);
+    }
+
+    res.json({ ok: true, asset_id: assetId, icon_name: iconName });
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });
   }

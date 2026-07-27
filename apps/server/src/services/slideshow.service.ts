@@ -32,6 +32,8 @@ export interface Photo {
   isFavorite: boolean;
   useGpsLocation: boolean;
   adjustments: AssetAdjustments;
+  iconName?: string;
+  activityIds?: number[];
 }
 
 export interface SlideshowQuery {
@@ -82,6 +84,8 @@ function assetToPhoto(
   adjustments?: AssetAdjustments,
   forceAudio = false,
   useGpsLocation = true,
+  iconName?: string,
+  activityIds?: number[],
 ): Photo {
   const audio = forceAudio || isAudioAsset(asset);
   const imgW = asset.exifInfo?.exifImageWidth ?? 1920;
@@ -126,6 +130,8 @@ function assetToPhoto(
     isFavorite: asset.isFavorite ?? false,
     useGpsLocation,
     adjustments: adjustments ?? { ...DEFAULT_ASSET_ADJUSTMENTS },
+    ...(iconName ? { iconName } : {}),
+    ...(activityIds?.length ? { activityIds } : {}),
   };
 }
 
@@ -191,6 +197,7 @@ export async function querySlideshow(
     ),
   ];
 
+  const activityIdsByAssetId = new Map<string, Set<number>>();
   if (query.placementFocus) {
     const focus = query.placementFocus;
     const publishedAssetIds = new Set(assets.map((asset) => asset.id));
@@ -227,46 +234,86 @@ export async function querySlideshow(
     for (const asset of taggedAssets) byId.set(asset.id, asset);
     assets = Array.from(byId.values());
 
-    if (focus.activityId != null && Number.isFinite(focus.activityId)) {
-      const config = await getUploadConfig();
-      const activity = config.activities.find((a) => a.id === focus.activityId);
-      if (!activity) {
-        assets = [];
-      } else {
-        const anchorTagName = activityAnchorTag(focus.activityId);
-        const labelNorm = activity.label.trim().toLowerCase();
-        const activityTagIds = allTags
-          .filter((tag) =>
-            tag.name.trim().toLowerCase() === anchorTagName ||
-            tag.value.trim().toLowerCase() === anchorTagName ||
-            tag.name.trim().toLowerCase() === labelNorm ||
-            tag.value.trim().toLowerCase() === labelNorm
-          )
-          .map((tag) => tag.id);
-
-        if (activityTagIds.length === 0) {
-          assets = [];
-        } else {
-          const activityAssetIds = new Set(
-            (await Promise.all(activityTagIds.map(searchAssetIdsByTag))).flat()
+    const config = await getUploadConfig();
+    const activityAssignments = config.activities.map((activity) => {
+      const anchorTagName = activityAnchorTag(activity.id).toLowerCase();
+      const labelNorm = activity.label.trim().toLowerCase();
+      const tagIds = allTags
+        .filter((tag) => {
+          const tagKeys = [tag.name, tag.value].map((value) =>
+            value.trim().toLowerCase(),
           );
-          assets = assets.filter((asset) => activityAssetIds.has(asset.id));
-        }
+          return (
+            tagKeys.includes(anchorTagName) || tagKeys.includes(labelNorm)
+          );
+        })
+        .map((tag) => tag.id);
+      return { activityId: activity.id, tagIds: [...new Set(tagIds)] };
+    });
+    const activityMemberships = await Promise.all(
+      activityAssignments.map(async ({ activityId, tagIds }) => ({
+        activityId,
+        assetIds:
+          tagIds.length > 0
+            ? (
+                await Promise.all(tagIds.map(searchAssetIdsByTag))
+              ).flat()
+            : [],
+      })),
+    );
+    const placementAssetIds = new Set(assets.map((asset) => asset.id));
+    for (const membership of activityMemberships) {
+      for (const assetId of membership.assetIds) {
+        if (!placementAssetIds.has(assetId)) continue;
+        const activityIds =
+          activityIdsByAssetId.get(assetId) ?? new Set<number>();
+        activityIds.add(membership.activityId);
+        activityIdsByAssetId.set(assetId, activityIds);
       }
+    }
+
+    if (focus.activityId != null && Number.isFinite(focus.activityId)) {
+      assets = assets.filter((asset) =>
+        activityIdsByAssetId.get(asset.id)?.has(focus.activityId as number),
+      );
     }
   }
 
   const assetIds = assets.map((asset) => asset.id);
-  const [adjustmentMap, gpsDisabledAssetIds] = await Promise.all([
+  const assetIdSet = new Set(assetIds);
+  const iconTags = allTags.flatMap((tag) => {
+    const keys = [tag.name, tag.value].map((value) =>
+      value.trim().toLowerCase(),
+    );
+    const key = keys.find((value) => /^icon:[a-z0-9_]+$/.test(value));
+    return key ? [{ tagId: tag.id, iconName: key.slice(5) }] : [];
+  });
+  const [adjustmentMap, gpsDisabledAssetIds, iconTagAssignments] = await Promise.all([
     getAssetAdjustmentMap(assetIds),
     getGpsDisabledAssetIds(assetIds),
+    Promise.all(
+      iconTags.map(async (iconTag) => ({
+        ...iconTag,
+        assetIds: await searchAssetIdsByTag(iconTag.tagId),
+      })),
+    ),
   ]);
+  const iconNameByAssetId = new Map<string, string>();
+  for (const assignment of iconTagAssignments) {
+    for (const assetId of assignment.assetIds) {
+      if (assetIdSet.has(assetId) && !iconNameByAssetId.has(assetId)) {
+        iconNameByAssetId.set(assetId, assignment.iconName);
+      }
+    }
+  }
   let photos = assets.map((asset) =>
     assetToPhoto(
       asset,
       adjustmentMap.get(asset.id),
       audioIdSet.has(asset.id),
       !gpsDisabledAssetIds.has(asset.id),
+      iconNameByAssetId.get(asset.id),
+      Array.from(activityIdsByAssetId.get(asset.id) ?? []),
     ),
   );
 

@@ -25,6 +25,40 @@ interface GalleryState {
 }
 
 let galleryRequestId = 0;
+const placementPhotoCache = new Map<number, Photo[]>();
+const placementPhotoRequests = new Map<number, Promise<Photo[]>>();
+
+function photosForActivity(photos: Photo[], activityId?: number) {
+  if (activityId == null) return photos;
+  return photos.filter((photo) => photo.activityIds?.includes(activityId));
+}
+
+function requestPlacementPhotos(params: {
+  placementId: number;
+  lat: number;
+  lng: number;
+  radiusKm: number;
+}) {
+  const cached = placementPhotoCache.get(params.placementId);
+  if (cached) return Promise.resolve(cached);
+
+  const pending = placementPhotoRequests.get(params.placementId);
+  if (pending) return pending;
+
+  const request = fetchSlideshow({
+    placementFocus: params,
+    limit: 500,
+  })
+    .then((result) => {
+      placementPhotoCache.set(params.placementId, result.photos);
+      return result.photos;
+    })
+    .finally(() => {
+      placementPhotoRequests.delete(params.placementId);
+    });
+  placementPhotoRequests.set(params.placementId, request);
+  return request;
+}
 
 export const useGalleryStore = create<GalleryState>((set) => ({
   photos: [],
@@ -61,14 +95,25 @@ export const useGalleryStore = create<GalleryState>((set) => ({
       placementId: params.placementId,
       ...(params.activityId != null ? { activityId: params.activityId } : {}),
     };
-    set({ photos: [], photoScope: scope, loading: true, error: null, selectedPhotoIndex: null });
+    const cached = placementPhotoCache.get(params.placementId);
+    set({
+      photos: cached
+        ? photosForActivity(cached, params.activityId)
+        : [],
+      photoScope: scope,
+      loading: !cached,
+      error: null,
+      selectedPhotoIndex: null,
+    });
+    if (cached) return;
     try {
-      const result = await fetchSlideshow({
-        placementFocus: params,
-        limit: 500,
-      });
+      const photos = await requestPlacementPhotos(params);
       if (requestId === galleryRequestId) {
-        set({ photos: result.photos, photoScope: scope, loading: false });
+        set({
+          photos: photosForActivity(photos, params.activityId),
+          photoScope: scope,
+          loading: false,
+        });
       }
     } catch (err) {
       if (requestId === galleryRequestId) {

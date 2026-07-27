@@ -22,6 +22,7 @@ import {
   logoutAuthUser,
   resetUploadAssetEdits,
   setAssetArchived,
+  setAssetIcon,
   setAssetPublished,
   syncDriveFiles,
   updateAssetCaption,
@@ -41,6 +42,7 @@ import {
   type SiteActivityStats,
 } from "../../api/client";
 import AudioTrimEditor from "./AudioTrimEditor";
+import MaterialIconPicker from "./MaterialIconPicker";
 import RetryableUploadThumbnail from "./RetryableUploadThumbnail";
 
 interface UploadItem {
@@ -183,6 +185,7 @@ export default function UploadPanel({
   const [managePlacementKey, setManagePlacementKey] = useState("");
   const [manageUploaderKey, setManageUploaderKey] = useState("");
   const [manageActivityTag, setManageActivityTag] = useState("");
+  const [manageIconName, setManageIconName] = useState<string | null>(null);
   const [managePublished, setManagePublished] = useState(false);
   const [manageArchived, setManageArchived] = useState(false);
   const [manageCaption, setManageCaption] = useState("");
@@ -1506,6 +1509,7 @@ export default function UploadPanel({
     setManagePlacementKey(asset.placement_id ? String(asset.placement_id) : "");
     setManageUploaderKey(asset.uploader_id ? String(asset.uploader_id) : "");
     setManageActivityTag(asset.activity_id ? String(asset.activity_id) : "");
+    setManageIconName(asset.iconName ?? null);
     setManagePublished(Boolean(asset.published));
     setManageArchived(Boolean(asset.archived));
     setManageCaption(asset.description ?? "");
@@ -1544,6 +1548,7 @@ export default function UploadPanel({
     setManagePlacementKey("");
     setManageUploaderKey("");
     setManageActivityTag("");
+    setManageIconName(null);
     setManagePublished(false);
     setManageArchived(false);
     setManageCaption("");
@@ -1623,6 +1628,7 @@ export default function UploadPanel({
     const activityTagChanged =
       manageActivityTag !==
       (selectedAsset.activity_id ? String(selectedAsset.activity_id) : "");
+    const iconChanged = manageIconName !== (selectedAsset.iconName ?? null);
     const publishedChanged =
       managePublished !== Boolean(selectedAsset.published);
     const archivedChanged =
@@ -1632,6 +1638,7 @@ export default function UploadPanel({
       !placementChanged &&
       !uploaderChanged &&
       !activityTagChanged &&
+      !iconChanged &&
       !publishedChanged &&
       !archivedChanged
     ) {
@@ -1671,6 +1678,12 @@ export default function UploadPanel({
             : null,
         });
       }
+      if (iconChanged) {
+        await setAssetIcon({
+          assetId: selectedAsset.id,
+          iconName: manageIconName,
+        });
+      }
       if (publishedChanged) {
         await setAssetPublished({
           assetId: selectedAsset.id,
@@ -1705,6 +1718,7 @@ export default function UploadPanel({
     const activityChanged =
       manageActivityTag !==
       (selectedAsset.activity_id ? String(selectedAsset.activity_id) : "");
+    const iconChanged = manageIconName !== (selectedAsset.iconName ?? null);
     const publishedChanged =
       managePublished !== Boolean(selectedAsset.published);
     const archivedChanged =
@@ -1732,6 +1746,7 @@ export default function UploadPanel({
       !placementChanged &&
       !uploaderChanged &&
       !activityChanged &&
+      !iconChanged &&
       !publishedChanged &&
       !archivedChanged &&
       !captionChanged &&
@@ -1802,6 +1817,8 @@ export default function UploadPanel({
             : null,
         });
       }
+      if (iconChanged)
+        await setAssetIcon({ assetId, iconName: manageIconName });
       if (publishedChanged)
         await setAssetPublished({ assetId, published: managePublished });
       if (archivedChanged)
@@ -3218,6 +3235,7 @@ export default function UploadPanel({
     const activityChanged =
       manageActivityTag !==
       (selectedAsset.activity_id ? String(selectedAsset.activity_id) : "");
+    const iconChanged = manageIconName !== (selectedAsset.iconName ?? null);
     const publishedChanged =
       managePublished !== Boolean(selectedAsset.published);
     const archivedChanged =
@@ -3244,6 +3262,7 @@ export default function UploadPanel({
       placementChanged ||
       uploaderChanged ||
       activityChanged ||
+      iconChanged ||
       publishedChanged ||
       archivedChanged ||
       adjustmentChanged ||
@@ -3489,6 +3508,18 @@ export default function UploadPanel({
               ))}
             </select>
           </label>
+          <div style={labelStyle}>
+            <span>Asset Icon</span>
+            <MaterialIconPicker
+              value={manageIconName}
+              onChange={setManageIconName}
+              disabled={!authUser?.authenticated || savingAsset}
+            />
+            <span style={fieldHelpStyle}>
+              Stored in Immich as an <code>icon:name</code> tag and used by
+              the Galaxy viewer, especially for sound assets.
+            </span>
+          </div>
           <label style={labelStyle}>
             Caption / Description
             <textarea
