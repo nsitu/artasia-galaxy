@@ -65,6 +65,7 @@ function artasia_get_uploaders(): WP_REST_Response
             'name'  => $person->post_title,
             'role'  => get_post_meta($person->ID, 'artasia_role', true) ?: 'Artist Educator',
             'email' => get_post_meta($person->ID, 'artasia_email', true) ?: '',
+            'bio'   => get_post_meta($person->ID, 'artasia_bio', true) ?: '',
         ];
     }
 
@@ -176,6 +177,7 @@ function artasia_get_expanded_placements(): WP_REST_Response
                 'name'  => $person->post_title,
                 'role'  => get_post_meta($person->ID, 'artasia_role', true) ?: 'Artist Educator',
                 'email' => get_post_meta($person->ID, 'artasia_email', true) ?: '',
+                'bio'   => get_post_meta($person->ID, 'artasia_bio', true) ?: '',
                 'photo' => artasia_get_people_photo_response($photo_id),
             ];
         }
@@ -195,6 +197,7 @@ function artasia_get_expanded_placements(): WP_REST_Response
             'placement_name' => $placement->post_title,
             'placement_slug' => $placement->post_name,
             'project' => $project_lookup[$project_id] ?? null,
+            'description' => get_post_meta($placement->ID, 'artasia_placement_description', true) ?: '',
             'program_context' => get_post_meta($placement->ID, 'artasia_program_context', true) ?: '',
             'is_earlyon' => (bool) get_post_meta($placement->ID, 'artasia_is_earlyon', true),
             'section' => get_post_meta($placement->ID, 'artasia_section', true) ?: '',

@@ -73,7 +73,7 @@ function artasia_post_type_contexts(): array
                     artasia_context_post_type_link('artasia_partner', 'partner'),
                     artasia_context_post_type_link('artasia_placement', 'placement')
                 ),
-                "Use this record for the person's name, role, email address, photo, and internal notes.",
+                "Use this record for the person's name, role, email address, photo, public bio, and internal notes.",
             ],
         ],
         'artasia_placement' => [
@@ -87,7 +87,7 @@ function artasia_post_type_contexts(): array
                     artasia_context_post_type_link('artasia_place', 'place')
                 ),
                 sprintf(
-                    'Use this record to name the placement and connect the %s, %s, %s, program context, section, and participant details.',
+                    'Use this record to name and describe the placement and connect the %s, %s, %s, program context, section, and participant details.',
                     artasia_context_post_type_link('artasia_project', 'project'),
                     artasia_context_post_type_link('artasia_place', 'place'),
                     artasia_context_post_type_link('artasia_partner', 'Artasia Partner')
@@ -259,6 +259,7 @@ function artasia_placement_meta_box_html(WP_Post $post): void
     $team_member_id = get_post_meta($post->ID, 'artasia_team_member_id', true);
     $secondary_team_member_id = get_post_meta($post->ID, 'artasia_secondary_team_member_id', true);
     $program_context = get_post_meta($post->ID, 'artasia_program_context', true);
+    $description = get_post_meta($post->ID, 'artasia_placement_description', true);
     $is_earlyon     = (bool) get_post_meta($post->ID, 'artasia_is_earlyon', true);
     $section        = get_post_meta($post->ID, 'artasia_section', true);
     $participant_count = get_post_meta($post->ID, 'artasia_participant_count', true);
@@ -435,6 +436,20 @@ function artasia_placement_meta_box_html(WP_Post $post): void
                 <p class="description">Provide the age range of the attending children. Use number or words (e.g. 'School age')</p>
             </td>
         </tr>
+        <tr>
+            <th><label for="artasia_placement_description_editor">Description</label></th>
+            <td>
+                <?php
+                wp_editor($description, 'artasia_placement_description_editor', [
+                    'textarea_name' => 'artasia_placement_description',
+                    'textarea_rows' => 10,
+                    'media_buttons' => false,
+                    'teeny'         => false,
+                ]);
+                ?>
+                <p class="description">A rich-text description of this placement and its program context.</p>
+            </td>
+        </tr>
     </table>
 <?php
 }
@@ -487,6 +502,7 @@ function artasia_save_placement_meta(int $post_id): void
 
     update_post_meta($post_id, 'artasia_project_id', intval($_POST['artasia_project_id'] ?? 0));
     update_post_meta($post_id, 'artasia_program_context', sanitize_text_field($_POST['artasia_program_context'] ?? ''));
+    update_post_meta($post_id, 'artasia_placement_description', wp_kses_post(wp_unslash($_POST['artasia_placement_description'] ?? '')));
     update_post_meta($post_id, 'artasia_is_earlyon', isset($_POST['artasia_is_earlyon']));
     update_post_meta($post_id, 'artasia_place_id', intval($_POST['artasia_place_id'] ?? 0));
     update_post_meta($post_id, 'artasia_partner_id', intval($_POST['artasia_partner_id'] ?? 0));
@@ -982,6 +998,7 @@ function artasia_people_meta_box_html(WP_Post $post): void
     $email = get_post_meta($post->ID, 'artasia_email', true);
     $photo_id = intval(get_post_meta($post->ID, 'artasia_photo_id', true));
     $photo_url = $photo_id ? wp_get_attachment_url($photo_id) : '';
+    $bio = get_post_meta($post->ID, 'artasia_bio', true);
     $notes = get_post_meta($post->ID, 'artasia_notes', true);
 
     wp_nonce_field('artasia_people_meta', 'artasia_people_meta_nonce');
@@ -1006,6 +1023,20 @@ function artasia_people_meta_box_html(WP_Post $post): void
                 </div>
                 <button type="button" class="button" id="artasia_people_photo_select">Select Photo</button>
                 <button type="button" class="button" id="artasia_people_photo_remove" <?php disabled(!$photo_id); ?>>Remove Photo</button>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_people_bio_editor">Bio</label></th>
+            <td>
+                <?php
+                wp_editor($bio, 'artasia_people_bio_editor', [
+                    'textarea_name' => 'artasia_bio',
+                    'textarea_rows' => 10,
+                    'media_buttons' => true,
+                    'teeny'         => false,
+                ]);
+                ?>
+                <p class="description">A public biography for this person. Rich text formatting and media are supported.</p>
             </td>
         </tr>
         <tr>
@@ -1070,6 +1101,7 @@ function artasia_save_people_meta(int $post_id): void
     update_post_meta($post_id, 'artasia_role', $role);
     update_post_meta($post_id, 'artasia_email', sanitize_email($_POST['artasia_email'] ?? ''));
     update_post_meta($post_id, 'artasia_photo_id', artasia_validate_image_attachment_id(intval($_POST['artasia_photo_id'] ?? 0)));
+    update_post_meta($post_id, 'artasia_bio', wp_kses_post(wp_unslash($_POST['artasia_bio'] ?? '')));
     update_post_meta($post_id, 'artasia_notes', sanitize_textarea_field($_POST['artasia_notes'] ?? ''));
 }
 add_action('save_post_artasia_people', 'artasia_save_people_meta');

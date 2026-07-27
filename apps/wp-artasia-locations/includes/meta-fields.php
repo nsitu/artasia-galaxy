@@ -139,6 +139,13 @@ function artasia_register_meta_fields(): void
         'show_in_rest' => true,
         'sanitize_callback' => 'sanitize_text_field',
     ]);
+    register_post_meta('artasia_placement', 'artasia_placement_description', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'wp_kses_post',
+    ]);
     register_post_meta('artasia_placement', 'artasia_is_earlyon', [
         'type'         => 'boolean',
         'single'       => true,
@@ -268,6 +275,13 @@ function artasia_register_meta_fields(): void
         'default'      => 0,
         'show_in_rest' => true,
         'sanitize_callback' => 'artasia_sanitize_integer_meta',
+    ]);
+    register_post_meta('artasia_people', 'artasia_bio', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'wp_kses_post',
     ]);
     register_post_meta('artasia_people', 'artasia_notes', [
         'type'         => 'string',
