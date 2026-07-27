@@ -259,6 +259,8 @@ export async function searchAssets(params: {
   type?: "IMAGE" | "VIDEO";
   page?: number;
   size?: number;
+  withExif?: boolean;
+  withPeople?: boolean;
   takenAfter?: string;
   takenBefore?: string;
 }): Promise<ImmichSearchResponse> {
@@ -266,8 +268,8 @@ export async function searchAssets(params: {
     page: params.page ?? 1,
     size: params.size ?? 100,
     type: params.type ?? "IMAGE",
-    withExif: true,
-    withPeople: true,
+    withExif: params.withExif ?? true,
+    withPeople: params.withPeople ?? true,
   };
 
   if (params.albumId) body.albumId = params.albumId;

@@ -64,6 +64,25 @@ import {
 const router = Router();
 const DATA_DIR = process.env.DATA_DIR ?? join(process.cwd(), "data");
 const UPLOAD_TMP_DIR = join(DATA_DIR, "upload-tmp");
+const SITE_ACTIVITY_STATS_TTL_MS = 30_000;
+
+interface SiteActivityStatsResponse {
+  sites: Record<string, {
+    totalPublished: number;
+    activities: Array<{
+      activityId: number;
+      label: string;
+      publishedCount: number;
+    }>;
+  }>;
+  generatedAt: string;
+}
+
+let siteActivityStatsCache: {
+  expiresAt: number;
+  value: SiteActivityStatsResponse;
+} | null = null;
+let siteActivityStatsRequest: Promise<SiteActivityStatsResponse> | null = null;
 
 mkdirSync(UPLOAD_TMP_DIR, { recursive: true });
 
@@ -320,13 +339,22 @@ function assetMediaUrl(asset: Awaited<ReturnType<typeof getAssetsForPlacementTag
   return `/api/v1/assets/${asset.id}/${kind}?v=${version}&edited=true`;
 }
 
-async function searchAssetsByAlbumId(albumId: string) {
+async function searchAssetsByAlbumId(
+  albumId: string,
+  options?: { compact?: boolean },
+) {
   const byId = new Map<string, Awaited<ReturnType<typeof searchAssets>>["assets"]["items"][number]>();
-  const size = 100;
+  const size = options?.compact ? 500 : 100;
   for (const type of ["IMAGE", "VIDEO"] as const) {
     let page = 1;
     for (;;) {
-      const result = await searchAssets({ albumIds: [albumId], page, size, type });
+      const result = await searchAssets({
+        albumIds: [albumId],
+        page,
+        size,
+        type,
+        ...(options?.compact ? { withExif: false, withPeople: false } : {}),
+      });
       for (const asset of result.assets.items) byId.set(asset.id, asset);
       if (!result.assets.nextPage || result.assets.items.length < size) break;
       page += 1;
@@ -350,6 +378,123 @@ async function searchAllImmichAssets() {
   }
 
   return Array.from(byId.values()).sort((a, b) => b.fileCreatedAt.localeCompare(a.fileCreatedAt));
+}
+
+async function buildSiteActivityStats(): Promise<SiteActivityStatsResponse> {
+  const [config, publishedAlbum] = await Promise.all([
+    getUploadConfig(),
+    getPublishedAlbum(),
+  ]);
+  const publishedAssets = await searchAssetsByAlbumId(
+    publishedAlbum.id,
+    { compact: true },
+  );
+  const placementIds = new Set(
+    config.placements.map((placement) => placement.placement_id),
+  );
+  const activityIds = new Set(
+    config.activities.map((activity) => activity.id),
+  );
+  const placementIdByLegacyLabel = new Map(
+    config.placements.map((placement) => [
+      placement.placement_name.trim().toLowerCase(),
+      placement.placement_id,
+    ]),
+  );
+  const activityIdByLegacyLabel = new Map(
+    config.activities.map((activity) => [
+      activity.label.trim().toLowerCase(),
+      activity.id,
+    ]),
+  );
+  const totals = new Map<number, number>();
+  const counts = new Map<number, Map<number, number>>();
+
+  for (const asset of publishedAssets) {
+    if (asset.isArchived || asset.isTrashed) continue;
+    const tagKeys = new Set(
+      (asset.tags ?? []).flatMap((tag) => [tag.name, tag.value])
+        .map((value) => value.trim().toLowerCase())
+        .filter(Boolean),
+    );
+    const assetPlacementIds = new Set<number>();
+    const assetActivityIds = new Set<number>();
+
+    for (const key of tagKeys) {
+      const placementMatch = key.match(/^placement:(\d+)$/);
+      const placementId = placementMatch
+        ? Number(placementMatch[1])
+        : placementIdByLegacyLabel.get(key);
+      if (placementId != null && placementIds.has(placementId)) {
+        assetPlacementIds.add(placementId);
+      }
+
+      const activityMatch = key.match(/^activity:(\d+)$/);
+      const activityId = activityMatch
+        ? Number(activityMatch[1])
+        : activityIdByLegacyLabel.get(key);
+      if (activityId != null && activityIds.has(activityId)) {
+        assetActivityIds.add(activityId);
+      }
+    }
+
+    for (const placementId of assetPlacementIds) {
+      totals.set(placementId, (totals.get(placementId) ?? 0) + 1);
+      const placementCounts = counts.get(placementId) ?? new Map<number, number>();
+      for (const activityId of assetActivityIds) {
+        placementCounts.set(
+          activityId,
+          (placementCounts.get(activityId) ?? 0) + 1,
+        );
+      }
+      counts.set(placementId, placementCounts);
+    }
+  }
+
+  const sites: SiteActivityStatsResponse["sites"] = {};
+  for (const placement of config.placements) {
+    const placementCounts = counts.get(placement.placement_id);
+    sites[String(placement.placement_id)] = {
+      totalPublished: totals.get(placement.placement_id) ?? 0,
+      activities: config.activities.flatMap((activity) => {
+        const publishedCount = placementCounts?.get(activity.id) ?? 0;
+        return publishedCount > 0
+          ? [{
+              activityId: activity.id,
+              label: activity.label,
+              publishedCount,
+            }]
+          : [];
+      }),
+    };
+  }
+
+  return { sites, generatedAt: new Date().toISOString() };
+}
+
+async function getSiteActivityStats(): Promise<SiteActivityStatsResponse> {
+  if (siteActivityStatsCache && siteActivityStatsCache.expiresAt > Date.now()) {
+    return siteActivityStatsCache.value;
+  }
+  if (siteActivityStatsRequest) return siteActivityStatsRequest;
+
+  const request = buildSiteActivityStats()
+    .then((value) => {
+      siteActivityStatsCache = {
+        expiresAt: Date.now() + SITE_ACTIVITY_STATS_TTL_MS,
+        value,
+      };
+      return value;
+    })
+    .finally(() => {
+      siteActivityStatsRequest = null;
+    });
+  siteActivityStatsRequest = request;
+  return request;
+}
+
+function invalidateSiteActivityStats() {
+  siteActivityStatsCache = null;
 }
 
 async function getUploaderAlbums(): Promise<UploaderAlbum[]> {
@@ -526,6 +671,19 @@ router.get("/options", async (req, res) => {
   }
 });
 
+router.get("/site-activity-stats", async (req, res) => {
+  try {
+    const auth = await getAuthContext(req);
+    if (!auth.authenticated) {
+      res.status(401).json({ error: "Sign in to view site statistics." });
+      return;
+    }
+    res.json(await getSiteActivityStats());
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
+});
+
 router.get("/assets", async (req, res) => {
   try {
     const rawPlacementIds = typeof req.query.placement_ids === "string" ? req.query.placement_ids : "";
@@ -667,6 +825,7 @@ router.post("/assets/:assetId/placement", async (req, res) => {
       lat: placement.place?.lat,
       lng: placement.place?.lng,
     });
+    invalidateSiteActivityStats();
 
     res.json({
       ok: true,
@@ -764,6 +923,7 @@ router.post("/assets/:assetId/activity-tag", async (req, res) => {
       }
       await tagAsset(assetId, tagNames);
     }
+    invalidateSiteActivityStats();
 
     res.json({ ok: true, asset_id: assetId, activity_id: activityId });
   } catch (err) {
@@ -794,6 +954,7 @@ router.post("/assets/:assetId/published", async (req, res) => {
     } else {
       await removeAssetsFromAlbum(album.id, [assetId]);
     }
+    invalidateSiteActivityStats();
 
     res.json({
       ok: true,
@@ -1144,6 +1305,7 @@ router.delete("/assets/:assetId", async (req, res) => {
 
     await getAsset(assetId);
     await deleteAssets([assetId]);
+    invalidateSiteActivityStats();
 
     res.json({
       ok: true,

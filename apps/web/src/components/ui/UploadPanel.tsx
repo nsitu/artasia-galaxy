@@ -14,6 +14,7 @@ import {
   flattenUploadAsset,
   fetchPlacementAssetSet,
   fetchPlacementAssets,
+  fetchSiteActivityStats,
   fetchUploadOptions,
   fetchUploadAssetAdjustments,
   fetchUploadAsset,
@@ -36,6 +37,7 @@ import {
   type RotationDegrees,
   type UploadOptions,
   type PlacementAsset,
+  type SiteActivityStats,
 } from "../../api/client";
 import AudioTrimEditor from "./AudioTrimEditor";
 import RetryableUploadThumbnail from "./RetryableUploadThumbnail";
@@ -71,6 +73,7 @@ type DeliveryDayFilter =
   | "thursday"
   | "friday";
 type SiteScope = "select" | "all" | "placement";
+type SiteSort = "default" | "assets-desc" | "assets-asc";
 type WorkspaceMode = "sites" | "browse" | "edit" | "upload" | "import";
 type PlacementMetaLine = {
   text: string;
@@ -165,6 +168,12 @@ export default function UploadPanel({
     "placements",
   );
   const [siteScope, setSiteScope] = useState<SiteScope>("select");
+  const [siteSort, setSiteSort] = useState<SiteSort>("default");
+  const [siteActivityStats, setSiteActivityStats] = useState<
+    SiteActivityStats["sites"]
+  >({});
+  const [siteActivityStatsLoading, setSiteActivityStatsLoading] =
+    useState(false);
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("sites");
   const [selectedAsset, setSelectedAsset] = useState<PlacementAsset | null>(
     null,
@@ -468,6 +477,26 @@ export default function UploadPanel({
   }, [appPath, appSearch, options]);
 
   useEffect(() => {
+    if (workspaceMode !== "sites" || !authUser?.authenticated) return;
+    let cancelled = false;
+    setSiteActivityStatsLoading(true);
+    fetchSiteActivityStats()
+      .then((result) => {
+        if (!cancelled) setSiteActivityStats(result.sites);
+      })
+      .catch((err) => {
+        if (!cancelled) setError((err as Error).message);
+      })
+      .finally(() => {
+        if (!cancelled) setSiteActivityStatsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authUser?.authenticated, workspaceMode]);
+
+  useEffect(() => {
     if (!initialAssetId) {
       setDirectAssetLoading(false);
       const baseAdminPaths = ["/admin", "/admin/browse"];
@@ -740,15 +769,30 @@ export default function UploadPanel({
       .filter(placementMatchesDeliveryDay)
       .filter(placementMatchesTimeOfDay)
       .filter(placementMatchesAgeRange);
-    if (
+    const partnerFilteredPlacements =
       workspaceMode === "upload" ||
       workspaceMode === "import" ||
       !browsePartnerKey
-    )
-      return contextFilteredPlacements;
-    return contextFilteredPlacements.filter(
-      (placement) => placement.partner_name?.trim() === browsePartnerKey,
-    );
+        ? contextFilteredPlacements
+        : contextFilteredPlacements.filter(
+            (placement) =>
+              placement.partner_name?.trim() === browsePartnerKey,
+          );
+    if (workspaceMode !== "sites" || siteSort === "default") {
+      return partnerFilteredPlacements;
+    }
+
+    const direction = siteSort === "assets-desc" ? -1 : 1;
+    return [...partnerFilteredPlacements].sort((a, b) => {
+      const countA =
+        siteActivityStats[String(a.placement_id)]?.totalPublished ?? 0;
+      const countB =
+        siteActivityStats[String(b.placement_id)]?.totalPublished ?? 0;
+      return (
+        (countA - countB) * direction ||
+        placementLabel(a).localeCompare(placementLabel(b))
+      );
+    });
   }, [
     ageRangeFilter,
     browseContextFilter,
@@ -756,6 +800,8 @@ export default function UploadPanel({
     deliveryDayFilter,
     options,
     selectedUploader,
+    siteActivityStats,
+    siteSort,
     timeOfDayFilter,
     workspaceMode,
   ]);
@@ -1031,6 +1077,11 @@ export default function UploadPanel({
 
   useEffect(() => {
     if (workspaceMode === "edit") return;
+    if (workspaceMode === "sites") {
+      setPlacementAssets([]);
+      setAssetsLoading(false);
+      return;
+    }
     if (assetMode === "untagged") {
       let cancelled = false;
       setAssetsLoading(true);
@@ -2936,6 +2987,7 @@ export default function UploadPanel({
                     ),
                   )}
                 </span>
+                {renderSiteActivityStats(placement.placement_id)}
               </div>
               <div style={siteActionRowStyle}>
                 <button
@@ -2997,6 +3049,42 @@ export default function UploadPanel({
 
         {filteredPlacements.length === 0 && (
           <div style={emptyStateStyle}>No sites match the current filters.</div>
+        )}
+      </div>
+    );
+  }
+
+  function renderSiteActivityStats(placementId: number) {
+    if (!authUser?.authenticated) return null;
+    if (siteActivityStatsLoading && !siteActivityStats[String(placementId)]) {
+      return <div style={siteStatsLoadingStyle}>Loading asset statistics…</div>;
+    }
+
+    const stats = siteActivityStats[String(placementId)];
+    if (!stats || stats.totalPublished === 0) {
+      return <div style={siteStatsEmptyStyle}>No published assets</div>;
+    }
+
+    return (
+      <div style={siteStatsStyle}>
+        <div style={siteStatsTotalStyle}>
+          {stats.totalPublished} published asset
+          {stats.totalPublished === 1 ? "" : "s"}
+        </div>
+        {stats.activities.length > 0 ? (
+          <ul style={siteStatsListStyle}>
+            {stats.activities.map((activity) => (
+              <li key={activity.activityId} style={siteStatsItemStyle}>
+                <span>{activity.label}</span>
+                <span style={siteStatsCountStyle}>
+                  {activity.publishedCount} asset
+                  {activity.publishedCount === 1 ? "" : "s"} published
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div style={siteStatsEmptyStyle}>No activity tags assigned</div>
         )}
       </div>
     );
@@ -4177,6 +4265,27 @@ export default function UploadPanel({
                 </label>
               )}
 
+              {workspaceMode === "sites" && (
+                <label style={labelStyle}>
+                  Sort Sites
+                  <select
+                    value={siteSort}
+                    onChange={(event) =>
+                      setSiteSort(event.target.value as SiteSort)
+                    }
+                    style={inputStyle}
+                  >
+                    <option value="default">Default order</option>
+                    <option value="assets-desc">
+                      Most published assets
+                    </option>
+                    <option value="assets-asc">
+                      Fewest published assets
+                    </option>
+                  </select>
+                </label>
+              )}
+
               {workspaceMode === "sites" && hasActiveSiteFilters && (
                 <button
                   type="button"
@@ -4646,6 +4755,55 @@ const siteCardContentStyle: React.CSSProperties = {
   display: "grid",
   gap: 7,
   minWidth: 0,
+};
+
+const siteStatsStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 6,
+  marginTop: 5,
+  paddingTop: 9,
+  borderTop: "1px solid rgba(255,255,255,0.1)",
+};
+
+const siteStatsTotalStyle: React.CSSProperties = {
+  color: "#d8e7ff",
+  fontSize: 12,
+  fontWeight: 600,
+};
+
+const siteStatsListStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 4,
+  margin: 0,
+  padding: 0,
+  listStyle: "none",
+};
+
+const siteStatsItemStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "baseline",
+  justifyContent: "space-between",
+  gap: 10,
+  color: "#bfc7d5",
+  fontSize: 11,
+  lineHeight: 1.35,
+};
+
+const siteStatsCountStyle: React.CSSProperties = {
+  flex: "0 0 auto",
+  color: "#8fc85c",
+  textAlign: "right",
+};
+
+const siteStatsEmptyStyle: React.CSSProperties = {
+  color: "#7f8898",
+  fontSize: 11,
+  lineHeight: 1.35,
+};
+
+const siteStatsLoadingStyle: React.CSSProperties = {
+  ...siteStatsEmptyStyle,
+  marginTop: 5,
 };
 
 const siteLogoRowStyle: React.CSSProperties = {

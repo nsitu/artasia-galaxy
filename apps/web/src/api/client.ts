@@ -210,6 +210,18 @@ export interface PlacementAsset {
   adjustments?: AssetAdjustments;
 }
 
+export interface SiteActivityStats {
+  sites: Record<string, {
+    totalPublished: number;
+    activities: Array<{
+      activityId: number;
+      label: string;
+      publishedCount: number;
+    }>;
+  }>;
+  generatedAt: string;
+}
+
 export interface CropParameters {
   x: number;
   y: number;
@@ -230,6 +242,15 @@ export interface AssetEditsResponse {
 
 export async function fetchUploadOptions(): Promise<UploadOptions> {
   const res = await fetch("/api/v1/uploads/options");
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function fetchSiteActivityStats(): Promise<SiteActivityStats> {
+  const res = await fetch("/api/v1/uploads/site-activity-stats");
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(body.error ?? `HTTP ${res.status}`);
