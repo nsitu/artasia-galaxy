@@ -80,6 +80,7 @@ export default function ArtScene() {
   }, []);
 
   useEffect(() => {
+    if (window.location.pathname.startsWith("/sites/")) return;
     fetchPhotos();
   }, [fetchPhotos]);
 

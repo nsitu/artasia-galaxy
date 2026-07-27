@@ -1238,7 +1238,6 @@ export default function TerrainGallery({
     if (focusedPlacement && galleryLoading) {
       return {
         label: "Loading artworks",
-        detail: `Fetching assets for ${focusedPlacement.placement_name}.`,
       };
     }
 

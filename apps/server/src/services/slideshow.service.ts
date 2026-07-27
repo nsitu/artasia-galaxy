@@ -151,6 +151,76 @@ function seededShuffle<T>(array: T[], seed: number): T[] {
   return shuffled;
 }
 
+function embeddedTagKeys(asset: ImmichAsset) {
+  return new Set(
+    (asset.tags ?? [])
+      .flatMap((tag) => [tag.name, tag.value])
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
+function hasEmbeddedTags(assets: ImmichAsset[]) {
+  return assets.every(
+    (asset) => Array.isArray(asset.tags) && asset.tags.length > 0,
+  );
+}
+
+async function mapEmbeddedFocusedMetadata(assets: ImmichAsset[]) {
+  const config = await getUploadConfig();
+  const activityByTag = new Map<string, number>();
+  for (const activity of config.activities) {
+    activityByTag.set(activityAnchorTag(activity.id).toLowerCase(), activity.id);
+    activityByTag.set(activity.label.trim().toLowerCase(), activity.id);
+  }
+
+  const audioAssetIds = new Set<string>();
+  const activityIdsByAssetId = new Map<string, Set<number>>();
+  const adjustmentMap = new Map<string, AssetAdjustments>();
+  const gpsDisabledAssetIds = new Set<string>();
+  const iconNameByAssetId = new Map<string, string>();
+
+  for (const asset of assets) {
+    const adjustments = { ...DEFAULT_ASSET_ADJUSTMENTS };
+    let hasAdjustments = false;
+    for (const key of embeddedTagKeys(asset)) {
+      if (key === "media:audio") audioAssetIds.add(asset.id);
+      if (key === "artasia:gps:disabled") gpsDisabledAssetIds.add(asset.id);
+      if (/^icon:[a-z0-9_]+$/.test(key)) {
+        iconNameByAssetId.set(asset.id, key.slice("icon:".length));
+      }
+
+      const activityId = activityByTag.get(key);
+      if (activityId != null) {
+        const activityIds =
+          activityIdsByAssetId.get(asset.id) ?? new Set<number>();
+        activityIds.add(activityId);
+        activityIdsByAssetId.set(asset.id, activityIds);
+      }
+
+      const adjustmentMatch = key.match(
+        /^artasia:adjust:(brightness|contrast|saturation):(\d{1,3})$/,
+      );
+      if (adjustmentMatch) {
+        const value = Number(adjustmentMatch[2]);
+        if (value >= 50 && value <= 150) {
+          adjustments[adjustmentMatch[1] as keyof AssetAdjustments] = value;
+          hasAdjustments = true;
+        }
+      }
+    }
+    if (hasAdjustments) adjustmentMap.set(asset.id, adjustments);
+  }
+
+  return {
+    activityIdsByAssetId,
+    adjustmentMap,
+    audioAssetIds,
+    gpsDisabledAssetIds,
+    iconNameByAssetId,
+  };
+}
+
 export async function querySlideshow(
   query: SlideshowQuery
 ): Promise<{ photos: Photo[]; total: number }> {
@@ -161,48 +231,27 @@ export async function querySlideshow(
   );
 
   const limit = Math.min(query.limit ?? 100, 500);
-  const publishedAlbum = await getPublishedAlbum();
+  const [publishedAlbum, allTags] = await Promise.all([
+    getPublishedAlbum(),
+    listTags(),
+  ]);
   const size = query.placementFocus ? 500 : limit;
-
-  const allTags = await listTags();
   const audioTag = allTags.find((tag) => {
     const name = tag.name.trim().toLowerCase();
     const value = tag.value.trim().toLowerCase();
     return name === "media:audio" || value === "media:audio";
   });
-  const [imageResult, videoResult, audioAssetIds] = await Promise.all([
-    searchAssets({
-      albumIds: [publishedAlbum.id],
-      personIds: query.personIds,
-      type: "IMAGE",
-      size,
-      takenAfter: dateRange.takenAfter,
-      takenBefore: dateRange.takenBefore,
-    }),
-    searchAssets({
-      albumIds: [publishedAlbum.id],
-      type: "VIDEO",
-      size,
-      takenAfter: dateRange.takenAfter,
-      takenBefore: dateRange.takenBefore,
-    }),
-    audioTag ? searchAssetIdsByTag(audioTag.id) : Promise.resolve([]),
-  ]);
+  let assets: ImmichAsset[] = [];
+  let audioIdSet = new Set<string>();
+  let activityIdsByAssetId = new Map<string, Set<number>>();
+  let adjustmentMap = new Map<string, AssetAdjustments>();
+  let gpsDisabledAssetIds = new Set<string>();
+  let iconNameByAssetId = new Map<string, string>();
+  let usesEmbeddedMetadata = false;
 
-  const audioIdSet = new Set(audioAssetIds);
-  let assets = [
-    ...imageResult.assets.items.filter((asset) => asset.type === "IMAGE"),
-    ...videoResult.assets.items.filter(
-      (asset) => asset.type === "VIDEO" && audioIdSet.has(asset.id),
-    ),
-  ];
-
-  const activityIdsByAssetId = new Map<string, Set<number>>();
   if (query.placementFocus) {
     const focus = query.placementFocus;
-    const publishedAssetIds = new Set(assets.map((asset) => asset.id));
     const directPlacementTag = placementAnchorTag(focus.placementId).toLowerCase();
-
     const placementTagIds = allTags
       .filter((tag) =>
         tag.name.trim().toLowerCase() === directPlacementTag ||
@@ -214,95 +263,138 @@ export async function querySlideshow(
       placementTagIds.flatMap((tagId) =>
         (["IMAGE", "VIDEO"] as const).map((type) =>
           searchAssets({
+            albumIds: [publishedAlbum.id],
             tagIds: [tagId],
             type,
             size: 500,
+            takenAfter: dateRange.takenAfter,
+            takenBefore: dateRange.takenBefore,
           }),
         ),
       ),
     );
-    const taggedAssets = taggedResults
-      .flatMap((tagResult) => tagResult.assets.items)
-      .filter(
-        (asset) =>
-          publishedAssetIds.has(asset.id) &&
-          (asset.type === "IMAGE" ||
-            (asset.type === "VIDEO" && audioIdSet.has(asset.id))),
-      );
-
     const byId = new Map<string, ImmichAsset>();
-    for (const asset of taggedAssets) byId.set(asset.id, asset);
+    for (const asset of taggedResults.flatMap((result) => result.assets.items)) {
+      byId.set(asset.id, asset);
+    }
     assets = Array.from(byId.values());
 
-    const config = await getUploadConfig();
-    const activityAssignments = config.activities.map((activity) => {
-      const anchorTagName = activityAnchorTag(activity.id).toLowerCase();
-      const labelNorm = activity.label.trim().toLowerCase();
-      const tagIds = allTags
-        .filter((tag) => {
-          const tagKeys = [tag.name, tag.value].map((value) =>
-            value.trim().toLowerCase(),
-          );
-          return (
-            tagKeys.includes(anchorTagName) || tagKeys.includes(labelNorm)
-          );
-        })
-        .map((tag) => tag.id);
-      return { activityId: activity.id, tagIds: [...new Set(tagIds)] };
-    });
-    const activityMemberships = await Promise.all(
-      activityAssignments.map(async ({ activityId, tagIds }) => ({
-        activityId,
-        assetIds:
-          tagIds.length > 0
-            ? (
-                await Promise.all(tagIds.map(searchAssetIdsByTag))
-              ).flat()
-            : [],
-      })),
-    );
-    const placementAssetIds = new Set(assets.map((asset) => asset.id));
-    for (const membership of activityMemberships) {
-      for (const assetId of membership.assetIds) {
-        if (!placementAssetIds.has(assetId)) continue;
-        const activityIds =
-          activityIdsByAssetId.get(assetId) ?? new Set<number>();
-        activityIds.add(membership.activityId);
-        activityIdsByAssetId.set(assetId, activityIds);
+    usesEmbeddedMetadata = hasEmbeddedTags(assets);
+    if (usesEmbeddedMetadata) {
+      const metadata = await mapEmbeddedFocusedMetadata(assets);
+      audioIdSet = metadata.audioAssetIds;
+      activityIdsByAssetId = metadata.activityIdsByAssetId;
+      adjustmentMap = metadata.adjustmentMap;
+      gpsDisabledAssetIds = metadata.gpsDisabledAssetIds;
+      iconNameByAssetId = metadata.iconNameByAssetId;
+    } else {
+      const audioAssetIds = audioTag
+        ? await searchAssetIdsByTag(audioTag.id)
+        : [];
+      audioIdSet = new Set(audioAssetIds);
+
+      const config = await getUploadConfig();
+      const activityAssignments = config.activities.map((activity) => {
+        const anchorTagName = activityAnchorTag(activity.id).toLowerCase();
+        const labelNorm = activity.label.trim().toLowerCase();
+        const tagIds = allTags
+          .filter((tag) => {
+            const tagKeys = [tag.name, tag.value].map((value) =>
+              value.trim().toLowerCase(),
+            );
+            return (
+              tagKeys.includes(anchorTagName) || tagKeys.includes(labelNorm)
+            );
+          })
+          .map((tag) => tag.id);
+        return { activityId: activity.id, tagIds: [...new Set(tagIds)] };
+      });
+      const activityMemberships = await Promise.all(
+        activityAssignments.map(async ({ activityId, tagIds }) => ({
+          activityId,
+          assetIds:
+            tagIds.length > 0
+              ? (
+                  await Promise.all(tagIds.map(searchAssetIdsByTag))
+                ).flat()
+              : [],
+        })),
+      );
+      const placementAssetIds = new Set(assets.map((asset) => asset.id));
+      for (const membership of activityMemberships) {
+        for (const assetId of membership.assetIds) {
+          if (!placementAssetIds.has(assetId)) continue;
+          const activityIds =
+            activityIdsByAssetId.get(assetId) ?? new Set<number>();
+          activityIds.add(membership.activityId);
+          activityIdsByAssetId.set(assetId, activityIds);
+        }
       }
     }
 
+    assets = assets.filter(
+      (asset) => asset.type === "IMAGE" || audioIdSet.has(asset.id),
+    );
     if (focus.activityId != null && Number.isFinite(focus.activityId)) {
       assets = assets.filter((asset) =>
         activityIdsByAssetId.get(asset.id)?.has(focus.activityId as number),
       );
     }
+  } else {
+    const [imageResult, videoResult, audioAssetIds] = await Promise.all([
+      searchAssets({
+        albumIds: [publishedAlbum.id],
+        personIds: query.personIds,
+        type: "IMAGE",
+        size,
+        takenAfter: dateRange.takenAfter,
+        takenBefore: dateRange.takenBefore,
+      }),
+      searchAssets({
+        albumIds: [publishedAlbum.id],
+        type: "VIDEO",
+        size,
+        takenAfter: dateRange.takenAfter,
+        takenBefore: dateRange.takenBefore,
+      }),
+      audioTag ? searchAssetIdsByTag(audioTag.id) : Promise.resolve([]),
+    ]);
+    audioIdSet = new Set(audioAssetIds);
+    assets = [
+      ...imageResult.assets.items.filter((asset) => asset.type === "IMAGE"),
+      ...videoResult.assets.items.filter(
+        (asset) => asset.type === "VIDEO" && audioIdSet.has(asset.id),
+      ),
+    ];
   }
 
   const assetIds = assets.map((asset) => asset.id);
-  const assetIdSet = new Set(assetIds);
-  const iconTags = allTags.flatMap((tag) => {
-    const keys = [tag.name, tag.value].map((value) =>
-      value.trim().toLowerCase(),
-    );
-    const key = keys.find((value) => /^icon:[a-z0-9_]+$/.test(value));
-    return key ? [{ tagId: tag.id, iconName: key.slice(5) }] : [];
-  });
-  const [adjustmentMap, gpsDisabledAssetIds, iconTagAssignments] = await Promise.all([
-    getAssetAdjustmentMap(assetIds),
-    getGpsDisabledAssetIds(assetIds),
-    Promise.all(
-      iconTags.map(async (iconTag) => ({
-        ...iconTag,
-        assetIds: await searchAssetIdsByTag(iconTag.tagId),
-      })),
-    ),
-  ]);
-  const iconNameByAssetId = new Map<string, string>();
-  for (const assignment of iconTagAssignments) {
-    for (const assetId of assignment.assetIds) {
-      if (assetIdSet.has(assetId) && !iconNameByAssetId.has(assetId)) {
-        iconNameByAssetId.set(assetId, assignment.iconName);
+  if (!usesEmbeddedMetadata) {
+    const assetIdSet = new Set(assetIds);
+    const iconTags = allTags.flatMap((tag) => {
+      const keys = [tag.name, tag.value].map((value) =>
+        value.trim().toLowerCase(),
+      );
+      const key = keys.find((value) => /^icon:[a-z0-9_]+$/.test(value));
+      return key ? [{ tagId: tag.id, iconName: key.slice(5) }] : [];
+    });
+    const enrichment = await Promise.all([
+      getAssetAdjustmentMap(assetIds),
+      getGpsDisabledAssetIds(assetIds),
+      Promise.all(
+        iconTags.map(async (iconTag) => ({
+          ...iconTag,
+          assetIds: await searchAssetIdsByTag(iconTag.tagId),
+        })),
+      ),
+    ]);
+    adjustmentMap = enrichment[0];
+    gpsDisabledAssetIds = enrichment[1];
+    for (const assignment of enrichment[2]) {
+      for (const assetId of assignment.assetIds) {
+        if (assetIdSet.has(assetId) && !iconNameByAssetId.has(assetId)) {
+          iconNameByAssetId.set(assetId, assignment.iconName);
+        }
       }
     }
   }

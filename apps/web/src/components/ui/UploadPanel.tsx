@@ -230,6 +230,7 @@ export default function UploadPanel({
   );
   const [mediaRefreshAttempt, setMediaRefreshAttempt] = useState(0);
   const [assetsLoading, setAssetsLoading] = useState(false);
+  const [routeSelectionResolved, setRouteSelectionResolved] = useState(false);
   const [directAssetLoading, setDirectAssetLoading] = useState(
     Boolean(initialAssetId),
   );
@@ -258,6 +259,13 @@ export default function UploadPanel({
 
   useEffect(() => {
     const nextMode = routeWorkspaceMode(appPath);
+    if (
+      nextMode === "browse" ||
+      nextMode === "upload" ||
+      nextMode === "import"
+    ) {
+      setRouteSelectionResolved(false);
+    }
     if (nextMode === workspaceMode) {
       if (
         nextMode === "import" &&
@@ -480,6 +488,7 @@ export default function UploadPanel({
     setItems([]);
     setNotice(null);
     setError(null);
+    setRouteSelectionResolved(true);
   }, [appPath, appSearch, options]);
 
   useEffect(() => {
@@ -1098,6 +1107,14 @@ export default function UploadPanel({
 
   useEffect(() => {
     if (workspaceMode === "edit") return;
+    if (
+      (workspaceMode === "browse" ||
+        workspaceMode === "upload" ||
+        workspaceMode === "import") &&
+      !routeSelectionResolved
+    ) {
+      return;
+    }
     if (workspaceMode === "sites") {
       setPlacementAssets([]);
       setAssetsLoading(false);
@@ -1146,7 +1163,13 @@ export default function UploadPanel({
     return () => {
       cancelled = true;
     };
-  }, [assetMode, visiblePlacementIds, activityTagFilter, workspaceMode]);
+  }, [
+    activityTagFilter,
+    assetMode,
+    routeSelectionResolved,
+    visiblePlacementIds,
+    workspaceMode,
+  ]);
 
   function addFiles(fileList: FileList | File[]) {
     if (!selectedPlacement) {

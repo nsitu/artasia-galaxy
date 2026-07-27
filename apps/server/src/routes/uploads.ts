@@ -65,6 +65,7 @@ const router = Router();
 const DATA_DIR = process.env.DATA_DIR ?? join(process.cwd(), "data");
 const UPLOAD_TMP_DIR = join(DATA_DIR, "upload-tmp");
 const SITE_ACTIVITY_STATS_TTL_MS = 30_000;
+const ADMIN_BROWSE_INDEX_TTL_MS = 30_000;
 
 interface SiteActivityStatsResponse {
   sites: Record<string, {
@@ -274,6 +275,27 @@ interface UploaderAlbum {
   id: string;
   uploaderId: number;
   uploaderName: string;
+}
+
+let uploaderAssignmentCache: {
+  expiresAt: number;
+  value: Map<string, UploaderAlbum>;
+} | null = null;
+let uploaderAssignmentRequest: Promise<Map<string, UploaderAlbum>> | null =
+  null;
+let publishedAssetIdCache: {
+  expiresAt: number;
+  value: Set<string>;
+} | null = null;
+let publishedAssetIdRequest: Promise<Set<string>> | null = null;
+let adminBrowseIndexGeneration = 0;
+
+function invalidateAdminBrowseIndexes() {
+  adminBrowseIndexGeneration += 1;
+  uploaderAssignmentCache = null;
+  uploaderAssignmentRequest = null;
+  publishedAssetIdCache = null;
+  publishedAssetIdRequest = null;
 }
 
 interface AssetManagementAssignment {
@@ -500,6 +522,7 @@ async function getSiteActivityStats(): Promise<SiteActivityStatsResponse> {
 
 function invalidateSiteActivityStats() {
   siteActivityStatsCache = null;
+  invalidateAdminBrowseIndexes();
 }
 
 async function getUploaderAlbums(): Promise<UploaderAlbum[]> {
@@ -522,11 +545,76 @@ async function getUploaderAlbums(): Promise<UploaderAlbum[]> {
 
 async function getUploaderAlbumAssignments(uploaderAlbums: UploaderAlbum[]) {
   const assignments = new Map<string, UploaderAlbum>();
-  for (const album of uploaderAlbums) {
-    const assets = await searchAssetsByAlbumId(album.id);
+  const albumAssets = await processWithConcurrency(
+    uploaderAlbums,
+    4,
+    async (album) => ({
+      album,
+      assets: await searchAssetsByAlbumId(album.id, { compact: true }),
+    }),
+  );
+  for (const { album, assets } of albumAssets) {
     for (const asset of assets) assignments.set(asset.id, album);
   }
   return assignments;
+}
+
+async function getCachedUploaderAlbumAssignments() {
+  if (
+    uploaderAssignmentCache &&
+    uploaderAssignmentCache.expiresAt > Date.now()
+  ) {
+    return uploaderAssignmentCache.value;
+  }
+  if (uploaderAssignmentRequest) return uploaderAssignmentRequest;
+
+  const generation = adminBrowseIndexGeneration;
+  const request = getUploaderAlbums()
+    .then(getUploaderAlbumAssignments)
+    .then((value) => {
+      if (generation === adminBrowseIndexGeneration) {
+        uploaderAssignmentCache = {
+          expiresAt: Date.now() + ADMIN_BROWSE_INDEX_TTL_MS,
+          value,
+        };
+      }
+      return value;
+    })
+    .finally(() => {
+      if (uploaderAssignmentRequest === request) {
+        uploaderAssignmentRequest = null;
+      }
+    });
+  uploaderAssignmentRequest = request;
+  return request;
+}
+
+async function getCachedPublishedAssetIds() {
+  if (publishedAssetIdCache && publishedAssetIdCache.expiresAt > Date.now()) {
+    return publishedAssetIdCache.value;
+  }
+  if (publishedAssetIdRequest) return publishedAssetIdRequest;
+
+  const generation = adminBrowseIndexGeneration;
+  const request = getPublishedAlbum()
+    .then((album) => searchAssetsByAlbumId(album.id, { compact: true }))
+    .then((assets) => new Set(assets.map((asset) => asset.id)))
+    .then((value) => {
+      if (generation === adminBrowseIndexGeneration) {
+        publishedAssetIdCache = {
+          expiresAt: Date.now() + ADMIN_BROWSE_INDEX_TTL_MS,
+          value,
+        };
+      }
+      return value;
+    })
+    .finally(() => {
+      if (publishedAssetIdRequest === request) {
+        publishedAssetIdRequest = null;
+      }
+    });
+  publishedAssetIdRequest = request;
+  return request;
 }
 
 async function getUploaderAlbumMemberships(assetId: string, uploaderAlbums: UploaderAlbum[]) {
@@ -651,20 +739,125 @@ async function getManagementAssignments(
   return assignments;
 }
 
+function embeddedAssetTagsAvailable(
+  assets: Awaited<ReturnType<typeof getAssetsForPlacementTagIds>>,
+) {
+  return assets.every((asset) => Array.isArray(asset.tags));
+}
+
+function embeddedTagKeys(asset: {
+  tags?: Array<{ name: string; value: string }>;
+}) {
+  return new Set(
+    (asset.tags ?? [])
+      .flatMap((tag) => [tag.name, tag.value])
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
+function mapEmbeddedAssetMetadata(
+  assets: Awaited<ReturnType<typeof getAssetsForPlacementTagIds>>,
+  config: Awaited<ReturnType<typeof getUploadConfig>>,
+) {
+  const assignments = new Map<string, AssetManagementAssignment>();
+  const adjustments = new Map<string, AssetAdjustments>();
+  const gpsDisabledAssetIds = new Set<string>();
+  const placementsByTag = new Map<
+    string,
+    { id: number; name: string }
+  >();
+  const activitiesByTag = new Map<
+    string,
+    { id: number; label: string }
+  >();
+
+  for (const placement of config.placements) {
+    const value = {
+      id: placement.placement_id,
+      name: placement.placement_name,
+    };
+    placementsByTag.set(
+      placementAnchorTag(placement.placement_id).toLowerCase(),
+      value,
+    );
+    placementsByTag.set(placement.placement_name.trim().toLowerCase(), value);
+  }
+  for (const activity of config.activities) {
+    const value = { id: activity.id, label: activity.label };
+    activitiesByTag.set(activityAnchorTag(activity.id).toLowerCase(), value);
+    activitiesByTag.set(activity.label.trim().toLowerCase(), value);
+  }
+
+  for (const asset of assets) {
+    const keys = embeddedTagKeys(asset);
+    const assignment: AssetManagementAssignment = {};
+    const assetAdjustments = { ...DEFAULT_ASSET_ADJUSTMENTS };
+    let hasAdjustments = false;
+
+    for (const key of keys) {
+      const placement = placementsByTag.get(key);
+      if (placement) {
+        assignment.placementId = placement.id;
+        assignment.placementName = placement.name;
+      }
+      const activity = activitiesByTag.get(key);
+      if (activity) {
+        assignment.activityId = activity.id;
+        assignment.activityLabel = activity.label;
+      }
+      if (/^icon:[a-z0-9_]+$/.test(key)) {
+        assignment.iconName = key.slice("icon:".length);
+      }
+      if (key === "media:audio") assignment.isAudio = true;
+      if (key === "artasia:gps:disabled") gpsDisabledAssetIds.add(asset.id);
+
+      const adjustmentMatch = key.match(
+        /^artasia:adjust:(brightness|contrast|saturation):(\d{1,3})$/,
+      );
+      if (adjustmentMatch) {
+        const value = Number(adjustmentMatch[2]);
+        if (value >= 50 && value <= 150) {
+          assetAdjustments[
+            adjustmentMatch[1] as keyof AssetAdjustments
+          ] = value;
+          hasAdjustments = true;
+        }
+      }
+    }
+
+    assignments.set(asset.id, assignment);
+    if (hasAdjustments) adjustments.set(asset.id, assetAdjustments);
+  }
+
+  return { assignments, adjustments, gpsDisabledAssetIds };
+}
+
 async function mapAssetsWithUploaderAlbums(assets: Awaited<ReturnType<typeof getAssetsForPlacementTagIds>>) {
-  const uploaderAlbums = await getUploaderAlbums();
-  const publishedAlbum = await getPublishedAlbum();
-  const [albumAssignments, managementAssignments, publishedAssets] = await Promise.all([
-    getUploaderAlbumAssignments(uploaderAlbums),
-    getManagementAssignments(assets.map((asset) => asset.id)),
-    searchAssetsByAlbumId(publishedAlbum.id),
+  if (assets.length === 0) return [];
+  const usesEmbeddedTags = embeddedAssetTagsAvailable(assets);
+  const [config, albumAssignments, publishedAssetIds] = await Promise.all([
+    usesEmbeddedTags ? getUploadConfig() : Promise.resolve(null),
+    getCachedUploaderAlbumAssignments(),
+    getCachedPublishedAssetIds(),
   ]);
   const assetIds = assets.map((asset) => asset.id);
-  const [adjustmentMap, gpsDisabledAssetIds] = await Promise.all([
-    getAssetAdjustmentMap(assetIds),
-    getGpsDisabledAssetIds(assetIds),
-  ]);
-  const publishedAssetIds = new Set(publishedAssets.map((asset) => asset.id));
+  const embeddedMetadata =
+    usesEmbeddedTags && config
+      ? mapEmbeddedAssetMetadata(assets, config)
+      : null;
+  const [managementAssignments, adjustmentMap, gpsDisabledAssetIds] =
+    embeddedMetadata
+      ? [
+          embeddedMetadata.assignments,
+          embeddedMetadata.adjustments,
+          embeddedMetadata.gpsDisabledAssetIds,
+        ]
+      : await Promise.all([
+          getManagementAssignments(assetIds),
+          getAssetAdjustmentMap(assetIds),
+          getGpsDisabledAssetIds(assetIds),
+        ]);
   return assets.map((asset) => mapAdminAsset(
     asset,
     albumAssignments.get(asset.id),
@@ -754,26 +947,37 @@ router.get("/assets", async (req, res) => {
         res.json({ assets: [] });
         return;
       }
-      // Match by anchor tag (new) OR label tag (legacy), union of both
-      const allTags = await listTags();
       const anchorTagName = activityAnchorTag(activityId);
       const labelNorm = activity.label.trim().toLowerCase();
-      const activityImmichTagIds = allTags
-        .filter((tag) =>
-          tag.name.trim().toLowerCase() === anchorTagName ||
-          tag.value.trim().toLowerCase() === anchorTagName ||
-          tag.name.trim().toLowerCase() === labelNorm ||
-          tag.value.trim().toLowerCase() === labelNorm
-        )
-        .map((tag) => tag.id);
-
-      if (activityImmichTagIds.length === 0) {
-        assets = [];
+      if (embeddedAssetTagsAvailable(assets)) {
+        assets = assets.filter((asset) => {
+          const keys = embeddedTagKeys(asset);
+          return keys.has(anchorTagName) || keys.has(labelNorm);
+        });
       } else {
-        const activityAssetIds = new Set(
-          (await Promise.all(activityImmichTagIds.map(searchAdminAssetIdsByTag))).flat()
-        );
-        assets = assets.filter((asset) => activityAssetIds.has(asset.id));
+        // Match by anchor tag (new) OR label tag (legacy), union of both.
+        const allTags = await listTags();
+        const activityImmichTagIds = allTags
+          .filter((tag) =>
+            tag.name.trim().toLowerCase() === anchorTagName ||
+            tag.value.trim().toLowerCase() === anchorTagName ||
+            tag.name.trim().toLowerCase() === labelNorm ||
+            tag.value.trim().toLowerCase() === labelNorm
+          )
+          .map((tag) => tag.id);
+
+        if (activityImmichTagIds.length === 0) {
+          assets = [];
+        } else {
+          const activityAssetIds = new Set(
+            (
+              await Promise.all(
+                activityImmichTagIds.map(searchAdminAssetIdsByTag),
+              )
+            ).flat(),
+          );
+          assets = assets.filter((asset) => activityAssetIds.has(asset.id));
+        }
       }
     }
 
@@ -903,6 +1107,7 @@ router.post("/assets/:assetId/uploader", async (req, res) => {
       }
     }
     await addAssetsToAlbum(destinationAlbum.id, [assetId]);
+    invalidateAdminBrowseIndexes();
 
     res.json({
       ok: true,
@@ -1553,6 +1758,7 @@ router.post(
           cleanup(file);
         }
       });
+      invalidateSiteActivityStats();
 
       res.json({
         uploader: selectedUploader?.name ?? null,

@@ -46,6 +46,11 @@ const panelStyle: CSSProperties = {
   width: "min(280px, calc(100vw - 48px))",
   padding: "12px 14px",
   color: "#d8dde7",
+  background: "rgba(10,10,20,0.78)",
+  border: "1px solid rgba(255,255,255,0.14)",
+  borderRadius: 8,
+  boxShadow: "0 8px 24px rgba(0,0,0,0.28)",
+  backdropFilter: "blur(5px)",
   fontFamily: "monospace",
   textAlign: "center",
 };
@@ -57,7 +62,7 @@ const errorPanelStyle: CSSProperties = {
 
 const headerStyle: CSSProperties = {
   display: "flex",
-  flexDirection: "column",
+  flexDirection: "row",
   alignItems: "center",
   justifyContent: "center",
   gap: 10,
