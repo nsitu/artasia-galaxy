@@ -2970,6 +2970,8 @@ export default function UploadPanel({
                 </button>
                 <a
                   href={placementViewerUrl(placement)}
+                  target="_blank"
+                  rel="noreferrer"
                   style={siteActionLinkStyle}
                 >
                   <span style={siteActionIconStyle} aria-hidden="true">
@@ -3277,6 +3279,8 @@ export default function UploadPanel({
             {assignedPlacement && (
               <a
                 href={placementViewerUrl(assignedPlacement)}
+                target="_blank"
+                rel="noreferrer"
                 style={siteActionLinkStyle}
               >
                 <span style={siteActionIconStyle} aria-hidden="true">
@@ -4336,6 +4340,8 @@ export default function UploadPanel({
                   <div style={detailHeaderActionsStyle}>
                     <a
                       href={placementViewerUrl(selectedPlacement)}
+                      target="_blank"
+                      rel="noreferrer"
                       style={siteActionLinkStyle}
                     >
                       <span style={siteActionIconStyle} aria-hidden="true">

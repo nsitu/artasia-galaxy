@@ -94,6 +94,18 @@ function artasia_post_type_contexts(): array
                 ),
             ],
         ],
+        'artasia_document' => [
+            'title' => 'About Pedagogical Documentation',
+            'nav_label' => 'Documentation',
+            'paragraphs' => [
+                sprintf(
+                    'Pedagogical Documentation records observations and reflection connected to the %s and %s involved in the work.',
+                    artasia_context_post_type_link('artasia_people', 'people'),
+                    artasia_context_post_type_link('artasia_placement', 'placements')
+                ),
+                'Use the main rich-text editor for the documentation itself, then identify its context and optionally provide a short pull quote.',
+            ],
+        ],
     ];
 }
 
@@ -1073,9 +1085,146 @@ function artasia_validate_image_attachment_id(int $attachment_id): int
     return strpos((string) $mime_type, 'image/') === 0 ? $attachment_id : 0;
 }
 
+// --- Pedagogical Documentation meta box ---
+
+function artasia_documentation_meta_box_html(WP_Post $post): void
+{
+    $people = get_posts([
+        'post_type'   => 'artasia_people',
+        'numberposts' => -1,
+        'orderby'     => 'title',
+        'order'       => 'ASC',
+    ]);
+    $placements = get_posts([
+        'post_type'   => 'artasia_placement',
+        'numberposts' => -1,
+        'orderby'     => 'title',
+        'order'       => 'ASC',
+    ]);
+    $people_ids = artasia_sanitize_integer_array_meta(
+        get_post_meta($post->ID, 'artasia_documentation_people_ids', true)
+    );
+    $placement_ids = artasia_sanitize_integer_array_meta(
+        get_post_meta($post->ID, 'artasia_documentation_placement_ids', true)
+    );
+    $pull_quote = get_post_meta($post->ID, 'artasia_documentation_pull_quote', true);
+
+    wp_nonce_field('artasia_documentation_meta', 'artasia_documentation_meta_nonce');
+?>
+    <table class="form-table">
+        <tr>
+            <th><label for="artasia_documentation_people_ids">People</label></th>
+            <td>
+                <select id="artasia_documentation_people_ids" name="artasia_documentation_people_ids[]" multiple size="8" class="widefat">
+                    <?php foreach ($people as $person) : ?>
+                        <option value="<?php echo esc_attr($person->ID); ?>" <?php selected(in_array($person->ID, $people_ids, true)); ?>>
+                            <?php echo esc_html($person->post_title); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <p class="description">Select the people who authored, facilitated, or contributed to this documentation. Hold Ctrl (Windows) or Command (Mac) to select more than one.</p>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_documentation_placement_ids">Placements</label></th>
+            <td>
+                <select id="artasia_documentation_placement_ids" name="artasia_documentation_placement_ids[]" multiple size="8" class="widefat">
+                    <?php foreach ($placements as $placement) : ?>
+                        <option value="<?php echo esc_attr($placement->ID); ?>" <?php selected(in_array($placement->ID, $placement_ids, true)); ?>>
+                            <?php echo esc_html($placement->post_title); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <p class="description">Select the placements that define where and in what program context the documentation occurred.</p>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_documentation_pull_quote">Pull Quote</label></th>
+            <td>
+                <textarea id="artasia_documentation_pull_quote" name="artasia_documentation_pull_quote" rows="4" class="widefat" placeholder="Optional short excerpt"><?php echo esc_textarea($pull_quote); ?></textarea>
+                <p class="description">A concise excerpt that can be highlighted when this documentation is displayed.</p>
+            </td>
+        </tr>
+    </table>
+<?php
+}
+
+function artasia_register_documentation_meta_box(): void
+{
+    $context = artasia_get_post_type_context('artasia_document');
+
+    add_meta_box(
+        'artasia_documentation_details',
+        'Documentation Context',
+        'artasia_documentation_meta_box_html',
+        'artasia_document',
+        'normal',
+        'default'
+    );
+
+    add_meta_box(
+        'artasia_documentation_about',
+        $context['title'],
+        'artasia_documentation_context_meta_box_html',
+        'artasia_document',
+        'side',
+        'high'
+    );
+}
+add_action('add_meta_boxes', 'artasia_register_documentation_meta_box');
+
+function artasia_documentation_context_meta_box_html(): void
+{
+    $context = artasia_get_post_type_context('artasia_document');
+    if (!$context) {
+        return;
+    }
+
+    artasia_context_meta_box_html($context['paragraphs']);
+}
+
+function artasia_validate_related_post_ids($values, string $post_type): array
+{
+    $ids = artasia_sanitize_integer_array_meta($values);
+
+    return array_values(array_filter($ids, static function (int $post_id) use ($post_type): bool {
+        return get_post_type($post_id) === $post_type;
+    }));
+}
+
+function artasia_save_documentation_meta(int $post_id): void
+{
+    if (!isset($_POST['artasia_documentation_meta_nonce']) || !wp_verify_nonce($_POST['artasia_documentation_meta_nonce'], 'artasia_documentation_meta')) {
+        return;
+    }
+    if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
+        return;
+    }
+    if (!current_user_can('edit_post', $post_id)) {
+        return;
+    }
+
+    update_post_meta(
+        $post_id,
+        'artasia_documentation_people_ids',
+        artasia_validate_related_post_ids($_POST['artasia_documentation_people_ids'] ?? [], 'artasia_people')
+    );
+    update_post_meta(
+        $post_id,
+        'artasia_documentation_placement_ids',
+        artasia_validate_related_post_ids($_POST['artasia_documentation_placement_ids'] ?? [], 'artasia_placement')
+    );
+    update_post_meta(
+        $post_id,
+        'artasia_documentation_pull_quote',
+        sanitize_textarea_field($_POST['artasia_documentation_pull_quote'] ?? '')
+    );
+}
+add_action('save_post_artasia_document', 'artasia_save_documentation_meta');
+
 function artasia_remove_unnecessary_meta_boxes(): void
 {
-    $post_types = ['artasia_project', 'artasia_activity', 'artasia_partner', 'artasia_place', 'artasia_people', 'artasia_placement'];
+    $post_types = ['artasia_project', 'artasia_activity', 'artasia_partner', 'artasia_place', 'artasia_people', 'artasia_placement', 'artasia_document'];
     $meta_box_contexts = ['side', 'normal', 'advanced'];
 
     foreach ($post_types as $post_type) {

@@ -1601,7 +1601,7 @@ export function FocusedPlacementOverlay({
           {adminHref && (
             <div style={siteDetailsAdminActionStyle}>
               <a href={adminHref} style={siteDetailsAdminLinkStyle}>
-                Edit site in Admin
+                Admin
               </a>
             </div>
           )}

@@ -298,3 +298,46 @@ function artasia_people_column(string $column, int $post_id): void
     }
 }
 add_action('manage_artasia_people_posts_custom_column', 'artasia_people_column', 10, 2);
+
+// --- Pedagogical Documentation columns ---
+
+function artasia_documentation_columns(array $columns): array
+{
+    $new = [];
+    foreach ($columns as $key => $label) {
+        $new[$key] = $label;
+        if ($key === 'title') {
+            $new['artasia_documentation_people'] = 'People';
+            $new['artasia_documentation_placements'] = 'Placements';
+            $new['artasia_documentation_pull_quote'] = 'Pull Quote';
+        }
+    }
+
+    return $new;
+}
+add_filter('manage_artasia_document_posts_columns', 'artasia_documentation_columns');
+
+function artasia_documentation_related_titles(int $post_id, string $meta_key): string
+{
+    $ids = artasia_sanitize_integer_array_meta(get_post_meta($post_id, $meta_key, true));
+    $titles = array_filter(array_map('get_the_title', $ids));
+
+    return implode(', ', $titles);
+}
+
+function artasia_documentation_column(string $column, int $post_id): void
+{
+    switch ($column) {
+        case 'artasia_documentation_people':
+            echo esc_html(artasia_documentation_related_titles($post_id, 'artasia_documentation_people_ids') ?: '—');
+            break;
+        case 'artasia_documentation_placements':
+            echo esc_html(artasia_documentation_related_titles($post_id, 'artasia_documentation_placement_ids') ?: '—');
+            break;
+        case 'artasia_documentation_pull_quote':
+            $pull_quote = get_post_meta($post_id, 'artasia_documentation_pull_quote', true);
+            echo esc_html($pull_quote ? wp_trim_words($pull_quote, 18, '…') : '—');
+            break;
+    }
+}
+add_action('manage_artasia_document_posts_custom_column', 'artasia_documentation_column', 10, 2);

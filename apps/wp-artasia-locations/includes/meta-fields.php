@@ -276,6 +276,39 @@ function artasia_register_meta_fields(): void
         'show_in_rest' => true,
         'sanitize_callback' => 'sanitize_textarea_field',
     ]);
+
+    // --- Pedagogical Documentation meta ---
+    register_post_meta('artasia_document', 'artasia_documentation_people_ids', [
+        'type'         => 'array',
+        'single'       => true,
+        'default'      => [],
+        'show_in_rest' => [
+            'schema' => [
+                'type'  => 'array',
+                'items' => ['type' => 'integer'],
+            ],
+        ],
+        'sanitize_callback' => 'artasia_sanitize_integer_array_meta',
+    ]);
+    register_post_meta('artasia_document', 'artasia_documentation_placement_ids', [
+        'type'         => 'array',
+        'single'       => true,
+        'default'      => [],
+        'show_in_rest' => [
+            'schema' => [
+                'type'  => 'array',
+                'items' => ['type' => 'integer'],
+            ],
+        ],
+        'sanitize_callback' => 'artasia_sanitize_integer_array_meta',
+    ]);
+    register_post_meta('artasia_document', 'artasia_documentation_pull_quote', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'sanitize_textarea_field',
+    ]);
 }
 
 function artasia_sanitize_integer_meta($value, string $meta_key = '', string $object_type = '', string $object_subtype = ''): int
@@ -291,6 +324,15 @@ function artasia_sanitize_float_meta($value, string $meta_key = '', string $obje
 function artasia_sanitize_boolean_meta($value, string $meta_key = '', string $object_type = '', string $object_subtype = ''): bool
 {
     return filter_var($value, FILTER_VALIDATE_BOOLEAN);
+}
+
+function artasia_sanitize_integer_array_meta($value, string $meta_key = '', string $object_type = '', string $object_subtype = ''): array
+{
+    if (!is_array($value)) {
+        return [];
+    }
+
+    return array_values(array_unique(array_filter(array_map('intval', $value))));
 }
 
 add_action('init', 'artasia_register_meta_fields');

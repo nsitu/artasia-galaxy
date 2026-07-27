@@ -125,6 +125,26 @@ function artasia_register_post_types(): void
         'menu_icon'    => 'dashicons-id-alt',
         'supports'     => ['title'],
     ]);
+
+    register_post_type('artasia_document', [
+        'labels' => [
+            'name'          => 'Documentation',
+            'singular_name' => 'Documentation',
+            'add_new_item'  => 'Add New Documentation',
+            'edit_item'     => 'Edit Documentation',
+            'new_item'      => 'New Documentation',
+            'view_item'     => 'View Documentation',
+            'search_items'  => 'Search Documentation',
+            'not_found'     => 'No documentation found',
+        ],
+        'public'       => true,
+        'has_archive'  => false,
+        'show_in_menu' => false,
+        'show_in_rest' => true,
+        'rest_base'    => 'artasia_documentation',
+        'menu_icon'    => 'dashicons-welcome-write-blog',
+        'supports'     => ['title', 'editor', 'author', 'revisions'],
+    ]);
 }
 
 add_action('init', 'artasia_register_post_types');
@@ -195,6 +215,14 @@ function artasia_register_admin_menu(): void
         'edit.php?post_type=artasia_placement'
     );
 
+    add_submenu_page(
+        'edit.php?post_type=artasia_placement',
+        'Pedagogical Documentation',
+        'Documentation',
+        'edit_posts',
+        'edit.php?post_type=artasia_document'
+    );
+
     remove_submenu_page(
         'edit.php?post_type=artasia_placement',
         'edit.php?post_type=artasia_placement'
@@ -205,7 +233,7 @@ add_action('admin_menu', 'artasia_register_admin_menu');
 function artasia_admin_parent_file($parent_file)
 {
     $screen = get_current_screen();
-    if (!$screen || !in_array($screen->post_type, ['artasia_project', 'artasia_activity', 'artasia_partner', 'artasia_place', 'artasia_people', 'artasia_placement'], true)) {
+    if (!$screen || !in_array($screen->post_type, ['artasia_project', 'artasia_activity', 'artasia_partner', 'artasia_place', 'artasia_people', 'artasia_placement', 'artasia_document'], true)) {
         return $parent_file;
     }
 
@@ -216,7 +244,7 @@ add_filter('parent_file', 'artasia_admin_parent_file');
 function artasia_admin_submenu_file($submenu_file)
 {
     $screen = get_current_screen();
-    if (!$screen || !in_array($screen->post_type, ['artasia_project', 'artasia_activity', 'artasia_partner', 'artasia_place', 'artasia_people', 'artasia_placement'], true)) {
+    if (!$screen || !in_array($screen->post_type, ['artasia_project', 'artasia_activity', 'artasia_partner', 'artasia_place', 'artasia_people', 'artasia_placement', 'artasia_document'], true)) {
         return $submenu_file;
     }
 
@@ -226,7 +254,7 @@ add_filter('submenu_file', 'artasia_admin_submenu_file');
 
 function artasia_use_block_editor_for_post_type(bool $use_block_editor, string $post_type): bool
 {
-    $artasia_post_types = ['artasia_project', 'artasia_activity', 'artasia_partner', 'artasia_place', 'artasia_people', 'artasia_placement'];
+    $artasia_post_types = ['artasia_project', 'artasia_activity', 'artasia_partner', 'artasia_place', 'artasia_people', 'artasia_placement', 'artasia_document'];
 
     if (in_array($post_type, $artasia_post_types, true)) {
         return false;
@@ -244,6 +272,10 @@ function artasia_enter_title_here(string $title, WP_Post $post): string
 
     if ($post->post_type === 'artasia_activity') {
         return 'Add activity name';
+    }
+
+    if ($post->post_type === 'artasia_document') {
+        return 'Add documentation title';
     }
 
     return $title;
