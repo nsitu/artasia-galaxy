@@ -1360,6 +1360,10 @@ export default function UploadPanel({
   function browsePlacement(placement: UploadOptions["placements"][number]) {
     selectPlacement(placement);
     setWorkspaceMode("browse");
+    setApplicationPath(
+      `/admin/browse?site=${encodeURIComponent(String(placement.placement_id))}`,
+      true,
+    );
   }
 
   function uploadToPlacement(placement: UploadOptions["placements"][number]) {

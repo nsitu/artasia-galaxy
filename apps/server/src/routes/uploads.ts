@@ -182,13 +182,23 @@ async function processWithConcurrency<T, R>(
   return results;
 }
 
-async function findExistingPlacementTagId(placementId: number) {
-  const tagName = placementAnchorTag(placementId);
-  const normalized = tagName.toLowerCase();
-  const tags = await listTags();
-  return tags.find(
-    (tag) => tag.name.trim().toLowerCase() === normalized || tag.value.trim().toLowerCase() === normalized
-  )?.id ?? null;
+function findExistingPlacementTagIds(
+  placement: { placement_id: number; placement_name: string } | null | undefined,
+  tags: Awaited<ReturnType<typeof listTags>>,
+) {
+  if (!placement) return [];
+
+  const placementTagNames = new Set([
+    placementAnchorTag(placement.placement_id).trim().toLowerCase(),
+    placement.placement_name.trim().toLowerCase(),
+  ]);
+
+  return tags
+    .filter((tag) =>
+      placementTagNames.has(tag.name.trim().toLowerCase()) ||
+      placementTagNames.has(tag.value.trim().toLowerCase())
+    )
+    .map((tag) => tag.id);
 }
 
 function isPlacementAnchorTagName(value: string) {
@@ -925,14 +935,15 @@ router.get("/assets", async (req, res) => {
     const activityId = rawActivityId ? parseInt(rawActivityId, 10) : null;
 
     const config = await getUploadConfig();
-    const knownPlacementIds = new Set(config.placements.map((placement) => placement.placement_id));
-    const tagIds = (
-      await Promise.all(
-        placementIds
-          .filter((placementId) => knownPlacementIds.has(placementId))
-          .map((placementId) => findExistingPlacementTagId(placementId))
-      )
-    ).filter((tagId): tagId is string => Boolean(tagId));
+    const placementsById = new Map(
+      config.placements.map((placement) => [placement.placement_id, placement]),
+    );
+    const tags = await listTags();
+    const tagIds = Array.from(new Set(
+      placementIds.flatMap((placementId) =>
+        findExistingPlacementTagIds(placementsById.get(placementId), tags)
+      ),
+    ));
 
     if (tagIds.length === 0) {
       res.json({ assets: [] });
@@ -1639,13 +1650,14 @@ router.get("/placements/:id/assets", async (req, res) => {
       return;
     }
 
-    const tagId = await findExistingPlacementTagId(placementId);
-    if (!tagId) {
+    const tags = await listTags();
+    const tagIds = findExistingPlacementTagIds(placement, tags);
+    if (tagIds.length === 0) {
       res.json({ placement_id: placementId, assets: [] });
       return;
     }
 
-    const assets = await getAssetsForPlacementTagIds([tagId]);
+    const assets = await getAssetsForPlacementTagIds(tagIds);
     res.json({
       placement_id: placementId,
       assets: await mapAssetsWithUploaderAlbums(assets),

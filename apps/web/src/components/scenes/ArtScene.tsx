@@ -291,6 +291,7 @@ export default function ArtScene() {
                 onChange={(event) => setSelectedActivityFilter(event.target.value)}
                 style={{
                   ...filterSelectStyle,
+                  width: "auto",
                   ...getActivityColourStyle(selectedActivityColour),
                 }}
               >
