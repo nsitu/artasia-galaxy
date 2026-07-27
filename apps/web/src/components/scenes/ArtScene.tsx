@@ -258,7 +258,16 @@ export default function ArtScene() {
       {error && <div style={errorStyle}>{error}</div>}
       <div style={buildStampStyle}>{__ARTASIA_BUILD_LABEL__}</div>
       {terrainNotice && <LoadingIndicator {...terrainNotice} />}
-      {focusedPlacementDetails && <FocusedPlacementOverlay placement={focusedPlacementDetails} />}
+      {focusedPlacementDetails && (
+        <FocusedPlacementOverlay
+          placement={focusedPlacementDetails}
+          adminHref={
+            authUser?.authenticated
+              ? `/admin/browse?site=${encodeURIComponent(String(focusedPlacementDetails.placement_id))}`
+              : undefined
+          }
+        />
+      )}
       {!focusedPlacementDetails && previewPlacementDetails && previewPlacementAction && (
         <PlacementPreviewPanel placement={previewPlacementDetails} onOpen={previewPlacementAction} />
       )}

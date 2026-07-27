@@ -1516,8 +1516,10 @@ function applyTerrainCameraFrame(
 
 export function FocusedPlacementOverlay({
   placement,
+  adminHref,
 }: {
   placement: MapPlacement;
+  adminHref?: string;
 }) {
   const isMobile = useIsMobileBreakpoint();
   const [expanded, setExpanded] = useState(true);
@@ -1582,19 +1584,28 @@ export function FocusedPlacementOverlay({
       </div>
 
       {expanded && (
-        <div style={siteDetailsGridStyle}>
-          <SiteDetail label="Site" value={siteDetails || "Not specified"} />
-          <SiteDetail
-            label={peopleLabel}
-            value={
-              people.map((person) => person.name).join(", ") || "Unassigned"
-            }
-          />
-          <SiteDetail
-            label="Children"
-            value={participantDetails || "Not specified"}
-          />
-        </div>
+        <>
+          <div style={siteDetailsGridStyle}>
+            <SiteDetail label="Site" value={siteDetails || "Not specified"} />
+            <SiteDetail
+              label={peopleLabel}
+              value={
+                people.map((person) => person.name).join(", ") || "Unassigned"
+              }
+            />
+            <SiteDetail
+              label="Children"
+              value={participantDetails || "Not specified"}
+            />
+          </div>
+          {adminHref && (
+            <div style={siteDetailsAdminActionStyle}>
+              <a href={adminHref} style={siteDetailsAdminLinkStyle}>
+                Edit site in Admin
+              </a>
+            </div>
+          )}
+        </>
       )}
     </section>
   );
@@ -2017,6 +2028,27 @@ const siteDetailsGridStyle: React.CSSProperties = {
   display: "grid",
   gap: 9,
   paddingTop: 10,
+};
+
+const siteDetailsAdminActionStyle: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "flex-end",
+  marginTop: 10,
+  pointerEvents: "auto",
+};
+
+const siteDetailsAdminLinkStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  minHeight: 30,
+  padding: "5px 9px",
+  border: "1px solid rgba(255,255,255,0.22)",
+  borderRadius: 4,
+  color: "#eef2f8",
+  textDecoration: "none",
+  fontSize: 12,
+  lineHeight: 1.2,
+  pointerEvents: "auto",
 };
 
 const siteDetailLabelStyle: React.CSSProperties = {

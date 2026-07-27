@@ -79,10 +79,38 @@ type PlacementMetaLine = {
   variant?: "location";
 };
 
+function ClearFilterButton({
+  label,
+  onClick,
+}: {
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onClick();
+      }}
+      style={clearSingleFilterButtonStyle}
+    >
+      <span style={clearSingleFilterIconStyle} aria-hidden="true">
+        close
+      </span>
+    </button>
+  );
+}
+
 interface UploadPanelProps {
   initialError?: string | null;
   initialAssetId?: string;
   adminPath?: string;
+  adminSearch?: string;
   onSignedOut?: () => void;
 }
 
@@ -115,6 +143,7 @@ export default function UploadPanel({
   initialError,
   initialAssetId,
   adminPath,
+  adminSearch,
   onSignedOut,
 }: UploadPanelProps) {
   const [options, setOptions] = useState<UploadOptions | null>(null);
@@ -200,6 +229,7 @@ export default function UploadPanel({
   const cropStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const appPath = adminPath ?? window.location.pathname;
+  const appSearch = adminSearch ?? window.location.search;
 
   function routeWorkspaceMode(path: string): WorkspaceMode {
     if (path === "/admin" || path === "/admin/sites") return "sites";
@@ -391,6 +421,51 @@ export default function UploadPanel({
       })
       .catch((err) => setError((err as Error).message));
   }, [options]);
+
+  useEffect(() => {
+    if (!options) return;
+    const mode = routeWorkspaceMode(appPath);
+    if (mode !== "browse" && mode !== "upload" && mode !== "import") return;
+
+    const params = new URLSearchParams(appSearch);
+    const requestedSiteId = Number(params.get("site"));
+    const requestedActivityId = Number(params.get("activity"));
+    const requestedOwnerId = Number(params.get("owner"));
+    const site = options.placements.find(
+      (placement) =>
+        params.has("site") &&
+        Number.isInteger(requestedSiteId) &&
+        placement.placement_id === requestedSiteId,
+    );
+    const activity = options.activities.find(
+      (candidate) =>
+        params.has("activity") &&
+        Number.isInteger(requestedActivityId) &&
+        candidate.id === requestedActivityId,
+    );
+    const owner = options.uploaders.find(
+      (candidate) =>
+        mode === "import" &&
+        site != null &&
+        params.has("owner") &&
+        Number.isInteger(requestedOwnerId) &&
+        candidate.id === requestedOwnerId &&
+        candidate.id !== site.team_member_id &&
+        placementIncludesUploader(site, candidate.id),
+    );
+
+    setPlacementKey(site ? String(site.placement_id) : "");
+    setSiteScope(site ? "placement" : mode === "browse" ? "all" : "select");
+    setAssetMode("placements");
+    setActivityTagFilter(activity ? String(activity.id) : "");
+    if (mode === "import") {
+      setDriveOwnerKey(owner ? String(owner.id) : "");
+    }
+    setSelectedAsset(null);
+    setItems([]);
+    setNotice(null);
+    setError(null);
+  }, [appPath, appSearch, options]);
 
   useEffect(() => {
     if (!initialAssetId) {
@@ -1205,6 +1280,16 @@ export default function UploadPanel({
     setTimeOfDayFilter("");
     setAgeRangeFilter("");
     setBrowsePartnerKey("");
+    setPlacementKey("");
+    setSiteScope("select");
+    setSelectedAsset(null);
+    setItems([]);
+    setNotice(null);
+    setError(null);
+  }
+
+  function clearSingleSiteFilter(clearFilter: () => void) {
+    clearFilter();
     setPlacementKey("");
     setSiteScope("select");
     setSelectedAsset(null);
@@ -2976,6 +3061,9 @@ export default function UploadPanel({
 
   function renderAssetManager() {
     if (!selectedAsset) return null;
+    const assignedPlacement = options?.placements.find(
+      (placement) => placement.placement_id === selectedAsset.placement_id,
+    );
     const placementChanged =
       Boolean(managePlacementKey) &&
       managePlacementKey !==
@@ -3184,7 +3272,20 @@ export default function UploadPanel({
           )}
         </div>
         <div style={manageDetailsStyle}>
-          <h2 style={assetHeadingStyle}>{selectedAsset.fileName}</h2>
+          <div style={manageHeaderStyle}>
+            <h2 style={assetHeadingStyle}>{selectedAsset.fileName}</h2>
+            {assignedPlacement && (
+              <a
+                href={placementViewerUrl(assignedPlacement)}
+                style={siteActionLinkStyle}
+              >
+                <span style={siteActionIconStyle} aria-hidden="true">
+                  open_in_new
+                </span>
+                View
+              </a>
+            )}
+          </div>
 
           <label style={labelStyle}>
             Artasia Site
@@ -3825,6 +3926,14 @@ export default function UploadPanel({
                       </option>
                     ))}
                   </select>
+                  {uploaderKey && (
+                    <ClearFilterButton
+                      label="Clear team member filter"
+                      onClick={() =>
+                        clearSingleSiteFilter(() => setUploaderKey(""))
+                      }
+                    />
+                  )}
                 </label>
               )}
 
@@ -3921,6 +4030,16 @@ export default function UploadPanel({
                     <option value="earlyon">EarlyON Sites Only</option>
                     <option value="nonEarlyon">Regular Sites Only</option>
                   </select>
+                  {browseContextFilter !== "all" && (
+                    <ClearFilterButton
+                      label="Clear program context filter"
+                      onClick={() =>
+                        clearSingleSiteFilter(() =>
+                          setBrowseContextFilter("all"),
+                        )
+                      }
+                    />
+                  )}
                 </label>
               )}
 
@@ -3948,6 +4067,14 @@ export default function UploadPanel({
                       </option>
                     ))}
                   </select>
+                  {browsePartnerKey && (
+                    <ClearFilterButton
+                      label="Clear Artasia partner filter"
+                      onClick={() =>
+                        clearSingleSiteFilter(() => setBrowsePartnerKey(""))
+                      }
+                    />
+                  )}
                 </label>
               )}
 
@@ -3971,6 +4098,14 @@ export default function UploadPanel({
                       </option>
                     ))}
                   </select>
+                  {deliveryDayFilter && (
+                    <ClearFilterButton
+                      label="Clear delivery day filter"
+                      onClick={() =>
+                        clearSingleSiteFilter(() => setDeliveryDayFilter(""))
+                      }
+                    />
+                  )}
                 </label>
               )}
 
@@ -3995,6 +4130,14 @@ export default function UploadPanel({
                       </option>
                     ))}
                   </select>
+                  {timeOfDayFilter && (
+                    <ClearFilterButton
+                      label="Clear time of day filter"
+                      onClick={() =>
+                        clearSingleSiteFilter(() => setTimeOfDayFilter(""))
+                      }
+                    />
+                  )}
                 </label>
               )}
 
@@ -4019,6 +4162,14 @@ export default function UploadPanel({
                       </option>
                     ))}
                   </select>
+                  {ageRangeFilter && (
+                    <ClearFilterButton
+                      label="Clear age range filter"
+                      onClick={() =>
+                        clearSingleSiteFilter(() => setAgeRangeFilter(""))
+                      }
+                    />
+                  )}
                 </label>
               )}
 
@@ -4183,6 +4334,15 @@ export default function UploadPanel({
                     )}
                   </div>
                   <div style={detailHeaderActionsStyle}>
+                    <a
+                      href={placementViewerUrl(selectedPlacement)}
+                      style={siteActionLinkStyle}
+                    >
+                      <span style={siteActionIconStyle} aria-hidden="true">
+                        open_in_new
+                      </span>
+                      View
+                    </a>
                     <div style={countBadgeStyle}>
                       {assetsLoading ? "..." : placementAssets.length} upload
                       {placementAssets.length === 1 ? "" : "s"}
@@ -4549,6 +4709,32 @@ const clearFiltersButtonStyle: React.CSSProperties = {
   boxSizing: "border-box",
 };
 
+const clearSingleFilterButtonStyle: React.CSSProperties = {
+  position: "absolute",
+  right: 5,
+  bottom: 5,
+  display: "grid",
+  placeItems: "center",
+  width: 28,
+  height: 28,
+  padding: 0,
+  border: 0,
+  borderRadius: 3,
+  background: "#2a2e39",
+  color: "#bfc7d5",
+  cursor: "pointer",
+  zIndex: 1,
+};
+
+const clearSingleFilterIconStyle: React.CSSProperties = {
+  fontFamily: "'Material Symbols Outlined'",
+  fontSize: 17,
+  fontWeight: 400,
+  lineHeight: 1,
+  fontStyle: "normal",
+  fontVariationSettings: "'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 20",
+};
+
 const siteActionIconStyle: React.CSSProperties = {
   fontFamily: "'Material Symbols Outlined'",
   fontSize: 16,
@@ -4725,6 +4911,7 @@ const fieldGridStyle: React.CSSProperties = {
 };
 
 const labelStyle: React.CSSProperties = {
+  position: "relative",
   display: "grid",
   gap: 6,
   fontSize: 13,

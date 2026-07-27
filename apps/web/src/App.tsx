@@ -10,22 +10,37 @@ function getAdminAuthError() {
 }
 
 export default function App() {
-  const [path, setPath] = useState(window.location.pathname);
+  const [location, setLocation] = useState(() => ({
+    path: window.location.pathname,
+    search: window.location.search,
+  }));
   const [adminAuthError, setAdminAuthError] = useState<string | null>(() =>
     getAdminAuthError(),
   );
+  const { path, search } = location;
 
   useEffect(() => {
     if (window.location.search.includes("auth=")) {
+      const params = new URLSearchParams(window.location.search);
+      params.delete("auth");
+      params.delete("message");
+      const nextSearch = params.toString();
       window.history.replaceState(
         null,
         "",
-        window.location.pathname + window.location.hash,
+        `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${window.location.hash}`,
       );
+      setLocation({
+        path: window.location.pathname,
+        search: window.location.search,
+      });
     }
 
     const onPopState = () => {
-      setPath(window.location.pathname);
+      setLocation({
+        path: window.location.pathname,
+        search: window.location.search,
+      });
       setAdminAuthError(getAdminAuthError());
     };
     window.addEventListener("popstate", onPopState);
@@ -58,6 +73,7 @@ export default function App() {
         initialError={adminAuthError}
         initialAssetId={adminEditMatch?.[1]}
         adminPath={path}
+        adminSearch={search}
       />
     );
   }
