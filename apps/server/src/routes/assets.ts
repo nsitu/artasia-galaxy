@@ -4,6 +4,24 @@ import { getWordPressConfig } from "../infra/WordPressClient.js";
 
 const router = Router();
 
+async function getAssetThumbnailWithFallback(
+  assetId: string,
+  size: "thumbnail" | "preview",
+  edited: boolean,
+) {
+  const response = await getAssetThumbnail(assetId, size, { edited });
+  if (!edited || response.ok) return response;
+
+  await response.body?.cancel().catch(() => undefined);
+  const fallback = await getAssetThumbnail(assetId, size);
+  if (fallback.ok) {
+    console.warn(
+      `[${size}] ${assetId}: edited rendition unavailable; using original thumbnail`,
+    );
+  }
+  return fallback;
+}
+
 router.get("/external-logo", async (req, res) => {
   try {
     const rawUrl = typeof req.query.url === "string" ? req.query.url : "";
@@ -48,7 +66,11 @@ router.get("/external-logo", async (req, res) => {
 router.get("/:id/thumbnail", async (req, res) => {
   try {
     const edited = req.query.edited === "true";
-    const immichRes = await getAssetThumbnail(req.params.id, "thumbnail", { edited });
+    const immichRes = await getAssetThumbnailWithFallback(
+      req.params.id,
+      "thumbnail",
+      edited,
+    );
 
     res.status(immichRes.status);
     res.setHeader("Content-Type", immichRes.headers.get("Content-Type") ?? "image/jpeg");
@@ -73,7 +95,11 @@ router.get("/:id/thumbnail", async (req, res) => {
 router.get("/:id/preview", async (req, res) => {
   try {
     const edited = req.query.edited === "true";
-    const immichRes = await getAssetThumbnail(req.params.id, "preview", { edited });
+    const immichRes = await getAssetThumbnailWithFallback(
+      req.params.id,
+      "preview",
+      edited,
+    );
 
     res.status(immichRes.status);
     res.setHeader("Content-Type", immichRes.headers.get("Content-Type") ?? "image/jpeg");

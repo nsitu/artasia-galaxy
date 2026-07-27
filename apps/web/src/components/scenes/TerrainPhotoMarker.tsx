@@ -1,6 +1,6 @@
 import { Billboard } from "@react-three/drei";
-import { extend, useFrame, useLoader, useThree, type ThreeEvent } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
+import { extend, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 
 class FlowerPhotoMaterial extends THREE.ShaderMaterial {
@@ -879,14 +879,56 @@ function orientHeadToCamera(head: THREE.Object3D, parent: THREE.Object3D, camera
 }
 
 function usePhotoTexture(url: string) {
-  const texture = useLoader(THREE.TextureLoader, url);
+  const fallbackTexture = useMemo(() => {
+    const texture = new THREE.DataTexture(
+      new Uint8Array([34, 38, 48, 255]),
+      1,
+      1,
+      THREE.RGBAFormat,
+    );
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.needsUpdate = true;
+    return texture;
+  }, []);
+  const [texture, setTexture] = useState<THREE.Texture>(fallbackTexture);
 
   useEffect(() => {
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.minFilter = THREE.LinearFilter;
-    texture.magFilter = THREE.LinearFilter;
-    texture.needsUpdate = true;
-  }, [texture]);
+    let active = true;
+    let loadedTexture: THREE.Texture | null = null;
+    setTexture(fallbackTexture);
+
+    new THREE.TextureLoader().load(
+      url,
+      (nextTexture) => {
+        loadedTexture = nextTexture;
+        nextTexture.colorSpace = THREE.SRGBColorSpace;
+        nextTexture.minFilter = THREE.LinearFilter;
+        nextTexture.magFilter = THREE.LinearFilter;
+        nextTexture.needsUpdate = true;
+        if (active) setTexture(nextTexture);
+        else nextTexture.dispose();
+      },
+      undefined,
+      () => {
+        if (active) {
+          console.warn(`[viewer] thumbnail unavailable: ${url}`);
+          setTexture(fallbackTexture);
+        }
+      },
+    );
+
+    return () => {
+      active = false;
+      loadedTexture?.dispose();
+    };
+  }, [fallbackTexture, url]);
+
+  useEffect(
+    () => () => {
+      fallbackTexture.dispose();
+    },
+    [fallbackTexture],
+  );
 
   return texture;
 }

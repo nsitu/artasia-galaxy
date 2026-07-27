@@ -261,6 +261,7 @@ export async function searchAssets(params: {
   size?: number;
   withExif?: boolean;
   withPeople?: boolean;
+  visibility?: "archive" | "timeline" | "hidden" | "locked";
   takenAfter?: string;
   takenBefore?: string;
 }): Promise<ImmichSearchResponse> {
@@ -276,6 +277,7 @@ export async function searchAssets(params: {
   if (params.albumIds?.length) body.albumIds = params.albumIds;
   if (params.personIds?.length) body.personIds = params.personIds;
   if (params.tagIds?.length) body.tagIds = params.tagIds;
+  if (params.visibility) body.visibility = params.visibility;
   if (params.takenAfter) body.takenAfter = params.takenAfter;
   if (params.takenBefore) body.takenBefore = params.takenBefore;
 

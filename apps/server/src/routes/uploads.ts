@@ -16,9 +16,9 @@ import {
   removeAssetsFromAlbum,
   removeAssetEdits,
   searchAssets,
-  searchAssetIdsByTag,
   tagAsset,
   untagAssets,
+  updateAsset,
   updateAssetDescription,
   updateAssetLocation,
   uploadAsset,
@@ -226,17 +226,48 @@ async function getAssetsForPlacementTagIds(tagIds: string[]) {
   const size = 100;
   for (const tagId of tagIds) {
     for (const type of ["IMAGE", "VIDEO"] as const) {
-      let page = 1;
-      for (;;) {
-        const result = await searchAssets({ tagIds: [tagId], page, size, type });
-        for (const asset of result.assets.items) byId.set(asset.id, asset);
-        if (!result.assets.nextPage || result.assets.items.length < size) break;
-        page += 1;
+      for (const visibility of ["timeline", "archive"] as const) {
+        let page = 1;
+        for (;;) {
+          const result = await searchAssets({
+            tagIds: [tagId],
+            page,
+            size,
+            type,
+            visibility,
+          });
+          for (const asset of result.assets.items) byId.set(asset.id, asset);
+          if (!result.assets.nextPage || result.assets.items.length < size) break;
+          page += 1;
+        }
       }
     }
   }
 
   return Array.from(byId.values()).sort((a, b) => b.fileCreatedAt.localeCompare(a.fileCreatedAt));
+}
+
+async function searchAdminAssetIdsByTag(tagId: string) {
+  const assetIds = new Set<string>();
+  const size = 100;
+  for (const type of ["IMAGE", "VIDEO"] as const) {
+    for (const visibility of ["timeline", "archive"] as const) {
+      let page = 1;
+      for (;;) {
+        const result = await searchAssets({
+          tagIds: [tagId],
+          page,
+          size,
+          type,
+          visibility,
+        });
+        for (const asset of result.assets.items) assetIds.add(asset.id);
+        if (!result.assets.nextPage || result.assets.items.length < size) break;
+        page += 1;
+      }
+    }
+  }
+  return Array.from(assetIds);
 }
 
 interface UploaderAlbum {
@@ -346,18 +377,21 @@ async function searchAssetsByAlbumId(
   const byId = new Map<string, Awaited<ReturnType<typeof searchAssets>>["assets"]["items"][number]>();
   const size = options?.compact ? 500 : 100;
   for (const type of ["IMAGE", "VIDEO"] as const) {
-    let page = 1;
-    for (;;) {
-      const result = await searchAssets({
-        albumIds: [albumId],
-        page,
-        size,
-        type,
-        ...(options?.compact ? { withExif: false, withPeople: false } : {}),
-      });
-      for (const asset of result.assets.items) byId.set(asset.id, asset);
-      if (!result.assets.nextPage || result.assets.items.length < size) break;
-      page += 1;
+    for (const visibility of ["timeline", "archive"] as const) {
+      let page = 1;
+      for (;;) {
+        const result = await searchAssets({
+          albumIds: [albumId],
+          page,
+          size,
+          type,
+          visibility,
+          ...(options?.compact ? { withExif: false, withPeople: false } : {}),
+        });
+        for (const asset of result.assets.items) byId.set(asset.id, asset);
+        if (!result.assets.nextPage || result.assets.items.length < size) break;
+        page += 1;
+      }
     }
   }
 
@@ -368,12 +402,14 @@ async function searchAllImmichAssets() {
   const byId = new Map<string, Awaited<ReturnType<typeof searchAssets>>["assets"]["items"][number]>();
   const size = 100;
   for (const type of ["IMAGE", "VIDEO"] as const) {
-    let page = 1;
-    for (;;) {
-      const result = await searchAssets({ page, size, type });
-      for (const asset of result.assets.items) byId.set(asset.id, asset);
-      if (!result.assets.nextPage || result.assets.items.length < size) break;
-      page += 1;
+    for (const visibility of ["timeline", "archive"] as const) {
+      let page = 1;
+      for (;;) {
+        const result = await searchAssets({ page, size, type, visibility });
+        for (const asset of result.assets.items) byId.set(asset.id, asset);
+        if (!result.assets.nextPage || result.assets.items.length < size) break;
+        page += 1;
+      }
     }
   }
 
@@ -581,7 +617,7 @@ async function getManagementAssignments(assetIds: string[]) {
   }
 
   for (const [tagId, placement] of placementByTagId) {
-    const taggedAssetIds = await searchAssetIdsByTag(tagId);
+    const taggedAssetIds = await searchAdminAssetIdsByTag(tagId);
     for (const assetId of taggedAssetIds) {
       if (!assetIdSet.has(assetId)) continue;
       const current = assignments.get(assetId) ?? {};
@@ -592,7 +628,7 @@ async function getManagementAssignments(assetIds: string[]) {
   }
 
   for (const [tagId, activity] of activityByTagId) {
-    const taggedAssetIds = await searchAssetIdsByTag(tagId);
+    const taggedAssetIds = await searchAdminAssetIdsByTag(tagId);
     for (const assetId of taggedAssetIds) {
       if (!assetIdSet.has(assetId)) continue;
       const current = assignments.get(assetId) ?? {};
@@ -608,7 +644,7 @@ async function getManagementAssignments(assetIds: string[]) {
     return name === "media:audio" || value === "media:audio";
   });
   if (audioTag) {
-    const audioAssetIds = await searchAssetIdsByTag(audioTag.id);
+    const audioAssetIds = await searchAdminAssetIdsByTag(audioTag.id);
     for (const assetId of audioAssetIds) {
       if (!assetIdSet.has(assetId)) continue;
       const current = assignments.get(assetId) ?? {};
@@ -740,7 +776,7 @@ router.get("/assets", async (req, res) => {
         assets = [];
       } else {
         const activityAssetIds = new Set(
-          (await Promise.all(activityImmichTagIds.map(searchAssetIdsByTag))).flat()
+          (await Promise.all(activityImmichTagIds.map(searchAdminAssetIdsByTag))).flat()
         );
         assets = assets.filter((asset) => activityAssetIds.has(asset.id));
       }
@@ -962,6 +998,33 @@ router.post("/assets/:assetId/published", async (req, res) => {
       published,
       published_album_id: album.id,
     });
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
+});
+
+router.post("/assets/:assetId/archived", async (req, res) => {
+  try {
+    const auth = await getAuthContext(req);
+    if (!auth.authenticated) {
+      res.status(401).json({ error: "Sign in to archive uploads." });
+      return;
+    }
+
+    const assetId = req.params.assetId.trim();
+    if (!assetId) {
+      res.status(400).json({ error: "Asset ID is required." });
+      return;
+    }
+
+    const archived = Boolean(req.body?.archived);
+    await getAsset(assetId);
+    await updateAsset(assetId, {
+      visibility: archived ? "archive" : "timeline",
+    });
+    invalidateSiteActivityStats();
+
+    res.json({ ok: true, asset_id: assetId, archived });
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });
   }

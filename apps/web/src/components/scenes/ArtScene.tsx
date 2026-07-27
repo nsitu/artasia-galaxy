@@ -30,6 +30,7 @@ const TERRAIN_GL_OPTIONS = {
   failIfMajorPerformanceCaveat: false,
 };
 type IntroPhase = "loading" | "ready" | "exiting" | "complete";
+const PARTNER_PATH_PREFIX = "/partners/";
 
 type TerrainMapControls = {
   target: THREE.Vector3;
@@ -54,6 +55,9 @@ export default function ArtScene() {
   const [previewPlacementAction, setPreviewPlacementAction] = useState<(() => void) | null>(null);
   const [partnerFilterOptions, setPartnerFilterOptions] = useState<PartnerFilterOption[]>([]);
   const [selectedPartnerFilter, setSelectedPartnerFilter] = useState("");
+  const [requestedPartnerSlug, setRequestedPartnerSlug] = useState(() =>
+    getPartnerSlugFromPath(window.location.pathname),
+  );
   const [activityFilterOptions, setActivityFilterOptions] = useState<ActivityOption[]>([]);
   const [selectedActivityFilter, setSelectedActivityFilter] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -146,6 +150,31 @@ export default function ArtScene() {
   }, [partnerFilterOptions, selectedPartnerFilter]);
 
   useEffect(() => {
+    const onPopState = () => {
+      setRequestedPartnerSlug(
+        getPartnerSlugFromPath(window.location.pathname),
+      );
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  useEffect(() => {
+    if (partnerFilterOptions.length === 0) return;
+    if (!requestedPartnerSlug) {
+      setSelectedPartnerFilter("");
+      return;
+    }
+
+    const partner = partnerFilterOptions.find(
+      (option) =>
+        normalizePartnerSlug(slugifyPartnerName(option.value)) ===
+        normalizePartnerSlug(requestedPartnerSlug),
+    );
+    setSelectedPartnerFilter(partner?.value ?? "");
+  }, [partnerFilterOptions, requestedPartnerSlug]);
+
+  useEffect(() => {
     if (!selectedActivityFilter) return;
     if (!activityFilterOptions.some((option) => String(option.id) === selectedActivityFilter)) {
       setSelectedActivityFilter("");
@@ -189,7 +218,11 @@ export default function ArtScene() {
               <select
                 aria-label="Filter placements by partner"
                 value={selectedPartnerFilter}
-                onChange={(event) => setSelectedPartnerFilter(event.target.value)}
+                onChange={(event) => {
+                  const partner = event.target.value;
+                  setSelectedPartnerFilter(partner);
+                  updatePartnerPath(partner);
+                }}
                 style={filterSelectStyle}
               >
                 <option value="" style={filterOptionStyle}>All partners</option>
@@ -400,6 +433,35 @@ function photoAdjustmentFilterStyle(adjustments?: { brightness?: number; contras
 function adjustmentPercent(value?: number) {
   if (!Number.isFinite(value)) return 100;
   return Math.max(50, Math.min(150, Math.round(value as number)));
+}
+
+function getPartnerSlugFromPath(pathname: string) {
+  if (!pathname.startsWith(PARTNER_PATH_PREFIX)) return null;
+  const slug = pathname.slice(PARTNER_PATH_PREFIX.length).split("/")[0] ?? "";
+  return slug ? decodeURIComponent(slug) : null;
+}
+
+function normalizePartnerSlug(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function slugifyPartnerName(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/['"]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function updatePartnerPath(partner: string) {
+  const slug = slugifyPartnerName(partner);
+  const path = slug
+    ? `${PARTNER_PATH_PREFIX}${encodeURIComponent(slug)}`
+    : "/";
+  if (window.location.pathname === path) return;
+  window.history.pushState(null, "", path);
+  window.dispatchEvent(new PopStateEvent("popstate"));
 }
 
 function getWebGL2SupportError() {

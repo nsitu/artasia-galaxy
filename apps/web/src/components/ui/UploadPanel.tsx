@@ -21,6 +21,7 @@ import {
   fetchUntaggedPlacementAssets,
   logoutAuthUser,
   resetUploadAssetEdits,
+  setAssetArchived,
   setAssetPublished,
   syncDriveFiles,
   updateAssetCaption,
@@ -182,6 +183,7 @@ export default function UploadPanel({
   const [manageUploaderKey, setManageUploaderKey] = useState("");
   const [manageActivityTag, setManageActivityTag] = useState("");
   const [managePublished, setManagePublished] = useState(false);
+  const [manageArchived, setManageArchived] = useState(false);
   const [manageCaption, setManageCaption] = useState("");
   const [manageLatitude, setManageLatitude] = useState("");
   const [manageLongitude, setManageLongitude] = useState("");
@@ -1460,9 +1462,24 @@ export default function UploadPanel({
   }
 
   function setApplicationPath(path: string, replace = false) {
-    if (window.location.pathname === path) return;
-    if (replace) window.history.replaceState(null, "", path);
-    else window.history.pushState(null, "", path);
+    const nextUrl = new URL(path, window.location.origin);
+    const retainsSelectedSite = [
+      "/admin/browse",
+      "/admin/upload",
+      "/admin/import",
+    ].includes(nextUrl.pathname);
+    if (
+      retainsSelectedSite &&
+      placementKey &&
+      !nextUrl.searchParams.has("site")
+    ) {
+      nextUrl.searchParams.set("site", placementKey);
+    }
+    const nextPath = `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`;
+    const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (currentPath === nextPath) return;
+    if (replace) window.history.replaceState(null, "", nextPath);
+    else window.history.pushState(null, "", nextPath);
     window.dispatchEvent(new PopStateEvent("popstate"));
   }
 
@@ -1473,6 +1490,7 @@ export default function UploadPanel({
     setManageUploaderKey(asset.uploader_id ? String(asset.uploader_id) : "");
     setManageActivityTag(asset.activity_id ? String(asset.activity_id) : "");
     setManagePublished(Boolean(asset.published));
+    setManageArchived(Boolean(asset.archived));
     setManageCaption(asset.description ?? "");
     setManageLatitude(coordinateInputValue(asset.latitude));
     setManageLongitude(coordinateInputValue(asset.longitude));
@@ -1510,6 +1528,7 @@ export default function UploadPanel({
     setManageUploaderKey("");
     setManageActivityTag("");
     setManagePublished(false);
+    setManageArchived(false);
     setManageCaption("");
     setManageLatitude("");
     setManageLongitude("");
@@ -1589,12 +1608,15 @@ export default function UploadPanel({
       (selectedAsset.activity_id ? String(selectedAsset.activity_id) : "");
     const publishedChanged =
       managePublished !== Boolean(selectedAsset.published);
+    const archivedChanged =
+      manageArchived !== Boolean(selectedAsset.archived);
 
     if (
       !placementChanged &&
       !uploaderChanged &&
       !activityTagChanged &&
-      !publishedChanged
+      !publishedChanged &&
+      !archivedChanged
     ) {
       setError(
         "Choose a placement, team member album, program week, or publication status to save.",
@@ -1638,6 +1660,12 @@ export default function UploadPanel({
           published: managePublished,
         });
       }
+      if (archivedChanged) {
+        await setAssetArchived({
+          assetId: selectedAsset.id,
+          archived: manageArchived,
+        });
+      }
       closeAssetManager();
       refreshVisibleAssets();
     } catch (err) {
@@ -1662,6 +1690,8 @@ export default function UploadPanel({
       (selectedAsset.activity_id ? String(selectedAsset.activity_id) : "");
     const publishedChanged =
       managePublished !== Boolean(selectedAsset.published);
+    const archivedChanged =
+      manageArchived !== Boolean(selectedAsset.archived);
     const captionChanged =
       manageCaption.trim() !== (selectedAsset.description ?? "").trim();
     const locationChanged =
@@ -1686,6 +1716,7 @@ export default function UploadPanel({
       !uploaderChanged &&
       !activityChanged &&
       !publishedChanged &&
+      !archivedChanged &&
       !captionChanged &&
       !locationChanged &&
       !gpsUsageChanged &&
@@ -1756,6 +1787,8 @@ export default function UploadPanel({
       }
       if (publishedChanged)
         await setAssetPublished({ assetId, published: managePublished });
+      if (archivedChanged)
+        await setAssetArchived({ assetId, archived: manageArchived });
       if (captionChanged)
         await updateAssetCaption({ assetId, caption: manageCaption.trim() });
       if (locationChanged)
@@ -2589,6 +2622,9 @@ export default function UploadPanel({
             ...adjustmentFilterStyle(asset.adjustments),
           }}
         />
+        {asset.archived && (
+          <span style={archivedAssetBadgeStyle}>Archived</span>
+        )}
         <span style={assetNameStyle}>{asset.fileName}</span>
         <span style={assetDateStyle}>
           {asset.uploader_name ?? "No team member album"}
@@ -3167,6 +3203,8 @@ export default function UploadPanel({
       (selectedAsset.activity_id ? String(selectedAsset.activity_id) : "");
     const publishedChanged =
       managePublished !== Boolean(selectedAsset.published);
+    const archivedChanged =
+      manageArchived !== Boolean(selectedAsset.archived);
     const selectedAdjustments = normalizeAdjustments(selectedAsset.adjustments);
     const adjustmentChanged =
       manageBrightness !== selectedAdjustments.brightness ||
@@ -3190,6 +3228,7 @@ export default function UploadPanel({
       uploaderChanged ||
       activityChanged ||
       publishedChanged ||
+      archivedChanged ||
       adjustmentChanged ||
       captionChanged ||
       locationChanged ||
@@ -3615,6 +3654,15 @@ export default function UploadPanel({
               onChange={(e) => setManagePublished(e.target.checked)}
             />
             Published
+          </label>
+          <label style={checkboxLabelStyle}>
+            <input
+              type="checkbox"
+              checked={manageArchived}
+              disabled={!authUser?.authenticated}
+              onChange={(e) => setManageArchived(e.target.checked)}
+            />
+            Archived
           </label>
           <div style={manageActionsStyle}>
             {savingAsset && audioTrimStatus && (
@@ -5466,6 +5514,20 @@ const assetImageStyle: React.CSSProperties = {
   objectFit: "cover",
   borderRadius: 4,
   background: "#0c0e13",
+};
+
+const archivedAssetBadgeStyle: React.CSSProperties = {
+  justifySelf: "start",
+  padding: "2px 6px",
+  borderRadius: 999,
+  background: "rgba(245, 158, 11, 0.18)",
+  border: "1px solid rgba(245, 158, 11, 0.5)",
+  color: "#fbbf24",
+  fontSize: 10,
+  fontWeight: 700,
+  lineHeight: 1.4,
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
 };
 
 const assetNameStyle: React.CSSProperties = {

@@ -363,6 +363,21 @@ export async function setAssetPublished(params: {
   }
 }
 
+export async function setAssetArchived(params: {
+  assetId: string;
+  archived: boolean;
+}): Promise<void> {
+  const res = await fetch(`/api/v1/uploads/assets/${params.assetId}/archived`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ archived: params.archived }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+}
+
 export async function updateAssetCaption(params: {
   assetId: string;
   caption: string;
