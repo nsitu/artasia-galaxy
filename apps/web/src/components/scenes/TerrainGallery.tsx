@@ -691,7 +691,11 @@ export default function TerrainGallery({
       }
       const lat = photo.exifInfo?.latitude;
       const lng = photo.exifInfo?.longitude;
-      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      if (
+        photo.useGpsLocation !== false &&
+        Number.isFinite(lat) &&
+        Number.isFinite(lng)
+      ) {
         const photoLatLng = [lat as number, lng as number] as [number, number];
         const placementLatLng = [
           focusedPlacement.lat,
@@ -1139,17 +1143,28 @@ export default function TerrainGallery({
       const startPosition = camera.position.clone();
       const startTarget =
         controls?.target?.clone() ?? finalFrame.target.clone();
+      const panOffset = new THREE.Vector3();
+      const lastRenderedTarget = startTarget.clone();
       const animate = (now: number) => {
+        if (controls?.target) {
+          panOffset.add(controls.target.clone().sub(lastRenderedTarget));
+        }
         const progress = Math.min(
           1,
           (now - startedAt) / INTRO_CAMERA_DURATION_MS,
         );
         const eased = 1 - (1 - progress) ** 3;
-        camera.position.lerpVectors(startPosition, finalFrame.position, eased);
-        const target = startTarget.clone().lerp(finalFrame.target, eased);
+        camera.position
+          .lerpVectors(startPosition, finalFrame.position, eased)
+          .add(panOffset);
+        const target = startTarget
+          .clone()
+          .lerp(finalFrame.target, eased)
+          .add(panOffset);
         camera.up.set(0, 1, 0);
         camera.lookAt(target);
         controls?.target?.copy(target);
+        lastRenderedTarget.copy(target);
         controls?.update?.();
         if (progress < 1) {
           frameId = window.requestAnimationFrame(animate);

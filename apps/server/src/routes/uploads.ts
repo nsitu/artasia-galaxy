@@ -31,6 +31,10 @@ import {
   saveAssetAdjustments,
   type AssetAdjustments,
 } from "../services/assetAdjustments.service.js";
+import {
+  getGpsDisabledAssetIds,
+  saveAssetGpsUsage,
+} from "../services/assetGpsUsage.service.js";
 import { getAuthContext } from "../services/auth.service.js";
 import { flattenAsset } from "../services/flattenAsset.service.js";
 import { isAudioAsset, parseImmichDuration } from "../services/audioAsset.service.js";
@@ -270,7 +274,8 @@ function mapAdminAsset(
   asset: Awaited<ReturnType<typeof getAssetsForPlacementTagIds>>[number],
   uploaderAlbum?: UploaderAlbum,
   assignment?: AssetManagementAssignment,
-  adjustments?: AssetAdjustments
+  adjustments?: AssetAdjustments,
+  useGpsLocation = true,
 ) {
   const dimensions = editableAssetDimensions(asset);
   return {
@@ -284,6 +289,9 @@ function mapAdminAsset(
     durationSeconds: parseImmichDuration(asset.duration),
     fileName: asset.originalFileName,
     description: asset.exifInfo?.description ?? "",
+    latitude: asset.exifInfo?.latitude ?? null,
+    longitude: asset.exifInfo?.longitude ?? null,
+    useGpsLocation,
     createdAt: asset.fileCreatedAt,
     updatedAt: asset.updatedAt,
     archived: asset.isArchived,
@@ -475,7 +483,11 @@ async function mapAssetsWithUploaderAlbums(assets: Awaited<ReturnType<typeof get
     getManagementAssignments(assets.map((asset) => asset.id)),
     searchAssetsByAlbumId(publishedAlbum.id),
   ]);
-  const adjustmentMap = await getAssetAdjustmentMap(assets.map((asset) => asset.id));
+  const assetIds = assets.map((asset) => asset.id);
+  const [adjustmentMap, gpsDisabledAssetIds] = await Promise.all([
+    getAssetAdjustmentMap(assetIds),
+    getGpsDisabledAssetIds(assetIds),
+  ]);
   const publishedAssetIds = new Set(publishedAssets.map((asset) => asset.id));
   return assets.map((asset) => mapAdminAsset(
     asset,
@@ -484,7 +496,8 @@ async function mapAssetsWithUploaderAlbums(assets: Awaited<ReturnType<typeof get
       ...(managementAssignments.get(asset.id) ?? {}),
       published: publishedAssetIds.has(asset.id),
     },
-    adjustmentMap.get(asset.id)
+    adjustmentMap.get(asset.id),
+    !gpsDisabledAssetIds.has(asset.id),
   ));
 }
 
@@ -809,6 +822,81 @@ router.post("/assets/:assetId/caption", async (req, res) => {
       ok: true,
       asset_id: assetId,
       caption,
+    });
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
+});
+
+router.put("/assets/:assetId/location", async (req, res) => {
+  try {
+    const auth = await getAuthContext(req);
+    if (!auth.authenticated) {
+      res.status(401).json({ error: "Sign in to edit upload locations." });
+      return;
+    }
+
+    const assetId = req.params.assetId.trim();
+    if (!assetId) {
+      res.status(400).json({ error: "Asset ID is required." });
+      return;
+    }
+
+    const latitude = req.body?.latitude;
+    const longitude = req.body?.longitude;
+    if (
+      typeof latitude !== "number" ||
+      !Number.isFinite(latitude) ||
+      latitude < -90 ||
+      latitude > 90
+    ) {
+      res.status(400).json({ error: "Latitude must be between -90 and 90." });
+      return;
+    }
+    if (
+      typeof longitude !== "number" ||
+      !Number.isFinite(longitude) ||
+      longitude < -180 ||
+      longitude > 180
+    ) {
+      res.status(400).json({ error: "Longitude must be between -180 and 180." });
+      return;
+    }
+
+    await getAsset(assetId);
+    await updateAssetLocation(assetId, { latitude, longitude });
+
+    res.json({ ok: true, asset_id: assetId, latitude, longitude });
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
+});
+
+router.put("/assets/:assetId/gps-usage", async (req, res) => {
+  try {
+    const auth = await getAuthContext(req);
+    if (!auth.authenticated) {
+      res.status(401).json({ error: "Sign in to edit GPS usage." });
+      return;
+    }
+
+    const assetId = req.params.assetId.trim();
+    if (!assetId) {
+      res.status(400).json({ error: "Asset ID is required." });
+      return;
+    }
+    if (typeof req.body?.useGpsLocation !== "boolean") {
+      res.status(400).json({ error: "GPS usage must be true or false." });
+      return;
+    }
+
+    await getAsset(assetId);
+    await saveAssetGpsUsage(assetId, req.body.useGpsLocation);
+
+    res.json({
+      ok: true,
+      asset_id: assetId,
+      useGpsLocation: req.body.useGpsLocation,
     });
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });

@@ -44,6 +44,7 @@ const HIGH_DETAIL_ZOOMS = [17, 16, 15, 14, 13, 12] as const;
 
 export function getGeoPhotos(photos: Photo[]): GeoPhoto[] {
   return photos.flatMap((photo, index) => {
+    if (photo.useGpsLocation === false) return [];
     const lat = photo.exifInfo?.latitude;
     const lng = photo.exifInfo?.longitude;
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return [];

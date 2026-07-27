@@ -16,6 +16,7 @@ export interface Photo {
   createdAt: string;
   fileName: string;
   isFavorite: boolean;
+  useGpsLocation?: boolean;
   adjustments?: AssetAdjustments;
   exifInfo?: {
     make?: string;
@@ -186,6 +187,9 @@ export interface PlacementAsset {
   durationSeconds: number;
   fileName: string;
   description?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  useGpsLocation?: boolean;
   createdAt: string;
   updatedAt: string;
   archived?: boolean;
@@ -347,6 +351,46 @@ export async function updateAssetCaption(params: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ caption: params.caption }),
   });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+}
+
+export async function updateAssetLocation(params: {
+  assetId: string;
+  latitude: number;
+  longitude: number;
+}): Promise<void> {
+  const res = await fetch(
+    `/api/v1/uploads/assets/${encodeURIComponent(params.assetId)}/location`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        latitude: params.latitude,
+        longitude: params.longitude,
+      }),
+    },
+  );
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+}
+
+export async function updateAssetGpsUsage(params: {
+  assetId: string;
+  useGpsLocation: boolean;
+}): Promise<void> {
+  const res = await fetch(
+    `/api/v1/uploads/assets/${encodeURIComponent(params.assetId)}/gps-usage`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ useGpsLocation: params.useGpsLocation }),
+    },
+  );
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(body.error ?? `HTTP ${res.status}`);

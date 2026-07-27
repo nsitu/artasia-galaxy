@@ -65,7 +65,7 @@ const overlayStyle: React.CSSProperties = {
 
 const exitingOverlayStyle: React.CSSProperties = {
   opacity: 0,
-  pointerEvents: "auto",
+  pointerEvents: "none",
 };
 
 const cardStyle: React.CSSProperties = {

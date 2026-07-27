@@ -23,6 +23,8 @@ import {
   setAssetPublished,
   syncDriveFiles,
   updateAssetCaption,
+  updateAssetGpsUsage,
+  updateAssetLocation,
   updateUploadAssetAdjustments,
   uploadFiles,
   type AssetAdjustments,
@@ -97,6 +99,8 @@ const MAX_ADJUSTMENT = 150;
 const UPLOAD_ACCEPT_TYPES = "image/*,video/*,.heic,.heif,image/heic,image/heif";
 const DEFAULT_SHARED_DRIVE_NAME = "artasia 2026";
 const DEFAULT_SHARED_DRIVE_FOLDER = "documentation";
+const coordinateInputValue = (value?: number | null) =>
+  Number.isFinite(value) ? String(value) : "";
 const DELIVERY_DAY_OPTIONS: Array<{ value: DeliveryDayFilter; label: string }> =
   [
     { value: "", label: "All Delivery Days" },
@@ -141,6 +145,9 @@ export default function UploadPanel({
   const [manageActivityTag, setManageActivityTag] = useState("");
   const [managePublished, setManagePublished] = useState(false);
   const [manageCaption, setManageCaption] = useState("");
+  const [manageLatitude, setManageLatitude] = useState("");
+  const [manageLongitude, setManageLongitude] = useState("");
+  const [manageUseGpsLocation, setManageUseGpsLocation] = useState(true);
   const [captionSaving, setCaptionSaving] = useState(false);
   const [captionSaveStatus, setCaptionSaveStatus] = useState<
     "idle" | "saved" | "failed"
@@ -1331,6 +1338,9 @@ export default function UploadPanel({
     setManageActivityTag(asset.activity_id ? String(asset.activity_id) : "");
     setManagePublished(Boolean(asset.published));
     setManageCaption(asset.description ?? "");
+    setManageLatitude(coordinateInputValue(asset.latitude));
+    setManageLongitude(coordinateInputValue(asset.longitude));
+    setManageUseGpsLocation(asset.useGpsLocation !== false);
     setCaptionSaveStatus("idle");
     setCaptionSaveError(null);
     setManageBrightness(adjustments.brightness);
@@ -1365,6 +1375,9 @@ export default function UploadPanel({
     setManageActivityTag("");
     setManagePublished(false);
     setManageCaption("");
+    setManageLatitude("");
+    setManageLongitude("");
+    setManageUseGpsLocation(true);
     setCaptionSaving(false);
     setCaptionSaveStatus("idle");
     setCaptionSaveError(null);
@@ -1515,6 +1528,11 @@ export default function UploadPanel({
       managePublished !== Boolean(selectedAsset.published);
     const captionChanged =
       manageCaption.trim() !== (selectedAsset.description ?? "").trim();
+    const locationChanged =
+      manageLatitude.trim() !== coordinateInputValue(selectedAsset.latitude) ||
+      manageLongitude.trim() !== coordinateInputValue(selectedAsset.longitude);
+    const gpsUsageChanged =
+      manageUseGpsLocation !== (selectedAsset.useGpsLocation !== false);
     const selectedAdjustments = normalizeAdjustments(selectedAsset.adjustments);
     const adjustmentChanged =
       manageBrightness !== selectedAdjustments.brightness ||
@@ -1533,6 +1551,8 @@ export default function UploadPanel({
       !activityChanged &&
       !publishedChanged &&
       !captionChanged &&
+      !locationChanged &&
+      !gpsUsageChanged &&
       !adjustmentChanged &&
       !pixelEditsChanged &&
       !audioTrimChanged
@@ -1542,6 +1562,28 @@ export default function UploadPanel({
     }
     if (pixelEditsChanged && !cropRect) {
       setError("Choose a crop area before saving.");
+      return;
+    }
+    const latitude = Number(manageLatitude);
+    const longitude = Number(manageLongitude);
+    if (
+      locationChanged &&
+      (manageLatitude.trim() === "" ||
+        !Number.isFinite(latitude) ||
+        latitude < -90 ||
+        latitude > 90)
+    ) {
+      setError("Latitude must be between -90 and 90.");
+      return;
+    }
+    if (
+      locationChanged &&
+      (manageLongitude.trim() === "" ||
+        !Number.isFinite(longitude) ||
+        longitude < -180 ||
+        longitude > 180)
+    ) {
+      setError("Longitude must be between -180 and 180.");
       return;
     }
     if (
@@ -1580,6 +1622,13 @@ export default function UploadPanel({
         await setAssetPublished({ assetId, published: managePublished });
       if (captionChanged)
         await updateAssetCaption({ assetId, caption: manageCaption.trim() });
+      if (locationChanged)
+        await updateAssetLocation({ assetId, latitude, longitude });
+      if (gpsUsageChanged)
+        await updateAssetGpsUsage({
+          assetId,
+          useGpsLocation: manageUseGpsLocation,
+        });
       if (adjustmentChanged) {
         await updateUploadAssetAdjustments({
           assetId,
@@ -2947,6 +2996,11 @@ export default function UploadPanel({
       manageSaturation !== selectedAdjustments.saturation;
     const captionChanged =
       manageCaption.trim() !== (selectedAsset.description ?? "").trim();
+    const locationChanged =
+      manageLatitude.trim() !== coordinateInputValue(selectedAsset.latitude) ||
+      manageLongitude.trim() !== coordinateInputValue(selectedAsset.longitude);
+    const gpsUsageChanged =
+      manageUseGpsLocation !== (selectedAsset.useGpsLocation !== false);
     const pixelEditsChanged = hasPendingPixelEdits(selectedAsset);
     const audioTrimChanged =
       selectedAsset.mediaKind === "audio" &&
@@ -2960,6 +3014,8 @@ export default function UploadPanel({
       publishedChanged ||
       adjustmentChanged ||
       captionChanged ||
+      locationChanged ||
+      gpsUsageChanged ||
       pixelEditsChanged ||
       audioTrimChanged;
     const displayPreviewUrl = mediaUrl(
@@ -3199,6 +3255,74 @@ export default function UploadPanel({
               style={captionTextareaStyle}
             />
           </label>
+          {selectedAsset.mediaKind === "image" && (
+            <div style={locationPanelStyle}>
+              <div style={coordinateFieldsStyle}>
+                <label style={labelStyle}>
+                  Latitude
+                  <input
+                    type="number"
+                    min={-90}
+                    max={90}
+                    step="any"
+                    value={manageLatitude}
+                    onChange={(event) => setManageLatitude(event.target.value)}
+                    disabled={!authUser?.authenticated || savingAsset}
+                    placeholder="e.g. 43.2557"
+                    style={inputStyle}
+                  />
+                </label>
+                <label style={labelStyle}>
+                  Longitude
+                  <input
+                    type="number"
+                    min={-180}
+                    max={180}
+                    step="any"
+                    value={manageLongitude}
+                    onChange={(event) => setManageLongitude(event.target.value)}
+                    disabled={!authUser?.authenticated || savingAsset}
+                    placeholder="e.g. -79.8711"
+                    style={inputStyle}
+                  />
+                </label>
+              </div>
+              <div style={gpsToggleRowStyle}>
+                <span>
+                  <span style={gpsToggleLabelStyle}>Use GPS location</span>
+                  <span style={gpsToggleHelpStyle}>
+                    {manageUseGpsLocation
+                      ? "Plants this artwork at its coordinates."
+                      : "Shows this artwork orbiting its Artasia site."}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={manageUseGpsLocation}
+                  aria-label="Use GPS location in the Galaxy viewer"
+                  onClick={() =>
+                    setManageUseGpsLocation((current) => !current)
+                  }
+                  disabled={!authUser?.authenticated || savingAsset}
+                  style={{
+                    ...gpsToggleTrackStyle,
+                    ...(manageUseGpsLocation ? gpsToggleTrackEnabledStyle : {}),
+                  }}
+                >
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      ...gpsToggleThumbStyle,
+                      ...(manageUseGpsLocation
+                        ? gpsToggleThumbEnabledStyle
+                        : {}),
+                    }}
+                  />
+                </button>
+              </div>
+            </div>
+          )}
           {authUser?.authenticated && selectedAsset.type === "IMAGE" && (
             <div style={adjustmentPanelStyle}>
               <label style={adjustmentLabelStyle}>
@@ -4838,6 +4962,72 @@ const manageDetailsStyle: React.CSSProperties = {
   gap: 12,
   alignContent: "start",
   minWidth: 0,
+};
+
+const coordinateFieldsStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: 12,
+};
+
+const locationPanelStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 12,
+  padding: 12,
+  border: "1px solid rgba(255,255,255,0.12)",
+  borderRadius: 6,
+};
+
+const gpsToggleRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 16,
+};
+
+const gpsToggleLabelStyle: React.CSSProperties = {
+  display: "block",
+  color: "#d8e7ff",
+  fontSize: 13,
+};
+
+const gpsToggleHelpStyle: React.CSSProperties = {
+  display: "block",
+  marginTop: 3,
+  color: "#8490a3",
+  fontSize: 11,
+  lineHeight: 1.35,
+};
+
+const gpsToggleTrackStyle: React.CSSProperties = {
+  position: "relative",
+  flex: "0 0 auto",
+  width: 44,
+  height: 24,
+  padding: 2,
+  border: "1px solid rgba(255,255,255,0.24)",
+  borderRadius: 999,
+  background: "#343946",
+  cursor: "pointer",
+};
+
+const gpsToggleTrackEnabledStyle: React.CSSProperties = {
+  background: "#8fc85c",
+  borderColor: "#a9dc79",
+};
+
+const gpsToggleThumbStyle: React.CSSProperties = {
+  display: "block",
+  width: 18,
+  height: 18,
+  borderRadius: "50%",
+  background: "#f5f7fb",
+  transform: "translateX(0)",
+  transition: "transform 120ms ease-out",
+};
+
+const gpsToggleThumbEnabledStyle: React.CSSProperties = {
+  transform: "translateX(18px)",
 };
 
 const manageHeaderStyle: React.CSSProperties = {

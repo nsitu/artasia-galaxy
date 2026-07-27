@@ -356,7 +356,13 @@ export default function ArtScene() {
               maxAzimuthAngle={TERRAIN_MAP_HEADING}
               mouseButtons={TERRAIN_MAP_MOUSE_BUTTONS}
             />
-            <GroundPlanePanControls enabled={!showWelcomeIntro || introPhase === "complete"} />
+            <GroundPlanePanControls
+              enabled={
+                !showWelcomeIntro ||
+                introPhase === "exiting" ||
+                introPhase === "complete"
+              }
+            />
             <Preload all />
           </Suspense>
         </Canvas>

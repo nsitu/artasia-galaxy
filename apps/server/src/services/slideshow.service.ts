@@ -2,6 +2,7 @@ import { getPublishedAlbum, listTags, searchAssetIdsByTag, searchAssets, ImmichA
 import { DEFAULT_ASSET_ADJUSTMENTS, getAssetAdjustmentMap, type AssetAdjustments } from "./assetAdjustments.service.js";
 import { activityAnchorTag, getUploadConfig, placementAnchorTag } from "./uploadConfig.service.js";
 import { isAudioAsset } from "./audioAsset.service.js";
+import { getGpsDisabledAssetIds } from "./assetGpsUsage.service.js";
 
 export interface Photo {
   id: string;
@@ -29,6 +30,7 @@ export interface Photo {
   }>;
   fileName: string;
   isFavorite: boolean;
+  useGpsLocation: boolean;
   adjustments: AssetAdjustments;
 }
 
@@ -79,6 +81,7 @@ function assetToPhoto(
   asset: ImmichAsset,
   adjustments?: AssetAdjustments,
   forceAudio = false,
+  useGpsLocation = true,
 ): Photo {
   const audio = forceAudio || isAudioAsset(asset);
   const imgW = asset.exifInfo?.exifImageWidth ?? 1920;
@@ -121,6 +124,7 @@ function assetToPhoto(
       .map(() => ({ x: 0.5, y: 0.5, width: 0.15, height: 0.2 })),
     fileName: asset.originalFileName,
     isFavorite: asset.isFavorite ?? false,
+    useGpsLocation,
     adjustments: adjustments ?? { ...DEFAULT_ASSET_ADJUSTMENTS },
   };
 }
@@ -252,9 +256,18 @@ export async function querySlideshow(
     }
   }
 
-  const adjustmentMap = await getAssetAdjustmentMap(assets.map((asset) => asset.id));
+  const assetIds = assets.map((asset) => asset.id);
+  const [adjustmentMap, gpsDisabledAssetIds] = await Promise.all([
+    getAssetAdjustmentMap(assetIds),
+    getGpsDisabledAssetIds(assetIds),
+  ]);
   let photos = assets.map((asset) =>
-    assetToPhoto(asset, adjustmentMap.get(asset.id), audioIdSet.has(asset.id)),
+    assetToPhoto(
+      asset,
+      adjustmentMap.get(asset.id),
+      audioIdSet.has(asset.id),
+      !gpsDisabledAssetIds.has(asset.id),
+    ),
   );
 
   if (query.shuffle && query.seed != null) {
