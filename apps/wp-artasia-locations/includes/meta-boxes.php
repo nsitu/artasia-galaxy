@@ -611,6 +611,7 @@ function artasia_activity_meta_box_html(WP_Post $post): void
     $project_id = get_post_meta($post->ID, 'artasia_project_id', true);
     $week = get_post_meta($post->ID, 'artasia_activity_week', true);
     $description = get_post_meta($post->ID, 'artasia_activity_description', true);
+    $colour = sanitize_hex_color(get_post_meta($post->ID, 'artasia_activity_colour', true)) ?: '#ffffff';
 
     wp_nonce_field('artasia_activity_meta', 'artasia_activity_meta_nonce');
 ?>
@@ -645,6 +646,14 @@ function artasia_activity_meta_box_html(WP_Post $post): void
             <td>
                 <textarea id="artasia_activity_description" name="artasia_activity_description" rows="6" class="widefat"><?php echo esc_textarea($description); ?></textarea>
                 <p class="description">Describe the activity, materials, intent, or delivery notes.</p>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_activity_colour">Colour</label></th>
+            <td>
+                <input type="color" id="artasia_activity_colour" name="artasia_activity_colour" value="<?php echo esc_attr($colour); ?>" />
+                <code><?php echo esc_html($colour); ?></code>
+                <p class="description">Choose the hex colour used to identify this activity in the Galaxy Viewer.</p>
             </td>
         </tr>
     </table>
@@ -700,6 +709,7 @@ function artasia_save_activity_meta(int $post_id): void
     update_post_meta($post_id, 'artasia_project_id', intval($_POST['artasia_project_id'] ?? 0));
     update_post_meta($post_id, 'artasia_activity_week', intval($_POST['artasia_activity_week'] ?? 0));
     update_post_meta($post_id, 'artasia_activity_description', sanitize_textarea_field($_POST['artasia_activity_description'] ?? ''));
+    update_post_meta($post_id, 'artasia_activity_colour', sanitize_hex_color($_POST['artasia_activity_colour'] ?? '') ?: '');
 }
 add_action('save_post_artasia_activity', 'artasia_save_activity_meta');
 

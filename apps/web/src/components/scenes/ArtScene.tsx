@@ -134,6 +134,10 @@ export default function ArtScene() {
 
   const selectedPhoto = selectedPhotoIndex !== null ? photos[selectedPhotoIndex] : null;
   const selectedDescription = selectedPhoto?.exifInfo?.description?.trim();
+  const selectedActivityColour =
+    activityFilterOptions.find(
+      (activity) => String(activity.id) === selectedActivityFilter,
+    )?.colour;
   const handleBackActionChange = useCallback((action: (() => void) | null) => {
     setBackAction(action ? () => action : null);
   }, []);
@@ -241,11 +245,23 @@ export default function ArtScene() {
                 aria-label="Filter photos by activity"
                 value={selectedActivityFilter}
                 onChange={(event) => setSelectedActivityFilter(event.target.value)}
-                style={filterSelectStyle}
+                style={{
+                  ...filterSelectStyle,
+                  ...(selectedActivityColour
+                    ? { color: selectedActivityColour }
+                    : {}),
+                }}
               >
                 <option value="" style={filterOptionStyle}>All Activities</option>
                 {activityFilterOptions.map((option) => (
-                  <option key={option.id} value={String(option.id)} style={filterOptionStyle}>
+                  <option
+                    key={option.id}
+                    value={String(option.id)}
+                    style={{
+                      ...filterOptionStyle,
+                      ...(option.colour ? { color: option.colour } : {}),
+                    }}
+                  >
                     {option.label}
                   </option>
                 ))}
@@ -324,9 +340,11 @@ export default function ArtScene() {
           />
           <div style={photoLightboxMetadataStyle} onClick={(event) => event.stopPropagation()}>
             <div style={photoLightboxTitleStyle}>{selectedPhoto.fileName}</div>
-            <div style={photoLightboxDescriptionStyle}>
-              {selectedDescription || "No description metadata."}
-            </div>
+            {selectedDescription && (
+              <div style={photoLightboxDescriptionStyle}>
+                {selectedDescription}
+              </div>
+            )}
             {authUser?.authenticated && (
               <a
                 href={`/edit/${selectedPhoto.id}`}
@@ -381,6 +399,7 @@ export default function ArtScene() {
               onPartnerFilterOptionsChange={setPartnerFilterOptions}
               selectedPartnerFilter={selectedPartnerFilter}
               selectedActivityFilter={selectedActivityFilter}
+              selectedActivityColour={selectedActivityColour}
             />
             <MapControls
               makeDefault

@@ -74,7 +74,7 @@ type DeliveryDayFilter =
   | "thursday"
   | "friday";
 type SiteScope = "select" | "all" | "placement";
-type SiteSort = "default" | "assets-desc" | "assets-asc";
+type SiteSort = "alphabetical" | "published-assets";
 type WorkspaceMode = "sites" | "browse" | "edit" | "upload" | "import";
 type PlacementMetaLine = {
   text: string;
@@ -161,6 +161,7 @@ export default function UploadPanel({
     useState<DeliveryDayFilter>("");
   const [timeOfDayFilter, setTimeOfDayFilter] = useState("");
   const [ageRangeFilter, setAgeRangeFilter] = useState("");
+  const [siteSearchFilter, setSiteSearchFilter] = useState("");
   const [placementKey, setPlacementKey] = useState("");
   const [activityTagFilter, setActivityTagFilter] = useState("");
   const [items, setItems] = useState<UploadItem[]>([]);
@@ -169,7 +170,7 @@ export default function UploadPanel({
     "placements",
   );
   const [siteScope, setSiteScope] = useState<SiteScope>("select");
-  const [siteSort, setSiteSort] = useState<SiteSort>("default");
+  const [siteSort, setSiteSort] = useState<SiteSort>("alphabetical");
   const [siteActivityStats, setSiteActivityStats] = useState<
     SiteActivityStats["sites"]
   >({});
@@ -780,20 +781,33 @@ export default function UploadPanel({
             (placement) =>
               placement.partner_name?.trim() === browsePartnerKey,
           );
-    if (workspaceMode !== "sites" || siteSort === "default") {
-      return partnerFilteredPlacements;
+    const normalizedSiteSearch = siteSearchFilter.trim().toLocaleLowerCase();
+    const searchedPlacements =
+      workspaceMode === "sites" && normalizedSiteSearch
+        ? partnerFilteredPlacements.filter((placement) =>
+            [
+              placement.placement_name,
+              placement.team_member_name,
+              placement.secondary_team_member_name,
+            ].some((value) =>
+              value?.toLocaleLowerCase().includes(normalizedSiteSearch),
+            ),
+          )
+        : partnerFilteredPlacements;
+    if (workspaceMode !== "sites") {
+      return searchedPlacements;
     }
 
-    const direction = siteSort === "assets-desc" ? -1 : 1;
-    return [...partnerFilteredPlacements].sort((a, b) => {
+    return [...searchedPlacements].sort((a, b) => {
+      const alphabetical =
+        placementLabel(a).localeCompare(placementLabel(b));
+      if (siteSort === "alphabetical") return alphabetical;
+
       const countA =
         siteActivityStats[String(a.placement_id)]?.totalPublished ?? 0;
       const countB =
         siteActivityStats[String(b.placement_id)]?.totalPublished ?? 0;
-      return (
-        (countA - countB) * direction ||
-        placementLabel(a).localeCompare(placementLabel(b))
-      );
+      return countB - countA || alphabetical;
     });
   }, [
     ageRangeFilter,
@@ -803,6 +817,7 @@ export default function UploadPanel({
     options,
     selectedUploader,
     siteActivityStats,
+    siteSearchFilter,
     siteSort,
     timeOfDayFilter,
     workspaceMode,
@@ -976,7 +991,8 @@ export default function UploadPanel({
     deliveryDayFilter ||
     timeOfDayFilter ||
     ageRangeFilter ||
-    browsePartnerKey,
+    browsePartnerKey ||
+    siteSearchFilter,
   );
 
   const visiblePlacementIds = useMemo(() => {
@@ -1333,6 +1349,7 @@ export default function UploadPanel({
     setTimeOfDayFilter("");
     setAgeRangeFilter("");
     setBrowsePartnerKey("");
+    setSiteSearchFilter("");
     setPlacementKey("");
     setSiteScope("select");
     setSelectedAsset(null);
@@ -4000,6 +4017,52 @@ export default function UploadPanel({
         >
           {workspaceMode !== "edit" && (
             <aside className="atlas-admin-filters" style={placementMenuStyle}>
+              {workspaceMode === "sites" && (
+                <label style={labelStyle}>
+                  <span style={filterLabelWithIconStyle}>
+                    <span style={filterLabelIconStyle} aria-hidden="true">
+                      sort
+                    </span>
+                    Sort Sites
+                  </span>
+                  <select
+                    value={siteSort}
+                    onChange={(event) =>
+                      setSiteSort(event.target.value as SiteSort)
+                    }
+                    style={inputStyle}
+                  >
+                    <option value="alphabetical">Alphabetical</option>
+                    <option value="published-assets">
+                      Published asset count
+                    </option>
+                  </select>
+                </label>
+              )}
+
+              {workspaceMode === "sites" && (
+                <label style={labelStyle}>
+                  Search Sites
+                  <input
+                    type="search"
+                    value={siteSearchFilter}
+                    onChange={(event) =>
+                      setSiteSearchFilter(event.target.value)
+                    }
+                    placeholder="Site or person"
+                    style={inputStyle}
+                  />
+                  {siteSearchFilter && (
+                    <ClearFilterButton
+                      label="Clear site search"
+                      onClick={() =>
+                        clearSingleSiteFilter(() => setSiteSearchFilter(""))
+                      }
+                    />
+                  )}
+                </label>
+              )}
+
               {workspaceMode === "browse" && (
                 <label style={labelStyle}>
                   Artasia Site
@@ -4310,27 +4373,6 @@ export default function UploadPanel({
                       }
                     />
                   )}
-                </label>
-              )}
-
-              {workspaceMode === "sites" && (
-                <label style={labelStyle}>
-                  Sort Sites
-                  <select
-                    value={siteSort}
-                    onChange={(event) =>
-                      setSiteSort(event.target.value as SiteSort)
-                    }
-                    style={inputStyle}
-                  >
-                    <option value="default">Default order</option>
-                    <option value="assets-desc">
-                      Most published assets
-                    </option>
-                    <option value="assets-asc">
-                      Fewest published assets
-                    </option>
-                  </select>
                 </label>
               )}
 
@@ -5129,6 +5171,21 @@ const labelStyle: React.CSSProperties = {
   fontSize: 13,
   color: "#aaa",
   minWidth: 0,
+};
+
+const filterLabelWithIconStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 5,
+};
+
+const filterLabelIconStyle: React.CSSProperties = {
+  fontFamily: "'Material Symbols Outlined'",
+  fontSize: 18,
+  fontWeight: 400,
+  lineHeight: 1,
+  fontStyle: "normal",
+  fontVariationSettings: "'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 20",
 };
 
 const fieldHelpStyle: React.CSSProperties = {

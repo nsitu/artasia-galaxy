@@ -42,6 +42,7 @@ function artasia_get_activities(): WP_REST_Response
             'project_id'  => intval(get_post_meta($activity->ID, 'artasia_project_id', true)),
             'week'        => intval(get_post_meta($activity->ID, 'artasia_activity_week', true)),
             'description' => get_post_meta($activity->ID, 'artasia_activity_description', true) ?: '',
+            'colour'      => sanitize_hex_color(get_post_meta($activity->ID, 'artasia_activity_colour', true)) ?: '',
         ];
     }
 

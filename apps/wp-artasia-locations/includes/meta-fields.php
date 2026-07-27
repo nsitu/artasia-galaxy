@@ -95,6 +95,13 @@ function artasia_register_meta_fields(): void
         'show_in_rest' => true,
         'sanitize_callback' => 'sanitize_textarea_field',
     ]);
+    register_post_meta('artasia_activity', 'artasia_activity_colour', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'sanitize_hex_color',
+    ]);
 
     // --- Placement meta ---
     register_post_meta('artasia_placement', 'artasia_project_id', [

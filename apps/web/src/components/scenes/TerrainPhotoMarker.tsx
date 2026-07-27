@@ -433,6 +433,7 @@ interface SharedPhotoProps {
   isSelected: boolean;
   isHighlighted: boolean;
   adjustments?: PhotoAdjustments;
+  borderColour?: string;
   onClick: () => void;
   onPointerEnter: () => void;
   onPointerLeave: () => void;
@@ -509,6 +510,7 @@ export function TerrainPhotoFlower({
   onPointerEnter,
   onPointerLeave,
   adjustments,
+  borderColour,
 }: FlowerProps) {
   const groupRef = useRef<THREE.Group>(null);
   const headRef = useRef<THREE.Group>(null);
@@ -600,7 +602,7 @@ export function TerrainPhotoFlower({
             saturation={saturation}
             petalCount={PETAL_LOBE_COUNT}
             flowerOpacity={0.96}
-            borderColor="#ffffff"
+            borderColor={borderColour ?? "#ffffff"}
             borderWidth={0.12}
             imageAspect={imageAspect}
             transparent
@@ -629,6 +631,7 @@ export function OrbitingPhotoBanner({
   onPointerEnter,
   onPointerLeave,
   adjustments,
+  borderColour: assignedBorderColour,
 }: OrbitBannerProps) {
   const groupRef = useRef<THREE.Group>(null);
   const imageRef = useRef<THREE.Mesh>(null);
@@ -640,7 +643,7 @@ export function OrbitingPhotoBanner({
     speed: stableRange(`${id}:speed`, ORBIT_SPEED_MIN, ORBIT_SPEED_MAX),
   }), [id]);
   const cutout = useMemo(() => createCutoutCorners(id), [id]);
-  const borderColor = useMemo(() => {
+  const fallbackBorderColor = useMemo(() => {
     const index = Math.min(
       CUTOUT_BORDER_COLORS.length - 1,
       Math.floor(stableRange(`${id}:cutout:border-color`, 0, CUTOUT_BORDER_COLORS.length)),
@@ -704,7 +707,7 @@ export function OrbitingPhotoBanner({
             cornerBottomRight={cutout.bottomRight}
             cornerTopRight={cutout.topRight}
             cornerTopLeft={cutout.topLeft}
-            borderColor={borderColor}
+            borderColor={assignedBorderColour ?? fallbackBorderColor}
             borderWidth={0.04}
             dashLength={0.11}
             dashGap={0.065}

@@ -517,6 +517,7 @@ interface TerrainGalleryProps {
   onPartnerFilterOptionsChange?: (options: PartnerFilterOption[]) => void;
   selectedPartnerFilter?: string;
   selectedActivityFilter?: string;
+  selectedActivityColour?: string;
 }
 
 export default function TerrainGallery({
@@ -532,6 +533,7 @@ export default function TerrainGallery({
   onPartnerFilterOptionsChange,
   selectedPartnerFilter = "",
   selectedActivityFilter = "",
+  selectedActivityColour,
 }: TerrainGalleryProps = {}) {
   const camera = useThree((state) => state.camera);
   const controls = useThree(
@@ -1395,6 +1397,7 @@ export default function TerrainGallery({
               width={item.photo.width}
               height={item.photo.height}
               adjustments={item.photo.adjustments}
+              borderColour={selectedActivityColour}
               position={item.position}
               isSelected={item.index === selectedIndex}
               isHighlighted={item.index === hoveredIndex}
@@ -1412,6 +1415,7 @@ export default function TerrainGallery({
               width={item.photo.width}
               height={item.photo.height}
               adjustments={item.photo.adjustments}
+              borderColour={selectedActivityColour}
               center={item.center}
               isSelected={item.index === selectedIndex}
               isHighlighted={item.index === hoveredIndex}

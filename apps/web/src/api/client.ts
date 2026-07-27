@@ -131,6 +131,7 @@ export interface MapPlacement {
 export interface ActivityOption {
   id: number;
   label: string;
+  colour?: string;
 }
 
 export interface UploadOptions {

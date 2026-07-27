@@ -134,11 +134,13 @@ interface WpActivity {
   project_id?: number;
   week?: number;
   description?: string;
+  colour?: string;
 }
 
 export interface WpActivityInfo {
   id: number;
   label: string;
+  colour?: string;
 }
 
 export const ACTIVITY_ANCHOR_TAG_PREFIX = "activity:";
@@ -180,7 +182,13 @@ export async function getUploadActivities({
       const label = activityUploadTagName(activity);
       if (!label || seen.has(activity.id)) continue;
       seen.add(activity.id);
-      result.push({ id: activity.id, label });
+      result.push({
+        id: activity.id,
+        label,
+        ...(/^#[0-9a-f]{6}$/i.test(activity.colour ?? "")
+          ? { colour: activity.colour }
+          : {}),
+      });
     }
     uploadTagCache = { data: result, timestamp: Date.now() };
     uploadTagLastKnownGood = result;

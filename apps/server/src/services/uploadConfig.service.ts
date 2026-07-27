@@ -14,6 +14,7 @@ export { activityAnchorTag, isActivityAnchorTagName };
 export interface ActivityConfig {
   id: number;
   label: string;
+  colour?: string;
 }
 
 export interface ArtasiaPlacement {
@@ -184,7 +185,11 @@ export async function getUploadConfig(): Promise<UploadConfig> {
   const placements = wpPlacements.map(mapWpPlacement);
   const activities: ActivityConfig[] = wpActivities
     .filter((a): a is WpActivityInfo => Boolean(a.label))
-    .map((a) => ({ id: a.id, label: a.label }));
+    .map((a) => ({
+      id: a.id,
+      label: a.label,
+      ...(a.colour ? { colour: a.colour } : {}),
+    }));
   const uploaders = wpUploaders
     .map(mapWpUploader)
     .filter((uploader) => uploader.name && !RESERVED_ALBUMS.has(normalizeKey(uploader.name)));
