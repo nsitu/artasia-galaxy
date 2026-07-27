@@ -1385,6 +1385,7 @@ export default function TerrainGallery({
               key={item.photo.id}
               id={item.photo.id}
               audioUrl={item.photo.audioUrl}
+              iconName={item.photo.iconName}
               center={item.kind === "orbit" ? item.center : item.position}
               isPlaying={playingAudioId === item.photo.id}
               isHighlighted={item.index === hoveredIndex}

@@ -88,7 +88,9 @@ export default function ArtScene() {
       photo.iconName ? [photo.iconName] : [],
     );
     if (assignedIconNames.length > 0) {
-      loadMaterialSymbols(assignedIconNames);
+      void loadMaterialSymbols(assignedIconNames).catch((iconError) => {
+        console.warn(`[viewer-icons] ${(iconError as Error).message}`);
+      });
     }
   }, [photos]);
 

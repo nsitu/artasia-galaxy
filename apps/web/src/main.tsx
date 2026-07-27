@@ -32,9 +32,11 @@ if (
   window.location.pathname.startsWith("/admin/") ||
   /^\/edit\/[0-9a-f-]{36}$/i.test(window.location.pathname)
 ) {
-  loadAllMaterialSymbols();
+  void loadAllMaterialSymbols();
 } else {
-  loadMaterialSymbols(coreIconNames);
+  void loadMaterialSymbols(coreIconNames).catch((error) => {
+    console.warn(`[icons] ${(error as Error).message}`);
+  });
 }
 
 createRoot(document.getElementById("root")!).render(

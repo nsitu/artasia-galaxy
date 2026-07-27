@@ -2,6 +2,7 @@ import { Billboard } from "@react-three/drei";
 import { extend, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
+import { loadMaterialSymbols } from "../../modules/iconLoader";
 
 class FlowerPhotoMaterial extends THREE.ShaderMaterial {
   constructor() {
@@ -450,6 +451,7 @@ interface OrbitBannerProps extends SharedPhotoProps {
 interface OrbitAudioProps {
   id: string;
   audioUrl: string;
+  iconName?: string;
   center: [number, number, number];
   isPlaying: boolean;
   isHighlighted: boolean;
@@ -497,6 +499,73 @@ const BASE_COLOR = new THREE.Color("#33b84a");
 const BASE_SELECTED_COLOR = new THREE.Color("#9df7a8");
 
 const tempVector = new THREE.Vector3();
+const materialSymbolTexturePromises = new Map<
+  string,
+  Promise<THREE.CanvasTexture>
+>();
+
+function createMaterialSymbolTexture(iconName: string) {
+  const existing = materialSymbolTexturePromises.get(iconName);
+  if (existing) return existing;
+
+  const request = loadMaterialSymbols([iconName])
+    .then(() => {
+      const size = 256;
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Canvas rendering is unavailable.");
+
+      context.clearRect(0, 0, size, size);
+      context.fillStyle = "#ffffff";
+      context.font = '400 176px "Material Symbols Outlined"';
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      context.fillText(iconName, size / 2, size / 2);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      texture.generateMipmaps = false;
+      texture.needsUpdate = true;
+      return texture;
+    })
+    .catch((error) => {
+      materialSymbolTexturePromises.delete(iconName);
+      throw error;
+    });
+  materialSymbolTexturePromises.set(iconName, request);
+  return request;
+}
+
+function useMaterialSymbolTexture(iconName?: string) {
+  const [texture, setTexture] = useState<THREE.CanvasTexture | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setTexture(null);
+    if (!iconName) return () => {
+      active = false;
+    };
+
+    createMaterialSymbolTexture(iconName)
+      .then((nextTexture) => {
+        if (active) setTexture(nextTexture);
+      })
+      .catch((error) => {
+        console.warn(
+          `[audio-icon] failed to render "${iconName}": ${(error as Error).message}`,
+        );
+      });
+    return () => {
+      active = false;
+    };
+  }, [iconName]);
+
+  return texture;
+}
 
 export function TerrainPhotoFlower({
   id,
@@ -728,6 +797,7 @@ export function OrbitingPhotoBanner({
 export function OrbitingAudioMarker({
   id,
   audioUrl,
+  iconName,
   center,
   isPlaying,
   isHighlighted,
@@ -740,6 +810,7 @@ export function OrbitingAudioMarker({
   const iconRef = useRef<THREE.Group>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const playbackStopRef = useRef(onPlaybackStop);
+  const assignedIconTexture = useMaterialSymbolTexture(iconName);
   playbackStopRef.current = onPlaybackStop;
   const orbit = useMemo(() => ({
     radius: stableRange(`${id}:radius`, ORBIT_MIN_UNITS, ORBIT_MAX_UNITS),
@@ -845,10 +916,25 @@ export function OrbitingAudioMarker({
             <ringGeometry args={[0.16, 0.205, 48]} />
             <meshBasicMaterial color={color} side={THREE.DoubleSide} toneMapped={false} />
           </mesh>
-          <mesh position={[0.018, 0, 0.002]}>
-            <shapeGeometry args={[triangle]} />
-            <meshBasicMaterial color={color} side={THREE.DoubleSide} toneMapped={false} />
-          </mesh>
+          {assignedIconTexture ? (
+            <mesh position={[0, 0, 0.002]}>
+              <planeGeometry args={[0.25, 0.25]} />
+              <meshBasicMaterial
+                map={assignedIconTexture}
+                color={color}
+                transparent
+                alphaTest={0.04}
+                depthWrite={false}
+                side={THREE.DoubleSide}
+                toneMapped={false}
+              />
+            </mesh>
+          ) : (
+            <mesh position={[0.018, 0, 0.002]}>
+              <shapeGeometry args={[triangle]} />
+              <meshBasicMaterial color={color} side={THREE.DoubleSide} toneMapped={false} />
+            </mesh>
+          )}
         </group>
       </Billboard>
     </group>
