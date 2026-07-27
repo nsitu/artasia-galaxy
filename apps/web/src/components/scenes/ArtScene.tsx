@@ -399,11 +399,20 @@ export default function ArtScene() {
             )}
           </div>
           <button
+            type="button"
             onClick={() => selectPhoto(null)}
             aria-label="Close photo"
             style={photoLightboxCloseStyle}
           >
-            x
+            <svg viewBox="0 0 16 16" aria-hidden="true" style={photoLightboxCloseIconStyle}>
+              <path
+                d="m3.5 3.5 9 9m0-9-9 9"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            </svg>
           </button>
         </div>
       )}
@@ -950,19 +959,17 @@ const photoLightboxEditLinkStyle: React.CSSProperties = {
 };
 
 const photoLightboxCloseStyle: React.CSSProperties = {
+  ...menuButtonStyle,
   position: "absolute",
   top: 16,
   right: 16,
-  background: "rgba(245,247,251,0.94)",
-  border: "1px solid rgba(0,0,0,0.28)",
-  borderRadius: 999,
-  color: "#10131c",
-  cursor: "pointer",
-  fontFamily: "monospace",
-  fontSize: 24,
-  fontWeight: 700,
-  lineHeight: 1,
-  width: 46,
-  height: 46,
-  boxShadow: "0 10px 32px rgba(0,0,0,0.36)",
+  background: "rgba(10,10,20,0.82)",
+  color: "#eef2f8",
+  border: "1px solid rgba(255,255,255,0.18)",
+  boxShadow: "0 10px 26px rgba(0,0,0,0.28)",
+};
+
+const photoLightboxCloseIconStyle: React.CSSProperties = {
+  width: 16,
+  height: 16,
 };

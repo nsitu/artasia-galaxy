@@ -171,8 +171,9 @@ export default function UploadPanel({
   const [assetMode, setAssetMode] = useState<"placements" | "untagged">(
     "placements",
   );
+  const [showArchivedAssets, setShowArchivedAssets] = useState(true);
   const [siteScope, setSiteScope] = useState<SiteScope>("select");
-  const [siteSort, setSiteSort] = useState<SiteSort>("alphabetical");
+  const [siteSort, setSiteSort] = useState<SiteSort>("published-assets");
   const [siteActivityStats, setSiteActivityStats] = useState<
     SiteActivityStats["sites"]
   >({});
@@ -799,6 +800,7 @@ export default function UploadPanel({
         ? partnerFilteredPlacements.filter((placement) =>
             [
               placement.placement_name,
+              placement.partner_name,
               placement.team_member_name,
               placement.secondary_team_member_name,
             ].some((value) =>
@@ -988,6 +990,14 @@ export default function UploadPanel({
       )?.label ?? null
     );
   }, [activityTagFilter, options]);
+
+  const displayedPlacementAssets = useMemo(
+    () =>
+      workspaceMode === "browse" && !showArchivedAssets
+        ? placementAssets.filter((asset) => !asset.archived)
+        : placementAssets,
+    [placementAssets, showArchivedAssets, workspaceMode],
+  );
 
   const browseBreadcrumbParents = useMemo(() => {
     return [
@@ -2700,10 +2710,12 @@ export default function UploadPanel({
   function renderAssetGrid(emptyMessage: string) {
     if (assetsLoading)
       return <div style={emptyStateStyle}>Loading uploads...</div>;
-    if (placementAssets.length === 0)
+    if (displayedPlacementAssets.length === 0)
       return <div style={emptyStateStyle}>{emptyMessage}</div>;
     return (
-      <div style={assetGridStyle}>{placementAssets.map(renderAssetCard)}</div>
+      <div style={assetGridStyle}>
+        {displayedPlacementAssets.map(renderAssetCard)}
+      </div>
     );
   }
 
@@ -4081,7 +4093,7 @@ export default function UploadPanel({
                     <span style={filterLabelIconStyle} aria-hidden="true">
                       sort
                     </span>
-                    Sort Sites
+                    Sort by
                   </span>
                   <select
                     value={siteSort}
@@ -4100,14 +4112,14 @@ export default function UploadPanel({
 
               {workspaceMode === "sites" && (
                 <label style={labelStyle}>
-                  Search Sites
+                  Search
                   <input
                     type="search"
                     value={siteSearchFilter}
                     onChange={(event) =>
                       setSiteSearchFilter(event.target.value)
                     }
-                    placeholder="Site or person"
+                    placeholder="Site, partner, or person"
                     style={inputStyle}
                   />
                   {siteSearchFilter && (
@@ -4484,6 +4496,37 @@ export default function UploadPanel({
                   </select>
                 </label>
               )}
+
+              {workspaceMode === "browse" && (
+                <div style={gpsToggleRowStyle}>
+                  <span style={gpsToggleLabelStyle}>Show archived assets</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={showArchivedAssets}
+                    aria-label="Show archived assets"
+                    onClick={() =>
+                      setShowArchivedAssets((current) => !current)
+                    }
+                    style={{
+                      ...gpsToggleTrackStyle,
+                      ...(showArchivedAssets
+                        ? gpsToggleTrackEnabledStyle
+                        : {}),
+                    }}
+                  >
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        ...gpsToggleThumbStyle,
+                        ...(showArchivedAssets
+                          ? gpsToggleThumbEnabledStyle
+                          : {}),
+                      }}
+                    />
+                  </button>
+                </div>
+              )}
             </aside>
           )}
 
@@ -4607,8 +4650,8 @@ export default function UploadPanel({
                       View
                     </a>
                     <div style={countBadgeStyle}>
-                      {assetsLoading ? "..." : placementAssets.length} upload
-                      {placementAssets.length === 1 ? "" : "s"}
+                      {assetsLoading ? "..." : displayedPlacementAssets.length} upload
+                      {displayedPlacementAssets.length === 1 ? "" : "s"}
                     </div>
                     <button
                       type="button"
@@ -4632,8 +4675,8 @@ export default function UploadPanel({
                   )}
                   <div style={detailHeaderActionsStyle}>
                     <div style={countBadgeStyle}>
-                      {assetsLoading ? "..." : placementAssets.length} upload
-                      {placementAssets.length === 1 ? "" : "s"}
+                      {assetsLoading ? "..." : displayedPlacementAssets.length} upload
+                      {displayedPlacementAssets.length === 1 ? "" : "s"}
                     </div>
                     <button
                       type="button"
