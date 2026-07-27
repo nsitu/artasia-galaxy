@@ -1139,35 +1139,39 @@ function artasia_documentation_meta_box_html(WP_Post $post): void
     $placement_ids = artasia_sanitize_integer_array_meta(
         get_post_meta($post->ID, 'artasia_documentation_placement_ids', true)
     );
+    $people_id = $people_ids[0] ?? 0;
+    $placement_id = $placement_ids[0] ?? 0;
     $pull_quote = get_post_meta($post->ID, 'artasia_documentation_pull_quote', true);
 
     wp_nonce_field('artasia_documentation_meta', 'artasia_documentation_meta_nonce');
 ?>
     <table class="form-table">
         <tr>
-            <th><label for="artasia_documentation_people_ids">People</label></th>
+            <th><label for="artasia_documentation_people_ids">Person</label></th>
             <td>
-                <select id="artasia_documentation_people_ids" name="artasia_documentation_people_ids[]" multiple size="8" class="widefat">
+                <select id="artasia_documentation_people_ids" name="artasia_documentation_people_ids[]" class="widefat">
+                    <option value="">&mdash; Select Person &mdash;</option>
                     <?php foreach ($people as $person) : ?>
-                        <option value="<?php echo esc_attr($person->ID); ?>" <?php selected(in_array($person->ID, $people_ids, true)); ?>>
+                        <option value="<?php echo esc_attr($person->ID); ?>" <?php selected($people_id, $person->ID); ?>>
                             <?php echo esc_html($person->post_title); ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
-                <p class="description">Select the people who authored, facilitated, or contributed to this documentation. Hold Ctrl (Windows) or Command (Mac) to select more than one.</p>
+                <p class="description">Select the person who authored, facilitated, or contributed to this documentation.</p>
             </td>
         </tr>
         <tr>
-            <th><label for="artasia_documentation_placement_ids">Placements</label></th>
+            <th><label for="artasia_documentation_placement_ids">Placement</label></th>
             <td>
-                <select id="artasia_documentation_placement_ids" name="artasia_documentation_placement_ids[]" multiple size="8" class="widefat">
+                <select id="artasia_documentation_placement_ids" name="artasia_documentation_placement_ids[]" class="widefat">
+                    <option value="">&mdash; Select Placement &mdash;</option>
                     <?php foreach ($placements as $placement) : ?>
-                        <option value="<?php echo esc_attr($placement->ID); ?>" <?php selected(in_array($placement->ID, $placement_ids, true)); ?>>
+                        <option value="<?php echo esc_attr($placement->ID); ?>" <?php selected($placement_id, $placement->ID); ?>>
                             <?php echo esc_html($placement->post_title); ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
-                <p class="description">Select the placements that define where and in what program context the documentation occurred.</p>
+                <p class="description">Select the placement that defines where and in what program context the documentation occurred.</p>
             </td>
         </tr>
         <tr>
