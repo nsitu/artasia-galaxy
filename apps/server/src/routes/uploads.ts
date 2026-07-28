@@ -70,6 +70,7 @@ const LINKED_AUDIO_TAG_PREFIX = "linkedaudio:";
 // These indexes scan all uploader and published albums. Admin mutations
 // explicitly invalidate them, so keep them warm between Browse requests.
 const ADMIN_BROWSE_INDEX_TTL_MS = 5 * 60_000;
+const AUDIO_OPTION_CACHE_TTL_MS = 60_000;
 
 interface SiteActivityStatsResponse {
   sites: Record<string, {
@@ -277,6 +278,58 @@ async function getAssetsForPlacementTagIds(tagIds: string[]) {
   return Array.from(byId.values()).sort((a, b) => b.fileCreatedAt.localeCompare(a.fileCreatedAt));
 }
 
+async function getActiveAudioAssetsForPlacementTagIds(tagIds: string[]) {
+  const results = await processWithConcurrency(
+    tagIds,
+    4,
+    async (tagId) => {
+      const assets: Awaited<ReturnType<typeof searchAssets>>["assets"]["items"] =
+        [];
+      const size = 500;
+      let page = 1;
+      for (;;) {
+        const result = await searchAssets({
+          tagIds: [tagId],
+          page,
+          size,
+          type: "VIDEO",
+          visibility: "timeline",
+          withExif: false,
+          withPeople: false,
+        });
+        assets.push(...result.assets.items);
+        if (!result.assets.nextPage || result.assets.items.length < size) break;
+        page += 1;
+      }
+      return assets;
+    },
+  );
+  const byId = new Map(
+    results.flat().map((asset) => [asset.id, asset]),
+  );
+  const candidates = Array.from(byId.values()).filter(
+    (asset) => !asset.isArchived && !asset.isTrashed,
+  );
+  if (embeddedAssetTagsAvailable(candidates)) {
+    return candidates.filter(isAudioAsset);
+  }
+
+  const tags = await listTags();
+  const audioTagIds = tags
+    .filter((tag) =>
+      [tag.name, tag.value].some(
+        (value) => value.trim().toLowerCase() === "media:audio",
+      ),
+    )
+    .map((tag) => tag.id);
+  const audioAssetIds = new Set(
+    (
+      await Promise.all(audioTagIds.map(searchAdminAssetIdsByTag))
+    ).flat(),
+  );
+  return candidates.filter((asset) => audioAssetIds.has(asset.id));
+}
+
 async function searchAdminAssetIdsByTag(tagId: string) {
   const assetIds = new Set<string>();
   const size = 100;
@@ -318,6 +371,10 @@ let publishedAssetIdCache: {
 } | null = null;
 let publishedAssetIdRequest: Promise<Set<string>> | null = null;
 let adminBrowseIndexGeneration = 0;
+const audioOptionCache = new Map<
+  string,
+  { expiresAt: number; value: Array<{ id: string; fileName: string }> }
+>();
 
 function invalidateAdminBrowseIndexes() {
   adminBrowseIndexGeneration += 1;
@@ -325,6 +382,7 @@ function invalidateAdminBrowseIndexes() {
   uploaderAssignmentRequest = null;
   publishedAssetIdCache = null;
   publishedAssetIdRequest = null;
+  audioOptionCache.clear();
 }
 
 interface AssetManagementAssignment {
@@ -964,6 +1022,69 @@ router.get("/site-activity-stats", async (req, res) => {
       return;
     }
     res.json(await getSiteActivityStats());
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
+});
+
+router.get("/audio-options", async (req, res) => {
+  try {
+    const auth = await getAuthContext(req);
+    if (!auth.authenticated) {
+      res.status(401).json({ error: "Sign in to view available sounds." });
+      return;
+    }
+
+    const requestedPlacementId = parseInt(
+      typeof req.query.placement_id === "string"
+        ? req.query.placement_id
+        : "",
+      10,
+    );
+    const placementIds = Array.from(
+      new Set([
+        GLOBAL_AUDIO_PLACEMENT_ID,
+        ...(Number.isFinite(requestedPlacementId)
+          ? [requestedPlacementId]
+          : []),
+      ]),
+    ).sort((a, b) => a - b);
+    const cacheKey = placementIds.join(",");
+    const cached = audioOptionCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      res.json({ options: cached.value });
+      return;
+    }
+
+    const [config, tags] = await Promise.all([
+      getUploadConfig(),
+      listTags(),
+    ]);
+    const placementsById = new Map(
+      config.placements.map((placement) => [
+        placement.placement_id,
+        placement,
+      ]),
+    );
+    const placementTagIds = Array.from(
+      new Set(
+        placementIds.flatMap((placementId) =>
+          findExistingPlacementTagIds(placementsById.get(placementId), tags),
+        ),
+      ),
+    );
+    const assets = placementTagIds.length
+      ? await getActiveAudioAssetsForPlacementTagIds(placementTagIds)
+      : [];
+    const options = assets
+      .map((asset) => ({ id: asset.id, fileName: asset.originalFileName }))
+      .sort((a, b) => a.fileName.localeCompare(b.fileName));
+    audioOptionCache.set(cacheKey, {
+      expiresAt: Date.now() + AUDIO_OPTION_CACHE_TTL_MS,
+      value: options,
+    });
+
+    res.json({ options });
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });
   }

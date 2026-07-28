@@ -9,6 +9,7 @@ export interface Photo {
   mediaKind: "image" | "video" | "audio";
   audioUrl?: string;
   videoUrl?: string;
+  linkedAudioUrl?: string;
   thumbnailUrl: string;
   previewUrl: string;
   width: number;
@@ -216,6 +217,11 @@ export interface PlacementAsset {
   adjustments?: AssetAdjustments;
 }
 
+export interface LinkedAudioOption {
+  id: string;
+  fileName: string;
+}
+
 export interface SiteActivityStats {
   sites: Record<string, {
     totalPublished: number;
@@ -287,6 +293,23 @@ export async function fetchPlacementAssetSet(placementIds: number[], activityId?
   }
   const body = await res.json() as { assets?: PlacementAsset[] };
   return body.assets ?? [];
+}
+
+export async function fetchLinkedAudioOptions(
+  placementId?: number,
+): Promise<LinkedAudioOption[]> {
+  const params = new URLSearchParams();
+  if (placementId != null) {
+    params.set("placement_id", String(placementId));
+  }
+  const query = params.size ? `?${params.toString()}` : "";
+  const res = await fetch(`/api/v1/uploads/audio-options${query}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  const body = await res.json() as { options?: LinkedAudioOption[] };
+  return body.options ?? [];
 }
 
 export async function fetchUntaggedPlacementAssets(): Promise<PlacementAsset[]> {

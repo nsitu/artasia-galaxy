@@ -9,6 +9,7 @@ export interface Photo {
   mediaKind: "image" | "video" | "audio";
   audioUrl?: string;
   videoUrl?: string;
+  linkedAudioUrl?: string;
   thumbnailUrl: string;
   previewUrl: string;
   width: number;
@@ -87,6 +88,7 @@ function assetToPhoto(
   useGpsLocation = true,
   iconName?: string,
   activityIds?: number[],
+  linkedAudioAssetId?: string,
 ): Photo {
   const audio = forceAudio || isAudioAsset(asset);
   const video = !audio && asset.type === "VIDEO";
@@ -140,6 +142,11 @@ function assetToPhoto(
     adjustments: adjustments ?? { ...DEFAULT_ASSET_ADJUSTMENTS },
     ...(iconName ? { iconName } : {}),
     ...(activityIds?.length ? { activityIds } : {}),
+    ...(linkedAudioAssetId
+      ? {
+          linkedAudioUrl: `/api/v1/assets/${linkedAudioAssetId}/original`,
+        }
+      : {}),
   };
 }
 
@@ -187,6 +194,7 @@ async function mapEmbeddedFocusedMetadata(assets: ImmichAsset[]) {
   const adjustmentMap = new Map<string, AssetAdjustments>();
   const gpsDisabledAssetIds = new Set<string>();
   const iconNameByAssetId = new Map<string, string>();
+  const linkedAudioAssetIdByAssetId = new Map<string, string>();
 
   for (const asset of assets) {
     const adjustments = { ...DEFAULT_ASSET_ADJUSTMENTS };
@@ -196,6 +204,12 @@ async function mapEmbeddedFocusedMetadata(assets: ImmichAsset[]) {
       if (key === "artasia:gps:disabled") gpsDisabledAssetIds.add(asset.id);
       if (/^icon:[a-z0-9_]+$/.test(key)) {
         iconNameByAssetId.set(asset.id, key.slice("icon:".length));
+      }
+      const linkedAudioMatch = key.match(
+        /^linkedaudio:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
+      );
+      if (linkedAudioMatch) {
+        linkedAudioAssetIdByAssetId.set(asset.id, linkedAudioMatch[1]);
       }
 
       const activityId = activityByTag.get(key);
@@ -226,6 +240,7 @@ async function mapEmbeddedFocusedMetadata(assets: ImmichAsset[]) {
     audioAssetIds,
     gpsDisabledAssetIds,
     iconNameByAssetId,
+    linkedAudioAssetIdByAssetId,
   };
 }
 
@@ -255,6 +270,7 @@ export async function querySlideshow(
   let adjustmentMap = new Map<string, AssetAdjustments>();
   let gpsDisabledAssetIds = new Set<string>();
   let iconNameByAssetId = new Map<string, string>();
+  let linkedAudioAssetIdByAssetId = new Map<string, string>();
   let usesEmbeddedMetadata = false;
 
   if (query.placementFocus) {
@@ -295,6 +311,7 @@ export async function querySlideshow(
       adjustmentMap = metadata.adjustmentMap;
       gpsDisabledAssetIds = metadata.gpsDisabledAssetIds;
       iconNameByAssetId = metadata.iconNameByAssetId;
+      linkedAudioAssetIdByAssetId = metadata.linkedAudioAssetIdByAssetId;
     } else {
       const audioAssetIds = audioTag
         ? await searchAssetIdsByTag(audioTag.id)
@@ -384,6 +401,21 @@ export async function querySlideshow(
       const key = keys.find((value) => /^icon:[a-z0-9_]+$/.test(value));
       return key ? [{ tagId: tag.id, iconName: key.slice(5) }] : [];
     });
+    const linkedAudioTags = allTags.flatMap((tag) => {
+      const key = [tag.name, tag.value]
+        .map((value) => value.trim().toLowerCase())
+        .find((value) =>
+          /^linkedaudio:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+            value,
+          ),
+        );
+      return key
+        ? [{
+            tagId: tag.id,
+            linkedAudioAssetId: key.slice("linkedaudio:".length),
+          }]
+        : [];
+    });
     const enrichment = await Promise.all([
       getAssetAdjustmentMap(assetIds),
       getGpsDisabledAssetIds(assetIds),
@@ -391,6 +423,12 @@ export async function querySlideshow(
         iconTags.map(async (iconTag) => ({
           ...iconTag,
           assetIds: await searchAssetIdsByTag(iconTag.tagId),
+        })),
+      ),
+      Promise.all(
+        linkedAudioTags.map(async (linkedAudioTag) => ({
+          ...linkedAudioTag,
+          assetIds: await searchAssetIdsByTag(linkedAudioTag.tagId),
         })),
       ),
     ]);
@@ -403,6 +441,16 @@ export async function querySlideshow(
         }
       }
     }
+    for (const assignment of enrichment[3]) {
+      for (const assetId of assignment.assetIds) {
+        if (assetIdSet.has(assetId)) {
+          linkedAudioAssetIdByAssetId.set(
+            assetId,
+            assignment.linkedAudioAssetId,
+          );
+        }
+      }
+    }
   }
   let photos = assets.map((asset) =>
     assetToPhoto(
@@ -412,6 +460,7 @@ export async function querySlideshow(
       !gpsDisabledAssetIds.has(asset.id),
       iconNameByAssetId.get(asset.id),
       Array.from(activityIdsByAssetId.get(asset.id) ?? []),
+      linkedAudioAssetIdByAssetId.get(asset.id),
     ),
   );
 

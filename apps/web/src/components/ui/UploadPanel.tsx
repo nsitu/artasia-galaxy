@@ -12,6 +12,7 @@ import {
   fetchDriveFiles,
   fetchDriveFolders,
   flattenUploadAsset,
+  fetchLinkedAudioOptions,
   fetchPlacementAssetSet,
   fetchPlacementAssets,
   fetchSiteActivityStats,
@@ -37,6 +38,7 @@ import {
   type CropParameters,
   type DriveFile,
   type DriveFolder,
+  type LinkedAudioOption,
   type RotationDegrees,
   type UploadOptions,
   type PlacementAsset,
@@ -65,6 +67,7 @@ interface UploadItem {
   caption?: string;
   captionStatus?: "idle" | "saving" | "saved" | "failed";
   captionError?: string;
+  openingEditor?: boolean;
 }
 
 type NoticeTone = "success" | "warning";
@@ -190,7 +193,7 @@ export default function UploadPanel({
   const [manageActivityTag, setManageActivityTag] = useState("");
   const [manageIconName, setManageIconName] = useState<string | null>(null);
   const [manageLinkedAudioAssetId, setManageLinkedAudioAssetId] = useState("");
-  const [linkedAudioOptions, setLinkedAudioOptions] = useState<PlacementAsset[]>(
+  const [linkedAudioOptions, setLinkedAudioOptions] = useState<LinkedAudioOption[]>(
     [],
   );
   const [linkedAudioLoading, setLinkedAudioLoading] = useState(false);
@@ -1364,6 +1367,28 @@ export default function UploadPanel({
     }
   }
 
+  async function editUploadedItem(item: UploadItem) {
+    if (!item.assetId || item.openingEditor) return;
+    setItems((current) =>
+      current.map((entry) =>
+        entry.id === item.id ? { ...entry, openingEditor: true } : entry,
+      ),
+    );
+    setError(null);
+
+    try {
+      const asset = await fetchUploadAsset(item.assetId);
+      openAssetManager(asset);
+    } catch (err) {
+      setError((err as Error).message);
+      setItems((current) =>
+        current.map((entry) =>
+          entry.id === item.id ? { ...entry, openingEditor: false } : entry,
+        ),
+      );
+    }
+  }
+
   function selectPlacement(placement: UploadOptions["placements"][number]) {
     setPlacementKey(String(placement.placement_id));
     setSiteScope("placement");
@@ -1669,26 +1694,16 @@ export default function UploadPanel({
     }
 
     const placementId = parseInt(managePlacementKey, 10);
-    const placementIds = Array.from(
-      new Set([
-        GLOBAL_AUDIO_PLACEMENT_ID,
-        ...(Number.isFinite(placementId) ? [placementId] : []),
-      ]),
-    );
     let cancelled = false;
     setLinkedAudioLoading(true);
 
-    fetchPlacementAssetSet(placementIds)
-      .then(async (assets) => {
-        const audioAssets = assets.filter(
-          (asset) =>
-            asset.mediaKind === "audio" &&
-            !asset.archived &&
-            !asset.trashed,
-        );
+    fetchLinkedAudioOptions(
+      Number.isFinite(placementId) ? placementId : undefined,
+    )
+      .then(async (audioOptions) => {
         if (
           manageLinkedAudioAssetId &&
-          !audioAssets.some((asset) => asset.id === manageLinkedAudioAssetId)
+          !audioOptions.some((asset) => asset.id === manageLinkedAudioAssetId)
         ) {
           const linkedAsset = await fetchUploadAsset(
             manageLinkedAudioAssetId,
@@ -1698,11 +1713,14 @@ export default function UploadPanel({
             !linkedAsset.archived &&
             !linkedAsset.trashed
           ) {
-            audioAssets.push(linkedAsset);
+            audioOptions.push({
+              id: linkedAsset.id,
+              fileName: linkedAsset.fileName,
+            });
           }
         }
         if (cancelled) return;
-        const byId = new Map(audioAssets.map((asset) => [asset.id, asset]));
+        const byId = new Map(audioOptions.map((asset) => [asset.id, asset]));
         setLinkedAudioOptions(
           Array.from(byId.values()).sort((a, b) =>
             a.fileName.localeCompare(b.fileName),
@@ -2924,10 +2942,22 @@ export default function UploadPanel({
                     <button
                       type="button"
                       onClick={() => void saveItemCaption(item)}
-                      disabled={item.captionStatus === "saving"}
+                      disabled={
+                        item.captionStatus === "saving" || item.openingEditor
+                      }
                       style={captionSaveButtonStyle}
                     >
                       {item.captionStatus === "saving" ? "Saving..." : "Save"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void editUploadedItem(item)}
+                      disabled={
+                        item.captionStatus === "saving" || item.openingEditor
+                      }
+                      style={captionSaveButtonStyle}
+                    >
+                      {item.openingEditor ? "Opening..." : "Edit"}
                     </button>
                   </div>
                   {item.captionStatus === "saved" && (

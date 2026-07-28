@@ -96,6 +96,8 @@ export default function ArtScene() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [webglError, setWebglError] = useState<string | null>(() => getWebGL2SupportError());
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const linkedAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [linkedAudioPlaying, setLinkedAudioPlaying] = useState(false);
 
   const handleIntroReady = useCallback(() => {
     setIntroPhase((current) => current === "loading" ? "ready" : current);
@@ -182,6 +184,32 @@ export default function ArtScene() {
     activityFilterOptions.find(
       (activity) => String(activity.id) === selectedActivityFilter,
     )?.colour;
+
+  useEffect(() => {
+    const audio = linkedAudioRef.current;
+    return () => {
+      audio?.pause();
+      setLinkedAudioPlaying(false);
+    };
+  }, [selectedPhoto?.id, selectedPhoto?.linkedAudioUrl]);
+
+  const toggleLinkedAudio = useCallback(() => {
+    const audio = linkedAudioRef.current;
+    if (!audio) return;
+    if (audio.paused) {
+      void audio.play()
+        .then(() => setLinkedAudioPlaying(true))
+        .catch((playError) => {
+          console.warn(
+            `[viewer-audio] ${(playError as Error).message}`,
+          );
+          setLinkedAudioPlaying(false);
+        });
+    } else {
+      audio.pause();
+      setLinkedAudioPlaying(false);
+    }
+  }, []);
   const handleBackActionChange = useCallback((action: (() => void) | null) => {
     setBackAction(action ? () => action : null);
   }, []);
@@ -400,6 +428,33 @@ export default function ArtScene() {
             {selectedDescription && (
               <div style={photoLightboxDescriptionStyle}>
                 {selectedDescription}
+              </div>
+            )}
+            {selectedPhoto.linkedAudioUrl && (
+              <div style={photoLightboxAudioStyle}>
+                <audio
+                  ref={linkedAudioRef}
+                  src={selectedPhoto.linkedAudioUrl}
+                  preload="metadata"
+                  onEnded={() => setLinkedAudioPlaying(false)}
+                  onPause={() => setLinkedAudioPlaying(false)}
+                  onPlay={() => setLinkedAudioPlaying(true)}
+                />
+                <button
+                  type="button"
+                  onClick={toggleLinkedAudio}
+                  style={photoLightboxAudioButtonStyle}
+                  aria-label={
+                    linkedAudioPlaying
+                      ? "Pause linked sound"
+                      : "Play linked sound"
+                  }
+                >
+                  <span aria-hidden="true">
+                    {linkedAudioPlaying ? "Ⅱ" : "▶"}
+                  </span>
+                  {linkedAudioPlaying ? "Pause sound" : "Play sound"}
+                </button>
               </div>
             )}
             {authUser?.authenticated && (
@@ -961,6 +1016,24 @@ const photoLightboxDescriptionStyle: React.CSSProperties = {
   color: "#c7ccd6",
   whiteSpace: "pre-wrap",
   overflowWrap: "anywhere",
+};
+
+const photoLightboxAudioStyle: React.CSSProperties = {
+  marginTop: 10,
+};
+
+const photoLightboxAudioButtonStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 8,
+  padding: "7px 11px",
+  border: "1px solid rgba(255,255,255,0.28)",
+  borderRadius: 999,
+  background: "rgba(255,255,255,0.1)",
+  color: "#fff",
+  font: "inherit",
+  fontWeight: 700,
+  cursor: "pointer",
 };
 
 const photoLightboxEditLinkStyle: React.CSSProperties = {
