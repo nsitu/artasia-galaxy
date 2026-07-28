@@ -1520,7 +1520,13 @@ router.post("/assets/:assetId/published", async (req, res) => {
     }
 
     const published = Boolean(req.body?.published);
-    await getAsset(assetId);
+    const asset = await getAsset(assetId);
+    if (published && asset.isArchived) {
+      res.status(409).json({
+        error: "Archived assets cannot be published. Restore the asset first.",
+      });
+      return;
+    }
 
     const album = await getPublishedAlbum();
     if (published) {
@@ -1557,12 +1563,23 @@ router.post("/assets/:assetId/archived", async (req, res) => {
 
     const archived = Boolean(req.body?.archived);
     await getAsset(assetId);
-    await updateAsset(assetId, {
-      visibility: archived ? "archive" : "timeline",
-    });
+    if (archived) {
+      const album = await getPublishedAlbum();
+      await Promise.all([
+        updateAsset(assetId, { visibility: "archive" }),
+        removeAssetsFromAlbum(album.id, [assetId]),
+      ]);
+    } else {
+      await updateAsset(assetId, { visibility: "timeline" });
+    }
     invalidateSiteActivityStats();
 
-    res.json({ ok: true, asset_id: assetId, archived });
+    res.json({
+      ok: true,
+      asset_id: assetId,
+      archived,
+      ...(archived ? { published: false } : {}),
+    });
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });
   }

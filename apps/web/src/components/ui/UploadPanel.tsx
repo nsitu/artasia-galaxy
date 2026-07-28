@@ -1580,7 +1580,7 @@ export default function UploadPanel({
     setManageActivityTag(asset.activity_id ? String(asset.activity_id) : "");
     setManageIconName(asset.iconName ?? null);
     setManageLinkedAudioAssetId(asset.linkedAudioAssetId ?? "");
-    setManagePublished(Boolean(asset.published));
+    setManagePublished(Boolean(asset.published) && !asset.archived);
     setManageArchived(Boolean(asset.archived));
     setManageCaption(asset.description ?? "");
     setManageLatitude(coordinateInputValue(asset.latitude));
@@ -2816,6 +2816,9 @@ export default function UploadPanel({
         {asset.published && (
           <span style={publishedAssetBadgeStyle}>Published</span>
         )}
+        {!asset.published && !asset.archived && (
+          <span style={draftAssetBadgeStyle}>Draft</span>
+        )}
         <span style={assetNameStyle}>{asset.fileName}</span>
         <span style={assetDateStyle}>
           {asset.uploader_name ?? "No team member album"}
@@ -2832,9 +2835,41 @@ export default function UploadPanel({
       return <div style={emptyStateStyle}>Loading uploads...</div>;
     if (displayedPlacementAssets.length === 0)
       return <div style={emptyStateStyle}>{emptyMessage}</div>;
+
+    const groups = [
+      {
+        label: "Draft",
+        assets: displayedPlacementAssets.filter(
+          (asset) => !asset.published && !asset.archived,
+        ),
+      },
+      {
+        label: "Published",
+        assets: displayedPlacementAssets.filter(
+          (asset) => Boolean(asset.published) && !asset.archived,
+        ),
+      },
+      {
+        label: "Archived",
+        assets: displayedPlacementAssets.filter(
+          (asset) => Boolean(asset.archived),
+        ),
+      },
+    ].filter((group) => group.assets.length > 0);
+
     return (
-      <div style={assetGridStyle}>
-        {displayedPlacementAssets.map(renderAssetCard)}
+      <div style={assetGroupsStyle}>
+        {groups.map((group) => (
+          <section key={group.label} style={assetGroupStyle}>
+            <h3 style={assetGroupHeadingStyle}>
+              <span>{group.label}</span>
+              <span style={assetGroupCountStyle}>{group.assets.length}</span>
+            </h3>
+            <div style={assetGridStyle}>
+              {group.assets.map(renderAssetCard)}
+            </div>
+          </section>
+        ))}
       </div>
     );
   }
@@ -3901,11 +3936,16 @@ export default function UploadPanel({
               </label>
             </div>
           )}
-          <label style={checkboxLabelStyle}>
+          <label
+            style={{
+              ...checkboxLabelStyle,
+              ...(manageArchived ? { opacity: 0.55 } : {}),
+            }}
+          >
             <input
               type="checkbox"
               checked={managePublished}
-              disabled={!authUser?.authenticated}
+              disabled={!authUser?.authenticated || manageArchived}
               onChange={(e) => setManagePublished(e.target.checked)}
             />
             Published
@@ -3915,10 +3955,19 @@ export default function UploadPanel({
               type="checkbox"
               checked={manageArchived}
               disabled={!authUser?.authenticated}
-              onChange={(e) => setManageArchived(e.target.checked)}
+              onChange={(e) => {
+                const archived = e.target.checked;
+                setManageArchived(archived);
+                if (archived) setManagePublished(false);
+              }}
             />
             Archived
           </label>
+          {manageArchived && (
+            <span style={fieldHelpStyle}>
+              Archived assets cannot be published.
+            </span>
+          )}
           <div style={manageActionsStyle}>
             {savingAsset && audioTrimStatus && (
               <div style={audioTrimStatusStyle}>
@@ -5826,6 +5875,38 @@ const assetGridStyle: React.CSSProperties = {
   gap: 10,
 };
 
+const assetGroupsStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 26,
+};
+
+const assetGroupStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 10,
+};
+
+const assetGroupHeadingStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  margin: 0,
+  color: "#e5e7eb",
+  fontSize: 14,
+  fontWeight: 700,
+};
+
+const assetGroupCountStyle: React.CSSProperties = {
+  display: "inline-grid",
+  placeItems: "center",
+  minWidth: 20,
+  height: 20,
+  padding: "0 5px",
+  borderRadius: 999,
+  background: "rgba(255,255,255,0.1)",
+  color: "#aeb8c7",
+  fontSize: 11,
+};
+
 const assetCardStyle: React.CSSProperties = {
   display: "grid",
   gap: 6,
@@ -5867,6 +5948,13 @@ const publishedAssetBadgeStyle: React.CSSProperties = {
   background: "rgba(34, 197, 94, 0.18)",
   border: "1px solid rgba(34, 197, 94, 0.5)",
   color: "#4ade80",
+};
+
+const draftAssetBadgeStyle: React.CSSProperties = {
+  ...archivedAssetBadgeStyle,
+  background: "rgba(148, 163, 184, 0.14)",
+  border: "1px solid rgba(148, 163, 184, 0.4)",
+  color: "#aeb8c7",
 };
 
 const assetNameStyle: React.CSSProperties = {
