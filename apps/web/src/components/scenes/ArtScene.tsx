@@ -375,12 +375,26 @@ export default function ArtScene() {
           aria-label={selectedPhoto.fileName}
           onClick={() => selectPhoto(null)}
         >
-          <img
-            src={selectedPhoto.previewUrl}
-            alt={selectedPhoto.fileName}
-            style={{ ...photoLightboxImageStyle, ...photoAdjustmentFilterStyle(selectedPhoto.adjustments) }}
-            onClick={(event) => event.stopPropagation()}
-          />
+          {selectedPhoto.mediaKind === "video" && selectedPhoto.videoUrl ? (
+            <video
+              src={selectedPhoto.videoUrl}
+              poster={selectedPhoto.previewUrl}
+              controls
+              autoPlay
+              playsInline
+              preload="metadata"
+              aria-label={selectedPhoto.fileName}
+              style={photoLightboxImageStyle}
+              onClick={(event) => event.stopPropagation()}
+            />
+          ) : (
+            <img
+              src={selectedPhoto.previewUrl}
+              alt={selectedPhoto.fileName}
+              style={{ ...photoLightboxImageStyle, ...photoAdjustmentFilterStyle(selectedPhoto.adjustments) }}
+              onClick={(event) => event.stopPropagation()}
+            />
+          )}
           <div style={photoLightboxMetadataStyle} onClick={(event) => event.stopPropagation()}>
             <div style={photoLightboxTitleStyle}>{selectedPhoto.fileName}</div>
             {selectedDescription && (

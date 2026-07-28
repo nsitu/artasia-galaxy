@@ -6,8 +6,9 @@ export interface AssetAdjustments {
 
 export interface Photo {
   id: string;
-  mediaKind: "image" | "audio";
+  mediaKind: "image" | "video" | "audio";
   audioUrl?: string;
+  videoUrl?: string;
   thumbnailUrl: string;
   previewUrl: string;
   width: number;
@@ -205,6 +206,7 @@ export interface PlacementAsset {
   activity_id?: number | null;
   activity_label?: string | null;
   iconName?: string | null;
+  linkedAudioAssetId?: string | null;
   uploader_id?: number | null;
   uploader_name?: string | null;
   uploader_album_id?: string | null;
@@ -361,6 +363,26 @@ export async function setAssetIcon(params: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ icon_name: params.iconName }),
   });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+}
+
+export async function setAssetLinkedAudio(params: {
+  assetId: string;
+  linkedAudioAssetId: string | null;
+}): Promise<void> {
+  const res = await fetch(
+    `/api/v1/uploads/assets/${params.assetId}/linked-audio`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        linked_audio_asset_id: params.linkedAudioAssetId,
+      }),
+    },
+  );
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(body.error ?? `HTTP ${res.status}`);

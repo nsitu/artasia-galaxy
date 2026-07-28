@@ -23,6 +23,7 @@ import {
   resetUploadAssetEdits,
   setAssetArchived,
   setAssetIcon,
+  setAssetLinkedAudio,
   setAssetPublished,
   syncDriveFiles,
   updateAssetCaption,
@@ -133,6 +134,7 @@ const MAX_ADJUSTMENT = 150;
 const UPLOAD_ACCEPT_TYPES = "image/*,video/*,.heic,.heif,image/heic,image/heif";
 const DEFAULT_SHARED_DRIVE_NAME = "artasia 2026";
 const DEFAULT_SHARED_DRIVE_FOLDER = "documentation";
+const GLOBAL_AUDIO_PLACEMENT_ID = 21639;
 const coordinateInputValue = (value?: number | null) =>
   Number.isFinite(value) ? String(value) : "";
 const DELIVERY_DAY_OPTIONS: Array<{ value: DeliveryDayFilter; label: string }> =
@@ -187,6 +189,11 @@ export default function UploadPanel({
   const [manageUploaderKey, setManageUploaderKey] = useState("");
   const [manageActivityTag, setManageActivityTag] = useState("");
   const [manageIconName, setManageIconName] = useState<string | null>(null);
+  const [manageLinkedAudioAssetId, setManageLinkedAudioAssetId] = useState("");
+  const [linkedAudioOptions, setLinkedAudioOptions] = useState<PlacementAsset[]>(
+    [],
+  );
+  const [linkedAudioLoading, setLinkedAudioLoading] = useState(false);
   const [managePublished, setManagePublished] = useState(false);
   const [manageArchived, setManageArchived] = useState(false);
   const [manageCaption, setManageCaption] = useState("");
@@ -1547,6 +1554,7 @@ export default function UploadPanel({
     setManageUploaderKey(asset.uploader_id ? String(asset.uploader_id) : "");
     setManageActivityTag(asset.activity_id ? String(asset.activity_id) : "");
     setManageIconName(asset.iconName ?? null);
+    setManageLinkedAudioAssetId(asset.linkedAudioAssetId ?? "");
     setManagePublished(Boolean(asset.published));
     setManageArchived(Boolean(asset.archived));
     setManageCaption(asset.description ?? "");
@@ -1586,6 +1594,9 @@ export default function UploadPanel({
     setManageUploaderKey("");
     setManageActivityTag("");
     setManageIconName(null);
+    setManageLinkedAudioAssetId("");
+    setLinkedAudioOptions([]);
+    setLinkedAudioLoading(false);
     setManagePublished(false);
     setManageArchived(false);
     setManageCaption("");
@@ -1646,6 +1657,75 @@ export default function UploadPanel({
     };
   }, [selectedAsset?.id, selectedAsset?.type, authUser?.authenticated]);
 
+  useEffect(() => {
+    if (
+      !selectedAsset ||
+      selectedAsset.type !== "IMAGE" ||
+      !authUser?.authenticated
+    ) {
+      setLinkedAudioOptions([]);
+      setLinkedAudioLoading(false);
+      return;
+    }
+
+    const placementId = parseInt(managePlacementKey, 10);
+    const placementIds = Array.from(
+      new Set([
+        GLOBAL_AUDIO_PLACEMENT_ID,
+        ...(Number.isFinite(placementId) ? [placementId] : []),
+      ]),
+    );
+    let cancelled = false;
+    setLinkedAudioLoading(true);
+
+    fetchPlacementAssetSet(placementIds)
+      .then(async (assets) => {
+        const audioAssets = assets.filter(
+          (asset) =>
+            asset.mediaKind === "audio" &&
+            !asset.archived &&
+            !asset.trashed,
+        );
+        if (
+          manageLinkedAudioAssetId &&
+          !audioAssets.some((asset) => asset.id === manageLinkedAudioAssetId)
+        ) {
+          const linkedAsset = await fetchUploadAsset(
+            manageLinkedAudioAssetId,
+          ).catch(() => null);
+          if (
+            linkedAsset?.mediaKind === "audio" &&
+            !linkedAsset.archived &&
+            !linkedAsset.trashed
+          ) {
+            audioAssets.push(linkedAsset);
+          }
+        }
+        if (cancelled) return;
+        const byId = new Map(audioAssets.map((asset) => [asset.id, asset]));
+        setLinkedAudioOptions(
+          Array.from(byId.values()).sort((a, b) =>
+            a.fileName.localeCompare(b.fileName),
+          ),
+        );
+      })
+      .catch((err) => {
+        if (!cancelled) setError((err as Error).message);
+      })
+      .finally(() => {
+        if (!cancelled) setLinkedAudioLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    authUser?.authenticated,
+    managePlacementKey,
+    selectedAsset?.id,
+    selectedAsset?.type,
+  ]);
+
   async function saveSelectedAssetChanges() {
     if (!selectedAsset) return;
     const placementId = managePlacementKey
@@ -1666,6 +1746,9 @@ export default function UploadPanel({
       manageActivityTag !==
       (selectedAsset.activity_id ? String(selectedAsset.activity_id) : "");
     const iconChanged = manageIconName !== (selectedAsset.iconName ?? null);
+    const linkedAudioChanged =
+      selectedAsset.type === "IMAGE" &&
+      manageLinkedAudioAssetId !== (selectedAsset.linkedAudioAssetId ?? "");
     const publishedChanged =
       managePublished !== Boolean(selectedAsset.published);
     const archivedChanged =
@@ -1676,6 +1759,7 @@ export default function UploadPanel({
       !uploaderChanged &&
       !activityTagChanged &&
       !iconChanged &&
+      !linkedAudioChanged &&
       !publishedChanged &&
       !archivedChanged
     ) {
@@ -1721,6 +1805,12 @@ export default function UploadPanel({
           iconName: manageIconName,
         });
       }
+      if (linkedAudioChanged) {
+        await setAssetLinkedAudio({
+          assetId: selectedAsset.id,
+          linkedAudioAssetId: manageLinkedAudioAssetId || null,
+        });
+      }
       if (publishedChanged) {
         await setAssetPublished({
           assetId: selectedAsset.id,
@@ -1756,6 +1846,9 @@ export default function UploadPanel({
       manageActivityTag !==
       (selectedAsset.activity_id ? String(selectedAsset.activity_id) : "");
     const iconChanged = manageIconName !== (selectedAsset.iconName ?? null);
+    const linkedAudioChanged =
+      selectedAsset.type === "IMAGE" &&
+      manageLinkedAudioAssetId !== (selectedAsset.linkedAudioAssetId ?? "");
     const publishedChanged =
       managePublished !== Boolean(selectedAsset.published);
     const archivedChanged =
@@ -1784,6 +1877,7 @@ export default function UploadPanel({
       !uploaderChanged &&
       !activityChanged &&
       !iconChanged &&
+      !linkedAudioChanged &&
       !publishedChanged &&
       !archivedChanged &&
       !captionChanged &&
@@ -1856,6 +1950,11 @@ export default function UploadPanel({
       }
       if (iconChanged)
         await setAssetIcon({ assetId, iconName: manageIconName });
+      if (linkedAudioChanged)
+        await setAssetLinkedAudio({
+          assetId,
+          linkedAudioAssetId: manageLinkedAudioAssetId || null,
+        });
       if (publishedChanged)
         await setAssetPublished({ assetId, published: managePublished });
       if (archivedChanged)
@@ -2696,6 +2795,9 @@ export default function UploadPanel({
         {asset.archived && (
           <span style={archivedAssetBadgeStyle}>Archived</span>
         )}
+        {asset.published && (
+          <span style={publishedAssetBadgeStyle}>Published</span>
+        )}
         <span style={assetNameStyle}>{asset.fileName}</span>
         <span style={assetDateStyle}>
           {asset.uploader_name ?? "No team member album"}
@@ -3275,6 +3377,9 @@ export default function UploadPanel({
       manageActivityTag !==
       (selectedAsset.activity_id ? String(selectedAsset.activity_id) : "");
     const iconChanged = manageIconName !== (selectedAsset.iconName ?? null);
+    const linkedAudioChanged =
+      selectedAsset.type === "IMAGE" &&
+      manageLinkedAudioAssetId !== (selectedAsset.linkedAudioAssetId ?? "");
     const publishedChanged =
       managePublished !== Boolean(selectedAsset.published);
     const archivedChanged =
@@ -3302,6 +3407,7 @@ export default function UploadPanel({
       uploaderChanged ||
       activityChanged ||
       iconChanged ||
+      linkedAudioChanged ||
       publishedChanged ||
       archivedChanged ||
       adjustmentChanged ||
@@ -3559,6 +3665,38 @@ export default function UploadPanel({
               the Galaxy viewer, especially for sound assets.
             </span>
           </div>
+          {selectedAsset.type === "IMAGE" && (
+            <label style={labelStyle}>
+              Linked Sound
+              <select
+                value={manageLinkedAudioAssetId}
+                onChange={(event) =>
+                  setManageLinkedAudioAssetId(event.target.value)
+                }
+                disabled={
+                  !authUser?.authenticated ||
+                  savingAsset ||
+                  linkedAudioLoading
+                }
+                style={inputStyle}
+              >
+                <option value="">
+                  {linkedAudioLoading
+                    ? "Loading available sounds..."
+                    : "No linked sound"}
+                </option>
+                {linkedAudioOptions.map((asset) => (
+                  <option key={asset.id} value={asset.id}>
+                    {asset.fileName}
+                  </option>
+                ))}
+              </select>
+              <span style={fieldHelpStyle}>
+                Sounds from this image&apos;s Artasia site and the global sound
+                library (site {GLOBAL_AUDIO_PLACEMENT_ID}).
+              </span>
+            </label>
+          )}
           <label style={labelStyle}>
             Caption / Description
             <textarea
@@ -3870,12 +4008,16 @@ export default function UploadPanel({
       </style>
       <section style={panelStyle}>
         <div style={headerStyle}>
-          <div style={headerBrandStyle}>
+          <a
+            href="/admin"
+            aria-label="Atlas Admin home"
+            style={headerBrandStyle}
+          >
             <img src="/artasia.svg" alt="Artasia" style={logoStyle} />
             <div>
               <h1 style={titleStyle}>Atlas Admin</h1>
             </div>
-          </div>
+          </a>
           <div ref={menuRef} style={navMenuWrapStyle}>
             <button
               type="button"
@@ -4748,6 +4890,8 @@ const headerBrandStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 14,
+  color: "inherit",
+  textDecoration: "none",
 };
 
 const logoStyle: React.CSSProperties = {
@@ -5686,6 +5830,13 @@ const archivedAssetBadgeStyle: React.CSSProperties = {
   lineHeight: 1.4,
   textTransform: "uppercase",
   letterSpacing: "0.04em",
+};
+
+const publishedAssetBadgeStyle: React.CSSProperties = {
+  ...archivedAssetBadgeStyle,
+  background: "rgba(34, 197, 94, 0.18)",
+  border: "1px solid rgba(34, 197, 94, 0.5)",
+  color: "#4ade80",
 };
 
 const assetNameStyle: React.CSSProperties = {

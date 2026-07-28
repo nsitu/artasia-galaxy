@@ -6,8 +6,9 @@ import { getGpsDisabledAssetIds } from "./assetGpsUsage.service.js";
 
 export interface Photo {
   id: string;
-  mediaKind: "image" | "audio";
+  mediaKind: "image" | "video" | "audio";
   audioUrl?: string;
+  videoUrl?: string;
   thumbnailUrl: string;
   previewUrl: string;
   width: number;
@@ -88,8 +89,9 @@ function assetToPhoto(
   activityIds?: number[],
 ): Photo {
   const audio = forceAudio || isAudioAsset(asset);
-  const imgW = asset.exifInfo?.exifImageWidth ?? 1920;
-  const imgH = asset.exifInfo?.exifImageHeight ?? 1080;
+  const video = !audio && asset.type === "VIDEO";
+  const imgW = asset.exifInfo?.exifImageWidth ?? asset.width ?? 1920;
+  const imgH = asset.exifInfo?.exifImageHeight ?? asset.height ?? 1080;
   const ratio = imgW / imgH;
 
   let orientation: Photo["orientation"] = "landscape";
@@ -99,14 +101,20 @@ function assetToPhoto(
 
   return {
     id: asset.id,
-    mediaKind: audio ? "audio" : "image",
+    mediaKind: audio ? "audio" : video ? "video" : "image",
     ...(audio
       ? {
           audioUrl: `/api/v1/assets/${asset.id}/original?v=${encodeURIComponent(
             asset.updatedAt || asset.fileModifiedAt || asset.checksum || asset.id,
           )}`,
         }
-      : {}),
+      : video
+        ? {
+            videoUrl: `/api/v1/assets/${asset.id}/original?v=${encodeURIComponent(
+              asset.updatedAt || asset.fileModifiedAt || asset.checksum || asset.id,
+            )}`,
+          }
+        : {}),
     thumbnailUrl: assetMediaUrl(asset, "thumbnail"),
     previewUrl: assetMediaUrl(asset, "preview"),
     width: imgW,
@@ -333,7 +341,7 @@ export async function querySlideshow(
     }
 
     assets = assets.filter(
-      (asset) => asset.type === "IMAGE" || audioIdSet.has(asset.id),
+      (asset) => asset.type === "IMAGE" || asset.type === "VIDEO",
     );
     if (focus.activityId != null && Number.isFinite(focus.activityId)) {
       assets = assets.filter((asset) =>
@@ -362,9 +370,7 @@ export async function querySlideshow(
     audioIdSet = new Set(audioAssetIds);
     assets = [
       ...imageResult.assets.items.filter((asset) => asset.type === "IMAGE"),
-      ...videoResult.assets.items.filter(
-        (asset) => asset.type === "VIDEO" && audioIdSet.has(asset.id),
-      ),
+      ...videoResult.assets.items.filter((asset) => asset.type === "VIDEO"),
     ];
   }
 

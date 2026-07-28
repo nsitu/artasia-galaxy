@@ -65,7 +65,11 @@ const router = Router();
 const DATA_DIR = process.env.DATA_DIR ?? join(process.cwd(), "data");
 const UPLOAD_TMP_DIR = join(DATA_DIR, "upload-tmp");
 const SITE_ACTIVITY_STATS_TTL_MS = 30_000;
-const ADMIN_BROWSE_INDEX_TTL_MS = 30_000;
+const GLOBAL_AUDIO_PLACEMENT_ID = 21639;
+const LINKED_AUDIO_TAG_PREFIX = "linkedaudio:";
+// These indexes scan all uploader and published albums. Admin mutations
+// explicitly invalidate them, so keep them warm between Browse requests.
+const ADMIN_BROWSE_INDEX_TTL_MS = 5 * 60_000;
 
 interface SiteActivityStatsResponse {
   sites: Record<string, {
@@ -234,25 +238,40 @@ async function getConfiguredPlacementAssignmentTagIds() {
 
 async function getAssetsForPlacementTagIds(tagIds: string[]) {
   const byId = new Map<string, Awaited<ReturnType<typeof searchAssets>>["assets"]["items"][number]>();
-  const size = 100;
-  for (const tagId of tagIds) {
-    for (const type of ["IMAGE", "VIDEO"] as const) {
-      for (const visibility of ["timeline", "archive"] as const) {
-        let page = 1;
-        for (;;) {
-          const result = await searchAssets({
-            tagIds: [tagId],
-            page,
-            size,
-            type,
-            visibility,
-          });
-          for (const asset of result.assets.items) byId.set(asset.id, asset);
-          if (!result.assets.nextPage || result.assets.items.length < size) break;
-          page += 1;
-        }
+  const size = 500;
+  const searches = tagIds.flatMap((tagId) =>
+    (["IMAGE", "VIDEO"] as const).flatMap((type) =>
+      (["timeline", "archive"] as const).map((visibility) => ({
+        tagId,
+        type,
+        visibility,
+      })),
+    ),
+  );
+  const results = await processWithConcurrency(
+    searches,
+    4,
+    async ({ tagId, type, visibility }) => {
+      const assets: Awaited<ReturnType<typeof searchAssets>>["assets"]["items"] = [];
+      let page = 1;
+      for (;;) {
+        const result = await searchAssets({
+          tagIds: [tagId],
+          page,
+          size,
+          type,
+          visibility,
+          withPeople: false,
+        });
+        assets.push(...result.assets.items);
+        if (!result.assets.nextPage || result.assets.items.length < size) break;
+        page += 1;
       }
-    }
+      return assets;
+    },
+  );
+  for (const assets of results) {
+    for (const asset of assets) byId.set(asset.id, asset);
   }
 
   return Array.from(byId.values()).sort((a, b) => b.fileCreatedAt.localeCompare(a.fileCreatedAt));
@@ -314,6 +333,7 @@ interface AssetManagementAssignment {
   activityId?: number;
   activityLabel?: string;
   iconName?: string;
+  linkedAudioAssetId?: string;
   published?: boolean;
   isAudio?: boolean;
 }
@@ -385,6 +405,7 @@ function mapAdminAsset(
     activity_id: assignment?.activityId ?? null,
     activity_label: assignment?.activityLabel ?? null,
     iconName: assignment?.iconName ?? null,
+    linkedAudioAssetId: assignment?.linkedAudioAssetId ?? null,
     uploader_id: uploaderAlbum?.uploaderId ?? null,
     uploader_name: uploaderAlbum?.uploaderName ?? null,
     uploader_album_id: uploaderAlbum?.id ?? null,
@@ -728,6 +749,30 @@ async function getManagementAssignments(
     );
   }
 
+  const linkedAudioTags = tags.flatMap((tag) => {
+    const value = [tag.name, tag.value]
+      .map((candidate) => candidate.trim().toLowerCase())
+      .find((candidate) =>
+        /^linkedaudio:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          candidate,
+        ),
+      );
+    return value
+      ? [{ id: tag.id, linkedAudioAssetId: value.slice(LINKED_AUDIO_TAG_PREFIX.length) }]
+      : [];
+  });
+  await Promise.all(
+    linkedAudioTags.map(async ({ id, linkedAudioAssetId }) => {
+      const taggedAssetIds = await searchAdminAssetIdsByTag(id);
+      for (const assetId of taggedAssetIds) {
+        if (!assetIdSet.has(assetId)) continue;
+        const current = assignments.get(assetId) ?? {};
+        current.linkedAudioAssetId = linkedAudioAssetId;
+        assignments.set(assetId, current);
+      }
+    }),
+  );
+
   const audioTag =
     options?.includeAudio === false
       ? undefined
@@ -818,6 +863,12 @@ function mapEmbeddedAssetMetadata(
       }
       if (/^icon:[a-z0-9_]+$/.test(key)) {
         assignment.iconName = key.slice("icon:".length);
+      }
+      const linkedAudioMatch = key.match(
+        /^linkedaudio:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
+      );
+      if (linkedAudioMatch) {
+        assignment.linkedAudioAssetId = linkedAudioMatch[1];
       }
       if (key === "media:audio") assignment.isAudio = true;
       if (key === "artasia:gps:disabled") gpsDisabledAssetIds.add(asset.id);
@@ -934,11 +985,13 @@ router.get("/assets", async (req, res) => {
     const rawActivityId = typeof req.query.activity_id === "string" ? req.query.activity_id : "";
     const activityId = rawActivityId ? parseInt(rawActivityId, 10) : null;
 
-    const config = await getUploadConfig();
+    const [config, tags] = await Promise.all([
+      getUploadConfig(),
+      listTags(),
+    ]);
     const placementsById = new Map(
       config.placements.map((placement) => [placement.placement_id, placement]),
     );
-    const tags = await listTags();
     const tagIds = Array.from(new Set(
       placementIds.flatMap((placementId) =>
         findExistingPlacementTagIds(placementsById.get(placementId), tags)
@@ -1221,6 +1274,74 @@ router.post("/assets/:assetId/icon", async (req, res) => {
     res.json({ ok: true, asset_id: assetId, icon_name: iconName });
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });
+  }
+});
+
+router.post("/assets/:assetId/linked-audio", async (req, res) => {
+  try {
+    const auth = await getAuthContext(req);
+    if (!auth.authenticated) {
+      res.status(401).json({ error: "Sign in to link audio to an image." });
+      return;
+    }
+
+    const assetId = req.params.assetId.trim();
+    const rawLinkedAudioAssetId = req.body?.linked_audio_asset_id;
+    const linkedAudioAssetId =
+      rawLinkedAudioAssetId == null || rawLinkedAudioAssetId === ""
+        ? null
+        : String(rawLinkedAudioAssetId).trim().toLowerCase();
+    const uuidPattern =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    if (!assetId) {
+      res.status(400).json({ error: "Asset ID is required." });
+      return;
+    }
+    if (linkedAudioAssetId && !uuidPattern.test(linkedAudioAssetId)) {
+      res.status(400).json({ error: "Select a valid linked sound." });
+      return;
+    }
+
+    const sourceAsset = await getAsset(assetId);
+    if (sourceAsset.type !== "IMAGE") {
+      res.status(400).json({ error: "Audio can only be linked to an image." });
+      return;
+    }
+    if (linkedAudioAssetId) {
+      const linkedAsset = await getAsset(linkedAudioAssetId);
+      if (!isAudioAsset(linkedAsset)) {
+        res.status(400).json({ error: "The selected asset is not an audio asset." });
+        return;
+      }
+    }
+
+    const tags = await listTags();
+    const existingLinkedAudioTagIds = tags
+      .filter((tag) =>
+        [tag.name, tag.value].some((value) =>
+          /^linkedaudio:[0-9a-f-]+$/i.test(value.trim()),
+        ),
+      )
+      .map((tag) => tag.id);
+    if (existingLinkedAudioTagIds.length > 0) {
+      await untagAssets([assetId], existingLinkedAudioTagIds);
+    }
+    if (linkedAudioAssetId) {
+      await tagAsset(assetId, [
+        `${LINKED_AUDIO_TAG_PREFIX}${linkedAudioAssetId}`,
+      ]);
+    }
+
+    res.json({
+      ok: true,
+      asset_id: assetId,
+      linked_audio_asset_id: linkedAudioAssetId,
+      global_audio_placement_id: GLOBAL_AUDIO_PLACEMENT_ID,
+    });
+  } catch (err) {
+    const message = (err as Error).message;
+    res.status(/404|not found/i.test(message) ? 404 : 502).json({ error: message });
   }
 });
 
