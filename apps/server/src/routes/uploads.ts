@@ -251,7 +251,7 @@ async function getAssetsForPlacementTagIds(tagIds: string[]) {
   );
   const results = await processWithConcurrency(
     searches,
-    4,
+    8,
     async ({ tagId, type, visibility }) => {
       const assets: Awaited<ReturnType<typeof searchAssets>>["assets"]["items"] = [];
       let page = 1;
@@ -489,8 +489,18 @@ async function searchAssetsByAlbumId(
 ) {
   const byId = new Map<string, Awaited<ReturnType<typeof searchAssets>>["assets"]["items"][number]>();
   const size = options?.compact ? 500 : 100;
-  for (const type of ["IMAGE", "VIDEO"] as const) {
-    for (const visibility of ["timeline", "archive"] as const) {
+  const searches = (["IMAGE", "VIDEO"] as const).flatMap((type) =>
+    (["timeline", "archive"] as const).map((visibility) => ({
+      type,
+      visibility,
+    })),
+  );
+  const results = await processWithConcurrency(
+    searches,
+    4,
+    async ({ type, visibility }) => {
+      const assets: Awaited<ReturnType<typeof searchAssets>>["assets"]["items"] =
+        [];
       let page = 1;
       for (;;) {
         const result = await searchAssets({
@@ -501,11 +511,15 @@ async function searchAssetsByAlbumId(
           visibility,
           ...(options?.compact ? { withExif: false, withPeople: false } : {}),
         });
-        for (const asset of result.assets.items) byId.set(asset.id, asset);
+        assets.push(...result.assets.items);
         if (!result.assets.nextPage || result.assets.items.length < size) break;
         page += 1;
       }
-    }
+      return assets;
+    },
+  );
+  for (const assets of results) {
+    for (const asset of assets) byId.set(asset.id, asset);
   }
 
   return Array.from(byId.values()).sort((a, b) => b.fileCreatedAt.localeCompare(a.fileCreatedAt));
@@ -636,7 +650,7 @@ async function getUploaderAlbumAssignments(uploaderAlbums: UploaderAlbum[]) {
   const assignments = new Map<string, UploaderAlbum>();
   const albumAssets = await processWithConcurrency(
     uploaderAlbums,
-    4,
+    2,
     async (album) => ({
       album,
       assets: await searchAssetsByAlbumId(album.id, { compact: true }),
@@ -1091,6 +1105,7 @@ router.get("/audio-options", async (req, res) => {
 });
 
 router.get("/assets", async (req, res) => {
+  const requestStartedAt = Date.now();
   try {
     const rawPlacementIds = typeof req.query.placement_ids === "string" ? req.query.placement_ids : "";
     const placementIds = rawPlacementIds
@@ -1118,8 +1133,13 @@ router.get("/assets", async (req, res) => {
         findExistingPlacementTagIds(placementsById.get(placementId), tags)
       ),
     ));
+    const resolvedAt = Date.now();
 
     if (tagIds.length === 0) {
+      res.setHeader(
+        "Server-Timing",
+        `resolve;dur=${resolvedAt - requestStartedAt}, search;dur=0, enrich;dur=0`,
+      );
       res.json({ assets: [] });
       return;
     }
@@ -1166,7 +1186,26 @@ router.get("/assets", async (req, res) => {
       }
     }
 
-    res.json({ assets: await mapAssetsWithUploaderAlbums(assets) });
+    const searchedAt = Date.now();
+    const mappedAssets = await mapAssetsWithUploaderAlbums(assets);
+    const completedAt = Date.now();
+    const resolveDuration = resolvedAt - requestStartedAt;
+    const searchDuration = searchedAt - resolvedAt;
+    const enrichDuration = completedAt - searchedAt;
+    res.setHeader(
+      "Server-Timing",
+      [
+        `resolve;dur=${resolveDuration}`,
+        `search;dur=${searchDuration}`,
+        `enrich;dur=${enrichDuration}`,
+      ].join(", "),
+    );
+    if (completedAt - requestStartedAt >= 1_000) {
+      console.info(
+        `[uploads/assets] ${placementIds.length} placement(s), ${tagIds.length} tag(s), ${assets.length} asset(s): resolve=${resolveDuration}ms search=${searchDuration}ms enrich=${enrichDuration}ms total=${completedAt - requestStartedAt}ms`,
+      );
+    }
+    res.json({ assets: mappedAssets });
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });
   }
