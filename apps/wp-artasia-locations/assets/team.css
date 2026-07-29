@@ -26,16 +26,14 @@
 }
 
 .artasia-team__toc-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem 2rem;
-    list-style-position: inside;
+    list-style-position: outside;
     margin-bottom: 0;
-    padding: 0;
+    padding-left: 1.25em;
 }
 
 .artasia-team__toc-list li {
     color: var(--artasia-team-colour);
+    margin-bottom: 0.35rem;
 }
 
 .artasia-team__inner {
