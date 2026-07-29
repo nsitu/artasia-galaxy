@@ -47,8 +47,18 @@ function artasia_render_sites(int $project_id): string
         'post_type'      => 'artasia_placement',
         'posts_per_page' => -1,
         'post_status'    => 'publish',
-        'meta_key'       => 'artasia_project_id',
-        'meta_value'     => $project_id,
+        'meta_query'     => [
+            [
+                'key'     => 'artasia_project_id',
+                'value'   => $project_id,
+                'compare' => '=',
+            ],
+            [
+                'key'     => 'artasia_publish_site',
+                'value'   => '1',
+                'compare' => '=',
+            ],
+        ],
         'orderby'        => 'title',
         'order'          => 'ASC',
         'no_found_rows'  => true,

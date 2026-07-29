@@ -177,6 +177,8 @@ jobs:
             sudo chown -R daemon:daemon "$PLUGINS_DIR/wp-artasia-locations"
             WP_BIN=$(command -v wp || echo /opt/bitnami/wp-cli/bin/wp)
             sudo "$WP_BIN" plugin activate wp-artasia-locations --path=/opt/bitnami/wordpress --allow-root
+            # Temporary one-time migration: remove this command and its script after this release.
+            sudo "$WP_BIN" eval-file "$PLUGINS_DIR/wp-artasia-locations/scripts/publish-existing-placement-sites.php" --path=/opt/bitnami/wordpress --allow-root
             sudo rm -rf /tmp/wp-artasia-locations-deploy
 
       - name: Delete old GHCR image versions

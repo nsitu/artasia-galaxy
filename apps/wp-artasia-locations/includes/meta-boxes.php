@@ -107,7 +107,7 @@ function artasia_post_type_contexts(): array
                     artasia_context_post_type_link('artasia_place', 'place'),
                     artasia_context_post_type_link('artasia_partner', 'Artasia Partner')
                 ),
-                'Published placements can be displayed by partner with the <code>[artasia_sites year="2026"]</code> shortcode or the Artasia Sites Elementor widget.',
+                'Placements can be displayed by partner with the <code>[artasia_sites year="2026"]</code> shortcode or the Artasia Sites Elementor widget when their "Publish this placement in Artasia site listings" checkbox is active.',
             ],
         ],
         'artasia_document' => [
@@ -270,6 +270,7 @@ function artasia_placement_meta_box_html(WP_Post $post): void
     ]);
 
     $project_id     = get_post_meta($post->ID, 'artasia_project_id', true);
+    $publish_site   = (bool) get_post_meta($post->ID, 'artasia_publish_site', true);
     $place_id       = get_post_meta($post->ID, 'artasia_place_id', true);
     $partner_id     = get_post_meta($post->ID, 'artasia_partner_id', true);
     $team_member_id = get_post_meta($post->ID, 'artasia_team_member_id', true);
@@ -305,6 +306,16 @@ function artasia_placement_meta_box_html(WP_Post $post): void
                     <?php endforeach; ?>
                 </select>
                 <p class="description">Select the annual Artasia Project this placement belongs to.</p>
+            </td>
+        </tr>
+        <tr>
+            <th>Public Site Listing</th>
+            <td>
+                <label for="artasia_publish_site">
+                    <input type="checkbox" id="artasia_publish_site" name="artasia_publish_site" value="1" <?php checked($publish_site); ?> />
+                    Publish this placement in Artasia site listings
+                </label>
+                <p class="description">Controls visibility in the <code>[artasia_sites]</code> shortcode and Artasia Sites Elementor widget only. It does not affect the Galaxy viewer.</p>
             </td>
         </tr>
         <tr>
@@ -517,6 +528,7 @@ function artasia_save_placement_meta(int $post_id): void
     }
 
     update_post_meta($post_id, 'artasia_project_id', intval($_POST['artasia_project_id'] ?? 0));
+    update_post_meta($post_id, 'artasia_publish_site', isset($_POST['artasia_publish_site']));
     update_post_meta($post_id, 'artasia_program_context', sanitize_text_field($_POST['artasia_program_context'] ?? ''));
     update_post_meta($post_id, 'artasia_placement_description', wp_kses_post(wp_unslash($_POST['artasia_placement_description'] ?? '')));
     update_post_meta($post_id, 'artasia_is_earlyon', isset($_POST['artasia_is_earlyon']));

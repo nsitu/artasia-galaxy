@@ -13,6 +13,7 @@ function artasia_placement_columns(array $columns): array
         $new[$key] = $label;
         if ($key === 'title') {
             $new['artasia_project']  = 'Project';
+            $new['artasia_publish_site'] = 'Public Site';
             $new['artasia_place']    = 'Place';
             $new['artasia_partner']  = 'Artasia Partner';
             $new['artasia_team_member'] = 'Lead Team Member';
@@ -34,6 +35,9 @@ function artasia_placement_column(string $column, int $post_id): void
         case 'artasia_project':
             $project_id = intval(get_post_meta($post_id, 'artasia_project_id', true));
             echo $project_id ? esc_html(artasia_project_admin_label($project_id)) : '—';
+            break;
+        case 'artasia_publish_site':
+            echo get_post_meta($post_id, 'artasia_publish_site', true) ? 'Published' : 'Hidden';
             break;
         case 'artasia_place':
             $vid = intval(get_post_meta($post_id, 'artasia_place_id', true));

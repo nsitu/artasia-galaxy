@@ -111,6 +111,13 @@ function artasia_register_meta_fields(): void
         'show_in_rest' => true,
         'sanitize_callback' => 'artasia_sanitize_integer_meta',
     ]);
+    register_post_meta('artasia_placement', 'artasia_publish_site', [
+        'type'         => 'boolean',
+        'single'       => true,
+        'default'      => false,
+        'show_in_rest' => false,
+        'sanitize_callback' => 'artasia_sanitize_boolean_meta',
+    ]);
     register_post_meta('artasia_placement', 'artasia_place_id', [
         'type'         => 'integer',
         'single'       => true,
