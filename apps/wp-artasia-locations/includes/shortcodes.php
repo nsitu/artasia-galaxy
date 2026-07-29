@@ -89,6 +89,11 @@ function artasia_team_shortcode($attributes): string
         'posts_per_page' => -1,
         'post_status'    => 'publish',
         'post__in'       => array_keys($team),
+        'meta_query'     => [[
+            'key'     => 'artasia_publish_profile',
+            'value'   => '1',
+            'compare' => '=',
+        ]],
         'orderby'        => 'title',
         'order'          => 'ASC',
         'no_found_rows'  => true,
@@ -115,7 +120,7 @@ function artasia_team_shortcode($attributes): string
             $instagram = get_post_meta($person->ID, 'artasia_instagram', true);
             $portfolio_url = get_post_meta($person->ID, 'artasia_portfolio_url', true);
             ?>
-            <article class="artasia-team__member">
+            <article class="artasia-team__member<?php echo $photo_id ? ' has-photo' : ''; ?>">
                 <?php if ($photo_id) : ?>
                     <div class="artasia-team__photo">
                         <?php echo wp_get_attachment_image($photo_id, 'medium', false, ['loading' => 'lazy']); ?>
@@ -124,10 +129,10 @@ function artasia_team_shortcode($attributes): string
                 <div class="artasia-team__content">
                     <h3 class="artasia-team__name">
                         <?php echo esc_html($person->post_title); ?>
-                        <?php if ($pronouns) : ?>
-                            <span class="artasia-team__pronouns"><?php echo esc_html($pronouns); ?></span>
-                        <?php endif; ?>
                     </h3>
+                    <?php if ($pronouns) : ?>
+                        <p class="artasia-team__pronouns"><?php echo esc_html($pronouns); ?></p>
+                    <?php endif; ?>
                     <p class="artasia-team__roles">
                         <?php echo esc_html(implode(', ', array_keys($team[$person->ID]['responsibilities']))); ?>
                     </p>

@@ -297,6 +297,13 @@ function artasia_register_meta_fields(): void
         'show_in_rest' => true,
         'sanitize_callback' => 'esc_url_raw',
     ]);
+    register_post_meta('artasia_people', 'artasia_publish_profile', [
+        'type'         => 'boolean',
+        'single'       => true,
+        'default'      => false,
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_boolean_meta',
+    ]);
     register_post_meta('artasia_people', 'artasia_photo_id', [
         'type'         => 'integer',
         'single'       => true,

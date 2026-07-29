@@ -70,6 +70,7 @@ function artasia_get_uploaders(): WP_REST_Response
             'pronouns' => get_post_meta($person->ID, 'artasia_pronouns', true) ?: '',
             'instagram' => get_post_meta($person->ID, 'artasia_instagram', true) ?: '',
             'portfolio_url' => get_post_meta($person->ID, 'artasia_portfolio_url', true) ?: '',
+            'publish_profile' => (bool) get_post_meta($person->ID, 'artasia_publish_profile', true),
         ];
     }
 
@@ -185,6 +186,7 @@ function artasia_get_expanded_placements(): WP_REST_Response
                 'pronouns' => get_post_meta($person->ID, 'artasia_pronouns', true) ?: '',
                 'instagram' => get_post_meta($person->ID, 'artasia_instagram', true) ?: '',
                 'portfolio_url' => get_post_meta($person->ID, 'artasia_portfolio_url', true) ?: '',
+                'publish_profile' => (bool) get_post_meta($person->ID, 'artasia_publish_profile', true),
                 'photo' => artasia_get_people_photo_response($photo_id),
             ];
         }

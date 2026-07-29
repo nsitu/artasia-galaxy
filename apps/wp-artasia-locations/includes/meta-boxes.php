@@ -1021,6 +1021,7 @@ function artasia_people_meta_box_html(WP_Post $post): void
     $pronouns = get_post_meta($post->ID, 'artasia_pronouns', true);
     $instagram = get_post_meta($post->ID, 'artasia_instagram', true);
     $portfolio_url = get_post_meta($post->ID, 'artasia_portfolio_url', true);
+    $publish_profile = (bool) get_post_meta($post->ID, 'artasia_publish_profile', true);
     $photo_id = intval(get_post_meta($post->ID, 'artasia_photo_id', true));
     $photo_url = $photo_id ? wp_get_attachment_url($photo_id) : '';
     $bio = get_post_meta($post->ID, 'artasia_bio', true);
@@ -1051,6 +1052,16 @@ function artasia_people_meta_box_html(WP_Post $post): void
         <tr>
             <th><label for="artasia_portfolio_url">Portfolio URL</label></th>
             <td><input type="url" id="artasia_portfolio_url" name="artasia_portfolio_url" value="<?php echo esc_attr($portfolio_url); ?>" class="widefat" placeholder="https://example.com" /></td>
+        </tr>
+        <tr>
+            <th>Public Profile</th>
+            <td>
+                <label for="artasia_publish_profile">
+                    <input type="checkbox" id="artasia_publish_profile" name="artasia_publish_profile" value="1" <?php checked($publish_profile); ?> />
+                    Publish this person in Artasia team listings
+                </label>
+                <p class="description">When disabled, this person will not appear in the <code>[artasia_team]</code> shortcode, even when associated with the selected project.</p>
+            </td>
         </tr>
         <tr>
             <th><label for="artasia_people_photo_id">Photo</label></th>
@@ -1143,6 +1154,7 @@ function artasia_save_people_meta(int $post_id): void
     update_post_meta($post_id, 'artasia_pronouns', sanitize_text_field($_POST['artasia_pronouns'] ?? ''));
     update_post_meta($post_id, 'artasia_instagram', artasia_sanitize_instagram_handle($_POST['artasia_instagram'] ?? ''));
     update_post_meta($post_id, 'artasia_portfolio_url', esc_url_raw($_POST['artasia_portfolio_url'] ?? ''));
+    update_post_meta($post_id, 'artasia_publish_profile', isset($_POST['artasia_publish_profile']));
     update_post_meta($post_id, 'artasia_photo_id', artasia_validate_image_attachment_id(intval($_POST['artasia_photo_id'] ?? 0)));
     update_post_meta($post_id, 'artasia_bio', wp_kses_post(wp_unslash($_POST['artasia_bio'] ?? '')));
     update_post_meta($post_id, 'artasia_notes', sanitize_textarea_field($_POST['artasia_notes'] ?? ''));

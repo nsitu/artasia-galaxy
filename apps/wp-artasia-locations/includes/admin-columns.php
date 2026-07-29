@@ -254,6 +254,7 @@ function artasia_people_columns(array $columns): array
             $new['artasia_role'] = 'Role';
             $new['artasia_email'] = 'Email';
             $new['artasia_photo'] = 'Photo';
+            $new['artasia_publish_profile'] = 'Public Profile';
             $new['artasia_assigned_placements'] = 'Assigned Placements';
         }
     }
@@ -274,6 +275,9 @@ function artasia_people_column(string $column, int $post_id): void
         case 'artasia_photo':
             $photo_id = intval(get_post_meta($post_id, 'artasia_photo_id', true));
             echo $photo_id ? wp_get_attachment_image($photo_id, 'thumbnail', false, ['style' => 'max-width:48px;height:auto;']) : '—';
+            break;
+        case 'artasia_publish_profile':
+            echo get_post_meta($post_id, 'artasia_publish_profile', true) ? 'Published' : 'Hidden';
             break;
         case 'artasia_assigned_placements':
             $placements = get_posts([
