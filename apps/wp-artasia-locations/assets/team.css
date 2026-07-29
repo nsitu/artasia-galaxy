@@ -19,19 +19,23 @@
 
 .artasia-team__photo {
     align-self: start;
-}
-
-.artasia-team__photo img {
     aspect-ratio: 1 / 1;
     border-radius: 50%;
-    display: block;
-    height: auto;
-    object-fit: cover;
+    clip-path: circle(50%);
+    overflow: hidden;
     transition: transform 220ms ease;
+}
+
+.artasia-team .artasia-team__photo img {
+    border-radius: 50% !important;
+    display: block;
+    height: 100% !important;
+    object-fit: cover;
+    object-position: center;
     width: 100%;
 }
 
-.artasia-team__member:hover .artasia-team__photo img {
+.artasia-team__member:hover .artasia-team__photo {
     transform: translateY(-0.5rem);
 }
 
@@ -59,8 +63,29 @@
 
 .artasia-team__links {
     display: flex;
+    flex-direction: column;
     flex-wrap: wrap;
-    gap: 0.75rem;
+    gap: 0.35rem;
+}
+
+.artasia-team__link {
+    overflow-wrap: anywhere;
+}
+
+.artasia-team__link strong {
+    font-weight: 900;
+    margin-right: 0.35rem;
+}
+
+.artasia-team .artasia-team__portfolio-link {
+    background-image: none !important;
+    padding-left: 0 !important;
+}
+
+.artasia-team .artasia-team__portfolio-link::before,
+.artasia-team .artasia-team__portfolio-link::after {
+    content: none !important;
+    display: none !important;
 }
 
 .artasia-team a,
@@ -83,11 +108,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .artasia-team__photo img {
+    .artasia-team__photo {
         transition: none;
     }
 
-    .artasia-team__member:hover .artasia-team__photo img {
+    .artasia-team__member:hover .artasia-team__photo {
         transform: none;
     }
 }

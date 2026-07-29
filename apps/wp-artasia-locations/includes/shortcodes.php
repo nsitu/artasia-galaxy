@@ -103,10 +103,14 @@ function artasia_team_shortcode($attributes): string
         return '';
     }
 
-    usort($people, function (WP_Post $a, WP_Post $b) use ($team): int {
-        $order_comparison = $team[$a->ID]['order'] <=> $team[$b->ID]['order'];
+    usort($people, static function (WP_Post $a, WP_Post $b): int {
+        $a_name_parts = array_values(array_filter(explode(' ', trim($a->post_title)), 'strlen'));
+        $b_name_parts = array_values(array_filter(explode(' ', trim($b->post_title)), 'strlen'));
+        $a_last_name = $a_name_parts ? $a_name_parts[count($a_name_parts) - 1] : '';
+        $b_last_name = $b_name_parts ? $b_name_parts[count($b_name_parts) - 1] : '';
+        $last_name_comparison = strcasecmp($a_last_name, $b_last_name);
 
-        return $order_comparison ?: strcasecmp($a->post_title, $b->post_title);
+        return $last_name_comparison ?: strcasecmp($a->post_title, $b->post_title);
     });
 
     ob_start();
@@ -119,6 +123,7 @@ function artasia_team_shortcode($attributes): string
             $bio = get_post_meta($person->ID, 'artasia_bio', true);
             $instagram = get_post_meta($person->ID, 'artasia_instagram', true);
             $portfolio_url = get_post_meta($person->ID, 'artasia_portfolio_url', true);
+            $portfolio_label = preg_replace('#^https?://#i', '', $portfolio_url);
             ?>
             <article class="artasia-team__member<?php echo $photo_id ? ' has-photo' : ''; ?>">
                 <?php if ($photo_id) : ?>
@@ -142,12 +147,18 @@ function artasia_team_shortcode($attributes): string
                     <?php if ($instagram || $portfolio_url) : ?>
                         <p class="artasia-team__links">
                             <?php if ($instagram) : ?>
-                                <a href="<?php echo esc_url('https://www.instagram.com/' . rawurlencode($instagram) . '/'); ?>" rel="noopener noreferrer" target="_blank">
-                                    @<?php echo esc_html($instagram); ?>
-                                </a>
+                                <span class="artasia-team__link">
+                                    <strong>Instagram</strong>
+                                    <a href="<?php echo esc_url('https://www.instagram.com/' . rawurlencode($instagram) . '/'); ?>" rel="noopener noreferrer" target="_blank">
+                                        @<?php echo esc_html($instagram); ?>
+                                    </a>
+                                </span>
                             <?php endif; ?>
                             <?php if ($portfolio_url) : ?>
-                                <a href="<?php echo esc_url($portfolio_url); ?>" rel="noopener noreferrer" target="_blank">Portfolio</a>
+                                <span class="artasia-team__link">
+                                    <strong>Portfolio</strong>
+                                    <a class="artasia-team__portfolio-link" href="<?php echo esc_url($portfolio_url); ?>" rel="noopener noreferrer" target="_blank"><?php echo esc_html($portfolio_label); ?></a>
+                                </span>
                             <?php endif; ?>
                         </p>
                     <?php endif; ?>
