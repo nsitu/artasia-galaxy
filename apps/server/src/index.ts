@@ -6,7 +6,7 @@ import assetRoutes from "./routes/assets.js";
 import slideshowRoutes from "./routes/slideshow.js";
 import albumRoutes from "./routes/albums.js";
 import authRoutes from "./routes/auth.js";
-import uploadRoutes from "./routes/uploads.js";
+import uploadRoutes, { getSiteActivityStats } from "./routes/uploads.js";
 import placementRoutes from "./routes/placements.js";
 import reconcileRoutes from "./routes/reconcile.js";
 import settingsRoutes, { mountSSE } from "./routes/settings.js";
@@ -28,6 +28,24 @@ app.use("/api/v1/slideshow", slideshowRoutes);
 app.use("/api/v1/albums", albumRoutes);
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/uploads", uploadRoutes);
+app.get("/api/v1/placements/gallery-availability", async (_req, res) => {
+  try {
+    const stats = await getSiteActivityStats();
+    const placements = Object.fromEntries(
+      Object.entries(stats.sites).map(([placementId, site]) => [
+        placementId,
+        site.totalPublished > 0,
+      ]),
+    );
+
+    res.set("Cache-Control", "public, max-age=30, stale-while-revalidate=300");
+    res.json({ placements, generatedAt: stats.generatedAt });
+  } catch (err) {
+    const msg = (err as Error).message;
+    console.error(`[placements] gallery availability failed: ${msg}`);
+    res.status(502).json({ error: msg });
+  }
+});
 app.use("/api/v1/placements", placementRoutes);
 app.use("/api/v1/reconcile", reconcileRoutes);
 app.use("/api/v1/settings", settingsRoutes);

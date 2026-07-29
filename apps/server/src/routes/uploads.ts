@@ -72,7 +72,7 @@ const LINKED_AUDIO_TAG_PREFIX = "linkedaudio:";
 const ADMIN_BROWSE_INDEX_TTL_MS = 5 * 60_000;
 const AUDIO_OPTION_CACHE_TTL_MS = 60_000;
 
-interface SiteActivityStatsResponse {
+export interface SiteActivityStatsResponse {
   sites: Record<string, {
     totalPublished: number;
     activities: Array<{
@@ -602,7 +602,7 @@ async function buildSiteActivityStats(): Promise<SiteActivityStatsResponse> {
   return { sites, generatedAt: new Date().toISOString() };
 }
 
-async function getSiteActivityStats(): Promise<SiteActivityStatsResponse> {
+export async function getSiteActivityStats(): Promise<SiteActivityStatsResponse> {
   if (siteActivityStatsCache && siteActivityStatsCache.expiresAt > Date.now()) {
     return siteActivityStatsCache.value;
   }
