@@ -56,7 +56,7 @@
     align-items: center;
     display: grid;
     gap: clamp(2rem, 5vw, 4.5rem);
-    grid-template-columns: clamp(12rem, 28vw, 27rem) minmax(0, 1fr);
+    grid-template-columns: clamp(12rem, 28%, 27rem) minmax(0, 1fr);
 }
 
 .artasia-team__photo {
