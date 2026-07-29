@@ -117,6 +117,19 @@ function artasia_get_project_documentation(int $project_id): array
             $partner_name = 'Other documentation';
         }
 
+        $placement_names = [];
+        foreach ($matching_placements as $placement_id) {
+            $placement_partner_id = $placement_lookup[$placement_id] ?? 0;
+            if ($placement_partner_id === $partner_id || (!$partner_id && !$placement_partner_id)) {
+                $placement_names[] = get_the_title($placement_id);
+            }
+        }
+        if (!$placement_names) {
+            $placement_names = array_map('get_the_title', $matching_placements);
+        }
+        natcasesort($placement_names);
+        $placement_name = (string) reset($placement_names);
+
         if (!isset($groups[$partner_id])) {
             $groups[$partner_id] = [
                 'partner_id'   => $partner_id,
@@ -124,7 +137,10 @@ function artasia_get_project_documentation(int $project_id): array
                 'documents'    => [],
             ];
         }
-        $groups[$partner_id]['documents'][] = $document;
+        $groups[$partner_id]['documents'][] = [
+            'document'       => $document,
+            'placement_name' => $placement_name,
+        ];
     }
 
     uasort($groups, static function (array $a, array $b): int {
@@ -143,7 +159,8 @@ function artasia_get_project_documentation(int $project_id): array
 function artasia_find_project_documentation(array $groups, string $slug): ?WP_Post
 {
     foreach ($groups as $group) {
-        foreach ($group['documents'] as $document) {
+        foreach ($group['documents'] as $entry) {
+            $document = $entry['document'];
             if ($document->post_name === $slug) {
                 return $document;
             }
@@ -190,12 +207,13 @@ function artasia_render_documentation_viewer(int $project_id): string
         : '';
     $selected = $requested_slug ? artasia_find_project_documentation($groups, $requested_slug) : null;
     if (!$selected) {
-        $selected = $groups[0]['documents'][0];
+        $selected = $groups[0]['documents'][0]['document'];
     }
 
     $selected_partner = '';
     foreach ($groups as $group) {
-        foreach ($group['documents'] as $document) {
+        foreach ($group['documents'] as $entry) {
+            $document = $entry['document'];
             if ($document->ID === $selected->ID) {
                 $selected_partner = $group['partner_name'];
                 break 2;
@@ -222,15 +240,27 @@ function artasia_render_documentation_viewer(int $project_id): string
             <h2 class="artasia-documentation__navigation-title">Documentation</h2>
             <?php foreach ($groups as $group) : ?>
                 <section class="artasia-documentation__navigation-group">
+                    <?php $logo_id = $group['partner_id'] ? intval(get_post_meta($group['partner_id'], 'artasia_logo_id', true)) : 0; ?>
+                    <?php if ($logo_id) : ?>
+                        <div class="artasia-documentation__navigation-logo">
+                            <?php echo wp_get_attachment_image($logo_id, 'medium', false, ['loading' => 'lazy']); ?>
+                        </div>
+                    <?php endif; ?>
                     <h3><?php echo esc_html($group['partner_name']); ?></h3>
                     <ul>
-                        <?php foreach ($group['documents'] as $document) : ?>
+                        <?php foreach ($group['documents'] as $entry) : ?>
+                            <?php $document = $entry['document']; ?>
                             <li>
                                 <a
                                     href="<?php echo esc_url(add_query_arg('documentation', $document->post_name, $base_url)); ?>"
                                     data-documentation-slug="<?php echo esc_attr($document->post_name); ?>"
                                     <?php echo $document->ID === $selected->ID ? 'aria-current="page"' : ''; ?>
-                                ><?php echo esc_html($document->post_title); ?></a>
+                                >
+                                    <span class="artasia-documentation__navigation-document-title"><?php echo esc_html($document->post_title); ?></span>
+                                    <?php if ($entry['placement_name']) : ?>
+                                        <span class="artasia-documentation__navigation-placement"><?php echo esc_html($entry['placement_name']); ?></span>
+                                    <?php endif; ?>
+                                </a>
                             </li>
                         <?php endforeach; ?>
                     </ul>
@@ -281,7 +311,8 @@ function artasia_rest_get_documentation(WP_REST_Request $request)
 
     $partner_name = '';
     foreach ($groups as $group) {
-        foreach ($group['documents'] as $group_document) {
+        foreach ($group['documents'] as $entry) {
+            $group_document = $entry['document'];
             if ($group_document->ID === $document->ID) {
                 $partner_name = $group['partner_name'];
                 break 2;

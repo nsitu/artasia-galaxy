@@ -1,49 +1,82 @@
 .artasia-documentation {
-  display: grid;
-  grid-template-columns: clamp(15rem, 28%, 22rem) minmax(0, 1fr);
-  gap: clamp(2rem, 5vw, 5rem);
   width: min(100%, 1140px);
   margin-inline: auto;
   color: #8e1d58;
 }
 
 .artasia-documentation__navigation {
-  align-self: start;
-  padding: 1.5rem;
-  background: #f7f2f5;
+  margin-bottom: clamp(2.5rem, 6vw, 5rem);
 }
 
 .artasia-documentation__navigation-title {
-  margin-top: 0;
-  font-size: 1.6rem;
+  margin: 0 0 1.5rem;
+  font-size: 1.8rem;
   font-weight: 900;
 }
 
-.artasia-documentation__navigation-group + .artasia-documentation__navigation-group {
-  margin-top: 1.5rem;
+.artasia-documentation__navigation {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: 2rem clamp(2rem, 5vw, 4rem);
+}
+
+.artasia-documentation__navigation-title {
+  grid-column: 1 / -1;
 }
 
 .artasia-documentation__navigation-group h3 {
-  margin: 0 0 0.4rem;
-  font-size: 1rem;
+  margin: 0 0 0.75rem;
+  font-size: 1.15rem;
   font-weight: 900;
+}
+
+.artasia-documentation__navigation-logo {
+  display: flex;
+  align-items: center;
+  min-height: 6rem;
+  margin-bottom: 1rem;
+}
+
+.artasia-documentation__navigation-logo img {
+  display: block;
+  width: auto;
+  max-width: min(100%, 15rem);
+  max-height: 6rem;
+  object-fit: contain;
 }
 
 .artasia-documentation__navigation-group ul {
   margin: 0;
-  padding-left: 1.25rem;
+  padding: 0;
+  list-style: none;
 }
 
 .artasia-documentation__navigation-group li + li {
-  margin-top: 0.35rem;
+  margin-top: 0.85rem;
 }
 
 .artasia-documentation__navigation a {
+  display: block;
+  padding-left: 0.9rem;
+  border-left: 3px solid #f28b20;
   color: inherit;
+  text-decoration: none;
 }
 
 .artasia-documentation__navigation a[aria-current="page"] {
+  border-left-color: currentColor;
+}
+
+.artasia-documentation__navigation-document-title {
+  display: block;
   font-weight: 900;
+}
+
+.artasia-documentation__navigation-placement {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.9em;
+  font-weight: 400;
 }
 
 .artasia-documentation__viewer {
@@ -90,11 +123,4 @@
 .artasia-documentation__body,
 .artasia-documentation__body :where(h1, h2, h3, h4, h5, h6, a) {
   color: inherit;
-}
-
-@media (max-width: 767px) {
-  .artasia-documentation {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 2rem;
-  }
 }
