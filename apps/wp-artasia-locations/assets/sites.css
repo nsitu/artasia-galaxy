@@ -51,7 +51,39 @@
 }
 
 .artasia-sites__list li {
-    margin-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.artasia-sites__placement-name,
+.artasia-sites__place-name,
+.artasia-sites__place-address {
+    display: block;
+}
+
+.artasia-sites__placement-name {
+    font-weight: 700;
+}
+
+.artasia-sites__gallery-link {
+    display: inline-block;
+    margin-top: 0.65rem;
+    padding: 0.4rem 0.85rem;
+    border: 2px solid currentColor;
+    border-radius: 999px;
+    color: inherit;
+    font-weight: 700;
+    line-height: 1.2;
+    text-decoration: none;
+}
+
+.artasia-sites__gallery-link:hover,
+.artasia-sites__gallery-link:focus-visible {
+    background: #8e1d58;
+    color: #fff;
+}
+
+.artasia-sites__place-name {
+    margin-top: 0.2rem;
 }
 
 @media (max-width: 700px) {

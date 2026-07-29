@@ -70,9 +70,11 @@ function artasia_render_sites(int $project_id): string
 
     $groups = [];
     $partner_ids = [];
+    $place_ids = [];
 
     foreach ($placements as $placement) {
         $partner_id = intval(get_post_meta($placement->ID, 'artasia_partner_id', true));
+        $place_id = intval(get_post_meta($placement->ID, 'artasia_place_id', true));
         $group_key = $partner_id ?: 0;
 
         if (!isset($groups[$group_key])) {
@@ -85,6 +87,32 @@ function artasia_render_sites(int $project_id): string
         $groups[$group_key]['sites'][] = $placement;
         if ($partner_id) {
             $partner_ids[$partner_id] = $partner_id;
+        }
+        if ($place_id) {
+            $place_ids[$place_id] = $place_id;
+        }
+    }
+
+    $place_lookup = [];
+    if ($place_ids) {
+        $places = get_posts([
+            'post_type'      => 'artasia_place',
+            'posts_per_page' => -1,
+            'post_status'    => 'publish',
+            'post__in'       => array_values($place_ids),
+            'no_found_rows'  => true,
+        ]);
+
+        foreach ($places as $place) {
+            $street_address = trim((string) get_post_meta($place->ID, 'artasia_address', true));
+            $city = trim((string) get_post_meta($place->ID, 'artasia_city', true));
+            $postal_code = trim((string) get_post_meta($place->ID, 'artasia_postal_code', true));
+            $city_postal = trim($city . ($postal_code !== '' ? ' ' . $postal_code : ''));
+
+            $place_lookup[$place->ID] = [
+                'name'    => $place->post_title,
+                'address' => implode(', ', array_filter([$street_address, $city_postal], 'strlen')),
+            ];
         }
     }
 
@@ -163,8 +191,20 @@ function artasia_render_sites(int $project_id): string
                                 $section = trim((string) get_post_meta($placement->ID, 'artasia_section', true));
                                 $placement_label = $placement->post_title
                                     . ($section !== '' ? ' — ' . $section : '');
+                                $galaxy_url = 'https://galaxy.artsforall.co/sites/' . rawurlencode($placement->post_name);
+                                $place_id = intval(get_post_meta($placement->ID, 'artasia_place_id', true));
+                                $place = $place_lookup[$place_id] ?? null;
                                 ?>
-                                <li><?php echo esc_html($placement_label); ?></li>
+                                <li>
+                                    <span class="artasia-sites__placement-name"><?php echo esc_html($placement_label); ?></span>
+                                    <?php if ($place) : ?>
+                                        <span class="artasia-sites__place-name"><?php echo esc_html($place['name']); ?></span>
+                                        <?php if ($place['address'] !== '') : ?>
+                                            <span class="artasia-sites__place-address"><?php echo esc_html($place['address']); ?></span>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
+                                    <a class="artasia-sites__gallery-link" href="<?php echo esc_url($galaxy_url); ?>">Gallery</a>
+                                </li>
                             <?php endforeach; ?>
                         </ul>
                     </div>
