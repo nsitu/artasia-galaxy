@@ -119,7 +119,8 @@ function artasia_post_type_contexts(): array
                     artasia_context_post_type_link('artasia_people', 'people'),
                     artasia_context_post_type_link('artasia_placement', 'placements')
                 ),
-                'Use the main rich-text editor for the documentation itself, then identify its context and optionally provide a short pull quote.',
+                'Use the block editor for the documentation itself, then identify its context and optionally provide a short pull quote.',
+                'Add images with the Gallery block. In the Gallery link settings, enable "Enlarge on click" to provide previous/next lightbox navigation on the published documentation.',
             ],
         ],
     ];
@@ -1431,5 +1432,7 @@ function artasia_remove_unnecessary_meta_boxes(): void
             remove_meta_box('passster', $post_type, $meta_box_context);
         }
     }
+
+    remove_meta_box('postcustom', 'artasia_document', 'normal');
 }
 add_action('add_meta_boxes', 'artasia_remove_unnecessary_meta_boxes', 99);

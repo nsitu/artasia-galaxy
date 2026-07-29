@@ -163,7 +163,17 @@ function artasia_register_post_types(): void
         'show_in_rest' => true,
         'rest_base'    => 'artasia_documentation',
         'menu_icon'    => 'dashicons-welcome-write-blog',
-        'supports'     => ['title', 'editor', 'author', 'revisions'],
+        'supports'     => ['title', 'editor', 'author', 'revisions', 'custom-fields'],
+        'template'     => [
+            ['core/paragraph', [
+                'placeholder' => 'Introduce this documentation...',
+            ]],
+            ['core/gallery'],
+            ['core/paragraph', [
+                'placeholder' => 'Continue the reflection...',
+            ]],
+        ],
+        'template_lock' => false,
     ]);
 }
 
@@ -282,7 +292,7 @@ add_filter('submenu_file', 'artasia_admin_submenu_file');
 
 function artasia_use_block_editor_for_post_type(bool $use_block_editor, string $post_type): bool
 {
-    $artasia_post_types = ['artasia_project', 'artasia_activity', 'artasia_partner', 'artasia_place', 'artasia_people', 'artasia_role', 'artasia_placement', 'artasia_document'];
+    $artasia_post_types = ['artasia_project', 'artasia_activity', 'artasia_partner', 'artasia_place', 'artasia_people', 'artasia_role', 'artasia_placement'];
 
     if (in_array($post_type, $artasia_post_types, true)) {
         return false;
