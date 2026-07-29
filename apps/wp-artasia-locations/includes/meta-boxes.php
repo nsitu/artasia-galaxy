@@ -19,6 +19,7 @@ function artasia_render_context_paragraph(string $paragraph): void
         'a' => [
             'href' => [],
         ],
+        'code' => [],
     ]);
 }
 
@@ -35,6 +36,7 @@ function artasia_post_type_contexts(): array
                     artasia_context_post_type_link('artasia_activity', 'activities'),
                     artasia_context_post_type_link('artasia_placement', 'placements')
                 ),
+                'Published projects are available in the project selector of the Artasia Team Elementor widget. The same team listing can be added with the <code>[artasia_team year="2026"]</code> shortcode, using the project year.',
             ],
         ],
         'artasia_activity' => [
@@ -74,6 +76,7 @@ function artasia_post_type_contexts(): array
                     artasia_context_post_type_link('artasia_placement', 'placement')
                 ),
                 "Use this record for the person's name, default role, pronouns, public profile links, photo, current public bio, and internal notes.",
+                'Published profiles can be displayed with the <code>[artasia_team year="2026"]</code> shortcode or the Artasia Team Elementor widget. A person appears only when the "Publish this person in Artasia team listings" checkbox is active and they are associated with the selected project through a placement or an Artasia Role.',
             ],
         ],
         'artasia_role' => [
