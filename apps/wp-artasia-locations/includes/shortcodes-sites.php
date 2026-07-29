@@ -139,20 +139,20 @@ function artasia_render_sites(int $project_id): string
                 $partner_name = $partner ? $partner->post_title : 'Other sites';
                 $logo_id = $partner ? intval(get_post_meta($partner->ID, 'artasia_logo_id', true)) : 0;
                 ?>
-                <section class="artasia-sites__partner">
-                    <header class="artasia-sites__partner-header">
-                        <?php if ($logo_id) : ?>
-                            <div class="artasia-sites__partner-logo">
-                                <?php echo wp_get_attachment_image($logo_id, 'medium', false, ['loading' => 'lazy']); ?>
-                            </div>
-                        <?php endif; ?>
+                <section class="artasia-sites__partner<?php echo $logo_id ? ' has-logo' : ''; ?>">
+                    <?php if ($logo_id) : ?>
+                        <div class="artasia-sites__partner-logo">
+                            <?php echo wp_get_attachment_image($logo_id, 'large', false, ['loading' => 'lazy']); ?>
+                        </div>
+                    <?php endif; ?>
+                    <div class="artasia-sites__partner-content">
                         <h2 class="artasia-sites__partner-name"><?php echo esc_html($partner_name); ?></h2>
-                    </header>
-                    <ul class="artasia-sites__list">
-                        <?php foreach ($group['sites'] as $placement) : ?>
-                            <li><?php echo esc_html($placement->post_title); ?></li>
-                        <?php endforeach; ?>
-                    </ul>
+                        <ul class="artasia-sites__list">
+                            <?php foreach ($group['sites'] as $placement) : ?>
+                                <li><?php echo esc_html($placement->post_title); ?></li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </div>
                 </section>
             <?php endforeach; ?>
         </div>
