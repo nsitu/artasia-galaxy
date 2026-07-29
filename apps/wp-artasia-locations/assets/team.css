@@ -88,6 +88,11 @@
     display: none !important;
 }
 
+.artasia-team__edit {
+    font-size: 0.875em;
+    font-weight: 900;
+}
+
 .artasia-team a,
 .artasia-team a:visited,
 .artasia-team a:hover,

@@ -124,6 +124,9 @@ function artasia_team_shortcode($attributes): string
             $instagram = get_post_meta($person->ID, 'artasia_instagram', true);
             $portfolio_url = get_post_meta($person->ID, 'artasia_portfolio_url', true);
             $portfolio_label = preg_replace('#^https?://#i', '', $portfolio_url);
+            $edit_url = is_user_logged_in() && current_user_can('edit_post', $person->ID)
+                ? get_edit_post_link($person->ID, '')
+                : '';
             ?>
             <article class="artasia-team__member<?php echo $photo_id ? ' has-photo' : ''; ?>">
                 <?php if ($photo_id) : ?>
@@ -160,6 +163,11 @@ function artasia_team_shortcode($attributes): string
                                     <a class="artasia-team__portfolio-link" href="<?php echo esc_url($portfolio_url); ?>" rel="noopener noreferrer" target="_blank"><?php echo esc_html($portfolio_label); ?></a>
                                 </span>
                             <?php endif; ?>
+                        </p>
+                    <?php endif; ?>
+                    <?php if ($edit_url) : ?>
+                        <p class="artasia-team__edit">
+                            <a href="<?php echo esc_url($edit_url); ?>">Edit profile</a>
                         </p>
                     <?php endif; ?>
                 </div>
