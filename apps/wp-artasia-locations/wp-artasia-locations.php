@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Artasia Locations
  * Description: Custom post types for Artasia placements, projects, activities, places, partners, people, and pedagogical documentation with a REST API endpoint for the Node.js backend.
- * Version:     1.1.4
+ * Version:     1.2.0
  * License:     GPL-2.0-or-later
  */
 
@@ -10,7 +10,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('ARTASIA_LOCATIONS_VERSION', '1.1.2');
+define('ARTASIA_LOCATIONS_VERSION', '1.2.0');
 define('ARTASIA_LOCATIONS_PATH', plugin_dir_path(__FILE__));
 define('ARTASIA_LOCATIONS_URL', plugin_dir_url(__FILE__));
 
@@ -20,6 +20,7 @@ require_once ARTASIA_LOCATIONS_PATH . 'includes/meta-boxes.php';
 require_once ARTASIA_LOCATIONS_PATH . 'includes/rest-fields.php';
 require_once ARTASIA_LOCATIONS_PATH . 'includes/admin-columns.php';
 require_once ARTASIA_LOCATIONS_PATH . 'includes/import.php';
+require_once ARTASIA_LOCATIONS_PATH . 'includes/shortcodes.php';
 
 function artasia_admin_enqueue_assets(string $hook_suffix): void
 {
@@ -28,7 +29,7 @@ function artasia_admin_enqueue_assets(string $hook_suffix): void
     }
 
     $screen = get_current_screen();
-    if (!$screen || !in_array($screen->post_type, ['artasia_project', 'artasia_activity', 'artasia_partner', 'artasia_place', 'artasia_people', 'artasia_placement', 'artasia_document'], true)) {
+    if (!$screen || !in_array($screen->post_type, ['artasia_project', 'artasia_activity', 'artasia_partner', 'artasia_place', 'artasia_people', 'artasia_role', 'artasia_placement', 'artasia_document'], true)) {
         return;
     }
 
@@ -60,6 +61,17 @@ function artasia_admin_enqueue_assets(string $hook_suffix): void
     );
 }
 add_action('admin_enqueue_scripts', 'artasia_admin_enqueue_assets');
+
+function artasia_enqueue_public_assets(): void
+{
+    wp_enqueue_style(
+        'artasia-team-shortcode',
+        ARTASIA_LOCATIONS_URL . 'assets/team.css',
+        [],
+        ARTASIA_LOCATIONS_VERSION
+    );
+}
+add_action('wp_enqueue_scripts', 'artasia_enqueue_public_assets');
 
 function artasia_allow_partner_logo_mime_types(array $mime_types): array
 {

@@ -276,6 +276,27 @@ function artasia_register_meta_fields(): void
         'show_in_rest' => true,
         'sanitize_callback' => 'sanitize_email',
     ]);
+    register_post_meta('artasia_people', 'artasia_pronouns', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'sanitize_text_field',
+    ]);
+    register_post_meta('artasia_people', 'artasia_instagram', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_instagram_handle',
+    ]);
+    register_post_meta('artasia_people', 'artasia_portfolio_url', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'esc_url_raw',
+    ]);
     register_post_meta('artasia_people', 'artasia_photo_id', [
         'type'         => 'integer',
         'single'       => true,
@@ -296,6 +317,29 @@ function artasia_register_meta_fields(): void
         'default'      => '',
         'show_in_rest' => true,
         'sanitize_callback' => 'sanitize_textarea_field',
+    ]);
+
+    // --- Artasia Role meta ---
+    register_post_meta('artasia_role', 'artasia_project_id', [
+        'type'         => 'integer',
+        'single'       => true,
+        'default'      => 0,
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_integer_meta',
+    ]);
+    register_post_meta('artasia_role', 'artasia_person_id', [
+        'type'         => 'integer',
+        'single'       => true,
+        'default'      => 0,
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_integer_meta',
+    ]);
+    register_post_meta('artasia_role', 'artasia_role_order', [
+        'type'         => 'integer',
+        'single'       => true,
+        'default'      => 0,
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_integer_meta',
     ]);
 
     // --- Pedagogical Documentation meta ---
@@ -354,6 +398,13 @@ function artasia_sanitize_integer_array_meta($value, string $meta_key = '', stri
     }
 
     return array_values(array_unique(array_filter(array_map('intval', $value))));
+}
+
+function artasia_sanitize_instagram_handle($value, string $meta_key = '', string $object_type = '', string $object_subtype = ''): string
+{
+    $handle = ltrim(trim(sanitize_text_field((string) $value)), '@');
+
+    return preg_replace('/[^A-Za-z0-9._]/', '', $handle) ?: '';
 }
 
 add_action('init', 'artasia_register_meta_fields');

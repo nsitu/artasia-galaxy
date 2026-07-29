@@ -73,7 +73,19 @@ function artasia_post_type_contexts(): array
                     artasia_context_post_type_link('artasia_partner', 'partner'),
                     artasia_context_post_type_link('artasia_placement', 'placement')
                 ),
-                "Use this record for the person's name, role, email address, photo, public bio, and internal notes.",
+                "Use this record for the person's name, default role, pronouns, public profile links, photo, current public bio, and internal notes.",
+            ],
+        ],
+        'artasia_role' => [
+            'title' => 'About Artasia Roles',
+            'nav_label' => 'Roles',
+            'paragraphs' => [
+                sprintf(
+                    'An Artasia Role connects one %s to one annual %s.',
+                    artasia_context_post_type_link('artasia_people', 'person'),
+                    artasia_context_post_type_link('artasia_project', 'project')
+                ),
+                'Use the title for the responsibility held in that year, such as Program Coordinator or Photographer.',
             ],
         ],
         'artasia_placement' => [
@@ -1006,6 +1018,9 @@ function artasia_people_meta_box_html(WP_Post $post): void
         $role = 'Artist Educator';
     }
     $email = get_post_meta($post->ID, 'artasia_email', true);
+    $pronouns = get_post_meta($post->ID, 'artasia_pronouns', true);
+    $instagram = get_post_meta($post->ID, 'artasia_instagram', true);
+    $portfolio_url = get_post_meta($post->ID, 'artasia_portfolio_url', true);
     $photo_id = intval(get_post_meta($post->ID, 'artasia_photo_id', true));
     $photo_url = $photo_id ? wp_get_attachment_url($photo_id) : '';
     $bio = get_post_meta($post->ID, 'artasia_bio', true);
@@ -1015,12 +1030,27 @@ function artasia_people_meta_box_html(WP_Post $post): void
 ?>
     <table class="form-table">
         <tr>
-            <th><label for="artasia_role">Role</label></th>
-            <td><input type="text" id="artasia_role" name="artasia_role" value="<?php echo esc_attr($role); ?>" class="widefat" /></td>
+            <th><label for="artasia_role">Default / Placement Role</label></th>
+            <td>
+                <input type="text" id="artasia_role" name="artasia_role" value="<?php echo esc_attr($role); ?>" class="widefat" />
+                <p class="description">Used when this person belongs to a project through a placement. Add annual non-placement responsibilities under Artasia Roles.</p>
+            </td>
         </tr>
         <tr>
             <th><label for="artasia_email">Email Address</label></th>
             <td><input type="email" id="artasia_email" name="artasia_email" value="<?php echo esc_attr($email); ?>" class="widefat" /></td>
+        </tr>
+        <tr>
+            <th><label for="artasia_pronouns">Pronouns</label></th>
+            <td><input type="text" id="artasia_pronouns" name="artasia_pronouns" value="<?php echo esc_attr($pronouns); ?>" class="widefat" placeholder="they/them" /></td>
+        </tr>
+        <tr>
+            <th><label for="artasia_instagram">Instagram Handle</label></th>
+            <td><input type="text" id="artasia_instagram" name="artasia_instagram" value="<?php echo esc_attr($instagram); ?>" class="widefat" placeholder="username" /></td>
+        </tr>
+        <tr>
+            <th><label for="artasia_portfolio_url">Portfolio URL</label></th>
+            <td><input type="url" id="artasia_portfolio_url" name="artasia_portfolio_url" value="<?php echo esc_attr($portfolio_url); ?>" class="widefat" placeholder="https://example.com" /></td>
         </tr>
         <tr>
             <th><label for="artasia_people_photo_id">Photo</label></th>
@@ -1110,11 +1140,106 @@ function artasia_save_people_meta(int $post_id): void
 
     update_post_meta($post_id, 'artasia_role', $role);
     update_post_meta($post_id, 'artasia_email', sanitize_email($_POST['artasia_email'] ?? ''));
+    update_post_meta($post_id, 'artasia_pronouns', sanitize_text_field($_POST['artasia_pronouns'] ?? ''));
+    update_post_meta($post_id, 'artasia_instagram', artasia_sanitize_instagram_handle($_POST['artasia_instagram'] ?? ''));
+    update_post_meta($post_id, 'artasia_portfolio_url', esc_url_raw($_POST['artasia_portfolio_url'] ?? ''));
     update_post_meta($post_id, 'artasia_photo_id', artasia_validate_image_attachment_id(intval($_POST['artasia_photo_id'] ?? 0)));
     update_post_meta($post_id, 'artasia_bio', wp_kses_post(wp_unslash($_POST['artasia_bio'] ?? '')));
     update_post_meta($post_id, 'artasia_notes', sanitize_textarea_field($_POST['artasia_notes'] ?? ''));
 }
 add_action('save_post_artasia_people', 'artasia_save_people_meta');
+
+// --- Artasia Role Details meta box ---
+
+function artasia_role_meta_box_html(WP_Post $post): void
+{
+    $projects = get_posts([
+        'post_type'   => 'artasia_project',
+        'numberposts' => -1,
+        'post_status' => ['publish', 'draft'],
+        'meta_key'    => 'artasia_project_year',
+        'orderby'     => 'meta_value_num',
+        'order'       => 'DESC',
+    ]);
+    $people = get_posts([
+        'post_type'   => 'artasia_people',
+        'numberposts' => -1,
+        'post_status' => ['publish', 'draft'],
+        'orderby'     => 'title',
+        'order'       => 'ASC',
+    ]);
+    $project_id = intval(get_post_meta($post->ID, 'artasia_project_id', true));
+    $person_id = intval(get_post_meta($post->ID, 'artasia_person_id', true));
+    $role_order = intval(get_post_meta($post->ID, 'artasia_role_order', true));
+
+    wp_nonce_field('artasia_role_meta', 'artasia_role_meta_nonce');
+?>
+    <table class="form-table">
+        <tr>
+            <th><label for="artasia_project_id">Project</label></th>
+            <td>
+                <select id="artasia_project_id" name="artasia_project_id" class="widefat" required>
+                    <option value="">Select a project</option>
+                    <?php foreach ($projects as $project) : ?>
+                        <?php $year = get_post_meta($project->ID, 'artasia_project_year', true); ?>
+                        <option value="<?php echo esc_attr($project->ID); ?>" <?php selected($project_id, $project->ID); ?>>
+                            <?php echo esc_html(trim($year . ' - ' . $project->post_title, ' -')); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_person_id">Person</label></th>
+            <td>
+                <select id="artasia_person_id" name="artasia_person_id" class="widefat" required>
+                    <option value="">Select a person</option>
+                    <?php foreach ($people as $person) : ?>
+                        <option value="<?php echo esc_attr($person->ID); ?>" <?php selected($person_id, $person->ID); ?>>
+                            <?php echo esc_html($person->post_title); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_role_order">Display Order</label></th>
+            <td><input type="number" id="artasia_role_order" name="artasia_role_order" value="<?php echo esc_attr($role_order); ?>" min="0" /></td>
+        </tr>
+    </table>
+<?php
+}
+
+function artasia_register_role_meta_box(): void
+{
+    add_meta_box('artasia_role_details', 'Role Assignment', 'artasia_role_meta_box_html', 'artasia_role', 'normal', 'default');
+    add_meta_box('artasia_role_context', 'About Artasia Roles', 'artasia_role_context_meta_box_html', 'artasia_role', 'side', 'high');
+}
+add_action('add_meta_boxes', 'artasia_register_role_meta_box');
+
+function artasia_role_context_meta_box_html(): void
+{
+    $context = artasia_get_post_type_context('artasia_role');
+    artasia_context_meta_box_html($context['paragraphs']);
+}
+
+function artasia_save_role_meta(int $post_id): void
+{
+    if (!isset($_POST['artasia_role_meta_nonce']) || !wp_verify_nonce($_POST['artasia_role_meta_nonce'], 'artasia_role_meta')) {
+        return;
+    }
+    if ((defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) || !current_user_can('edit_post', $post_id)) {
+        return;
+    }
+
+    $project_id = intval($_POST['artasia_project_id'] ?? 0);
+    $person_id = intval($_POST['artasia_person_id'] ?? 0);
+
+    update_post_meta($post_id, 'artasia_project_id', get_post_type($project_id) === 'artasia_project' ? $project_id : 0);
+    update_post_meta($post_id, 'artasia_person_id', get_post_type($person_id) === 'artasia_people' ? $person_id : 0);
+    update_post_meta($post_id, 'artasia_role_order', max(0, intval($_POST['artasia_role_order'] ?? 0)));
+}
+add_action('save_post_artasia_role', 'artasia_save_role_meta');
 
 function artasia_validate_image_attachment_id(int $attachment_id): int
 {
@@ -1270,7 +1395,7 @@ add_action('save_post_artasia_document', 'artasia_save_documentation_meta');
 
 function artasia_remove_unnecessary_meta_boxes(): void
 {
-    $post_types = ['artasia_project', 'artasia_activity', 'artasia_partner', 'artasia_place', 'artasia_people', 'artasia_placement', 'artasia_document'];
+    $post_types = ['artasia_project', 'artasia_activity', 'artasia_partner', 'artasia_place', 'artasia_people', 'artasia_role', 'artasia_placement', 'artasia_document'];
     $meta_box_contexts = ['side', 'normal', 'advanced'];
 
     foreach ($post_types as $post_type) {

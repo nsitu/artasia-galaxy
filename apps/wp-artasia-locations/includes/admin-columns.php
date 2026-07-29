@@ -299,6 +299,42 @@ function artasia_people_column(string $column, int $post_id): void
 }
 add_action('manage_artasia_people_posts_custom_column', 'artasia_people_column', 10, 2);
 
+// --- Artasia Role columns ---
+
+function artasia_role_columns(array $columns): array
+{
+    $new = [];
+    foreach ($columns as $key => $label) {
+        $new[$key] = $label;
+        if ($key === 'title') {
+            $new['artasia_role_person'] = 'Person';
+            $new['artasia_role_project'] = 'Project';
+            $new['artasia_role_order'] = 'Display Order';
+        }
+    }
+
+    return $new;
+}
+add_filter('manage_artasia_role_posts_columns', 'artasia_role_columns');
+
+function artasia_role_column(string $column, int $post_id): void
+{
+    switch ($column) {
+        case 'artasia_role_person':
+            $person_id = intval(get_post_meta($post_id, 'artasia_person_id', true));
+            echo $person_id ? esc_html(get_the_title($person_id)) : '—';
+            break;
+        case 'artasia_role_project':
+            $project_id = intval(get_post_meta($post_id, 'artasia_project_id', true));
+            echo $project_id ? esc_html(artasia_project_admin_label($project_id)) : '—';
+            break;
+        case 'artasia_role_order':
+            echo esc_html((string) intval(get_post_meta($post_id, 'artasia_role_order', true)));
+            break;
+    }
+}
+add_action('manage_artasia_role_posts_custom_column', 'artasia_role_column', 10, 2);
+
 // --- Pedagogical Documentation columns ---
 
 function artasia_documentation_columns(array $columns): array

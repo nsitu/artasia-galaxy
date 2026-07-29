@@ -1,0 +1,41 @@
+.artasia-team {
+    display: grid;
+    gap: 2rem;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+}
+
+.artasia-team__member {
+    min-width: 0;
+}
+
+.artasia-team__photo {
+    margin-bottom: 1rem;
+}
+
+.artasia-team__photo img {
+    aspect-ratio: 1 / 1;
+    display: block;
+    height: auto;
+    object-fit: cover;
+    width: 100%;
+}
+
+.artasia-team__name {
+    margin-bottom: 0.25rem;
+}
+
+.artasia-team__pronouns {
+    font-size: 0.75em;
+    font-weight: normal;
+    white-space: nowrap;
+}
+
+.artasia-team__roles {
+    margin-top: 0;
+}
+
+.artasia-team__links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
