@@ -33,7 +33,16 @@ function artasia_team_shortcode($attributes): string
         return '';
     }
 
-    $project_id = intval($projects[0]);
+    return artasia_render_team(intval($projects[0]));
+}
+
+function artasia_render_team(int $project_id): string
+{
+    if (get_post_type($project_id) !== 'artasia_project' || get_post_status($project_id) !== 'publish') {
+        return '';
+    }
+
+    $year = intval(get_post_meta($project_id, 'artasia_project_year', true));
     $team = [];
 
     $placements = get_posts([
