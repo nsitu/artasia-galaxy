@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Artasia Locations
  * Description: Custom post types for Artasia placements, projects, activities, places, partners, people, and pedagogical documentation with a REST API endpoint for the Node.js backend.
- * Version:     1.8.9
+ * Version:     2.0.0
  * License:     GPL-2.0-or-later
  */
 
@@ -10,7 +10,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('ARTASIA_LOCATIONS_VERSION', '1.8.9');
+define('ARTASIA_LOCATIONS_VERSION', '2.0.0');
 define('ARTASIA_LOCATIONS_PATH', plugin_dir_path(__FILE__));
 define('ARTASIA_LOCATIONS_URL', plugin_dir_url(__FILE__));
 
@@ -80,21 +80,29 @@ function artasia_enqueue_public_assets(): void
         [],
         ARTASIA_LOCATIONS_VERSION
     );
-    wp_register_style(
+    wp_enqueue_style(
         'artasia-documentation-shortcode',
         ARTASIA_LOCATIONS_URL . 'assets/documentation.css',
         [],
         ARTASIA_LOCATIONS_VERSION
     );
-    wp_register_script(
-        'artasia-documentation-shortcode',
-        ARTASIA_LOCATIONS_URL . 'assets/documentation.js',
-        ['artasia-documentation-gallery'],
-        ARTASIA_LOCATIONS_VERSION,
-        true
-    );
 }
 add_action('wp_enqueue_scripts', 'artasia_enqueue_public_assets');
+
+function artasia_documentation_template(string $template): string
+{
+    if (!is_singular('artasia_document')) {
+        return $template;
+    }
+
+    $theme_template = locate_template('single-artasia_document.php');
+    if ($theme_template) {
+        return $theme_template;
+    }
+
+    return ARTASIA_LOCATIONS_PATH . 'templates/single-artasia_document.php';
+}
+add_filter('template_include', 'artasia_documentation_template');
 
 function artasia_allow_partner_logo_mime_types(array $mime_types): array
 {

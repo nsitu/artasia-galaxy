@@ -4,6 +4,11 @@
   color: #8e1d58;
 }
 
+.artasia-documentation-template {
+  box-sizing: border-box;
+  padding: clamp(3rem, 7vw, 7rem) 50px;
+}
+
 .artasia-documentation [hidden] {
   display: none !important;
 }
@@ -107,6 +112,20 @@
 
 .artasia-documentation__people strong {
   font-weight: 900;
+}
+
+.artasia-documentation__placement {
+  margin: 0 0 0.5rem;
+  font-weight: 900;
+}
+
+.artasia-documentation__place {
+  margin: 0 0 1.5rem;
+}
+
+.artasia-documentation__place strong,
+.artasia-documentation__place span {
+  display: block;
 }
 
 .artasia-documentation__title {

@@ -47,7 +47,8 @@
 
 .artasia-sites__list {
     margin: 0;
-    padding-left: 1.25em;
+    padding: 0;
+    list-style: none;
 }
 
 .artasia-sites__list li {
@@ -64,9 +65,15 @@
     font-weight: 700;
 }
 
-.artasia-sites__gallery-link {
-    display: inline-block;
+.artasia-sites__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
     margin-top: 0.65rem;
+}
+
+.artasia-sites__action {
+    display: inline-block;
     padding: 0.4rem 0.85rem;
     border: 2px solid currentColor;
     border-radius: 999px;
@@ -76,8 +83,8 @@
     text-decoration: none;
 }
 
-.artasia-sites__gallery-link:hover,
-.artasia-sites__gallery-link:focus-visible {
+.artasia-sites__action:hover,
+.artasia-sites__action:focus-visible {
     background: #8e1d58;
     color: #fff;
 }

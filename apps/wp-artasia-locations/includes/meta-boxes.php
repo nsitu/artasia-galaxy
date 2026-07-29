@@ -36,7 +36,7 @@ function artasia_post_type_contexts(): array
                     artasia_context_post_type_link('artasia_activity', 'activities'),
                     artasia_context_post_type_link('artasia_placement', 'placements')
                 ),
-                'Published projects are available in the project selectors of the Artasia Team, Artasia Sites, and Artasia Documentation Elementor widgets. The same features can be added with the <code>[artasia_team year="2026"]</code>, <code>[artasia_sites year="2026"]</code>, and <code>[artasia_documentation year="2026"]</code> shortcodes.',
+                'Published projects are available in the project selectors of the Artasia Team, Artasia Sites, and Artasia Documentation Elementor widgets. The same features can be added with the <code>[artasia_team year="2026"]</code>, <code>[artasia_sites year="2026"]</code>, and <code>[artasia_documentation year="2026"]</code> shortcodes. Select the annual Documentation Landing Page in Project Details so singular Documentation pages have the correct Back destination.',
             ],
         ],
         'artasia_activity' => [
@@ -121,7 +121,7 @@ function artasia_post_type_contexts(): array
                 ),
                 'Use the classic rich text editor for the documentation itself, then identify its context and optionally provide a short pull quote.',
                 'Build the image sequence in the Documentation Gallery panel. Captions and alternative text come from the selected Media Library records, and the gallery is displayed automatically after the documentation.',
-                'Published records can be displayed with the <code>[artasia_documentation year="2026"]</code> shortcode or the Artasia Documentation Elementor widget. A record appears under the partner connected to its selected placement and project.',
+                'Published records are indexed with the <code>[artasia_documentation year="2026"]</code> shortcode or the Artasia Documentation Elementor widget. A record appears under the partner connected to its selected placement and project, and opens on its canonical singular page.',
             ],
         ],
     ];
@@ -557,6 +557,7 @@ function artasia_project_meta_box_html(WP_Post $post): void
         $project_year = date('Y');
     }
     $description = get_post_meta($post->ID, 'artasia_project_description', true);
+    $documentation_page_id = intval(get_post_meta($post->ID, 'artasia_documentation_page_id', true));
 
     wp_nonce_field('artasia_project_meta', 'artasia_project_meta_nonce');
 ?>
@@ -568,6 +569,22 @@ function artasia_project_meta_box_html(WP_Post $post): void
         <tr>
             <th><label for="artasia_project_description">Description</label></th>
             <td><textarea id="artasia_project_description" name="artasia_project_description" rows="5" class="widefat"><?php echo esc_textarea($description); ?></textarea></td>
+        </tr>
+        <tr>
+            <th><label for="artasia_documentation_page_id">Documentation Landing Page</label></th>
+            <td>
+                <?php
+                wp_dropdown_pages([
+                    'name'              => 'artasia_documentation_page_id',
+                    'id'                => 'artasia_documentation_page_id',
+                    'selected'          => $documentation_page_id,
+                    'show_option_none'  => '— Select Documentation Landing Page —',
+                    'option_none_value' => '0',
+                    'class'             => 'widefat',
+                ]);
+                ?>
+                <p class="description">Select the annual WordPress page containing the Artasia Documentation widget. Singular Documentation pages use it as their Back destination.</p>
+            </td>
         </tr>
     </table>
 <?php
@@ -621,6 +638,12 @@ function artasia_save_project_meta(int $post_id): void
 
     update_post_meta($post_id, 'artasia_project_year', intval($_POST['artasia_project_year'] ?? 0));
     update_post_meta($post_id, 'artasia_project_description', sanitize_textarea_field($_POST['artasia_project_description'] ?? ''));
+    $documentation_page_id = intval($_POST['artasia_documentation_page_id'] ?? 0);
+    update_post_meta(
+        $post_id,
+        'artasia_documentation_page_id',
+        get_post_type($documentation_page_id) === 'page' ? $documentation_page_id : 0
+    );
 }
 add_action('save_post_artasia_project', 'artasia_save_project_meta');
 

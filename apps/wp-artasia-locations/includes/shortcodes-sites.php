@@ -116,6 +116,28 @@ function artasia_render_sites(int $project_id): string
         }
     }
 
+    $documentation_lookup = [];
+    $documentation_posts = get_posts([
+        'post_type'      => 'artasia_document',
+        'posts_per_page' => -1,
+        'post_status'    => 'publish',
+        'orderby'        => [
+            'date'  => 'ASC',
+            'title' => 'ASC',
+        ],
+        'no_found_rows'  => true,
+    ]);
+    foreach ($documentation_posts as $documentation) {
+        $documentation_placement_ids = artasia_sanitize_integer_array_meta(
+            get_post_meta($documentation->ID, 'artasia_documentation_placement_ids', true)
+        );
+        foreach ($documentation_placement_ids as $documentation_placement_id) {
+            if (!isset($documentation_lookup[$documentation_placement_id])) {
+                $documentation_lookup[$documentation_placement_id] = $documentation;
+            }
+        }
+    }
+
     $partner_lookup = [];
     if ($partner_ids) {
         $partners = get_posts([
@@ -194,6 +216,7 @@ function artasia_render_sites(int $project_id): string
                                 $galaxy_url = 'https://galaxy.artsforall.co/sites/' . rawurlencode($placement->post_name);
                                 $place_id = intval(get_post_meta($placement->ID, 'artasia_place_id', true));
                                 $place = $place_lookup[$place_id] ?? null;
+                                $documentation = $documentation_lookup[$placement->ID] ?? null;
                                 ?>
                                 <li>
                                     <span class="artasia-sites__placement-name"><?php echo esc_html($placement_label); ?></span>
@@ -203,7 +226,12 @@ function artasia_render_sites(int $project_id): string
                                             <span class="artasia-sites__place-address"><?php echo esc_html($place['address']); ?></span>
                                         <?php endif; ?>
                                     <?php endif; ?>
-                                    <a class="artasia-sites__gallery-link" href="<?php echo esc_url($galaxy_url); ?>">Gallery</a>
+                                    <div class="artasia-sites__actions">
+                                        <a class="artasia-sites__action" href="<?php echo esc_url($galaxy_url); ?>">Gallery</a>
+                                        <?php if ($documentation) : ?>
+                                            <a class="artasia-sites__action" href="<?php echo esc_url(get_permalink($documentation)); ?>">Documentation</a>
+                                        <?php endif; ?>
+                                    </div>
                                 </li>
                             <?php endforeach; ?>
                         </ul>
