@@ -89,7 +89,6 @@
       if (heading) {
         heading.setAttribute('tabindex', '-1');
         heading.focus({ preventScroll: true });
-        heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     }
 
@@ -144,7 +143,6 @@
           var heading = content.querySelector('.artasia-documentation__title');
           if (heading) {
             heading.focus({ preventScroll: true });
-            heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }
           status.textContent = result.title + ' loaded.';
         })
