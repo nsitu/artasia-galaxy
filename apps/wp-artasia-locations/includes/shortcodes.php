@@ -122,11 +122,28 @@ function artasia_render_team(int $project_id): string
         return $last_name_comparison ?: strcasecmp($a->post_title, $b->post_title);
     });
 
+    static $render_instance = 0;
+    $render_instance++;
+
     ob_start();
 ?>
     <section class="artasia-team" data-artasia-year="<?php echo esc_attr($year); ?>">
+        <nav class="artasia-team__toc" aria-label="Team members">
+            <div class="artasia-team__toc-inner">
+                <h2 class="artasia-team__toc-title">Team members</h2>
+                <ul class="artasia-team__toc-list">
+                    <?php foreach ($people as $person) : ?>
+                        <?php $profile_id = sprintf('artasia-team-%d-%d-person-%d', $project_id, $render_instance, $person->ID); ?>
+                        <li>
+                            <a href="#<?php echo esc_attr($profile_id); ?>"><?php echo esc_html($person->post_title); ?></a>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+        </nav>
         <?php foreach ($people as $person) : ?>
             <?php
+            $profile_id = sprintf('artasia-team-%d-%d-person-%d', $project_id, $render_instance, $person->ID);
             $photo_id = intval(get_post_meta($person->ID, 'artasia_photo_id', true));
             $pronouns = get_post_meta($person->ID, 'artasia_pronouns', true);
             $bio = get_post_meta($person->ID, 'artasia_bio', true);
@@ -137,7 +154,7 @@ function artasia_render_team(int $project_id): string
                 ? get_edit_post_link($person->ID, '')
                 : '';
             ?>
-            <article class="artasia-team__member<?php echo $photo_id ? ' has-photo' : ''; ?>">
+            <article id="<?php echo esc_attr($profile_id); ?>" class="artasia-team__member<?php echo $photo_id ? ' has-photo' : ''; ?>">
                 <div class="artasia-team__inner">
                     <?php if ($photo_id) : ?>
                         <div class="artasia-team__photo">
