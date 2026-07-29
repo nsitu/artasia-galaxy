@@ -36,7 +36,7 @@ function artasia_post_type_contexts(): array
                     artasia_context_post_type_link('artasia_activity', 'activities'),
                     artasia_context_post_type_link('artasia_placement', 'placements')
                 ),
-                'Published projects are available in the project selector of the Artasia Team Elementor widget. The same team listing can be added with the <code>[artasia_team year="2026"]</code> shortcode, using the project year.',
+                'Published projects are available in the project selectors of the Artasia Team and Artasia Sites Elementor widgets. The same listings can be added with the <code>[artasia_team year="2026"]</code> and <code>[artasia_sites year="2026"]</code> shortcodes, using the project year.',
             ],
         ],
         'artasia_activity' => [
@@ -107,6 +107,7 @@ function artasia_post_type_contexts(): array
                     artasia_context_post_type_link('artasia_place', 'place'),
                     artasia_context_post_type_link('artasia_partner', 'Artasia Partner')
                 ),
+                'Published placements can be displayed by partner with the <code>[artasia_sites year="2026"]</code> shortcode or the Artasia Sites Elementor widget.',
             ],
         ],
         'artasia_document' => [

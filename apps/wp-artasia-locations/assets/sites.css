@@ -1,0 +1,63 @@
+.artasia-sites {
+    color: #8e1d58;
+}
+
+.artasia-sites__inner {
+    box-sizing: border-box;
+    margin: 0 auto;
+    max-width: 1140px;
+    padding: 50px;
+    width: 100%;
+}
+
+.artasia-sites__partner {
+    display: grid;
+    gap: clamp(1.5rem, 5%, 4rem);
+    grid-template-columns: minmax(10rem, 28%) minmax(0, 1fr);
+    padding: 2.5rem 0;
+}
+
+.artasia-sites__partner + .artasia-sites__partner {
+    border-top: 1px solid currentColor;
+}
+
+.artasia-sites__partner-header {
+    min-width: 0;
+}
+
+.artasia-sites__partner-logo {
+    margin-bottom: 1rem;
+    max-width: 14rem;
+}
+
+.artasia-sites__partner-logo img {
+    display: block;
+    height: auto;
+    max-height: 9rem;
+    max-width: 100%;
+    object-fit: contain;
+    object-position: left center;
+    width: auto;
+}
+
+.artasia-sites__partner-name {
+    color: #8e1d58;
+    font-weight: 900;
+    margin: 0;
+}
+
+.artasia-sites__list {
+    align-self: center;
+    margin: 0;
+    padding-left: 1.25em;
+}
+
+.artasia-sites__list li {
+    margin-bottom: 0.5rem;
+}
+
+@media (max-width: 700px) {
+    .artasia-sites__partner {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
