@@ -1331,8 +1331,13 @@ function artasia_documentation_meta_box_html(WP_Post $post): void
                 <select id="artasia_documentation_placement_ids" name="artasia_documentation_placement_ids[]" class="widefat">
                     <option value="">&mdash; Select Placement &mdash;</option>
                     <?php foreach ($placements as $placement) : ?>
+                        <?php
+                        $placement_section = trim((string) get_post_meta($placement->ID, 'artasia_section', true));
+                        $placement_label = $placement->post_title
+                            . ($placement_section !== '' ? ' — ' . $placement_section : '');
+                        ?>
                         <option value="<?php echo esc_attr($placement->ID); ?>" <?php selected($placement_id, $placement->ID); ?>>
-                            <?php echo esc_html($placement->post_title); ?>
+                            <?php echo esc_html($placement_label); ?>
                         </option>
                     <?php endforeach; ?>
                 </select>

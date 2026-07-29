@@ -159,7 +159,12 @@ function artasia_render_sites(int $project_id): string
                         <h2 class="artasia-sites__partner-name"><?php echo esc_html($partner_name); ?></h2>
                         <ul class="artasia-sites__list">
                             <?php foreach ($group['sites'] as $placement) : ?>
-                                <li><?php echo esc_html($placement->post_title); ?></li>
+                                <?php
+                                $section = trim((string) get_post_meta($placement->ID, 'artasia_section', true));
+                                $placement_label = $placement->post_title
+                                    . ($section !== '' ? ' — ' . $section : '');
+                                ?>
+                                <li><?php echo esc_html($placement_label); ?></li>
                             <?php endforeach; ?>
                         </ul>
                     </div>
