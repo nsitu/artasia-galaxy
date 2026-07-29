@@ -400,6 +400,18 @@ function artasia_register_meta_fields(): void
         ],
         'sanitize_callback' => 'artasia_sanitize_integer_array_meta',
     ]);
+    register_post_meta('artasia_document', 'artasia_documentation_gallery_captions', [
+        'type'         => 'array',
+        'single'       => true,
+        'default'      => [],
+        'show_in_rest' => [
+            'schema' => [
+                'type'  => 'array',
+                'items' => ['type' => 'string'],
+            ],
+        ],
+        'sanitize_callback' => 'artasia_sanitize_text_array_meta',
+    ]);
 }
 
 function artasia_sanitize_integer_meta($value, string $meta_key = '', string $object_type = '', string $object_subtype = ''): int
@@ -424,6 +436,15 @@ function artasia_sanitize_integer_array_meta($value, string $meta_key = '', stri
     }
 
     return array_values(array_unique(array_filter(array_map('intval', $value))));
+}
+
+function artasia_sanitize_text_array_meta($value, string $meta_key = '', string $object_type = '', string $object_subtype = ''): array
+{
+    if (!is_array($value)) {
+        return [];
+    }
+
+    return array_map('sanitize_textarea_field', array_values($value));
 }
 
 function artasia_sanitize_instagram_handle($value, string $meta_key = '', string $object_type = '', string $object_subtype = ''): string

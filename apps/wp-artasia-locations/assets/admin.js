@@ -122,7 +122,7 @@ jQuery(function ($) {
         thumbnailUrl = attachment.sizes.thumbnail.url;
       }
 
-      var caption = attachment.caption || 'No caption';
+      var caption = attachment.caption || attachment.title || '';
       var $item = $('<li>', {
         class: 'artasia-documentation-gallery-item',
         'data-attachment-id': attachment.id
@@ -138,9 +138,18 @@ jQuery(function ($) {
         src: thumbnailUrl,
         alt: ''
       }));
-      $item.append($('<span>', {
+      $item.append($('<label>', {
+        class: 'screen-reader-text',
+        for: 'artasia-documentation-caption-' + attachment.id,
+        text: 'Image caption'
+      }));
+      $item.append($('<textarea>', {
+        id: 'artasia-documentation-caption-' + attachment.id,
         class: 'artasia-documentation-gallery-caption',
-        text: caption
+        name: 'artasia_documentation_gallery_captions[]',
+        rows: 3,
+        placeholder: 'Add a caption',
+        val: caption
       }));
       $item.append($('<input>', {
         type: 'hidden',

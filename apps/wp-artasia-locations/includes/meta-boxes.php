@@ -1387,19 +1387,34 @@ function artasia_documentation_gallery_meta_box_html(WP_Post $post): void
     $gallery_ids = artasia_validate_image_attachment_ids(
         get_post_meta($post->ID, 'artasia_documentation_gallery_ids', true)
     );
+    $saved_captions = artasia_sanitize_text_array_meta(
+        get_post_meta($post->ID, 'artasia_documentation_gallery_captions', true)
+    );
 ?>
     <p>Select images from the Media Library, then drag them into the order in which they should appear.</p>
-    <p class="description">The image caption appears below the thumbnail and in the lightbox. Alternative text is used by screen readers.</p>
+    <p class="description">Edit each caption below its thumbnail. The caption appears in the gallery and lightbox. Alternative text continues to come from the Media Library.</p>
     <p>
         <button type="button" class="button button-primary" id="artasia_documentation_gallery_select">Select gallery images</button>
         <button type="button" class="button" id="artasia_documentation_gallery_clear" <?php disabled(empty($gallery_ids)); ?>>Remove all</button>
     </p>
     <ul id="artasia_documentation_gallery_items" class="artasia-documentation-gallery-items">
-        <?php foreach ($gallery_ids as $attachment_id) : ?>
+        <?php foreach ($gallery_ids as $index => $attachment_id) : ?>
+            <?php
+            $caption = array_key_exists($index, $saved_captions)
+                ? $saved_captions[$index]
+                : (wp_get_attachment_caption($attachment_id) ?: get_the_title($attachment_id));
+            ?>
             <li class="artasia-documentation-gallery-item" data-attachment-id="<?php echo esc_attr($attachment_id); ?>">
                 <span class="artasia-documentation-gallery-handle dashicons dashicons-move" aria-label="Drag to reorder" title="Drag to reorder"></span>
                 <?php echo wp_get_attachment_image($attachment_id, 'thumbnail', false, ['class' => 'artasia-documentation-gallery-thumbnail']); ?>
-                <span class="artasia-documentation-gallery-caption"><?php echo esc_html(wp_get_attachment_caption($attachment_id) ?: 'No caption'); ?></span>
+                <label class="screen-reader-text" for="artasia-documentation-caption-<?php echo esc_attr($attachment_id); ?>">Image caption</label>
+                <textarea
+                    id="artasia-documentation-caption-<?php echo esc_attr($attachment_id); ?>"
+                    class="artasia-documentation-gallery-caption"
+                    name="artasia_documentation_gallery_captions[]"
+                    rows="3"
+                    placeholder="Add a caption"
+                ><?php echo esc_textarea($caption); ?></textarea>
                 <input type="hidden" name="artasia_documentation_gallery_ids[]" value="<?php echo esc_attr($attachment_id); ?>">
                 <button type="button" class="button-link-delete artasia-documentation-gallery-remove">Remove</button>
             </li>
@@ -1468,6 +1483,11 @@ function artasia_save_documentation_meta(int $post_id): void
         $post_id,
         'artasia_documentation_gallery_ids',
         artasia_validate_image_attachment_ids($_POST['artasia_documentation_gallery_ids'] ?? [])
+    );
+    update_post_meta(
+        $post_id,
+        'artasia_documentation_gallery_captions',
+        artasia_sanitize_text_array_meta($_POST['artasia_documentation_gallery_captions'] ?? [])
     );
 }
 add_action('save_post_artasia_document', 'artasia_save_documentation_meta');

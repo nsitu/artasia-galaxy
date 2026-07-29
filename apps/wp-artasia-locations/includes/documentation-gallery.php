@@ -14,6 +14,10 @@ function artasia_render_documentation_gallery(int $post_id): string
         return '';
     }
 
+    $saved_captions = artasia_sanitize_text_array_meta(
+        get_post_meta($post_id, 'artasia_documentation_gallery_captions', true)
+    );
+
     static $gallery_instance = 0;
     $gallery_instance++;
     $gallery_id = 'artasia-documentation-gallery-' . $post_id . '-' . $gallery_instance;
@@ -25,7 +29,9 @@ function artasia_render_documentation_gallery(int $post_id): string
             <?php foreach ($gallery_ids as $index => $attachment_id) : ?>
                 <?php
                 $full_url = wp_get_attachment_image_url($attachment_id, 'full');
-                $caption = wp_get_attachment_caption($attachment_id);
+                $caption = array_key_exists($index, $saved_captions)
+                    ? $saved_captions[$index]
+                    : (wp_get_attachment_caption($attachment_id) ?: get_the_title($attachment_id));
                 if (!$full_url) {
                     continue;
                 }

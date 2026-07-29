@@ -165,7 +165,9 @@
 
 .artasia-documentation-gallery-caption {
   display: block;
-  min-height: 36px;
+  width: 100%;
+  min-height: 66px;
   margin: 8px 0;
+  box-sizing: border-box;
   overflow-wrap: anywhere;
 }
