@@ -388,6 +388,18 @@ function artasia_register_meta_fields(): void
         'show_in_rest' => true,
         'sanitize_callback' => 'sanitize_textarea_field',
     ]);
+    register_post_meta('artasia_document', 'artasia_documentation_gallery_ids', [
+        'type'         => 'array',
+        'single'       => true,
+        'default'      => [],
+        'show_in_rest' => [
+            'schema' => [
+                'type'  => 'array',
+                'items' => ['type' => 'integer'],
+            ],
+        ],
+        'sanitize_callback' => 'artasia_sanitize_integer_array_meta',
+    ]);
 }
 
 function artasia_sanitize_integer_meta($value, string $meta_key = '', string $object_type = '', string $object_subtype = ''): int

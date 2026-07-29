@@ -97,4 +97,112 @@ jQuery(function ($) {
     invalidMessage: 'Please choose an image file.',
     allowedMimeTypes: null
   });
+
+  function setupDocumentationGallery() {
+    var $items = $('#artasia_documentation_gallery_items');
+
+    if (!$items.length) {
+      return;
+    }
+
+    var frame;
+    var $clearButton = $('#artasia_documentation_gallery_clear');
+
+    function updateClearButton() {
+      $clearButton.prop('disabled', !$items.children().length);
+    }
+
+    function addImage(attachment) {
+      if ($items.children('[data-attachment-id="' + attachment.id + '"]').length) {
+        return;
+      }
+
+      var thumbnailUrl = attachment.url;
+      if (attachment.sizes && attachment.sizes.thumbnail) {
+        thumbnailUrl = attachment.sizes.thumbnail.url;
+      }
+
+      var caption = attachment.caption || 'No caption';
+      var $item = $('<li>', {
+        class: 'artasia-documentation-gallery-item',
+        'data-attachment-id': attachment.id
+      });
+
+      $item.append($('<span>', {
+        class: 'artasia-documentation-gallery-handle dashicons dashicons-move',
+        'aria-label': 'Drag to reorder',
+        title: 'Drag to reorder'
+      }));
+      $item.append($('<img>', {
+        class: 'artasia-documentation-gallery-thumbnail',
+        src: thumbnailUrl,
+        alt: ''
+      }));
+      $item.append($('<span>', {
+        class: 'artasia-documentation-gallery-caption',
+        text: caption
+      }));
+      $item.append($('<input>', {
+        type: 'hidden',
+        name: 'artasia_documentation_gallery_ids[]',
+        value: attachment.id
+      }));
+      $item.append($('<button>', {
+        type: 'button',
+        class: 'button-link-delete artasia-documentation-gallery-remove',
+        text: 'Remove'
+      }));
+
+      $items.append($item);
+    }
+
+    $items.sortable({
+      handle: '.artasia-documentation-gallery-handle',
+      placeholder: 'artasia-documentation-gallery-placeholder',
+      forcePlaceholderSize: true
+    });
+
+    $('#artasia_documentation_gallery_select').on('click', function (event) {
+      event.preventDefault();
+
+      if (frame) {
+        frame.open();
+        return;
+      }
+
+      frame = wp.media({
+        title: 'Select Documentation Gallery Images',
+        button: {
+          text: 'Add to gallery'
+        },
+        library: {
+          type: 'image'
+        },
+        multiple: 'add'
+      });
+
+      frame.on('select', function () {
+        frame.state().get('selection').each(function (model) {
+          addImage(model.toJSON());
+        });
+        updateClearButton();
+      });
+
+      frame.open();
+    });
+
+    $items.on('click', '.artasia-documentation-gallery-remove', function (event) {
+      event.preventDefault();
+      $(this).closest('.artasia-documentation-gallery-item').remove();
+      updateClearButton();
+    });
+
+    $clearButton.on('click', function (event) {
+      event.preventDefault();
+      $items.empty();
+      updateClearButton();
+    });
+  }
+
+  setupDocumentationGallery();
 });

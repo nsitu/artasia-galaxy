@@ -1,0 +1,136 @@
+.artasia-documentation-gallery {
+  margin-top: 3rem;
+}
+
+.artasia-documentation-gallery__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: 1.5rem;
+}
+
+.artasia-documentation-gallery__item {
+  margin: 0;
+}
+
+.artasia-documentation-gallery__trigger {
+  display: block;
+  overflow: hidden;
+  background: #f2f2f2;
+}
+
+.artasia-documentation-gallery__thumbnail {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  transition: transform 180ms ease;
+}
+
+.artasia-documentation-gallery__trigger:hover .artasia-documentation-gallery__thumbnail,
+.artasia-documentation-gallery__trigger:focus-visible .artasia-documentation-gallery__thumbnail {
+  transform: scale(1.025);
+}
+
+.artasia-documentation-gallery__trigger:focus-visible {
+  outline: 3px solid #8e1d58;
+  outline-offset: 3px;
+}
+
+.artasia-documentation-gallery__caption {
+  margin-top: 0.65rem;
+}
+
+.artasia-documentation-lightbox {
+  width: 100vw;
+  max-width: none;
+  height: 100vh;
+  max-height: none;
+  margin: 0;
+  padding: 3rem clamp(3.5rem, 8vw, 8rem);
+  border: 0;
+  box-sizing: border-box;
+  background: rgba(0, 0, 0, 0.92);
+  color: #fff;
+}
+
+.artasia-documentation-lightbox[open] {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+}
+
+.artasia-documentation-lightbox::backdrop {
+  background: rgba(0, 0, 0, 0.92);
+}
+
+.artasia-documentation-lightbox__content {
+  display: grid;
+  justify-items: center;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.artasia-documentation-lightbox__image {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100vh - 10rem);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+.artasia-documentation-lightbox__caption {
+  max-width: 60rem;
+  margin: 0;
+  color: #fff;
+  text-align: center;
+}
+
+.artasia-documentation-lightbox__close,
+.artasia-documentation-lightbox__previous,
+.artasia-documentation-lightbox__next {
+  border: 0;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+}
+
+.artasia-documentation-lightbox__close {
+  position: absolute;
+  top: 1rem;
+  right: 1.25rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+.artasia-documentation-lightbox__previous,
+.artasia-documentation-lightbox__next {
+  padding: 1rem;
+  font-size: 4rem;
+  line-height: 1;
+}
+
+.artasia-documentation-lightbox__previous:disabled,
+.artasia-documentation-lightbox__next:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+@media (max-width: 600px) {
+  .artasia-documentation-lightbox {
+    padding: 3.5rem 0.5rem 1rem;
+  }
+
+  .artasia-documentation-lightbox[open] {
+    gap: 0;
+  }
+
+  .artasia-documentation-lightbox__previous,
+  .artasia-documentation-lightbox__next {
+    padding: 0.5rem;
+    font-size: 2.5rem;
+  }
+}

@@ -119,8 +119,8 @@ function artasia_post_type_contexts(): array
                     artasia_context_post_type_link('artasia_people', 'people'),
                     artasia_context_post_type_link('artasia_placement', 'placements')
                 ),
-                'Use the block editor for the documentation itself, then identify its context and optionally provide a short pull quote.',
-                'Add images with the Gallery block. In the Gallery link settings, enable "Enlarge on click" to provide previous/next lightbox navigation on the published documentation.',
+                'Use the classic rich text editor for the documentation itself, then identify its context and optionally provide a short pull quote.',
+                'Build the image sequence in the Documentation Gallery panel. Captions and alternative text come from the selected Media Library records, and the gallery is displayed automatically after the documentation.',
             ],
         ],
     ];
@@ -1363,6 +1363,15 @@ function artasia_register_documentation_meta_box(): void
     );
 
     add_meta_box(
+        'artasia_documentation_gallery',
+        'Documentation Gallery',
+        'artasia_documentation_gallery_meta_box_html',
+        'artasia_document',
+        'normal',
+        'default'
+    );
+
+    add_meta_box(
         'artasia_documentation_about',
         $context['title'],
         'artasia_documentation_context_meta_box_html',
@@ -1372,6 +1381,32 @@ function artasia_register_documentation_meta_box(): void
     );
 }
 add_action('add_meta_boxes', 'artasia_register_documentation_meta_box');
+
+function artasia_documentation_gallery_meta_box_html(WP_Post $post): void
+{
+    $gallery_ids = artasia_validate_image_attachment_ids(
+        get_post_meta($post->ID, 'artasia_documentation_gallery_ids', true)
+    );
+?>
+    <p>Select images from the Media Library, then drag them into the order in which they should appear.</p>
+    <p class="description">The image caption appears below the thumbnail and in the lightbox. Alternative text is used by screen readers.</p>
+    <p>
+        <button type="button" class="button button-primary" id="artasia_documentation_gallery_select">Select gallery images</button>
+        <button type="button" class="button" id="artasia_documentation_gallery_clear" <?php disabled(empty($gallery_ids)); ?>>Remove all</button>
+    </p>
+    <ul id="artasia_documentation_gallery_items" class="artasia-documentation-gallery-items">
+        <?php foreach ($gallery_ids as $attachment_id) : ?>
+            <li class="artasia-documentation-gallery-item" data-attachment-id="<?php echo esc_attr($attachment_id); ?>">
+                <span class="artasia-documentation-gallery-handle dashicons dashicons-move" aria-label="Drag to reorder" title="Drag to reorder"></span>
+                <?php echo wp_get_attachment_image($attachment_id, 'thumbnail', false, ['class' => 'artasia-documentation-gallery-thumbnail']); ?>
+                <span class="artasia-documentation-gallery-caption"><?php echo esc_html(wp_get_attachment_caption($attachment_id) ?: 'No caption'); ?></span>
+                <input type="hidden" name="artasia_documentation_gallery_ids[]" value="<?php echo esc_attr($attachment_id); ?>">
+                <button type="button" class="button-link-delete artasia-documentation-gallery-remove">Remove</button>
+            </li>
+        <?php endforeach; ?>
+    </ul>
+<?php
+}
 
 function artasia_documentation_context_meta_box_html(): void
 {
@@ -1389,6 +1424,16 @@ function artasia_validate_related_post_ids($values, string $post_type): array
 
     return array_values(array_filter($ids, static function (int $post_id) use ($post_type): bool {
         return get_post_type($post_id) === $post_type;
+    }));
+}
+
+function artasia_validate_image_attachment_ids($values): array
+{
+    $ids = artasia_sanitize_integer_array_meta($values);
+
+    return array_values(array_filter($ids, static function (int $attachment_id): bool {
+        return get_post_type($attachment_id) === 'attachment'
+            && strpos((string) get_post_mime_type($attachment_id), 'image/') === 0;
     }));
 }
 
@@ -1419,6 +1464,11 @@ function artasia_save_documentation_meta(int $post_id): void
         'artasia_documentation_pull_quote',
         sanitize_textarea_field($_POST['artasia_documentation_pull_quote'] ?? '')
     );
+    update_post_meta(
+        $post_id,
+        'artasia_documentation_gallery_ids',
+        artasia_validate_image_attachment_ids($_POST['artasia_documentation_gallery_ids'] ?? [])
+    );
 }
 add_action('save_post_artasia_document', 'artasia_save_documentation_meta');
 
@@ -1432,7 +1482,5 @@ function artasia_remove_unnecessary_meta_boxes(): void
             remove_meta_box('passster', $post_type, $meta_box_context);
         }
     }
-
-    remove_meta_box('postcustom', 'artasia_document', 'normal');
 }
 add_action('add_meta_boxes', 'artasia_remove_unnecessary_meta_boxes', 99);
