@@ -72,6 +72,16 @@ class Artasia_Team_Elementor_Widget extends \Elementor\Widget_Base
             'description' => 'Choose the annual Artasia project whose team should appear.',
         ]);
 
+        $people_admin_url = admin_url('edit.php?post_type=artasia_people');
+        $this->add_control('team_instructions', [
+            'type' => \Elementor\Controls_Manager::RAW_HTML,
+            'raw'  => sprintf(
+                '<p>Manage team profiles in <a href="%s" target="_blank" rel="noopener noreferrer">Artasia People</a>.</p><p><strong>Important:</strong> People will not appear in this team listing unless the <strong>Publish this person in Artasia team listings</strong> checkbox is active on their profile.</p>',
+                esc_url($people_admin_url)
+            ),
+            'content_classes' => 'elementor-panel-alert elementor-panel-alert-info',
+        ]);
+
         $this->end_controls_section();
     }
 

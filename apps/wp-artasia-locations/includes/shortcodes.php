@@ -56,6 +56,8 @@ function artasia_render_team(int $project_id): string
     ]);
 
     foreach ($placements as $placement_id) {
+        $partner_id = intval(get_post_meta($placement_id, 'artasia_partner_id', true));
+
         foreach (['artasia_team_member_id', 'artasia_secondary_team_member_id'] as $meta_key) {
             $person_id = intval(get_post_meta($placement_id, $meta_key, true));
             if (!$person_id) {
@@ -64,6 +66,10 @@ function artasia_render_team(int $project_id): string
 
             $responsibility = get_post_meta($person_id, 'artasia_role', true) ?: 'Artist Educator';
             artasia_add_team_responsibility($team, $person_id, $responsibility, PHP_INT_MAX);
+
+            if ($partner_id) {
+                $team[$person_id]['partners'][$partner_id] = true;
+            }
         }
     }
 
@@ -91,6 +97,30 @@ function artasia_render_team(int $project_id): string
 
     if (!$team) {
         return '';
+    }
+
+    $partner_ids = [];
+    foreach ($team as $team_member) {
+        foreach (array_keys($team_member['partners']) as $partner_id) {
+            $partner_ids[$partner_id] = $partner_id;
+        }
+    }
+
+    $partner_lookup = [];
+    if ($partner_ids) {
+        $partners = get_posts([
+            'post_type'      => 'artasia_partner',
+            'posts_per_page' => -1,
+            'post_status'    => 'publish',
+            'post__in'       => array_values($partner_ids),
+            'orderby'        => 'title',
+            'order'          => 'ASC',
+            'no_found_rows'  => true,
+        ]);
+
+        foreach ($partners as $partner) {
+            $partner_lookup[$partner->ID] = $partner->post_title;
+        }
     }
 
     $people = get_posts([
@@ -153,6 +183,13 @@ function artasia_render_team(int $project_id): string
             $edit_url = is_user_logged_in() && current_user_can('edit_post', $person->ID)
                 ? get_edit_post_link($person->ID, '')
                 : '';
+            $partner_names = [];
+            foreach (array_keys($team[$person->ID]['partners']) as $partner_id) {
+                if (isset($partner_lookup[$partner_id])) {
+                    $partner_names[] = $partner_lookup[$partner_id];
+                }
+            }
+            natcasesort($partner_names);
             ?>
             <article id="<?php echo esc_attr($profile_id); ?>" class="artasia-team__member<?php echo $photo_id ? ' has-photo' : ''; ?>">
                 <div class="artasia-team__inner">
@@ -171,6 +208,12 @@ function artasia_render_team(int $project_id): string
                         <p class="artasia-team__roles">
                             <?php echo esc_html(implode(', ', array_keys($team[$person->ID]['responsibilities']))); ?>
                         </p>
+                        <?php if ($partner_names) : ?>
+                            <p class="artasia-team__partners">
+                                <strong><?php echo count($partner_names) === 1 ? 'Partner' : 'Partners'; ?></strong>
+                                <?php echo esc_html(implode(', ', $partner_names)); ?>
+                            </p>
+                        <?php endif; ?>
                         <?php if ($bio) : ?>
                             <div class="artasia-team__bio"><?php echo wp_kses_post(wpautop($bio)); ?></div>
                         <?php endif; ?>
@@ -213,6 +256,7 @@ function artasia_add_team_responsibility(array &$team, int $person_id, string $r
     if (!isset($team[$person_id])) {
         $team[$person_id] = [
             'order'            => $order,
+            'partners'         => [],
             'responsibilities' => [],
         ];
     }

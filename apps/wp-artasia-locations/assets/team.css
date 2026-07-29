@@ -96,6 +96,15 @@
     margin: 1rem 0;
 }
 
+.artasia-team__partners {
+    color: var(--artasia-team-colour);
+}
+
+.artasia-team__partners strong {
+    font-weight: 900;
+    margin-right: 0.35rem;
+}
+
 .artasia-team__bio,
 .artasia-team__bio * {
     color: var(--artasia-team-colour);
