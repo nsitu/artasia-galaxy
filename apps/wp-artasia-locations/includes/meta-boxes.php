@@ -36,7 +36,7 @@ function artasia_post_type_contexts(): array
                     artasia_context_post_type_link('artasia_activity', 'activities'),
                     artasia_context_post_type_link('artasia_placement', 'placements')
                 ),
-                'Published projects are available in the project selectors of the Artasia Team, Artasia Sites, and Artasia Documentation Elementor widgets. The same features can be added with the <code>[artasia_team year="2026"]</code>, <code>[artasia_sites year="2026"]</code>, and <code>[artasia_documentation year="2026"]</code> shortcodes. Select the annual Documentation Landing Page in Project Details so singular Documentation pages have the correct Back destination.',
+                'Published projects are available in the project selectors of the Artasia Team, Artasia Sites, and Artasia Documentation Elementor widgets. The same features can be added with the <code>[artasia_team year="2026"]</code>, <code>[artasia_sites year="2026"]</code>, and <code>[artasia_documentation year="2026"]</code> shortcodes. Select the annual Documentation Landing Page in Project Details so Documentation links open in the correct annual viewer.',
             ],
         ],
         'artasia_activity' => [
@@ -121,7 +121,7 @@ function artasia_post_type_contexts(): array
                 ),
                 'Use the classic rich text editor for the documentation itself, then identify its context and optionally provide a short pull quote.',
                 'Build the image sequence in the Documentation Gallery panel. Captions and alternative text come from the selected Media Library records, and the gallery is displayed automatically after the documentation.',
-                'Published records are indexed with the <code>[artasia_documentation year="2026"]</code> shortcode or the Artasia Documentation Elementor widget. A record appears under the partner connected to its selected placement and project, and opens on its canonical singular page.',
+                'Published records are indexed with the <code>[artasia_documentation year="2026"]</code> shortcode or the Artasia Documentation Elementor widget. A record appears under the partner connected to its selected placement and project, and opens in that project’s annual Documentation viewer.',
             ],
         ],
     ];
@@ -583,7 +583,7 @@ function artasia_project_meta_box_html(WP_Post $post): void
                     'class'             => 'widefat',
                 ]);
                 ?>
-                <p class="description">Select the annual WordPress page containing the Artasia Documentation widget. Singular Documentation pages use it as their Back destination.</p>
+                <p class="description">Select the annual WordPress page containing the Artasia Documentation widget. Documentation links use this page for their public viewer URL.</p>
             </td>
         </tr>
     </table>

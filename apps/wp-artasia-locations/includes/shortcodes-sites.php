@@ -188,6 +188,10 @@ function artasia_render_sites(int $project_id): string
     }
 
     $year = intval(get_post_meta($project_id, 'artasia_project_year', true));
+    $documentation_page_id = intval(get_post_meta($project_id, 'artasia_documentation_page_id', true));
+    $documentation_base_url = $documentation_page_id && get_post_status($documentation_page_id) === 'publish'
+        ? get_permalink($documentation_page_id)
+        : '';
 
     ob_start();
 ?>
@@ -228,8 +232,8 @@ function artasia_render_sites(int $project_id): string
                                     <?php endif; ?>
                                     <div class="artasia-sites__actions">
                                         <a class="artasia-sites__action" href="<?php echo esc_url($galaxy_url); ?>">Gallery</a>
-                                        <?php if ($documentation) : ?>
-                                            <a class="artasia-sites__action" href="<?php echo esc_url(get_permalink($documentation)); ?>">Documentation</a>
+                                        <?php if ($documentation && $documentation_base_url) : ?>
+                                            <a class="artasia-sites__action" href="<?php echo esc_url(add_query_arg('documentation', $documentation->post_name, $documentation_base_url)); ?>">Documentation</a>
                                         <?php endif; ?>
                                     </div>
                                 </li>

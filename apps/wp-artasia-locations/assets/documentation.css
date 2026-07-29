@@ -4,11 +4,6 @@
   color: #8e1d58;
 }
 
-.artasia-documentation-template {
-  box-sizing: border-box;
-  padding: clamp(3rem, 7vw, 7rem) 50px;
-}
-
 .artasia-documentation [hidden] {
   display: none !important;
 }

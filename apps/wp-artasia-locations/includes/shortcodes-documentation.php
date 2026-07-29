@@ -175,7 +175,7 @@ function artasia_render_documentation_article(WP_Post $document, string $partner
             <?php if ($partner_name && $partner_name !== 'Other documentation') : ?>
                 <p class="artasia-documentation__partner"><?php echo esc_html($partner_name); ?></p>
             <?php endif; ?>
-            <h1 class="artasia-documentation__title"><?php echo esc_html($document->post_title); ?></h1>
+            <h2 class="artasia-documentation__title" tabindex="-1"><?php echo esc_html($document->post_title); ?></h2>
             <?php if ($people_names) : ?>
                 <p class="artasia-documentation__people">
                     <span>Documentation by</span>
@@ -207,7 +207,7 @@ function artasia_render_documentation_article(WP_Post $document, string $partner
     return trim((string) ob_get_clean());
 }
 
-function artasia_render_documentation_directory(array $groups, int $selected_id = 0, bool $compact = false): string
+function artasia_render_documentation_directory(array $groups, string $base_url, int $selected_id = 0, bool $compact = false): string
 {
     ob_start();
 ?>
@@ -233,7 +233,10 @@ function artasia_render_documentation_directory(array $groups, int $selected_id 
                         <?php $document = $entry['document']; ?>
                         <li>
                             <a
-                                href="<?php echo esc_url(get_permalink($document)); ?>"
+                                href="<?php echo esc_url(add_query_arg('documentation', $document->post_name, $base_url)); ?>"
+                                data-documentation-slug="<?php echo esc_attr($document->post_name); ?>"
+                                data-documentation-id="<?php echo esc_attr($document->ID); ?>"
+                                data-partner-id="<?php echo esc_attr($group['partner_id']); ?>"
                                 <?php echo $document->ID === $selected_id ? 'aria-current="page"' : ''; ?>
                             >
                                 <span class="artasia-documentation__navigation-document-title"><?php echo esc_html($document->post_title); ?></span>
@@ -263,12 +266,85 @@ function artasia_render_documentation_viewer(int $project_id): string
         return '';
     }
 
+    $requested_slug = isset($_GET['documentation'])
+        ? sanitize_title(wp_unslash($_GET['documentation']))
+        : '';
+    $selected = null;
+    $selected_partner = '';
+    $selected_partner_id = 0;
+    $selected_partner_document_count = 0;
+
+    foreach ($groups as $group) {
+        foreach ($group['documents'] as $entry) {
+            if ($requested_slug && $entry['document']->post_name === $requested_slug) {
+                $selected = $entry['document'];
+                $selected_partner = $group['partner_name'];
+                $selected_partner_id = intval($group['partner_id']);
+                $selected_partner_document_count = count($group['documents']);
+                break 2;
+            }
+        }
+    }
+
+    $documentation_page_id = intval(get_post_meta($project_id, 'artasia_documentation_page_id', true));
+    $base_url = $documentation_page_id && get_post_status($documentation_page_id) === 'publish'
+        ? get_permalink($documentation_page_id)
+        : remove_query_arg('documentation');
+
     wp_enqueue_style('artasia-documentation-shortcode');
+    wp_enqueue_style('artasia-documentation-gallery');
+    wp_enqueue_script('artasia-documentation-gallery');
+    wp_enqueue_script('artasia-documentation-shortcode');
+
+    static $viewer_instance = 0;
+    $viewer_instance++;
+    $related_title_id = sprintf('artasia-documentation-related-title-%d-%d', $project_id, $viewer_instance);
 
     ob_start();
 ?>
-    <section class="artasia-documentation artasia-documentation--index">
-        <?php echo artasia_render_documentation_directory($groups); ?>
+    <section
+        class="artasia-documentation"
+        data-project-id="<?php echo esc_attr($project_id); ?>"
+        data-rest-base="<?php echo esc_url(rest_url('artasia/v1/documentation/')); ?>"
+    >
+        <div class="artasia-documentation__directory" <?php echo $selected ? 'hidden' : ''; ?>>
+            <?php echo artasia_render_documentation_directory($groups, $base_url); ?>
+        </div>
+        <div class="artasia-documentation__viewer" <?php echo $selected ? '' : 'hidden'; ?>>
+            <p class="artasia-documentation__status screen-reader-text" aria-live="polite"></p>
+            <a class="artasia-documentation__back" href="<?php echo esc_url($base_url); ?>" data-documentation-back>&larr; Back</a>
+            <div class="artasia-documentation__content">
+                <?php if ($selected) : ?>
+                    <?php echo artasia_render_documentation_article($selected, $selected_partner, artasia_get_documentation_context($selected)); ?>
+                <?php endif; ?>
+            </div>
+            <aside class="artasia-documentation__related" aria-labelledby="<?php echo esc_attr($related_title_id); ?>" <?php echo $selected_partner_document_count > 1 ? '' : 'hidden'; ?>>
+                <h2 id="<?php echo esc_attr($related_title_id); ?>">More from this partner</h2>
+                <ul>
+                    <?php if ($selected) : ?>
+                        <?php foreach ($groups as $group) : ?>
+                            <?php if (intval($group['partner_id']) !== $selected_partner_id) continue; ?>
+                            <?php foreach ($group['documents'] as $entry) : ?>
+                                <?php $related_document = $entry['document']; ?>
+                                <?php if ($related_document->ID === $selected->ID) continue; ?>
+                                <li>
+                                    <a
+                                        href="<?php echo esc_url(add_query_arg('documentation', $related_document->post_name, $base_url)); ?>"
+                                        data-documentation-slug="<?php echo esc_attr($related_document->post_name); ?>"
+                                        data-documentation-id="<?php echo esc_attr($related_document->ID); ?>"
+                                        data-partner-id="<?php echo esc_attr($group['partner_id']); ?>"
+                                    ><?php echo esc_html($related_document->post_title); ?></a>
+                                </li>
+                            <?php endforeach; ?>
+                            <?php break; ?>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </ul>
+            </aside>
+            <div class="artasia-documentation__all">
+                <?php echo artasia_render_documentation_directory($groups, $base_url, $selected ? $selected->ID : 0, true); ?>
+            </div>
+        </div>
     </section>
 <?php
 
@@ -309,56 +385,97 @@ function artasia_get_documentation_context(WP_Post $document): array
     ];
 }
 
-function artasia_render_single_documentation(WP_Post $document): string
+function artasia_register_documentation_rest_routes(): void
 {
-    $context = artasia_get_documentation_context($document);
-    $groups = $context['project_id'] ? artasia_get_project_documentation($context['project_id']) : [];
-    $related = [];
+    register_rest_route('artasia/v1', '/documentation/(?P<slug>[a-z0-9-]+)', [
+        'methods'             => 'GET',
+        'callback'            => 'artasia_rest_get_documentation',
+        'permission_callback' => '__return_true',
+        'args'                => [
+            'project_id' => [
+                'required'          => true,
+                'sanitize_callback' => 'absint',
+                'validate_callback' => static function ($value): bool {
+                    return intval($value) > 0;
+                },
+            ],
+        ],
+    ]);
+}
+add_action('rest_api_init', 'artasia_register_documentation_rest_routes');
+
+function artasia_rest_get_documentation(WP_REST_Request $request)
+{
+    $project_id = intval($request->get_param('project_id'));
+    $slug = sanitize_title($request->get_param('slug'));
+    $groups = artasia_get_project_documentation($project_id);
+    $document = null;
+    $partner_name = '';
 
     foreach ($groups as $group) {
-        if (intval($group['partner_id']) !== intval($context['partner_id'])) {
-            continue;
-        }
         foreach ($group['documents'] as $entry) {
-            if ($entry['document']->ID !== $document->ID) {
-                $related[] = $entry['document'];
+            if ($entry['document']->post_name === $slug) {
+                $document = $entry['document'];
+                $partner_name = $group['partner_name'];
+                break 2;
             }
         }
-        break;
     }
 
-    $back_url = $context['index_page_id'] && get_post_status($context['index_page_id']) === 'publish'
-        ? get_permalink($context['index_page_id'])
-        : ($context['project_id'] ? get_permalink($context['project_id']) : '');
+    if (!$document) {
+        return new WP_Error('artasia_documentation_not_found', 'Documentation not found.', ['status' => 404]);
+    }
 
-    wp_enqueue_style('artasia-documentation-shortcode');
-
-    ob_start();
-?>
-    <section class="artasia-documentation artasia-documentation--single">
-        <?php if ($back_url) : ?>
-            <a class="artasia-documentation__back" href="<?php echo esc_url($back_url); ?>">&larr; Back</a>
-        <?php endif; ?>
-        <?php echo artasia_render_documentation_article($document, $context['partner_name'], $context); ?>
-
-        <?php if ($related) : ?>
-            <aside class="artasia-documentation__related">
-                <h2>More from this partner</h2>
-                <ul>
-                    <?php foreach ($related as $related_document) : ?>
-                        <li><a href="<?php echo esc_url(get_permalink($related_document)); ?>"><?php echo esc_html($related_document->post_title); ?></a></li>
-                    <?php endforeach; ?>
-                </ul>
-            </aside>
-        <?php endif; ?>
-
-        <?php if ($groups) : ?>
-            <div class="artasia-documentation__all">
-                <?php echo artasia_render_documentation_directory($groups, $document->ID, true); ?>
-            </div>
-        <?php endif; ?>
-    </section>
-<?php
-
-    return trim((string) ob_get_clean());
+    return rest_ensure_response([
+        'id'    => $document->ID,
+        'slug'  => $document->post_name,
+        'title' => $document->post_title,
+        'html'  => artasia_render_documentation_article(
+            $document,
+            $partner_name,
+            artasia_get_documentation_context($document)
+        ),
+    ]);
 }
+
+function artasia_documentation_canonical_url(string $canonical_url, WP_Post $post): string
+{
+    if ($post->post_type !== 'page' || empty($_GET['documentation'])) {
+        return $canonical_url;
+    }
+
+    $slug = sanitize_title(wp_unslash($_GET['documentation']));
+    $document = get_page_by_path($slug, OBJECT, 'artasia_document');
+    if (!$document || $document->post_status !== 'publish') {
+        return $canonical_url;
+    }
+
+    $context = artasia_get_documentation_context($document);
+    if (intval($context['index_page_id']) !== $post->ID) {
+        return $canonical_url;
+    }
+
+    return add_query_arg('documentation', $document->post_name, get_permalink($post));
+}
+add_filter('get_canonical_url', 'artasia_documentation_canonical_url', 10, 2);
+
+function artasia_documentation_document_title(array $title): array
+{
+    if (empty($_GET['documentation'])) {
+        return $title;
+    }
+
+    $slug = sanitize_title(wp_unslash($_GET['documentation']));
+    $document = get_page_by_path($slug, OBJECT, 'artasia_document');
+    $context = $document ? artasia_get_documentation_context($document) : [];
+    if (
+        $document
+        && $document->post_status === 'publish'
+        && intval($context['index_page_id'] ?? 0) === get_queried_object_id()
+    ) {
+        $title['title'] = $document->post_title;
+    }
+
+    return $title;
+}
+add_filter('document_title_parts', 'artasia_documentation_document_title');

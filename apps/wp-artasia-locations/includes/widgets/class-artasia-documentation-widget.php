@@ -33,7 +33,12 @@ class Artasia_Documentation_Elementor_Widget extends \Elementor\Widget_Base
 
     public function get_style_depends(): array
     {
-        return ['artasia-documentation-shortcode'];
+        return ['artasia-documentation-gallery', 'artasia-documentation-shortcode'];
+    }
+
+    public function get_script_depends(): array
+    {
+        return ['artasia-documentation-gallery', 'artasia-documentation-shortcode'];
     }
 
     protected function register_controls(): void
@@ -74,7 +79,7 @@ class Artasia_Documentation_Elementor_Widget extends \Elementor\Widget_Base
         $this->add_control('documentation_instructions', [
             'type' => \Elementor\Controls_Manager::RAW_HTML,
             'raw'  => sprintf(
-                '<p>Manage entries in <a href="%s" target="_blank" rel="noopener noreferrer">Pedagogical Documentation</a>. Only published entries connected to a placement in the selected project will appear. Each entry opens at its canonical Documentation URL.</p>',
+                '<p>Manage entries in <a href="%s" target="_blank" rel="noopener noreferrer">Pedagogical Documentation</a>. Only published entries connected to a placement in the selected project will appear. Configure this annual page as the project’s Documentation Landing Page so Sites and other generated links open this viewer.</p>',
                 esc_url(admin_url('edit.php?post_type=artasia_document'))
             ),
             'content_classes' => 'elementor-panel-alert elementor-panel-alert-info',
