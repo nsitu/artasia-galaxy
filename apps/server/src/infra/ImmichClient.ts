@@ -8,9 +8,9 @@ const PUBLISHED_ALBUM_NAME = "Published";
 
 export interface ImmichAsset {
   id: string;
-  deviceAssetId: string;
-  ownerId: string;
-  deviceId: string;
+  deviceAssetId?: string;
+  ownerId?: string;
+  deviceId?: string;
   type: "IMAGE" | "VIDEO";
   width?: number | null;
   height?: number | null;
@@ -22,7 +22,7 @@ export interface ImmichAsset {
   isFavorite: boolean;
   isArchived: boolean;
   isTrashed?: boolean;
-  duration: string;
+  duration: string | number | null;
   exifInfo?: {
     make?: string;
     model?: string;
@@ -296,7 +296,13 @@ export async function searchAssetIdsByTag(tagId: string): Promise<string[]> {
   for (const type of ["IMAGE", "VIDEO"] as const) {
     let page = 1;
     for (;;) {
-      const res = await searchAssets({ tagIds: [tagId], page, size, type });
+      const res = await searchAssets({
+        tagIds: [tagId],
+        page,
+        size,
+        type,
+        visibility: "timeline",
+      });
       for (const item of res.assets.items) assetIds.push(item.id);
       if (!res.assets.nextPage || res.assets.items.length < size) break;
       page += 1;
@@ -315,7 +321,7 @@ export interface ImmichAlbum {
   description: string;
   createdAt: string;
   updatedAt: string;
-  ownerId: string;
+  ownerId?: string;
   albumThumbnailAssetId: string | null;
   assetCount: number;
   shared: boolean;
@@ -525,25 +531,18 @@ export async function uploadAsset(params: {
 }): Promise<ImmichUploadResponse> {
   const createdAt = params.createdAt ?? new Date();
   const modifiedAt = params.modifiedAt ?? createdAt;
-  const form = new FormData();
   const blob = await openAsBlob(params.filePath, { type: params.mimeType });
   const checksum = await sha1File(params.filePath);
   const deviceAssetId = params.deviceAssetId ?? `artasia-galaxy:${checksum}`;
 
-  form.append("assetData", blob, params.filename);
-  form.append("deviceAssetId", deviceAssetId);
-  form.append("deviceId", "artasia-galaxy");
-  form.append("filename", params.filename);
-  form.append("fileCreatedAt", createdAt.toISOString());
-  form.append("fileModifiedAt", modifiedAt.toISOString());
-
-  const res = await immichRequest("/assets", {
-    method: "POST",
-    headers: { "x-immich-checksum": checksum },
-    body: form,
+  return uploadAssetBlob({
+    blob,
+    checksum,
+    filename: params.filename,
+    createdAt,
+    modifiedAt,
+    legacyDeviceAssetId: deviceAssetId,
   });
-
-  return res.json();
 }
 
 export async function uploadAssetStream(params: {
@@ -574,21 +573,78 @@ export async function uploadAssetStream(params: {
   const uint8Arrays = chunks.map((chunk) => new Uint8Array(chunk));
   const blob = new Blob(uint8Arrays, { type: params.mimeType });
 
-  const form = new FormData();
-  form.append("assetData", blob, params.filename);
-  form.append("deviceAssetId", params.deviceAssetId);
-  form.append("deviceId", "artasia-galaxy");
-  form.append("filename", params.filename);
-  form.append("fileCreatedAt", createdAt.toISOString());
-  form.append("fileModifiedAt", modifiedAt.toISOString());
-
-  const res = await immichRequest("/assets", {
-    method: "POST",
-    headers: { "x-immich-checksum": checksum },
-    body: form,
+  return uploadAssetBlob({
+    blob,
+    checksum,
+    filename: params.filename,
+    createdAt,
+    modifiedAt,
+    legacyDeviceAssetId: params.deviceAssetId,
   });
+}
 
-  return res.json();
+function createAssetUploadForm(params: {
+  blob: Blob;
+  filename: string;
+  createdAt: Date;
+  modifiedAt: Date;
+  legacyDeviceAssetId?: string;
+}) {
+  const form = new FormData();
+  form.append("assetData", params.blob, params.filename);
+  if (params.legacyDeviceAssetId) {
+    form.append("deviceAssetId", params.legacyDeviceAssetId);
+    form.append("deviceId", "artasia-galaxy");
+  }
+  form.append("filename", params.filename);
+  form.append("fileCreatedAt", params.createdAt.toISOString());
+  form.append("fileModifiedAt", params.modifiedAt.toISOString());
+  return form;
+}
+
+async function uploadAssetBlob(params: {
+  blob: Blob;
+  checksum: string;
+  filename: string;
+  createdAt: Date;
+  modifiedAt: Date;
+  legacyDeviceAssetId: string;
+}): Promise<ImmichUploadResponse> {
+  const modernResponse = await immichRequest(
+    "/assets",
+    {
+      method: "POST",
+      headers: { "x-immich-checksum": params.checksum },
+      body: createAssetUploadForm({
+        blob: params.blob,
+        filename: params.filename,
+        createdAt: params.createdAt,
+        modifiedAt: params.modifiedAt,
+      }),
+    },
+    { allowErrorStatus: true },
+  );
+  if (modernResponse.ok) return modernResponse.json();
+
+  const modernError = await modernResponse.clone().text().catch(() => "");
+  const requiresLegacyFields =
+    modernResponse.status === 400 &&
+    /deviceAssetId|deviceId/i.test(modernError);
+  if (!requiresLegacyFields) {
+    throw new Error(
+      `Immich ${modernResponse.status} ${modernResponse.statusText} — upload failed\n${modernError.slice(0, 500)}`,
+    );
+  }
+
+  const legacyResponse = await immichRequest("/assets", {
+    method: "POST",
+    headers: { "x-immich-checksum": params.checksum },
+    body: createAssetUploadForm({
+      ...params,
+      legacyDeviceAssetId: params.legacyDeviceAssetId,
+    }),
+  });
+  return legacyResponse.json();
 }
 
 async function sha1File(path: string): Promise<string> {
@@ -610,6 +666,7 @@ export async function randomAssets(params: {
   const body: Record<string, unknown> = {
     size: params.size ?? 50,
     type: params.type ?? "IMAGE",
+    visibility: "timeline",
   };
 
   if (params.albumId) body.albumId = params.albumId;

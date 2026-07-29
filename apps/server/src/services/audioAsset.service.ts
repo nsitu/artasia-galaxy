@@ -10,8 +10,11 @@ export function isAudioAsset(asset: ImmichAsset) {
   });
 }
 
-export function parseImmichDuration(value?: string | null) {
-  if (!value) return 0;
+export function parseImmichDuration(value?: string | number | null) {
+  if (value == null || value === "") return 0;
+  if (typeof value === "number") {
+    return Number.isFinite(value) && value > 0 ? value / 1000 : 0;
+  }
   if (/^\d+(?:\.\d+)?$/.test(value.trim())) {
     return Number.parseFloat(value);
   }

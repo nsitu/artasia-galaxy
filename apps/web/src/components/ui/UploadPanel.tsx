@@ -197,6 +197,9 @@ export default function UploadPanel({
     [],
   );
   const [linkedAudioLoading, setLinkedAudioLoading] = useState(false);
+  const [linkedAudioPreviewPlaying, setLinkedAudioPreviewPlaying] =
+    useState(false);
+  const linkedAudioPreviewRef = useRef<HTMLAudioElement | null>(null);
   const [managePublished, setManagePublished] = useState(false);
   const [manageArchived, setManageArchived] = useState(false);
   const [manageCaption, setManageCaption] = useState("");
@@ -1622,6 +1625,7 @@ export default function UploadPanel({
     setManageLinkedAudioAssetId("");
     setLinkedAudioOptions([]);
     setLinkedAudioLoading(false);
+    setLinkedAudioPreviewPlaying(false);
     setManagePublished(false);
     setManageArchived(false);
     setManageCaption("");
@@ -1743,6 +1747,30 @@ export default function UploadPanel({
     selectedAsset?.id,
     selectedAsset?.type,
   ]);
+
+  useEffect(() => {
+    const audio = linkedAudioPreviewRef.current;
+    return () => {
+      audio?.pause();
+      setLinkedAudioPreviewPlaying(false);
+    };
+  }, [manageLinkedAudioAssetId, selectedAsset?.id]);
+
+  function toggleLinkedAudioPreview() {
+    const audio = linkedAudioPreviewRef.current;
+    if (!audio) return;
+    if (audio.paused) {
+      void audio.play()
+        .then(() => setLinkedAudioPreviewPlaying(true))
+        .catch((playError) => {
+          setError(`Could not play linked sound: ${(playError as Error).message}`);
+          setLinkedAudioPreviewPlaying(false);
+        });
+    } else {
+      audio.pause();
+      setLinkedAudioPreviewPlaying(false);
+    }
+  }
 
   async function saveSelectedAssetChanges() {
     if (!selectedAsset) return;
@@ -2810,15 +2838,22 @@ export default function UploadPanel({
             ...adjustmentFilterStyle(asset.adjustments),
           }}
         />
-        {asset.archived && (
-          <span style={archivedAssetBadgeStyle}>Archived</span>
-        )}
-        {asset.published && (
-          <span style={publishedAssetBadgeStyle}>Published</span>
-        )}
-        {!asset.published && !asset.archived && (
-          <span style={draftAssetBadgeStyle}>Draft</span>
-        )}
+        <span style={assetBadgeRowStyle}>
+          {asset.archived ? (
+            <span style={archivedAssetBadgeStyle}>Archived</span>
+          ) : asset.published ? (
+            <span style={publishedAssetBadgeStyle}>Published</span>
+          ) : (
+            <span style={draftAssetBadgeStyle}>Draft</span>
+          )}
+          <span style={mediaKindBadgeStyle}>
+            {asset.mediaKind === "audio"
+              ? "Audio"
+              : asset.mediaKind === "video"
+                ? "Video"
+                : "Image"}
+          </span>
+        </span>
         <span style={assetNameStyle}>{asset.fileName}</span>
         <span style={assetDateStyle}>
           {asset.uploader_name ?? "No team member album"}
@@ -2832,7 +2867,12 @@ export default function UploadPanel({
 
   function renderAssetGrid(emptyMessage: string) {
     if (assetsLoading)
-      return <div style={emptyStateStyle}>Loading uploads...</div>;
+      return (
+        <div style={loadingUploadsStyle}>
+          <span aria-hidden="true" style={loadingSpinnerStyle} />
+          <span>Loading uploads...</span>
+        </div>
+      );
     if (displayedPlacementAssets.length === 0)
       return <div style={emptyStateStyle}>{emptyMessage}</div>;
 
@@ -3718,18 +3758,20 @@ export default function UploadPanel({
               ))}
             </select>
           </label>
-          <div style={labelStyle}>
-            <span>Asset Icon</span>
-            <MaterialIconPicker
-              value={manageIconName}
-              onChange={setManageIconName}
-              disabled={!authUser?.authenticated || savingAsset}
-            />
-            <span style={fieldHelpStyle}>
-              Stored in Immich as an <code>icon:name</code> tag and used by
-              the Galaxy viewer, especially for sound assets.
-            </span>
-          </div>
+          {selectedAsset.mediaKind === "audio" && (
+            <div style={labelStyle}>
+              <span>Asset Icon</span>
+              <MaterialIconPicker
+                value={manageIconName}
+                onChange={setManageIconName}
+                disabled={!authUser?.authenticated || savingAsset}
+              />
+              <span style={fieldHelpStyle}>
+                Stored in Immich as an <code>icon:name</code> tag and used by
+                the Galaxy viewer for sound assets.
+              </span>
+            </div>
+          )}
           {selectedAsset.type === "IMAGE" && (
             <label style={labelStyle}>
               Linked Sound
@@ -3756,6 +3798,34 @@ export default function UploadPanel({
                   </option>
                 ))}
               </select>
+              {manageLinkedAudioAssetId && (
+                <div style={linkedAudioPreviewStyle}>
+                  <audio
+                    ref={linkedAudioPreviewRef}
+                    src={`/api/v1/assets/${manageLinkedAudioAssetId}/original`}
+                    preload="metadata"
+                    onEnded={() => setLinkedAudioPreviewPlaying(false)}
+                    onPause={() => setLinkedAudioPreviewPlaying(false)}
+                    onPlay={() => setLinkedAudioPreviewPlaying(true)}
+                  />
+                  <button
+                    type="button"
+                    onClick={toggleLinkedAudioPreview}
+                    disabled={savingAsset}
+                    style={linkedAudioPreviewButtonStyle}
+                    aria-label={
+                      linkedAudioPreviewPlaying
+                        ? "Pause linked sound"
+                        : "Play linked sound"
+                    }
+                  >
+                    <span aria-hidden="true">
+                      {linkedAudioPreviewPlaying ? "Ⅱ" : "▶"}
+                    </span>
+                    {linkedAudioPreviewPlaying ? "Pause sound" : "Play sound"}
+                  </button>
+                </div>
+              )}
               <span style={fieldHelpStyle}>
                 Sounds from this image&apos;s Artasia site and the global sound
                 library (site {GLOBAL_AUDIO_PLACEMENT_ID}).
@@ -4051,6 +4121,12 @@ export default function UploadPanel({
     <main style={pageStyle}>
       <style>
         {`
+          @keyframes atlas-loading-spin {
+            to {
+              transform: rotate(360deg);
+            }
+          }
+
           @media (max-width: 760px) {
             .atlas-admin-layout {
               display: grid !important;
@@ -5930,7 +6006,6 @@ const assetImageStyle: React.CSSProperties = {
 };
 
 const archivedAssetBadgeStyle: React.CSSProperties = {
-  justifySelf: "start",
   padding: "2px 6px",
   borderRadius: 999,
   background: "rgba(245, 158, 11, 0.18)",
@@ -5941,6 +6016,14 @@ const archivedAssetBadgeStyle: React.CSSProperties = {
   lineHeight: 1.4,
   textTransform: "uppercase",
   letterSpacing: "0.04em",
+};
+
+const assetBadgeRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 5,
+  flexWrap: "wrap",
+  justifySelf: "start",
 };
 
 const publishedAssetBadgeStyle: React.CSSProperties = {
@@ -5955,6 +6038,13 @@ const draftAssetBadgeStyle: React.CSSProperties = {
   background: "rgba(148, 163, 184, 0.14)",
   border: "1px solid rgba(148, 163, 184, 0.4)",
   color: "#aeb8c7",
+};
+
+const mediaKindBadgeStyle: React.CSSProperties = {
+  ...archivedAssetBadgeStyle,
+  background: "rgba(96, 165, 250, 0.12)",
+  border: "1px solid rgba(96, 165, 250, 0.35)",
+  color: "#93c5fd",
 };
 
 const assetNameStyle: React.CSSProperties = {
@@ -5984,6 +6074,23 @@ const emptyStateStyle: React.CSSProperties = {
   border: "1px solid rgba(255,255,255,0.1)",
   borderRadius: 6,
   padding: 16,
+};
+
+const loadingUploadsStyle: React.CSSProperties = {
+  ...emptyStateStyle,
+  display: "flex",
+  alignItems: "center",
+  gap: 9,
+};
+
+const loadingSpinnerStyle: React.CSSProperties = {
+  width: 14,
+  height: 14,
+  flex: "0 0 auto",
+  border: "2px solid rgba(148, 163, 184, 0.3)",
+  borderTopColor: "#aeb8c7",
+  borderRadius: "50%",
+  animation: "atlas-loading-spin 0.8s linear infinite",
 };
 
 const itemStyle: React.CSSProperties = {
@@ -6125,6 +6232,20 @@ const captionManagerActionsStyle: React.CSSProperties = {
   alignItems: "center",
   gap: 10,
   flexWrap: "wrap",
+};
+
+const linkedAudioPreviewStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+};
+
+const linkedAudioPreviewButtonStyle: React.CSSProperties = {
+  ...secondaryButtonStyle,
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 8,
+  padding: "7px 11px",
+  borderRadius: 999,
 };
 
 const captionStatusStyle: React.CSSProperties = {

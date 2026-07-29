@@ -290,6 +290,7 @@ export async function querySlideshow(
             albumIds: [publishedAlbum.id],
             tagIds: [tagId],
             type,
+            visibility: "timeline",
             size: 500,
             takenAfter: dateRange.takenAfter,
             takenBefore: dateRange.takenBefore,
@@ -371,6 +372,7 @@ export async function querySlideshow(
         albumIds: [publishedAlbum.id],
         personIds: query.personIds,
         type: "IMAGE",
+        visibility: "timeline",
         size,
         takenAfter: dateRange.takenAfter,
         takenBefore: dateRange.takenBefore,
@@ -378,6 +380,7 @@ export async function querySlideshow(
       searchAssets({
         albumIds: [publishedAlbum.id],
         type: "VIDEO",
+        visibility: "timeline",
         size,
         takenAfter: dateRange.takenAfter,
         takenBefore: dateRange.takenBefore,
