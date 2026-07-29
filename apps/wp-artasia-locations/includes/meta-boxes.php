@@ -36,7 +36,7 @@ function artasia_post_type_contexts(): array
                     artasia_context_post_type_link('artasia_activity', 'activities'),
                     artasia_context_post_type_link('artasia_placement', 'placements')
                 ),
-                'Published projects are available in the project selectors of the Artasia Team and Artasia Sites Elementor widgets. The same listings can be added with the <code>[artasia_team year="2026"]</code> and <code>[artasia_sites year="2026"]</code> shortcodes, using the project year.',
+                'Published projects are available in the project selectors of the Artasia Team, Artasia Sites, and Artasia Documentation Elementor widgets. The same features can be added with the <code>[artasia_team year="2026"]</code>, <code>[artasia_sites year="2026"]</code>, and <code>[artasia_documentation year="2026"]</code> shortcodes.',
             ],
         ],
         'artasia_activity' => [
@@ -121,6 +121,7 @@ function artasia_post_type_contexts(): array
                 ),
                 'Use the classic rich text editor for the documentation itself, then identify its context and optionally provide a short pull quote.',
                 'Build the image sequence in the Documentation Gallery panel. Captions and alternative text come from the selected Media Library records, and the gallery is displayed automatically after the documentation.',
+                'Published records can be displayed with the <code>[artasia_documentation year="2026"]</code> shortcode or the Artasia Documentation Elementor widget. A record appears under the partner connected to its selected placement and project.',
             ],
         ],
     ];

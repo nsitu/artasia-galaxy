@@ -1,5 +1,9 @@
-document.addEventListener('DOMContentLoaded', function () {
-  document.querySelectorAll('.artasia-documentation-gallery').forEach(function (gallery) {
+(function () {
+  function initializeGallery(gallery) {
+    if (gallery.dataset.artasiaLightboxInitialized === 'true') {
+      return;
+    }
+
     var triggers = Array.prototype.slice.call(
       gallery.querySelectorAll('.artasia-documentation-gallery__trigger')
     );
@@ -8,6 +12,8 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!triggers.length || !dialog || typeof dialog.showModal !== 'function') {
       return;
     }
+
+    gallery.dataset.artasiaLightboxInitialized = 'true';
 
     var image = dialog.querySelector('.artasia-documentation-lightbox__image');
     var caption = dialog.querySelector('.artasia-documentation-lightbox__caption');
@@ -76,5 +82,14 @@ document.addEventListener('DOMContentLoaded', function () {
         opener.focus();
       }
     });
+  }
+
+  window.artasiaInitDocumentationGalleries = function (root) {
+    var scope = root || document;
+    scope.querySelectorAll('.artasia-documentation-gallery').forEach(initializeGallery);
+  };
+
+  document.addEventListener('DOMContentLoaded', function () {
+    window.artasiaInitDocumentationGalleries(document);
   });
-});
+})();

@@ -1,0 +1,100 @@
+.artasia-documentation {
+  display: grid;
+  grid-template-columns: clamp(15rem, 28%, 22rem) minmax(0, 1fr);
+  gap: clamp(2rem, 5vw, 5rem);
+  width: min(100%, 1140px);
+  margin-inline: auto;
+  color: #8e1d58;
+}
+
+.artasia-documentation__navigation {
+  align-self: start;
+  padding: 1.5rem;
+  background: #f7f2f5;
+}
+
+.artasia-documentation__navigation-title {
+  margin-top: 0;
+  font-size: 1.6rem;
+  font-weight: 900;
+}
+
+.artasia-documentation__navigation-group + .artasia-documentation__navigation-group {
+  margin-top: 1.5rem;
+}
+
+.artasia-documentation__navigation-group h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.artasia-documentation__navigation-group ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.artasia-documentation__navigation-group li + li {
+  margin-top: 0.35rem;
+}
+
+.artasia-documentation__navigation a {
+  color: inherit;
+}
+
+.artasia-documentation__navigation a[aria-current="page"] {
+  font-weight: 900;
+}
+
+.artasia-documentation__viewer {
+  min-width: 0;
+}
+
+.artasia-documentation__content {
+  transition: opacity 150ms ease;
+}
+
+.artasia-documentation.is-loading .artasia-documentation__content {
+  opacity: 0.45;
+}
+
+.artasia-documentation__partner {
+  margin: 0 0 0.4rem;
+  font-weight: 900;
+}
+
+.artasia-documentation__title {
+  margin-top: 0;
+  color: inherit;
+  font-weight: 900;
+  scroll-margin-top: 14rem;
+}
+
+.artasia-documentation__title:focus {
+  outline: none;
+}
+
+.artasia-documentation__title:focus-visible {
+  outline: 3px solid currentColor;
+  outline-offset: 4px;
+}
+
+.artasia-documentation__pull-quote {
+  margin: 1.5rem 0;
+  padding-left: 1.25rem;
+  border-left: 4px solid #f28b20;
+  color: inherit;
+  font-size: 1.2em;
+}
+
+.artasia-documentation__body,
+.artasia-documentation__body :where(h1, h2, h3, h4, h5, h6, a) {
+  color: inherit;
+}
+
+@media (max-width: 767px) {
+  .artasia-documentation {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2rem;
+  }
+}

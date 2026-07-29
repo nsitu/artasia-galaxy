@@ -83,22 +83,23 @@ add_filter('the_content', 'artasia_append_documentation_gallery', 20);
 
 function artasia_enqueue_documentation_gallery_assets(): void
 {
-    if (!is_singular('artasia_document')) {
-        return;
-    }
-
-    wp_enqueue_style(
+    wp_register_style(
         'artasia-documentation-gallery',
         ARTASIA_LOCATIONS_URL . 'assets/documentation-gallery.css',
         [],
         ARTASIA_LOCATIONS_VERSION
     );
-    wp_enqueue_script(
+    wp_register_script(
         'artasia-documentation-gallery',
         ARTASIA_LOCATIONS_URL . 'assets/documentation-gallery.js',
         [],
         ARTASIA_LOCATIONS_VERSION,
         true
     );
+
+    if (is_singular('artasia_document')) {
+        wp_enqueue_style('artasia-documentation-gallery');
+        wp_enqueue_script('artasia-documentation-gallery');
+    }
 }
 add_action('wp_enqueue_scripts', 'artasia_enqueue_documentation_gallery_assets');
