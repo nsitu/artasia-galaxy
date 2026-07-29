@@ -138,47 +138,49 @@ function artasia_render_team(int $project_id): string
                 : '';
             ?>
             <article class="artasia-team__member<?php echo $photo_id ? ' has-photo' : ''; ?>">
-                <?php if ($photo_id) : ?>
-                    <div class="artasia-team__photo">
-                        <?php echo wp_get_attachment_image($photo_id, 'medium', false, ['loading' => 'lazy']); ?>
+                <div class="artasia-team__inner">
+                    <?php if ($photo_id) : ?>
+                        <div class="artasia-team__photo">
+                            <?php echo wp_get_attachment_image($photo_id, 'medium', false, ['loading' => 'lazy']); ?>
+                        </div>
+                    <?php endif; ?>
+                    <div class="artasia-team__content">
+                        <h3 class="artasia-team__name">
+                            <?php echo esc_html($person->post_title); ?>
+                        </h3>
+                        <?php if ($pronouns) : ?>
+                            <p class="artasia-team__pronouns"><?php echo esc_html($pronouns); ?></p>
+                        <?php endif; ?>
+                        <p class="artasia-team__roles">
+                            <?php echo esc_html(implode(', ', array_keys($team[$person->ID]['responsibilities']))); ?>
+                        </p>
+                        <?php if ($bio) : ?>
+                            <div class="artasia-team__bio"><?php echo wp_kses_post(wpautop($bio)); ?></div>
+                        <?php endif; ?>
+                        <?php if ($instagram || $portfolio_url) : ?>
+                            <p class="artasia-team__links">
+                                <?php if ($instagram) : ?>
+                                    <span class="artasia-team__link">
+                                        <strong>Instagram</strong>
+                                        <a href="<?php echo esc_url('https://www.instagram.com/' . rawurlencode($instagram) . '/'); ?>" rel="noopener noreferrer" target="_blank">
+                                            @<?php echo esc_html($instagram); ?>
+                                        </a>
+                                    </span>
+                                <?php endif; ?>
+                                <?php if ($portfolio_url) : ?>
+                                    <span class="artasia-team__link">
+                                        <strong>Portfolio</strong>
+                                        <a class="artasia-team__portfolio-link" href="<?php echo esc_url($portfolio_url); ?>" rel="noopener noreferrer" target="_blank"><?php echo esc_html($portfolio_label); ?></a>
+                                    </span>
+                                <?php endif; ?>
+                            </p>
+                        <?php endif; ?>
+                        <?php if ($edit_url) : ?>
+                            <p class="artasia-team__edit">
+                                <a href="<?php echo esc_url($edit_url); ?>">Edit profile</a>
+                            </p>
+                        <?php endif; ?>
                     </div>
-                <?php endif; ?>
-                <div class="artasia-team__content">
-                    <h3 class="artasia-team__name">
-                        <?php echo esc_html($person->post_title); ?>
-                    </h3>
-                    <?php if ($pronouns) : ?>
-                        <p class="artasia-team__pronouns"><?php echo esc_html($pronouns); ?></p>
-                    <?php endif; ?>
-                    <p class="artasia-team__roles">
-                        <?php echo esc_html(implode(', ', array_keys($team[$person->ID]['responsibilities']))); ?>
-                    </p>
-                    <?php if ($bio) : ?>
-                        <div class="artasia-team__bio"><?php echo wp_kses_post(wpautop($bio)); ?></div>
-                    <?php endif; ?>
-                    <?php if ($instagram || $portfolio_url) : ?>
-                        <p class="artasia-team__links">
-                            <?php if ($instagram) : ?>
-                                <span class="artasia-team__link">
-                                    <strong>Instagram</strong>
-                                    <a href="<?php echo esc_url('https://www.instagram.com/' . rawurlencode($instagram) . '/'); ?>" rel="noopener noreferrer" target="_blank">
-                                        @<?php echo esc_html($instagram); ?>
-                                    </a>
-                                </span>
-                            <?php endif; ?>
-                            <?php if ($portfolio_url) : ?>
-                                <span class="artasia-team__link">
-                                    <strong>Portfolio</strong>
-                                    <a class="artasia-team__portfolio-link" href="<?php echo esc_url($portfolio_url); ?>" rel="noopener noreferrer" target="_blank"><?php echo esc_html($portfolio_label); ?></a>
-                                </span>
-                            <?php endif; ?>
-                        </p>
-                    <?php endif; ?>
-                    <?php if ($edit_url) : ?>
-                        <p class="artasia-team__edit">
-                            <a href="<?php echo esc_url($edit_url); ?>">Edit profile</a>
-                        </p>
-                    <?php endif; ?>
                 </div>
             </article>
         <?php endforeach; ?>

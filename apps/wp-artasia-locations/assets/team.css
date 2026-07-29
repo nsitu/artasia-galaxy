@@ -7,10 +7,15 @@
 }
 
 .artasia-team__member {
-    align-items: center;
-    box-sizing: border-box;
     min-width: 0;
+}
+
+.artasia-team__inner {
+    box-sizing: border-box;
+    margin: 0 auto;
+    max-width: 1140px;
     padding: 50px;
+    width: 100%;
 }
 
 .artasia-team__member:nth-child(even) {
@@ -19,7 +24,8 @@
     color: var(--artasia-team-colour);
 }
 
-.artasia-team__member.has-photo {
+.artasia-team__member.has-photo .artasia-team__inner {
+    align-items: center;
     display: grid;
     gap: clamp(2rem, 5vw, 4.5rem);
     grid-template-columns: clamp(12rem, 28vw, 27rem) minmax(0, 1fr);
@@ -109,7 +115,7 @@
 }
 
 @media (max-width: 700px) {
-    .artasia-team__member.has-photo {
+    .artasia-team__member.has-photo .artasia-team__inner {
         align-items: start;
         grid-template-columns: minmax(0, 1fr);
     }
