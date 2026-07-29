@@ -7,25 +7,90 @@
 
     var projectId = viewer.dataset.projectId;
     var restBase = viewer.dataset.restBase;
+    var directory = viewer.querySelector('.artasia-documentation__directory');
+    var detail = viewer.querySelector('.artasia-documentation__viewer');
     var content = viewer.querySelector('.artasia-documentation__content');
     var status = viewer.querySelector('.artasia-documentation__status');
-    var links = Array.prototype.slice.call(
-      viewer.querySelectorAll('[data-documentation-slug]')
-    );
+    var related = viewer.querySelector('.artasia-documentation__related');
+    var relatedList = related ? related.querySelector('ul') : null;
+    var back = viewer.querySelector('[data-documentation-back]');
     var requestController = null;
 
-    if (!projectId || !restBase || !content || !links.length || !window.fetch) {
+    if (!projectId || !restBase || !directory || !detail || !content || !back || !window.fetch) {
       return;
     }
 
+    function directoryLinks() {
+      return Array.prototype.slice.call(
+        directory.querySelectorAll('[data-documentation-slug]')
+      );
+    }
+
     function setCurrentLink(slug) {
-      links.forEach(function (link) {
+      viewer.querySelectorAll('[data-documentation-slug]').forEach(function (link) {
         if (link.dataset.documentationSlug === slug) {
           link.setAttribute('aria-current', 'page');
         } else {
           link.removeAttribute('aria-current');
         }
       });
+    }
+
+    function updateRelated(slug) {
+      if (!related || !relatedList) {
+        return;
+      }
+
+      var current = directoryLinks().find(function (link) {
+        return link.dataset.documentationSlug === slug;
+      });
+      relatedList.innerHTML = '';
+
+      if (!current) {
+        related.hidden = true;
+        return;
+      }
+
+      directoryLinks().forEach(function (link) {
+        if (
+          link.dataset.partnerId !== current.dataset.partnerId
+          || link.dataset.documentationSlug === slug
+        ) {
+          return;
+        }
+
+        var item = document.createElement('li');
+        var suggestion = link.cloneNode(true);
+        suggestion.removeAttribute('aria-current');
+        item.appendChild(suggestion);
+        relatedList.appendChild(item);
+      });
+
+      related.hidden = !relatedList.children.length;
+    }
+
+    function showDirectory(url, pushHistory) {
+      if (requestController) {
+        requestController.abort();
+        requestController = null;
+      }
+
+      detail.hidden = true;
+      directory.hidden = false;
+      viewer.classList.remove('is-loading');
+      viewer.removeAttribute('aria-busy');
+      setCurrentLink('');
+
+      if (pushHistory) {
+        window.history.pushState({ artasiaDocumentation: true }, '', url);
+      }
+
+      var heading = directory.querySelector('.artasia-documentation__navigation-group h3');
+      if (heading) {
+        heading.setAttribute('tabindex', '-1');
+        heading.focus({ preventScroll: true });
+        heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
     }
 
     function loadDocumentation(slug, url, pushHistory) {
@@ -57,6 +122,14 @@
         .then(function (result) {
           content.innerHTML = result.html;
           setCurrentLink(result.slug);
+          updateRelated(result.slug);
+          directory.hidden = true;
+          detail.hidden = false;
+
+          var allMenu = detail.querySelector('.artasia-documentation__all');
+          if (allMenu) {
+            allMenu.open = false;
+          }
 
           if (window.artasiaInitDocumentationGalleries) {
             window.artasiaInitDocumentationGalleries(content);
@@ -89,30 +162,49 @@
         });
     }
 
-    links.forEach(function (link) {
-      link.addEventListener('click', function (event) {
-        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
-          return;
-        }
+    viewer.addEventListener('click', function (event) {
+      var documentationLink = event.target.closest('[data-documentation-slug]');
+      var backLink = event.target.closest('[data-documentation-back]');
+
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+        return;
+      }
+
+      if (documentationLink && viewer.contains(documentationLink)) {
         event.preventDefault();
-        loadDocumentation(link.dataset.documentationSlug, link.href, true);
-      });
+        loadDocumentation(
+          documentationLink.dataset.documentationSlug,
+          documentationLink.href,
+          true
+        );
+      } else if (backLink) {
+        event.preventDefault();
+        showDirectory(backLink.href, true);
+      }
     });
 
     window.addEventListener('popstate', function () {
       var params = new URLSearchParams(window.location.search);
       var slug = params.get('documentation');
-      var target = links.find(function (link) {
+      var target = directoryLinks().find(function (link) {
         return link.dataset.documentationSlug === slug;
       });
 
-      if (!target) {
-        target = links[0];
-      }
       if (target) {
         loadDocumentation(target.dataset.documentationSlug, window.location.href, false);
+      } else {
+        showDirectory(window.location.href, false);
       }
     });
+
+    var initial = directoryLinks().find(function (link) {
+      return link.getAttribute('aria-current') === 'page';
+    });
+    if (initial) {
+      updateRelated(initial.dataset.documentationSlug);
+    } else if (related) {
+      related.hidden = true;
+    }
   }
 
   window.artasiaInitDocumentationViewers = function (root) {

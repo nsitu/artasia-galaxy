@@ -4,24 +4,18 @@
   color: #8e1d58;
 }
 
-.artasia-documentation__navigation {
-  margin-bottom: clamp(2.5rem, 6vw, 5rem);
+.artasia-documentation [hidden] {
+  display: none !important;
 }
 
-.artasia-documentation__navigation-title {
-  margin: 0 0 1.5rem;
-  font-size: 1.8rem;
-  font-weight: 900;
+.artasia-documentation__navigation {
+  margin-bottom: clamp(2.5rem, 6vw, 5rem);
 }
 
 .artasia-documentation__navigation {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
   gap: 2rem clamp(2rem, 5vw, 4rem);
-}
-
-.artasia-documentation__navigation-title {
-  grid-column: 1 / -1;
 }
 
 .artasia-documentation__navigation-group h3 {
@@ -83,6 +77,13 @@
   min-width: 0;
 }
 
+.artasia-documentation__back {
+  display: inline-block;
+  margin-bottom: 2rem;
+  color: inherit;
+  font-weight: 900;
+}
+
 .artasia-documentation__content {
   transition: opacity 150ms ease;
 }
@@ -123,4 +124,42 @@
 .artasia-documentation__body,
 .artasia-documentation__body :where(h1, h2, h3, h4, h5, h6, a) {
   color: inherit;
+}
+
+.artasia-documentation__related {
+  margin-top: clamp(2.5rem, 6vw, 5rem);
+  padding-top: 2rem;
+  border-top: 1px solid currentColor;
+}
+
+.artasia-documentation__related h2 {
+  margin-top: 0;
+  color: inherit;
+  font-size: 1.4rem;
+  font-weight: 900;
+}
+
+.artasia-documentation__related a {
+  color: inherit;
+}
+
+.artasia-documentation__all {
+  margin-top: 2.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid currentColor;
+}
+
+.artasia-documentation__all > summary {
+  cursor: pointer;
+  font-size: 1.15rem;
+  font-weight: 900;
+}
+
+.artasia-documentation__navigation--compact {
+  display: block;
+  margin: 1.5rem 0 0;
+}
+
+.artasia-documentation__navigation--compact .artasia-documentation__navigation-group + .artasia-documentation__navigation-group {
+  margin-top: 1.5rem;
 }
