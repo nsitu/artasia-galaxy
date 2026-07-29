@@ -124,7 +124,7 @@
 
 .artasia-documentation-gallery-items {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 12px;
   margin: 16px 0 0;
 }
@@ -132,7 +132,7 @@
 .artasia-documentation-gallery-item,
 .artasia-documentation-gallery-placeholder {
   position: relative;
-  min-height: 210px;
+  min-height: 390px;
   margin: 0;
   padding: 10px;
   border: 1px solid #c3c4c7;
@@ -159,14 +159,14 @@
 .artasia-documentation-gallery-thumbnail {
   display: block;
   width: 100%;
-  height: 130px;
+  height: 260px;
   object-fit: cover;
 }
 
 .artasia-documentation-gallery-caption {
   display: block;
   width: 100%;
-  min-height: 66px;
+  min-height: 88px;
   margin: 8px 0;
   box-sizing: border-box;
   overflow-wrap: anywhere;

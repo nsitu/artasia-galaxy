@@ -1406,13 +1406,13 @@ function artasia_documentation_gallery_meta_box_html(WP_Post $post): void
             ?>
             <li class="artasia-documentation-gallery-item" data-attachment-id="<?php echo esc_attr($attachment_id); ?>">
                 <span class="artasia-documentation-gallery-handle dashicons dashicons-move" aria-label="Drag to reorder" title="Drag to reorder"></span>
-                <?php echo wp_get_attachment_image($attachment_id, 'thumbnail', false, ['class' => 'artasia-documentation-gallery-thumbnail']); ?>
+                <?php echo wp_get_attachment_image($attachment_id, 'medium', false, ['class' => 'artasia-documentation-gallery-thumbnail']); ?>
                 <label class="screen-reader-text" for="artasia-documentation-caption-<?php echo esc_attr($attachment_id); ?>">Image caption</label>
                 <textarea
                     id="artasia-documentation-caption-<?php echo esc_attr($attachment_id); ?>"
                     class="artasia-documentation-gallery-caption"
                     name="artasia_documentation_gallery_captions[]"
-                    rows="3"
+                    rows="4"
                     placeholder="Add a caption"
                 ><?php echo esc_textarea($caption); ?></textarea>
                 <input type="hidden" name="artasia_documentation_gallery_ids[]" value="<?php echo esc_attr($attachment_id); ?>">

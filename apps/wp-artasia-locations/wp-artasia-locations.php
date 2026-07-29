@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Artasia Locations
  * Description: Custom post types for Artasia placements, projects, activities, places, partners, people, and pedagogical documentation with a REST API endpoint for the Node.js backend.
- * Version:     1.6.2
+ * Version:     1.6.3
  * License:     GPL-2.0-or-later
  */
 
@@ -10,7 +10,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('ARTASIA_LOCATIONS_VERSION', '1.6.2');
+define('ARTASIA_LOCATIONS_VERSION', '1.6.3');
 define('ARTASIA_LOCATIONS_PATH', plugin_dir_path(__FILE__));
 define('ARTASIA_LOCATIONS_URL', plugin_dir_url(__FILE__));
 

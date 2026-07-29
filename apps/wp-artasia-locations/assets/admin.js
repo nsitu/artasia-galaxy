@@ -118,7 +118,9 @@ jQuery(function ($) {
       }
 
       var thumbnailUrl = attachment.url;
-      if (attachment.sizes && attachment.sizes.thumbnail) {
+      if (attachment.sizes && attachment.sizes.medium) {
+        thumbnailUrl = attachment.sizes.medium.url;
+      } else if (attachment.sizes && attachment.sizes.thumbnail) {
         thumbnailUrl = attachment.sizes.thumbnail.url;
       }
 
@@ -147,7 +149,7 @@ jQuery(function ($) {
         id: 'artasia-documentation-caption-' + attachment.id,
         class: 'artasia-documentation-gallery-caption',
         name: 'artasia_documentation_gallery_captions[]',
-        rows: 3,
+        rows: 4,
         placeholder: 'Add a caption',
         val: caption
       }));
