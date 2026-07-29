@@ -126,10 +126,9 @@
           directory.hidden = true;
           detail.hidden = false;
 
-          var allMenu = detail.querySelector('.artasia-documentation__all');
-          if (allMenu) {
-            allMenu.open = false;
-          }
+          detail.querySelectorAll('.artasia-documentation__all details').forEach(function (group) {
+            group.open = false;
+          });
 
           if (window.artasiaInitDocumentationGalleries) {
             window.artasiaInitDocumentationGalleries(content);

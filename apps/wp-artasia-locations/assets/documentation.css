@@ -97,6 +97,18 @@
   font-weight: 900;
 }
 
+.artasia-documentation__people {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35em;
+  margin: -0.5rem 0 1.5rem;
+  color: inherit;
+}
+
+.artasia-documentation__people strong {
+  font-weight: 900;
+}
+
 .artasia-documentation__title {
   margin-top: 0;
   color: inherit;
@@ -149,7 +161,7 @@
   border-top: 1px solid currentColor;
 }
 
-.artasia-documentation__all > summary {
+.artasia-documentation__navigation--compact summary {
   cursor: pointer;
   font-size: 1.15rem;
   font-weight: 900;
@@ -160,6 +172,24 @@
   margin: 1.5rem 0 0;
 }
 
+.artasia-documentation__navigation--compact .artasia-documentation__navigation-group {
+  padding-block: 0.75rem;
+  border-bottom: 1px solid currentColor;
+}
+
+.artasia-documentation__navigation--compact .artasia-documentation__navigation-group:first-child {
+  border-top: 1px solid currentColor;
+}
+
 .artasia-documentation__navigation--compact .artasia-documentation__navigation-group + .artasia-documentation__navigation-group {
+  margin-top: 0;
+}
+
+.artasia-documentation__navigation--compact .artasia-documentation__navigation-group ul {
+  margin-top: 0.75rem;
+  padding-left: 1rem;
+}
+
+.artasia-documentation__navigation--compact .artasia-documentation__navigation-group li + li {
   margin-top: 1.5rem;
 }

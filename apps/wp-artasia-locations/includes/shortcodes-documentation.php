@@ -173,6 +173,11 @@ function artasia_find_project_documentation(array $groups, string $slug): ?WP_Po
 function artasia_render_documentation_article(WP_Post $document, string $partner_name = ''): string
 {
     $pull_quote = get_post_meta($document->ID, 'artasia_documentation_pull_quote', true);
+    $people_ids = artasia_validate_related_post_ids(
+        get_post_meta($document->ID, 'artasia_documentation_people_ids', true),
+        'artasia_people'
+    );
+    $people_names = array_values(array_filter(array_map('get_the_title', $people_ids)));
     $content = apply_filters('the_content', $document->post_content);
 
     ob_start();
@@ -183,6 +188,12 @@ function artasia_render_documentation_article(WP_Post $document, string $partner
                 <p class="artasia-documentation__partner"><?php echo esc_html($partner_name); ?></p>
             <?php endif; ?>
             <h2 class="artasia-documentation__title" tabindex="-1"><?php echo esc_html($document->post_title); ?></h2>
+            <?php if ($people_names) : ?>
+                <p class="artasia-documentation__people">
+                    <span>Documentation by</span>
+                    <strong><?php echo esc_html(implode(', ', $people_names)); ?></strong>
+                </p>
+            <?php endif; ?>
             <?php if ($pull_quote) : ?>
                 <blockquote class="artasia-documentation__pull-quote"><?php echo esc_html($pull_quote); ?></blockquote>
             <?php endif; ?>
@@ -201,14 +212,21 @@ function artasia_render_documentation_directory(array $groups, string $base_url,
 ?>
     <nav class="artasia-documentation__navigation<?php echo $compact ? ' artasia-documentation__navigation--compact' : ''; ?>" aria-label="<?php echo esc_attr($compact ? 'All documentation' : 'Documentation'); ?>">
         <?php foreach ($groups as $group) : ?>
-            <section class="artasia-documentation__navigation-group" data-partner-id="<?php echo esc_attr($group['partner_id']); ?>">
+            <?php if ($compact) : ?>
+                <details class="artasia-documentation__navigation-group" data-partner-id="<?php echo esc_attr($group['partner_id']); ?>">
+                    <summary><?php echo esc_html($group['partner_name']); ?></summary>
+            <?php else : ?>
+                <section class="artasia-documentation__navigation-group" data-partner-id="<?php echo esc_attr($group['partner_id']); ?>">
+            <?php endif; ?>
                 <?php $logo_id = $group['partner_id'] ? intval(get_post_meta($group['partner_id'], 'artasia_logo_id', true)) : 0; ?>
                 <?php if ($logo_id && !$compact) : ?>
                     <div class="artasia-documentation__navigation-logo">
                         <?php echo wp_get_attachment_image($logo_id, 'medium', false, ['loading' => 'lazy']); ?>
                     </div>
                 <?php endif; ?>
-                <h3><?php echo esc_html($group['partner_name']); ?></h3>
+                <?php if (!$compact) : ?>
+                    <h3><?php echo esc_html($group['partner_name']); ?></h3>
+                <?php endif; ?>
                 <ul>
                     <?php foreach ($group['documents'] as $entry) : ?>
                         <?php $document = $entry['document']; ?>
@@ -228,7 +246,11 @@ function artasia_render_documentation_directory(array $groups, string $base_url,
                         </li>
                     <?php endforeach; ?>
                 </ul>
-            </section>
+            <?php if ($compact) : ?>
+                </details>
+            <?php else : ?>
+                </section>
+            <?php endif; ?>
         <?php endforeach; ?>
     </nav>
 <?php
@@ -288,7 +310,7 @@ function artasia_render_documentation_viewer(int $project_id): string
         </div>
         <div class="artasia-documentation__viewer" <?php echo $selected ? '' : 'hidden'; ?>>
             <p class="artasia-documentation__status screen-reader-text" aria-live="polite"></p>
-            <a class="artasia-documentation__back" href="<?php echo esc_url($base_url); ?>" data-documentation-back>&larr; Back to all documentation</a>
+            <a class="artasia-documentation__back" href="<?php echo esc_url($base_url); ?>" data-documentation-back>&larr; Back</a>
             <div class="artasia-documentation__content">
                 <?php echo $selected ? artasia_render_documentation_article($selected, $selected_partner) : ''; ?>
             </div>
@@ -315,10 +337,9 @@ function artasia_render_documentation_viewer(int $project_id): string
                     <?php endif; ?>
                 </ul>
             </aside>
-            <details class="artasia-documentation__all">
-                <summary>Browse all documentation</summary>
+            <div class="artasia-documentation__all">
                 <?php echo artasia_render_documentation_directory($groups, $base_url, $selected ? $selected->ID : 0, true); ?>
-            </details>
+            </div>
         </div>
     </section>
 <?php

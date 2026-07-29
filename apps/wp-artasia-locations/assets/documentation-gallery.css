@@ -91,10 +91,30 @@
 .artasia-documentation-lightbox__previous,
 .artasia-documentation-lightbox__next {
   border: 0;
+  border-radius: 999px;
   background: transparent;
   color: #fff;
   cursor: pointer;
   font: inherit;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.artasia-documentation-lightbox__close:hover,
+.artasia-documentation-lightbox__close:focus-visible,
+.artasia-documentation-lightbox__previous:hover,
+.artasia-documentation-lightbox__previous:focus-visible,
+.artasia-documentation-lightbox__next:hover,
+.artasia-documentation-lightbox__next:focus-visible {
+  border-color: transparent !important;
+  background: rgba(255, 255, 255, 0.14) !important;
+  color: #fff !important;
+}
+
+.artasia-documentation-lightbox__close:focus-visible,
+.artasia-documentation-lightbox__previous:focus-visible,
+.artasia-documentation-lightbox__next:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.9);
+  outline-offset: 2px;
 }
 
 .artasia-documentation-lightbox__close {
@@ -115,6 +135,7 @@
 
 .artasia-documentation-lightbox__previous:disabled,
 .artasia-documentation-lightbox__next:disabled {
+  background: transparent !important;
   opacity: 0.25;
   cursor: default;
 }
