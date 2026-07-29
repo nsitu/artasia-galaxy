@@ -281,7 +281,7 @@ function artasia_render_sites(int $project_id): string
                                     <?php if ($show_gallery || ($documentation && $documentation_base_url)) : ?>
                                         <div class="artasia-sites__actions">
                                             <?php if ($show_gallery) : ?>
-                                                <a class="artasia-sites__action" href="<?php echo esc_url($galaxy_url); ?>">Gallery</a>
+                                                <a class="artasia-sites__action" href="<?php echo esc_url($galaxy_url); ?>" target="_blank" rel="noopener noreferrer">Gallery</a>
                                             <?php endif; ?>
                                             <?php if ($documentation && $documentation_base_url) : ?>
                                                 <a class="artasia-sites__action" href="<?php echo esc_url(add_query_arg('documentation', $documentation->post_name, $documentation_base_url)); ?>">Documentation</a>
