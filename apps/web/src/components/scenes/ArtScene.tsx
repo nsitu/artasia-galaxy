@@ -656,6 +656,13 @@ export default function ArtScene() {
                 introPhase === "complete"
               }
             />
+            <TouchDoubleTapZoom
+              enabled={
+                (!showWelcomeIntro || introPhase === "complete") &&
+                !previewPlacementDetails &&
+                !selectedPhoto
+              }
+            />
             <Preload all />
           </Suspense>
         </Canvas>
@@ -836,6 +843,98 @@ function GroundPlanePanControls({ enabled }: { enabled: boolean }) {
       element.removeEventListener("pointerup", onPointerUp);
       element.removeEventListener("pointercancel", onPointerUp);
       element.removeEventListener("contextmenu", onContextMenu);
+    };
+  }, [camera, controls, enabled, gl]);
+
+  return null;
+}
+
+function TouchDoubleTapZoom({ enabled }: { enabled: boolean }) {
+  const camera = useThree((state) => state.camera);
+  const gl = useThree((state) => state.gl);
+  const controls = useThree(
+    (state) =>
+      (state as unknown as { controls?: TerrainMapControls }).controls,
+  );
+
+  useEffect(() => {
+    if (!enabled || !controls?.target) return;
+
+    const element = gl.domElement;
+    const terrainControls = controls;
+    let pointerId: number | null = null;
+    let pointerStart = new THREE.Vector2();
+    let moved = false;
+    let lastTapAt = 0;
+    let lastTapPosition = new THREE.Vector2();
+
+    function onPointerDown(event: PointerEvent) {
+      if (event.pointerType !== "touch" || !event.isPrimary) return;
+      pointerId = event.pointerId;
+      pointerStart.set(event.clientX, event.clientY);
+      moved = false;
+    }
+
+    function onPointerMove(event: PointerEvent) {
+      if (event.pointerId !== pointerId) return;
+      if (
+        pointerStart.distanceTo(
+          new THREE.Vector2(event.clientX, event.clientY),
+        ) > 12
+      ) {
+        moved = true;
+      }
+    }
+
+    function onPointerUp(event: PointerEvent) {
+      if (event.pointerId !== pointerId) return;
+      pointerId = null;
+      if (moved) {
+        lastTapAt = 0;
+        return;
+      }
+
+      const now = performance.now();
+      const tapPosition = new THREE.Vector2(event.clientX, event.clientY);
+      const isDoubleTap =
+        now - lastTapAt <= 350 &&
+        tapPosition.distanceTo(lastTapPosition) <= 28;
+
+      if (!isDoubleTap) {
+        lastTapAt = now;
+        lastTapPosition.copy(tapPosition);
+        return;
+      }
+
+      const offset = camera.position.clone().sub(terrainControls.target);
+      const currentDistance = offset.length();
+      if (currentDistance > 1.5) {
+        const nextDistance = Math.max(1.5, currentDistance * 0.78);
+        camera.position
+          .copy(terrainControls.target)
+          .add(offset.setLength(nextDistance));
+        terrainControls.update?.();
+      }
+      lastTapAt = 0;
+      event.preventDefault();
+    }
+
+    function onPointerCancel() {
+      pointerId = null;
+      moved = false;
+      lastTapAt = 0;
+    }
+
+    element.addEventListener("pointerdown", onPointerDown);
+    element.addEventListener("pointermove", onPointerMove);
+    element.addEventListener("pointerup", onPointerUp);
+    element.addEventListener("pointercancel", onPointerCancel);
+
+    return () => {
+      element.removeEventListener("pointerdown", onPointerDown);
+      element.removeEventListener("pointermove", onPointerMove);
+      element.removeEventListener("pointerup", onPointerUp);
+      element.removeEventListener("pointercancel", onPointerCancel);
     };
   }, [camera, controls, enabled, gl]);
 
