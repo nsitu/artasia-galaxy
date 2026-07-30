@@ -8,6 +8,7 @@ interface Props {
   brandColorOne?: string;
   brandColorTwo?: string;
   headPlaneZ: number;
+  isForked?: boolean;
   isSelected?: boolean;
   onClick?: () => void;
   onPointerEnter?: () => void;
@@ -40,6 +41,7 @@ export default function PlaceMarker({
   brandColorOne,
   brandColorTwo,
   headPlaneZ,
+  isForked = false,
   isSelected = false,
   onClick,
   onPointerEnter,
@@ -65,8 +67,8 @@ export default function PlaceMarker({
   const centerGeometry = useMemo(() => new THREE.CircleGeometry(HEAD_RADIUS * 0.34, 24), []);
   const baseGeometry = useMemo(() => new THREE.SphereGeometry(STEM_RADIUS * 1.45, 12, 8), []);
   const initialStemGeometry = useMemo(
-    () => createInitialStemGeometry(stemHeight),
-    [stemHeight]
+    () => createInitialStemGeometry(stemHeight, isForked),
+    [isForked, stemHeight]
   );
 
   useEffect(() => {
@@ -134,6 +136,7 @@ export default function PlaceMarker({
         new THREE.Vector3(0, 0, stemHeight),
         resolvedHeadCenter,
         stemHeight,
+        isForked,
       );
       const nextGeometry = new THREE.TubeGeometry(curve, 18, STEM_RADIUS, 8, false);
       stem.geometry.dispose();
@@ -310,7 +313,12 @@ function resolveAgentHeadCenter({
   for (const other of markerAgents.values()) {
     if (other.id === markerId || other.radiusPx <= 0) continue;
     const delta = preferredScreen.clone().sub(other.screen);
-    const distance = Math.max(delta.length(), 0.001);
+    let distance = delta.length();
+    if (distance < 0.001) {
+      const angle = getStableMarkerAngle(markerId);
+      delta.set(Math.cos(angle), Math.sin(angle));
+      distance = 1;
+    }
     const minDistance = radiusPx + other.radiusPx + HEAD_AGENT_PADDING_PX;
     if (distance >= minDistance) continue;
 
@@ -339,6 +347,14 @@ function resolveAgentHeadCenter({
   state.world.copy(easedWorld);
 
   return easedLocal;
+}
+
+function getStableMarkerAngle(markerId: string) {
+  let hash = 0;
+  for (let index = 0; index < markerId.length; index += 1) {
+    hash = (hash * 31 + markerId.charCodeAt(index)) | 0;
+  }
+  return ((Math.abs(hash) % 360) * Math.PI) / 180;
 }
 
 function projectToScreen(point: THREE.Vector3, camera: THREE.Camera, size: { width: number; height: number }) {
@@ -385,12 +401,31 @@ function estimateScreenRadius(
   return 0;
 }
 
-function createStemCurve(sphereCenter: THREE.Vector3, headCenter: THREE.Vector3, stemHeight: number) {
+function createStemCurve(
+  sphereCenter: THREE.Vector3,
+  headCenter: THREE.Vector3,
+  stemHeight: number,
+  isForked = false,
+) {
   const lowerStem = new THREE.Vector3(0, 0, stemHeight * 0.48);
   if (sphereCenter.distanceToSquared(headCenter) < 0.000001) {
     return new THREE.CatmullRomCurve3([
       new THREE.Vector3(0, 0, 0),
       lowerStem,
+      headCenter,
+    ]);
+  }
+  if (isForked) {
+    const branchControl = new THREE.Vector3(
+      headCenter.x * 0.48,
+      headCenter.y * 0.48,
+      THREE.MathUtils.lerp(lowerStem.z, headCenter.z, 0.58),
+    );
+    return new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(0, 0, stemHeight * 0.24),
+      lowerStem,
+      branchControl,
       headCenter,
     ]);
   }
@@ -427,10 +462,10 @@ function createPetalledHeadGeometry() {
   return new THREE.ShapeGeometry(shape, totalSegments);
 }
 
-function createInitialStemGeometry(stemHeight: number) {
+function createInitialStemGeometry(stemHeight: number, isForked: boolean) {
   const sphereCenter = new THREE.Vector3(0, 0, stemHeight);
   return new THREE.TubeGeometry(
-    createStemCurve(sphereCenter, sphereCenter, stemHeight),
+    createStemCurve(sphereCenter, sphereCenter, stemHeight, isForked),
     18,
     STEM_RADIUS,
     8,

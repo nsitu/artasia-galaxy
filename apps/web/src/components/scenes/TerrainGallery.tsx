@@ -760,14 +760,33 @@ export default function TerrainGallery({
         },
       ];
     });
+    const anchorGroups = new Map<string, typeof projected>();
+    for (const item of projected) {
+      const key = getPlacementAnchorKey(item.placement);
+      const group = anchorGroups.get(key);
+      if (group) group.push(item);
+      else anchorGroups.set(key, [item]);
+    }
 
     return projected.map(({ placement, x, y, z }) => {
+      const anchorGroup =
+        anchorGroups.get(getPlacementAnchorKey(placement)) ?? [];
+      const anchorX = anchorGroup.length > 1
+        ? anchorGroup.reduce((sum, item) => sum + item.x, 0) / anchorGroup.length
+        : x;
+      const anchorY = anchorGroup.length > 1
+        ? anchorGroup.reduce((sum, item) => sum + item.y, 0) / anchorGroup.length
+        : y;
+      const anchorZ = terrain
+        ? (sampleTerrainZ(terrain, anchorX, anchorY) ?? z)
+        : z;
       return {
         placement,
+        isForked: anchorGroup.length > 1,
         position: [
-          x,
-          y,
-          terrain ? (sampleTerrainZ(terrain, x, y) ?? z) : z,
+          anchorX,
+          anchorY,
+          anchorZ,
         ] as [number, number, number],
       };
     });
@@ -1434,7 +1453,7 @@ export default function TerrainGallery({
         )}
 
       {sceneReadyForMarkers &&
-        placementLayout.map(({ placement, position }) => (
+        placementLayout.map(({ placement, position, isForked }) => (
           <PlaceMarker
             key={placement.placement_id}
             markerId={String(placement.placement_id)}
@@ -1442,6 +1461,7 @@ export default function TerrainGallery({
             brandColorOne={placement.partner_brand_color_one}
             brandColorTwo={placement.partner_brand_color_two}
             headPlaneZ={flowerHeadPlaneZ}
+            isForked={isForked}
             isSelected={
               usesTouchPreview &&
               previewPlacement?.placement_id === placement.placement_id
@@ -2209,6 +2229,18 @@ function terrainPhaseLabel(phase: TerrainPhase) {
 
 function formatRadius(radiusKm: number) {
   return `${radiusKm.toFixed(radiusKm >= 10 ? 0 : 1)} km`;
+}
+
+function getPlacementAnchorKey(placement: MapPlacement) {
+  const normalize = (value?: string) =>
+    value?.trim().toLocaleLowerCase().replace(/\s+/g, " ") ?? "";
+  const placeName = normalize(placement.place_name);
+  const address = normalize(placement.address);
+  const city = normalize(placement.place_city);
+
+  if (placeName) return `place:${placeName}|${city}`;
+  if (address) return `address:${address}|${city}`;
+  return `coordinates:${placement.lat.toFixed(5)}:${placement.lng.toFixed(5)}`;
 }
 
 function haversineMeters(a: [number, number], b: [number, number]) {
