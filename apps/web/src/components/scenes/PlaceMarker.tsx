@@ -5,7 +5,7 @@ import * as THREE from "three";
 interface Props {
   markerId: string;
   position: [number, number, number];
-  placementName: string;
+  participantAge?: string;
   brandColorOne?: string;
   brandColorTwo?: string;
   heightScale?: number;
@@ -41,7 +41,7 @@ const UP = new THREE.Vector3(0, 0, 1);
 export default function PlaceMarker({
   markerId,
   position,
-  placementName,
+  participantAge,
   brandColorOne,
   brandColorTwo,
   heightScale,
@@ -61,7 +61,10 @@ export default function PlaceMarker({
   const camera = useThree((state) => state.camera);
   const size = useThree((state) => state.size);
   const [x, y, z] = position;
-  const resolvedHeightScale = useMemo(() => heightScale ?? getHeightScale(placementName), [heightScale, placementName]);
+  const resolvedHeightScale = useMemo(
+    () => heightScale ?? getAgeBasedFlowerHeightScale(participantAge),
+    [heightScale, participantAge],
+  );
   const flowerColors = useMemo(() => getFlowerColors(brandColorOne, brandColorTwo), [brandColorOne, brandColorTwo]);
   const stemHeight = STEM_HEIGHT * resolvedHeightScale;
   const trackingRadius = TRACKING_RADIUS * resolvedHeightScale;
@@ -437,8 +440,20 @@ function createInitialStemGeometry(stemHeight: number, trackingRadius: number) {
   return new THREE.TubeGeometry(createStemCurve(sphereCenter, headCenter, stemHeight), 18, STEM_RADIUS, 8, false);
 }
 
-function getHeightScale(placementName: string) {
-  const length = placementName.trim().length;
-  const normalized = THREE.MathUtils.clamp((length - 8) / 40, 0, 1);
-  return THREE.MathUtils.lerp(0.8, 1.2, normalized);
+export function getAgeBasedFlowerHeightScale(participantAge?: string) {
+  const age = parseRepresentativeAge(participantAge);
+  if (age === null) return 1;
+  const normalized = THREE.MathUtils.clamp((age - 4) / 16, 0, 1);
+  return THREE.MathUtils.lerp(0.8, 1.8, normalized);
+}
+
+function parseRepresentativeAge(value?: string): number | null {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return null;
+  if (normalized.includes("adult")) return 20;
+  if (normalized.includes("school")) return 9;
+
+  const ages = normalized.match(/\d+(?:\.\d+)?/g)?.map(Number) ?? [];
+  if (ages.length >= 2) return (Math.min(...ages) + Math.max(...ages)) / 2;
+  return ages.length === 1 ? ages[0] : null;
 }

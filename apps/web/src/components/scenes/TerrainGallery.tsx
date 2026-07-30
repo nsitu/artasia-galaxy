@@ -12,7 +12,7 @@ import {
   OrbitingPhotoBanner,
   TerrainPhotoFlower,
 } from "./TerrainPhotoMarker";
-import PlaceMarker from "./PlaceMarker";
+import PlaceMarker, { getAgeBasedFlowerHeightScale } from "./PlaceMarker";
 import {
   createMaxDetailTerrainRequest,
   createTerrainRequest,
@@ -1442,7 +1442,7 @@ export default function TerrainGallery({
             key={placement.placement_id}
             markerId={String(placement.placement_id)}
             position={position}
-            placementName={placement.placement_name}
+            participantAge={placement.participant_age}
             brandColorOne={placement.partner_brand_color_one}
             brandColorTwo={placement.partner_brand_color_two}
             heightScale={heightScale}
@@ -2220,21 +2220,10 @@ function getDensityAwareFlowerHeightScale(
   neighborCount: number,
 ) {
   const density = clamp(neighborCount / 6, 0, 1);
-  const min = THREE.MathUtils.lerp(0.8, 0.5, density);
-  const max = THREE.MathUtils.lerp(1.2, 5, density);
-  return THREE.MathUtils.lerp(
-    min,
-    max,
-    stableUnit(`${placement.placement_id}:${placement.placement_name}`),
+  return (
+    getAgeBasedFlowerHeightScale(placement.participant_age) *
+    THREE.MathUtils.lerp(1, 1.35, density)
   );
-}
-
-function stableUnit(seed: string) {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    hash = (hash * 31 + seed.charCodeAt(i)) | 0;
-  }
-  return (Math.abs(hash) % 1000) / 999;
 }
 
 function haversineMeters(a: [number, number], b: [number, number]) {
