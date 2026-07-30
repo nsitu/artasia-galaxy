@@ -423,7 +423,22 @@ export default function ArtScene() {
         <div role="dialog" aria-modal="true" aria-label="About Atlas" style={aboutOverlayStyle}>
           <div style={aboutCardStyle}>
             <button type="button" aria-label="Close About" onClick={() => setAboutOpen(false)} style={aboutCloseStyle}>×</button>
-            <div style={aboutEyebrowStyle}>ARTS FOR ALL PRESENTS</div>
+            <div style={aboutPresenterStyle}>
+              <a
+                href="https://artsforall.co"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Arts For All"
+                style={aboutPresenterLinkStyle}
+              >
+                <img
+                  src="/afa-horizontal.svg"
+                  alt="Arts For All"
+                  style={aboutPresenterLogoStyle}
+                />
+              </a>
+              <span style={aboutPresenterTextStyle}>PRESENTS</span>
+            </div>
             <img src="/artasia-atlas.svg" alt="ArtAsia Atlas" style={aboutLogoStyle} />
             <p style={aboutTextStyle}>Explore artist-led learning experiences and creative spaces across our community.</p>
             <a href="https://artsforall.co" target="_blank" rel="noopener noreferrer" style={aboutLinkStyle}>Visit Arts For All</a>
@@ -1241,9 +1256,32 @@ const aboutCardStyle: React.CSSProperties = {
   position: "relative", width: "min(420px, 100%)", padding: "42px 28px 30px",
   borderRadius: 18, background: "rgba(16, 19, 31, 0.96)", border: "1px solid rgba(255,255,255,0.16)",
   color: "#eef3fb", textAlign: "center", boxShadow: "0 24px 70px rgba(0,0,0,0.45)",
+  fontFamily: "monospace",
 };
 const aboutCloseStyle: React.CSSProperties = { position: "absolute", top: 10, right: 14, border: 0, background: "transparent", color: "#cfd6e2", fontSize: 28, cursor: "pointer" };
-const aboutEyebrowStyle: React.CSSProperties = { color: "#aeb7c6", fontFamily: "monospace", fontSize: 10, letterSpacing: "0.16em" };
+const aboutPresenterStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "flex-end",
+  justifyContent: "center",
+  gap: 8,
+};
+const aboutPresenterLinkStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+};
+const aboutPresenterLogoStyle: React.CSSProperties = {
+  display: "block",
+  width: "clamp(92px, 21vw, 132px)",
+  height: "auto",
+};
+const aboutPresenterTextStyle: React.CSSProperties = {
+  marginBottom: "clamp(0.35rem, 1.1vw, 0.5rem)",
+  color: "#c1c9d7",
+  fontSize: 10,
+  fontVariant: "small-caps",
+  letterSpacing: "0.16em",
+  lineHeight: 1,
+};
 const aboutLogoStyle: React.CSSProperties = { display: "block", width: "min(260px, 80%)", height: "auto", margin: "18px auto" };
 const aboutTextStyle: React.CSSProperties = { margin: "0 auto 22px", maxWidth: 320, color: "#c1c9d7", lineHeight: 1.55, fontSize: 14 };
 const aboutLinkStyle: React.CSSProperties = { color: "#fff", fontFamily: "monospace", fontSize: 12, textDecoration: "underline" };
