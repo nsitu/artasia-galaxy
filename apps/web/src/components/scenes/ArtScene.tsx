@@ -505,6 +505,14 @@ export default function ArtScene() {
           }}
           style={{ ...photoLightboxStyle, touchAction: "pan-y" }}
         >
+          {focusedPlacementDetails && (
+            <div style={photoLightboxPlacementStyle}>
+              {focusedPlacementDetails.placement_name}
+              {focusedPlacementDetails.section?.trim()
+                ? ` - ${focusedPlacementDetails.section.trim()}`
+                : ""}
+            </div>
+          )}
           {selectedPhoto.mediaKind === "video" && selectedPhoto.videoUrl ? (
             <video
               className="atlas-photo-lightbox-media"
@@ -1439,6 +1447,21 @@ const photoLightboxCloseStyle: React.CSSProperties = {
   color: "#eef2f8",
   border: "1px solid rgba(255,255,255,0.18)",
   boxShadow: "0 10px 26px rgba(0,0,0,0.28)",
+};
+
+const photoLightboxPlacementStyle: React.CSSProperties = {
+  position: "absolute",
+  top: "max(16px, env(safe-area-inset-top))",
+  left: 16,
+  zIndex: 2,
+  maxWidth: "calc(100vw - 96px)",
+  color: "#fff",
+  fontFamily: "monospace",
+  fontSize: 14,
+  fontWeight: 700,
+  lineHeight: 1.3,
+  textShadow: "0 2px 8px rgba(0,0,0,0.85)",
+  pointerEvents: "none",
 };
 
 const aboutOverlayStyle: React.CSSProperties = {
