@@ -702,11 +702,14 @@ export default function TerrainGallery({
       const currentOuterRadius = 0.78 + outerRank * 0.3;
       const expandedStep = outerRank > 0
         ? (currentOuterRadius * 2 - 0.78) / outerRank
-        : 0;
+        : 0.6;
+      const untaggedRadius = currentOuterRadius * 2 + expandedStep;
       return {
-        orbitRadius: rank >= 0 ? 0.78 + rank * expandedStep : 0.78,
-        ...(activity ? { activityId: activity.id } : {}),
-        ...(activity?.colour ? { orbitColour: activity.colour } : {}),
+        orbitRadius: rank >= 0
+          ? 0.78 + rank * expandedStep
+          : untaggedRadius,
+        activityId: activity?.id ?? -1,
+        orbitColour: activity?.colour ?? "#8a9099",
       };
     };
 
