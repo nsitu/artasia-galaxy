@@ -268,9 +268,6 @@ export default function ArtScene() {
           <a href="/" aria-label="Artasia home" style={homeLogoLinkStyle}>
             <img src="/artasia-atlas.svg" alt="Artasia Atlas" style={homeLogoImageStyle} />
           </a>
-          <div style={homePartnerLogoRowStyle} aria-label="Artasia partners">
-            <img src="/spider.png" alt="Spider" style={homeSpiderLogoStyle} />
-          </div>
         </div>
 
         <div style={topControlGroupStyle}>
@@ -373,6 +370,17 @@ export default function ArtScene() {
           )}
         </div>
       </div>
+
+      <a
+        href="https://artsforall.co"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Presented by Arts For All"
+        style={presentedByStyle}
+      >
+        <span style={presentedByTextStyle}>PRESENTED BY</span>
+        <img src="/afa-horizontal.svg" alt="Arts For All" style={presentedByLogoStyle} />
+      </a>
 
       {error && <div style={errorStyle}>{error}</div>}
       <div style={buildStampStyle}>{__ARTASIA_BUILD_LABEL__}</div>
@@ -732,7 +740,7 @@ function GroundPlanePanControls({ enabled }: { enabled: boolean }) {
 
 const topNavStyle: React.CSSProperties = {
   position: "absolute",
-  top: 12,
+  top: 0,
   left: 16,
   right: 16,
   zIndex: 16,
@@ -751,6 +759,36 @@ const topControlGroupStyle: React.CSSProperties = {
   alignItems: "center",
   gap: 8,
   pointerEvents: "none",
+};
+
+const presentedByStyle: React.CSSProperties = {
+  position: "fixed",
+  right: 16,
+  bottom: 14,
+  zIndex: 16,
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 8,
+  padding: "6px 8px",
+  borderRadius: 999,
+  color: "#c1c9d7",
+  background: "rgba(10, 10, 20, 0.72)",
+  textDecoration: "none",
+  fontFamily: "monospace",
+  pointerEvents: "auto",
+};
+
+const presentedByTextStyle: React.CSSProperties = {
+  fontSize: 10,
+  fontVariant: "small-caps",
+  letterSpacing: "0.14em",
+  lineHeight: 1,
+};
+
+const presentedByLogoStyle: React.CSSProperties = {
+  width: "clamp(84px, 16vw, 116px)",
+  height: "auto",
+  display: "block",
 };
 
 const webglFallbackStyle: React.CSSProperties = {
@@ -870,8 +908,8 @@ const backChevronStyle: React.CSSProperties = {
 
 const homeLogoLinkStyle: React.CSSProperties = {
   flex: "0 0 auto",
-  width: "clamp(92px, 18vw, 150px)",
-  height: 50,
+  width: "9.92rem",
+  height: "5rem",
   display: "grid",
   placeItems: "center",
   pointerEvents: "auto",
@@ -885,23 +923,10 @@ const homeBrandStyle: React.CSSProperties = {
   gap: 8,
 };
 
-const homePartnerLogoRowStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 6,
-  minWidth: 0,
-  pointerEvents: "none",
-};
-
-const homeSpiderLogoStyle: React.CSSProperties = {
-  width: "clamp(40px, 8vw, 60px)",
-  height: 64,
-  objectFit: "contain",
-};
-
 const homeLogoImageStyle: React.CSSProperties = {
-  width: "100%",
-  height: 48,
+  width: "9.92rem",
+  height: "5rem",
+  aspectRatio: "484.7404381 / 244.2527827",
   objectFit: "contain",
   display: "block",
 };

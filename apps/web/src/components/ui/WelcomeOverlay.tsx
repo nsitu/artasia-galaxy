@@ -25,9 +25,20 @@ export default function WelcomeOverlay({
       aria-labelledby="welcome-title"
     >
       <div style={cardStyle}>
+        <div style={presenterStyle}>
+          <a
+            href="https://artsforall.co"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Arts For All"
+            style={presenterLogoLinkStyle}
+          >
+            <img src="/afa-horizontal.svg" alt="Arts For All" style={presenterLogoStyle} />
+          </a>
+          <span style={presenterTextStyle}>PRESENTS</span>
+        </div>
         <div style={brandRowStyle}>
           <img src="/artasia-atlas.svg" alt="Artasia Atlas" style={logoStyle} />
-          <img src="/spider.png" alt="Spider" style={spiderLogoStyle} />
         </div>
         <p style={descriptionStyle}>
           Welcome to Artasia Atlas! Explore creative projects made by children
@@ -91,10 +102,31 @@ const brandRowStyle: React.CSSProperties = {
   marginBottom: 6,
 };
 
-const spiderLogoStyle: React.CSSProperties = {
-  width: "clamp(56px, 14vw, 96px)",
-  height: "clamp(68px, 18vw, 116px)",
-  objectFit: "contain",
+const presenterStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 8,
+  marginBottom: 2,
+};
+
+const presenterLogoLinkStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+};
+
+const presenterLogoStyle: React.CSSProperties = {
+  width: "clamp(92px, 21vw, 132px)",
+  height: "auto",
+  display: "block",
+};
+
+const presenterTextStyle: React.CSSProperties = {
+  color: "#c1c9d7",
+  fontSize: 10,
+  fontVariant: "small-caps",
+  letterSpacing: "0.16em",
+  lineHeight: 1,
 };
 
 const taglineStyle: React.CSSProperties = {
