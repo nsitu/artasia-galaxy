@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import {
   fetchMapPlacements,
+  type ActivityOption,
   type MapPlacement,
   type Photo,
 } from "../../api/client";
@@ -471,6 +472,9 @@ type LocalPhotoLayoutItem =
       photo: Photo;
       index: number;
       center: [number, number, number];
+      orbitRadius: number;
+      orbitColour?: string;
+      activityId?: number;
     };
 type TerrainOrbitControls = {
   target?: THREE.Vector3;
@@ -517,6 +521,7 @@ interface TerrainGalleryProps {
   selectedPartnerFilter?: string;
   selectedActivityFilter?: string;
   selectedActivityColour?: string;
+  activityOptions?: ActivityOption[];
 }
 
 export default function TerrainGallery({
@@ -533,6 +538,7 @@ export default function TerrainGallery({
   selectedPartnerFilter = "",
   selectedActivityFilter = "",
   selectedActivityColour,
+  activityOptions = [],
 }: TerrainGalleryProps = {}) {
   const camera = useThree((state) => state.camera);
   const controls = useThree(
@@ -681,6 +687,19 @@ export default function TerrainGallery({
         ? (sampleTerrainZ(terrain, placementX, placementY) ?? placementZ)
         : placementZ,
     ] as [number, number, number];
+    const orbitForPhoto = (photo: Photo) => {
+      const activity = activityOptions.find((option) =>
+        photo.activityIds?.includes(option.id),
+      );
+      const rank = activity
+        ? activityOptions.findIndex((option) => option.id === activity.id)
+        : -1;
+      return {
+        orbitRadius: rank >= 0 ? 0.78 + rank * 0.3 : 0.78,
+        ...(activity ? { activityId: activity.id } : {}),
+        ...(activity?.colour ? { orbitColour: activity.colour } : {}),
+      };
+    };
 
     return photosForCurrentView.map((photo, index) => {
       if (photo.mediaKind === "audio") {
@@ -689,6 +708,7 @@ export default function TerrainGallery({
           photo,
           index,
           center: placementCenter,
+          ...orbitForPhoto(photo),
         };
       }
       const lat = photo.exifInfo?.latitude;
@@ -731,9 +751,26 @@ export default function TerrainGallery({
         photo,
         index,
         center: placementCenter,
+        ...orbitForPhoto(photo),
       };
     });
-  }, [focusedPlacement, photosForCurrentView, projection, terrain]);
+  }, [activityOptions, focusedPlacement, photosForCurrentView, projection, terrain]);
+  const activityOrbitRings = useMemo(() => {
+    const rings = new Map<number, {
+      radius: number;
+      colour: string;
+      center: [number, number, number];
+    }>();
+    for (const item of localPhotoLayout) {
+      if (item.kind !== "orbit" || item.activityId == null) continue;
+      rings.set(item.activityId, {
+        radius: item.orbitRadius,
+        colour: item.orbitColour ?? "#ffffff",
+        center: item.center,
+      });
+    }
+    return [...rings.values()];
+  }, [localPhotoLayout]);
 
   useEffect(() => {
     if (
@@ -1428,6 +1465,23 @@ export default function TerrainGallery({
     >
       <FlowerLayoutCoordinator />
       {terrain && terrainMatchesRequest && <primitive object={terrain} />}
+      {sceneReadyForMarkers && focusedPlacement &&
+        activityOrbitRings.map((ring) => (
+          <mesh
+            key={`${ring.radius}:${ring.colour}`}
+            position={[ring.center[0], ring.center[1], ring.center[2] + 0.72]}
+            renderOrder={1}
+          >
+            <ringGeometry args={[ring.radius - 0.012, ring.radius + 0.012, 96]} />
+            <meshBasicMaterial
+              color={ring.colour}
+              transparent
+              opacity={0.72}
+              side={THREE.DoubleSide}
+              depthWrite={false}
+            />
+          </mesh>
+        ))}
 
       {sceneReadyForMarkers &&
         showPhotoPins &&
@@ -1439,6 +1493,7 @@ export default function TerrainGallery({
               audioUrl={item.photo.audioUrl}
               iconName={item.photo.iconName}
               center={item.kind === "orbit" ? item.center : item.position}
+              orbitRadius={item.kind === "orbit" ? item.orbitRadius : undefined}
               isPlaying={playingAudioId === item.photo.id}
               isHighlighted={item.index === hoveredIndex}
               onPlaybackStart={() => setPlayingAudioId(item.photo.id)}
@@ -1478,6 +1533,7 @@ export default function TerrainGallery({
               adjustments={item.photo.adjustments}
               borderColour={selectedActivityColour}
               center={item.center}
+              orbitRadius={item.orbitRadius}
               isSelected={item.index === selectedIndex}
               isHighlighted={item.index === hoveredIndex}
               onClick={() =>

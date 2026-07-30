@@ -446,6 +446,7 @@ interface FlowerProps extends SharedPhotoProps {
 
 interface OrbitBannerProps extends SharedPhotoProps {
   center: [number, number, number];
+  orbitRadius?: number;
 }
 
 interface OrbitAudioProps {
@@ -453,6 +454,7 @@ interface OrbitAudioProps {
   audioUrl: string;
   iconName?: string;
   center: [number, number, number];
+  orbitRadius?: number;
   isPlaying: boolean;
   isHighlighted: boolean;
   onPlaybackStart: () => void;
@@ -694,6 +696,7 @@ export function OrbitingPhotoBanner({
   width,
   height,
   center,
+  orbitRadius,
   isSelected,
   isHighlighted,
   onClick,
@@ -799,6 +802,7 @@ export function OrbitingAudioMarker({
   audioUrl,
   iconName,
   center,
+  orbitRadius,
   isPlaying,
   isHighlighted,
   onPlaybackStart,
@@ -813,10 +817,10 @@ export function OrbitingAudioMarker({
   const assignedIconTexture = useMaterialSymbolTexture(iconName);
   playbackStopRef.current = onPlaybackStop;
   const orbit = useMemo(() => ({
-    radius: stableRange(`${id}:radius`, ORBIT_MIN_UNITS, ORBIT_MAX_UNITS),
+    radius: orbitRadius ?? stableRange(`${id}:radius`, ORBIT_MIN_UNITS, ORBIT_MAX_UNITS),
     phase: stableRange(`${id}:phase`, 0, Math.PI * 2),
     speed: stableRange(`${id}:speed`, ORBIT_SPEED_MIN, ORBIT_SPEED_MAX),
-  }), [id]);
+  }), [id, orbitRadius]);
   const triangle = useMemo(() => {
     const shape = new THREE.Shape();
     shape.moveTo(-0.055, -0.09);

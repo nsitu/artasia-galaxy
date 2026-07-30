@@ -654,6 +654,7 @@ export default function ArtScene() {
               selectedPartnerFilter={selectedPartnerFilter}
               selectedActivityFilter={selectedActivityFilter}
               selectedActivityColour={selectedActivityColour}
+              activityOptions={activityFilterOptions}
             />
             <MapControls
               makeDefault
