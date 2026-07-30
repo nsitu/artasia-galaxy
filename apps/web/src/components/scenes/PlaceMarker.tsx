@@ -4,6 +4,7 @@ import * as THREE from "three";
 
 interface Props {
   markerId: string;
+  stemColorSeed?: string;
   position: [number, number, number];
   brandColorOne?: string;
   brandColorTwo?: string;
@@ -40,6 +41,7 @@ const UP = new THREE.Vector3(0, 0, 1);
 
 export default function PlaceMarker({
   markerId,
+  stemColorSeed,
   position,
   brandColorOne,
   brandColorTwo,
@@ -86,8 +88,8 @@ export default function PlaceMarker({
     isSelected ? SELECTED_STEM_RADIUS_MULTIPLIER : 1
   );
   const stemColors = useMemo(
-    () => getStemColors(markerId, isSelected),
-    [isSelected, markerId],
+    () => getStemColors(stemColorSeed ?? markerId, isSelected),
+    [isSelected, markerId, stemColorSeed],
   );
 
   const headGeometry = useMemo(() => createPetalledHeadGeometry(), []);
@@ -375,10 +377,11 @@ function getStemColors(markerId: string, isSelected: boolean) {
   // subtle hue shift so their paths remain legible when they overlap.
   const hash = hashString(markerId);
   const hue = 0.34 + ((hash % 17) - 8) * 0.0045;
+  const brightness = 0.72 + ((hash >>> 8) % 29) / 100;
   const stem = new THREE.Color().setHSL(
     hue,
     isSelected ? 0.62 : 0.72,
-    isSelected ? 0.7 : 0.39,
+    (isSelected ? 0.7 : 0.39) * brightness,
   );
   const base = stem.clone().multiplyScalar(isSelected ? 0.9 : 0.82);
   return {
@@ -562,6 +565,7 @@ function resolveAgentHeadCenter({
     const easedLocal = currentHeadCenter
       ? currentHeadCenter.clone().lerp(preferredHeadCenter, HEAD_AGENT_EASE)
       : preferredHeadCenter.clone();
+    easedLocal.z = Math.max(easedLocal.z, HEAD_RADIUS * headScale * 1.18);
     const easedWorld = group.localToWorld(easedLocal.clone());
     state.screen.copy(projectToScreen(easedWorld, camera, size));
     state.world.copy(easedWorld);
@@ -582,9 +586,15 @@ function resolveAgentHeadCenter({
   }
 
   const targetLocal = sphereCenter.add(tetherOffset);
+  // Camera-facing heads can be pushed sideways by the layout solver. Keep
+  // their lowest point above the terrain anchor so the petals never clip into
+  // the surface when the camera is pitched or zoomed out.
+  const minimumHeadZ = HEAD_RADIUS * headScale * 1.18;
+  targetLocal.z = Math.max(targetLocal.z, minimumHeadZ);
   const easedLocal = currentHeadCenter
     ? currentHeadCenter.clone().lerp(targetLocal, HEAD_AGENT_EASE)
     : targetLocal;
+  easedLocal.z = Math.max(easedLocal.z, minimumHeadZ);
   const easedWorld = group.localToWorld(easedLocal.clone());
 
   state.screen.copy(projectToScreen(easedWorld, camera, size));

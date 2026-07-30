@@ -1481,6 +1481,7 @@ export default function TerrainGallery({
           <PlaceMarker
             key={placement.placement_id}
             markerId={String(placement.placement_id)}
+            stemColorSeed={getPlacementAnchorKey(placement)}
             position={position}
             brandColorOne={placement.partner_brand_color_one}
             brandColorTwo={placement.partner_brand_color_two}
