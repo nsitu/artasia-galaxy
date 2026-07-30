@@ -12,6 +12,7 @@ interface Props {
   clusterIndex?: number;
   clusterCount?: number;
   isSelected?: boolean;
+  hasAssets?: boolean;
   onClick?: () => void;
   onPointerEnter?: () => void;
   onPointerLeave?: () => void;
@@ -49,6 +50,7 @@ export default function PlaceMarker({
   clusterIndex = 0,
   clusterCount = 1,
   isSelected = false,
+  hasAssets = false,
   onClick,
   onPointerEnter,
   onPointerLeave,
@@ -56,6 +58,7 @@ export default function PlaceMarker({
   const groupRef = useRef<THREE.Group>(null);
   const headRef = useRef<THREE.Group>(null);
   const stemRef = useRef<THREE.Mesh>(null);
+  const leafRef = useRef<THREE.Group>(null);
   const currentHeadCenter = useRef<THREE.Vector3 | null>(null);
   const lastStemAttachment = useRef<THREE.Vector3 | null>(null);
   const lastStemRadius = useRef(0);
@@ -231,7 +234,11 @@ export default function PlaceMarker({
       lastStemAttachment.current = stemAttachment.clone();
       lastStemRadius.current = stemRadius;
       lastIncludesClusterTrunk.current = includesActiveClusterTrunk;
+      if (leafRef.current) {
+        leafRef.current.position.copy(curve.getPointAt(isForked ? 0.62 : 0.42));
+      }
     }
+    if (leafRef.current) orientHeadToCamera(leafRef.current, group, camera);
   });
 
   const pointerHandlers = {
@@ -281,6 +288,23 @@ export default function PlaceMarker({
           depthTest={false}
         />
       </mesh>}
+      {hasAssets && (
+        <group ref={leafRef} position={[0, 0, baseStemHeight * 0.42]}>
+          <mesh
+            rotation={[0, 0, hashString(markerId) % 2 ? 0.65 : -0.65]}
+            scale={[1.45, 0.62, 1]}
+            renderOrder={2}
+          >
+            <circleGeometry args={[0.09, 18]} />
+            <meshStandardMaterial
+              color={stemColors.stem}
+              roughness={0.7}
+              side={THREE.DoubleSide}
+              depthWrite={false}
+            />
+          </mesh>
+        </group>
+      )}
       <group ref={headRef} position={[0, 0, baseStemHeight]} {...pointerHandlers}>
         <mesh geometry={headGeometry} renderOrder={isSelected ? 6 : 3}>
           <meshStandardMaterial

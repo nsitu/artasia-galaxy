@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import {
   fetchMapPlacements,
+  fetchSiteActivityStats,
   type ActivityOption,
   type MapPlacement,
   type Photo,
@@ -565,6 +566,9 @@ export default function TerrainGallery({
     null,
   );
   const [placements, setPlacements] = useState<MapPlacement[]>([]);
+  const [placementsWithAssets, setPlacementsWithAssets] = useState<Set<number>>(
+    () => new Set(),
+  );
   const [placementError, setPlacementError] = useState<string | null>(null);
   const [placementsResolved, setPlacementsResolved] = useState(false);
   const [requestedSiteSlug, setRequestedSiteSlug] = useState(() =>
@@ -956,6 +960,25 @@ export default function TerrainGallery({
         }
       });
 
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchSiteActivityStats()
+      .then((result) => {
+        if (cancelled) return;
+        setPlacementsWithAssets(new Set(
+          Object.entries(result.sites)
+            .filter(([, stats]) => stats.totalPublished > 0)
+            .map(([placementId]) => Number(placementId)),
+        ));
+      })
+      .catch((statsError) => {
+        console.warn(`[viewer] failed to load placement asset stats: ${(statsError as Error).message}`);
+      });
     return () => {
       cancelled = true;
     };
@@ -1475,7 +1498,7 @@ export default function TerrainGallery({
           <mesh
             key={`${ring.radius}:${ring.colour}`}
             position={[ring.center[0], ring.center[1], ring.center[2] + 0.72]}
-            renderOrder={1}
+            renderOrder={0}
           >
             <ringGeometry args={[ring.radius - 0.012, ring.radius + 0.012, 96]} />
             <meshBasicMaterial
@@ -1536,7 +1559,7 @@ export default function TerrainGallery({
               width={item.photo.width}
               height={item.photo.height}
               adjustments={item.photo.adjustments}
-              borderColour={selectedActivityColour}
+              borderColour={selectedActivityColour ?? item.orbitColour}
               center={item.center}
               orbitRadius={item.orbitRadius}
               isSelected={item.index === selectedIndex}
@@ -1568,6 +1591,7 @@ export default function TerrainGallery({
             isForked={isForked}
             clusterIndex={clusterIndex}
             clusterCount={clusterCount}
+            hasAssets={placementsWithAssets.has(placement.placement_id)}
             isSelected={
               (
                 usesTouchPreview

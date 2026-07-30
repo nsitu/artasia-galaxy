@@ -56,7 +56,12 @@ function getContrastingTextColour(backgroundColour: string): string | undefined 
 }
 
 function getActivityColourStyle(colour?: string): React.CSSProperties {
-  if (!colour?.trim()) return {};
+  if (!colour?.trim()) {
+    return {
+      backgroundColor: "rgba(10,10,20,0.82)",
+      color: "#f4f7fb",
+    };
+  }
 
   const textColour = getContrastingTextColour(colour);
   return {

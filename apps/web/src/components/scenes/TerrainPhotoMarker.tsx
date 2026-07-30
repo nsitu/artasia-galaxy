@@ -708,11 +708,10 @@ export function OrbitingPhotoBanner({
   const groupRef = useRef<THREE.Group>(null);
   const imageRef = useRef<THREE.Mesh>(null);
   const pointerInsideRef = useRef(false);
+  const pointerDragRef = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   const texture = usePhotoTexture(url);
   const orbit = useMemo(() => ({
-    radius: orbitRadius != null
-      ? orbitRadius + stableRange(`${id}:activity-radius-offset`, -0.04, 0.04)
-      : stableRange(`${id}:radius`, ORBIT_MIN_UNITS, ORBIT_MAX_UNITS),
+    radius: orbitRadius ?? stableRange(`${id}:radius`, ORBIT_MIN_UNITS, ORBIT_MAX_UNITS),
     phase: stableRange(`${id}:phase`, 0, Math.PI * 2),
     speed: stableRange(`${id}:speed`, ORBIT_SPEED_MIN, ORBIT_SPEED_MAX),
   }), [id, orbitRadius]);
@@ -751,12 +750,33 @@ export function OrbitingPhotoBanner({
       <Billboard>
         <mesh
           ref={imageRef}
+          renderOrder={3}
+          onPointerDown={(event) => {
+            pointerDragRef.current = {
+              x: event.nativeEvent.clientX,
+              y: event.nativeEvent.clientY,
+              moved: false,
+            };
+          }}
           onClick={(event) => {
+            if (pointerDragRef.current?.moved) {
+              pointerDragRef.current = null;
+              event.stopPropagation();
+              return;
+            }
+            pointerDragRef.current = null;
             if (!isPointInsideCutout(event.uv, cutout)) return;
             event.stopPropagation();
             onClick();
           }}
           onPointerMove={(event) => {
+            const drag = pointerDragRef.current;
+            if (drag && Math.hypot(
+              event.nativeEvent.clientX - drag.x,
+              event.nativeEvent.clientY - drag.y,
+            ) > 6) {
+              drag.moved = true;
+            }
             const inside = isPointInsideCutout(event.uv, cutout);
             if (inside === pointerInsideRef.current) return;
             pointerInsideRef.current = inside;
@@ -765,6 +785,7 @@ export function OrbitingPhotoBanner({
             else onPointerLeave();
           }}
           onPointerOut={() => {
+            pointerDragRef.current = null;
             if (pointerInsideRef.current) onPointerLeave();
             pointerInsideRef.current = false;
             document.body.style.cursor = "";
@@ -789,6 +810,7 @@ export function OrbitingPhotoBanner({
             side={THREE.DoubleSide}
             toneMapped={false}
             depthWrite={false}
+            depthTest={false}
             polygonOffset
             polygonOffsetFactor={-2}
             polygonOffsetUnits={-2}
@@ -819,9 +841,7 @@ export function OrbitingAudioMarker({
   const assignedIconTexture = useMaterialSymbolTexture(iconName);
   playbackStopRef.current = onPlaybackStop;
   const orbit = useMemo(() => ({
-    radius: orbitRadius != null
-      ? orbitRadius + stableRange(`${id}:activity-radius-offset`, -0.04, 0.04)
-      : stableRange(`${id}:radius`, ORBIT_MIN_UNITS, ORBIT_MAX_UNITS),
+    radius: orbitRadius ?? stableRange(`${id}:radius`, ORBIT_MIN_UNITS, ORBIT_MAX_UNITS),
     phase: stableRange(`${id}:phase`, 0, Math.PI * 2),
     speed: stableRange(`${id}:speed`, ORBIT_SPEED_MIN, ORBIT_SPEED_MAX),
   }), [id, orbitRadius]);
@@ -1045,10 +1065,32 @@ function createPointerHandlers(
   onPointerEnter: () => void,
   onPointerLeave: () => void
 ) {
+  let dragStart: { x: number; y: number; moved: boolean } | null = null;
   return {
     onClick: (event: ThreeEvent<MouseEvent>) => {
       event.stopPropagation();
+      if (dragStart?.moved) {
+        dragStart = null;
+        return;
+      }
+      dragStart = null;
       onClick();
+    },
+    onPointerDown: (event: ThreeEvent<PointerEvent>) => {
+      dragStart = {
+        x: event.nativeEvent.clientX,
+        y: event.nativeEvent.clientY,
+        moved: false,
+      };
+    },
+    onPointerMove: (event: ThreeEvent<PointerEvent>) => {
+      if (!dragStart) return;
+      if (Math.hypot(
+        event.nativeEvent.clientX - dragStart.x,
+        event.nativeEvent.clientY - dragStart.y,
+      ) > 6) {
+        dragStart.moved = true;
+      }
     },
     onPointerOver: (event: ThreeEvent<PointerEvent>) => {
       event.stopPropagation();
@@ -1057,6 +1099,7 @@ function createPointerHandlers(
     },
     onPointerOut: (event: ThreeEvent<PointerEvent>) => {
       event.stopPropagation();
+      dragStart = null;
       document.body.style.cursor = "";
       onPointerLeave();
     },
