@@ -1302,7 +1302,7 @@ const photoLightboxStyle: React.CSSProperties = {
 const photoLightboxImageStyle: React.CSSProperties = {
   maxWidth: "calc(100vw - 48px)",
   // Reserve room for the caption panel, especially on short mobile screens.
-  maxHeight: "calc(100vh - 180px)",
+  maxHeight: "calc(100dvh - 220px)",
   objectFit: "contain",
   boxShadow: "0 18px 60px rgba(0,0,0,0.5)",
   cursor: "default",
@@ -1313,7 +1313,8 @@ const photoLightboxMetadataStyle: React.CSSProperties = {
   left: 24,
   bottom: "max(12px, env(safe-area-inset-bottom))",
   width: "min(520px, calc(100vw - 48px))",
-  maxHeight: "36vh",
+  maxHeight: "min(36vh, calc(100dvh - 120px))",
+  boxSizing: "border-box",
   overflowY: "auto",
   background: "rgba(10,10,20,0.86)",
   border: "1px solid rgba(255,255,255,0.18)",

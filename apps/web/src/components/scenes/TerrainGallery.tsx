@@ -1681,10 +1681,9 @@ export function FocusedPlacementOverlay({
                 people.map((person) => person.name).join(", ") || "Unassigned"
               }
             />
-            <SiteDetail
-              label="Children"
-              value={participantDetails || "Not specified"}
-            />
+            {participantDetails && (
+              <SiteDetail label="Age range" value={participantDetails} />
+            )}
           </div>
           {adminHref && (
             <div style={siteDetailsAdminActionStyle}>
