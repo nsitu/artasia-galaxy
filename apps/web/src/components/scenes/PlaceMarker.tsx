@@ -25,12 +25,11 @@ const HEAD_RADIUS = 0.2295;
 const PETAL_LOBE_COUNT = 10;
 const STEM_RADIUS = 0.011;
 const SELECTED_STEM_RADIUS_MULTIPLIER = 1.3;
-const HEAD_FULL_SCALE_DISTANCE = 8;
-const HEAD_MIN_SCALE_DISTANCE = 1.6;
-const HEAD_MIN_SCALE = 0.24;
-const HEAD_MAX_SCALE = 1.08;
+const HEAD_NEAR_SCALE_DISTANCE = 2;
+const HEAD_FAR_SCALE_DISTANCE = 14;
+const HEAD_NEAR_SCREEN_RADIUS_PX = 30;
+const HEAD_FAR_SCREEN_RADIUS_PX = 16;
 const HEAD_AGENT_PADDING_PX = 10;
-const HEAD_AGENT_REPULSION = 0.62;
 const HEAD_AGENT_EASE = 0.18;
 const HEAD_AGENT_TETHER_EXTENSION = 1.9;
 const DEFAULT_HEAD_COLOR = "#ff1f2d";
@@ -125,7 +124,11 @@ export default function PlaceMarker({
       0.14,
     );
     const headScale =
-      getCameraResponsiveHeadScale(cameraDistance) * selectionScale.current;
+      getCameraResponsiveHeadScale(
+        cameraDistance,
+        camera,
+        size.height,
+      ) * selectionScale.current;
     const preferredHeadCenter = naturalHeadCenter.clone();
     if (isForked && clusterCount > 1) {
       const cameraWorldQuaternion = camera.getWorldQuaternion(
@@ -302,17 +305,47 @@ function darkenHexColor(value: string, fallback: string) {
   return new THREE.Color(color).multiplyScalar(0.38).getStyle();
 }
 
-function getCameraResponsiveHeadScale(cameraDistance: number) {
+function getCameraResponsiveHeadScale(
+  cameraDistance: number,
+  camera: THREE.Camera,
+  viewportHeight: number,
+) {
   if (!Number.isFinite(cameraDistance)) return 1;
-  const t = THREE.MathUtils.smoothstep(cameraDistance, HEAD_MIN_SCALE_DISTANCE, HEAD_FULL_SCALE_DISTANCE);
-  return THREE.MathUtils.lerp(HEAD_MIN_SCALE, HEAD_MAX_SCALE, t);
+  const distanceProgress = THREE.MathUtils.smoothstep(
+    cameraDistance,
+    HEAD_NEAR_SCALE_DISTANCE,
+    HEAD_FAR_SCALE_DISTANCE,
+  );
+  const desiredRadiusPx = THREE.MathUtils.lerp(
+    HEAD_NEAR_SCREEN_RADIUS_PX,
+    HEAD_FAR_SCREEN_RADIUS_PX,
+    distanceProgress,
+  );
+  if (camera instanceof THREE.PerspectiveCamera) {
+    const visibleHeight =
+      2 *
+      Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) *
+      cameraDistance;
+    return THREE.MathUtils.clamp(
+      (desiredRadiusPx * visibleHeight) /
+        Math.max(1, viewportHeight) /
+        HEAD_RADIUS,
+      0.18,
+      1.4,
+    );
+  }
+  return 1;
 }
 
 type MarkerAgentState = {
   id: string;
+  preferredScreen: THREE.Vector2;
+  targetScreen: THREE.Vector2;
   screen: THREE.Vector2;
   radiusPx: number;
   world: THREE.Vector3;
+  visible: boolean;
+  hasTarget: boolean;
 };
 
 const markerAgents = new Map<string, MarkerAgentState>();
@@ -322,13 +355,108 @@ function getMarkerAgentState(id: string) {
   if (!state) {
     state = {
       id,
+      preferredScreen: new THREE.Vector2(),
+      targetScreen: new THREE.Vector2(),
       screen: new THREE.Vector2(),
       radiusPx: 0,
       world: new THREE.Vector3(),
+      visible: false,
+      hasTarget: false,
     };
     markerAgents.set(id, state);
   }
   return state;
+}
+
+const FLOWER_LAYOUT_INTERVAL_SECONDS = 1 / 15;
+const FLOWER_LAYOUT_ITERATIONS = 6;
+const FLOWER_LAYOUT_DEAD_ZONE_PX = 3;
+const FLOWER_LAYOUT_ANCHOR_SPRING = 0.12;
+const FLOWER_LAYOUT_RELAXATION = 0.58;
+
+export function FlowerLayoutCoordinator() {
+  const size = useThree((state) => state.size);
+  const lastLayoutAt = useRef(Number.NEGATIVE_INFINITY);
+
+  useFrame(({ clock }) => {
+    const elapsed = clock.getElapsedTime();
+    if (elapsed - lastLayoutAt.current < FLOWER_LAYOUT_INTERVAL_SECONDS) return;
+    lastLayoutAt.current = elapsed;
+    solveFlowerLayout(size);
+  }, -1);
+
+  return null;
+}
+
+function solveFlowerLayout(size: { width: number; height: number }) {
+  const agents = [...markerAgents.values()].filter(
+    (agent) => agent.visible && agent.radiusPx > 0,
+  );
+  if (agents.length === 0) return;
+
+  const positions = agents.map((agent) =>
+    agent.hasTarget
+      ? agent.targetScreen.clone()
+      : agent.preferredScreen.clone(),
+  );
+
+  for (let iteration = 0; iteration < FLOWER_LAYOUT_ITERATIONS; iteration += 1) {
+    const corrections = positions.map(() => new THREE.Vector2());
+
+    for (let left = 0; left < agents.length; left += 1) {
+      for (let right = left + 1; right < agents.length; right += 1) {
+        const delta = positions[left].clone().sub(positions[right]);
+        let distance = delta.length();
+        if (distance < 0.001) {
+          const angle = getStableMarkerAngle(
+            `${agents[left].id}:${agents[right].id}`,
+          );
+          delta.set(Math.cos(angle), Math.sin(angle));
+          distance = 1;
+        }
+        const requiredDistance =
+          agents[left].radiusPx +
+          agents[right].radiusPx +
+          HEAD_AGENT_PADDING_PX;
+        const overlap = requiredDistance - distance;
+        if (overlap <= FLOWER_LAYOUT_DEAD_ZONE_PX) continue;
+
+        const correction = delta
+          .divideScalar(distance)
+          .multiplyScalar(
+            (overlap - FLOWER_LAYOUT_DEAD_ZONE_PX) *
+              0.5 *
+              FLOWER_LAYOUT_RELAXATION,
+          );
+        corrections[left].add(correction);
+        corrections[right].sub(correction);
+      }
+    }
+
+    for (let index = 0; index < agents.length; index += 1) {
+      positions[index]
+        .add(corrections[index])
+        .lerp(agents[index].preferredScreen, FLOWER_LAYOUT_ANCHOR_SPRING);
+      const padding = agents[index].radiusPx + 8;
+      positions[index].set(
+        THREE.MathUtils.clamp(
+          positions[index].x,
+          padding,
+          Math.max(padding, size.width - padding),
+        ),
+        THREE.MathUtils.clamp(
+          positions[index].y,
+          padding,
+          Math.max(padding, size.height - padding),
+        ),
+      );
+    }
+  }
+
+  agents.forEach((agent, index) => {
+    agent.targetScreen.copy(positions[index]);
+    agent.hasTarget = true;
+  });
 }
 
 function resolveAgentHeadCenter({
@@ -361,57 +489,28 @@ function resolveAgentHeadCenter({
   const preferredWorld = group.localToWorld(preferredHeadCenter.clone());
   const preferredScreen = projectToScreen(preferredWorld, camera, size);
   const radiusPx = estimateScreenRadius(preferredWorld, HEAD_RADIUS * headScale, camera, size);
+  if (state.hasTarget && state.visible) {
+    state.targetScreen.add(
+      preferredScreen.clone().sub(state.preferredScreen),
+    );
+  }
+  state.preferredScreen.copy(preferredScreen);
+  state.visible = arrangeForCamera;
+  state.radiusPx = arrangeForCamera ? radiusPx : 0;
+
   if (!arrangeForCamera) {
     const easedLocal = currentHeadCenter
       ? currentHeadCenter.clone().lerp(preferredHeadCenter, HEAD_AGENT_EASE)
       : preferredHeadCenter.clone();
     const easedWorld = group.localToWorld(easedLocal.clone());
     state.screen.copy(projectToScreen(easedWorld, camera, size));
-    state.radiusPx = 0;
     state.world.copy(easedWorld);
+    state.hasTarget = false;
     return easedLocal;
   }
-  let screenOffset = new THREE.Vector2();
-
-  for (const other of markerAgents.values()) {
-    if (other.id === markerId || other.radiusPx <= 0) continue;
-    const delta = preferredScreen.clone().sub(other.screen);
-    let distance = delta.length();
-    if (distance < 0.001) {
-      const angle = getStableMarkerAngle(markerId);
-      delta.set(Math.cos(angle), Math.sin(angle));
-      distance = 1;
-    }
-    const minDistance = radiusPx + other.radiusPx + HEAD_AGENT_PADDING_PX;
-    if (distance >= minDistance) continue;
-
-    const direction = delta.divideScalar(distance);
-    const upwardPreference = new THREE.Vector2(
-      direction.x >= 0 ? 0.34 : -0.34,
-      -1,
-    ).normalize();
-    direction.lerp(upwardPreference, 0.38).normalize();
-    screenOffset.add(
-      direction.multiplyScalar(
-        (minDistance - distance) * HEAD_AGENT_REPULSION,
-      ),
-    );
-  }
-
-  const resolvedScreen = preferredScreen.add(screenOffset);
-  const viewportPadding = radiusPx + 8;
-  resolvedScreen.set(
-    THREE.MathUtils.clamp(
-      resolvedScreen.x,
-      viewportPadding,
-      Math.max(viewportPadding, size.width - viewportPadding),
-    ),
-    THREE.MathUtils.clamp(
-      resolvedScreen.y,
-      viewportPadding,
-      Math.max(viewportPadding, size.height - viewportPadding),
-    ),
-  );
+  const resolvedScreen = state.hasTarget
+    ? state.targetScreen
+    : preferredScreen;
   const resolvedWorld = screenToWorldOnCameraPlane(resolvedScreen, preferredWorld, camera, size);
   const resolvedLocal = group.worldToLocal(resolvedWorld);
   const sphereCenter = new THREE.Vector3(0, 0, stemHeight);
@@ -429,7 +528,6 @@ function resolveAgentHeadCenter({
   const easedWorld = group.localToWorld(easedLocal.clone());
 
   state.screen.copy(projectToScreen(easedWorld, camera, size));
-  state.radiusPx = estimateScreenRadius(easedWorld, HEAD_RADIUS * headScale, camera, size);
   state.world.copy(easedWorld);
 
   return easedLocal;

@@ -12,7 +12,7 @@ import {
   OrbitingPhotoBanner,
   TerrainPhotoFlower,
 } from "./TerrainPhotoMarker";
-import PlaceMarker from "./PlaceMarker";
+import PlaceMarker, { FlowerLayoutCoordinator } from "./PlaceMarker";
 import {
   createMaxDetailTerrainRequest,
   createTerrainRequest,
@@ -1388,6 +1388,7 @@ export default function TerrainGallery({
 
   return (
     <group>
+      <FlowerLayoutCoordinator />
       {terrain && terrainMatchesRequest && <primitive object={terrain} />}
 
       {sceneReadyForMarkers &&
