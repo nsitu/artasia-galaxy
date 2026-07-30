@@ -94,6 +94,7 @@ export default function PlaceMarker({
     const planeHeadCenter = new THREE.Vector3(0, 0, stemHeight);
     const cameraLocal = group.worldToLocal(camera.position.clone());
     const cameraDistance = cameraLocal.distanceTo(planeHeadCenter);
+    const anchorIsVisible = isAnchorInsideViewport(group, camera);
 
     selectionScale.current = THREE.MathUtils.lerp(
       selectionScale.current,
@@ -112,6 +113,7 @@ export default function PlaceMarker({
       headScale,
       preferredHeadCenter: planeHeadCenter,
       currentHeadCenter: currentHeadCenter.current,
+      arrangeForCamera: anchorIsVisible,
     });
     currentHeadCenter.current = resolvedHeadCenter.clone();
     head.position.copy(resolvedHeadCenter);
@@ -294,6 +296,7 @@ function resolveAgentHeadCenter({
   headScale,
   preferredHeadCenter,
   currentHeadCenter,
+  arrangeForCamera,
 }: {
   markerId: string;
   group: THREE.Group;
@@ -304,6 +307,7 @@ function resolveAgentHeadCenter({
   headScale: number;
   preferredHeadCenter: THREE.Vector3;
   currentHeadCenter: THREE.Vector3 | null;
+  arrangeForCamera: boolean;
 }) {
   group.updateMatrixWorld(true);
   camera.updateMatrixWorld(true);
@@ -312,6 +316,16 @@ function resolveAgentHeadCenter({
   const preferredWorld = group.localToWorld(preferredHeadCenter.clone());
   const preferredScreen = projectToScreen(preferredWorld, camera, size);
   const radiusPx = estimateScreenRadius(preferredWorld, HEAD_RADIUS * headScale, camera, size);
+  if (!arrangeForCamera) {
+    const easedLocal = currentHeadCenter
+      ? currentHeadCenter.clone().lerp(preferredHeadCenter, HEAD_AGENT_EASE)
+      : preferredHeadCenter.clone();
+    const easedWorld = group.localToWorld(easedLocal.clone());
+    state.screen.copy(projectToScreen(easedWorld, camera, size));
+    state.radiusPx = 0;
+    state.world.copy(easedWorld);
+    return easedLocal;
+  }
   let screenOffset = new THREE.Vector2();
 
   for (const other of markerAgents.values()) {
@@ -374,6 +388,22 @@ function resolveAgentHeadCenter({
   state.world.copy(easedWorld);
 
   return easedLocal;
+}
+
+function isAnchorInsideViewport(group: THREE.Group, camera: THREE.Camera) {
+  group.updateMatrixWorld(true);
+  camera.updateMatrixWorld(true);
+  const anchorNdc = group
+    .localToWorld(new THREE.Vector3(0, 0, 0))
+    .project(camera);
+  return (
+    anchorNdc.z >= -1 &&
+    anchorNdc.z <= 1 &&
+    anchorNdc.x >= -1 &&
+    anchorNdc.x <= 1 &&
+    anchorNdc.y >= -1 &&
+    anchorNdc.y <= 1
+  );
 }
 
 function getStableMarkerAngle(markerId: string) {

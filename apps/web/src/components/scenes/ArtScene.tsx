@@ -27,6 +27,7 @@ const TERRAIN_MAP_MOUSE_BUTTONS = {
 const TERRAIN_GROUND_PLANE_NORMAL = new THREE.Vector3(0, 0, 1);
 const TERRAIN_GL_OPTIONS = {
   antialias: false,
+  alpha: true,
   powerPreference: "default" as WebGLPowerPreference,
   failIfMajorPerformanceCaveat: false,
 };
@@ -607,6 +608,7 @@ export default function ArtScene() {
           onCreated={({ camera, gl }) => {
             camera.up.set(0, 1, 0);
             camera.lookAt(0, 0, 0);
+            gl.setClearColor(0x000000, 0);
             gl.domElement.addEventListener("webglcontextlost", () => {
               setWebglError("The 3D map lost its WebGL context. Reload this page, or try a newer iPad/browser if the issue repeats.");
             });
@@ -614,7 +616,10 @@ export default function ArtScene() {
           onError={(error) => {
             setWebglError(error instanceof Error ? error.message : "The 3D map could not start WebGL.");
           }}
-          style={{ background: "#0a0a14" }}
+          style={{
+            background:
+              "linear-gradient(130deg, #8E1D58 0%, #F28B20DD 100%)",
+          }}
         >
           <ambientLight intensity={0.8} />
           <Suspense fallback={null}>

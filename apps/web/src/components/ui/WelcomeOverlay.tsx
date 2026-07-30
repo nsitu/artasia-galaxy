@@ -67,7 +67,8 @@ const overlayStyle: React.CSSProperties = {
   display: "grid",
   placeItems: "center",
   padding: 24,
-  background: "rgba(10, 10, 20, 0.98)",
+  background:
+    "linear-gradient(130deg, #8E1D58 0%, #F28B20DD 100%)",
   color: "#eef2f8",
   fontFamily: "monospace",
   opacity: 1,
