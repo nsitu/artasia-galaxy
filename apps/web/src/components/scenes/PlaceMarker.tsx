@@ -190,6 +190,7 @@ export default function PlaceMarker({
       preferredHeadCenter,
       currentHeadCenter: currentHeadCenter.current,
       arrangeForCamera: anchorIsVisible,
+      collisionScale: isSelected ? 1.35 : 1,
     });
     currentHeadCenter.current = resolvedHeadCenter.clone();
     head.position.copy(resolvedHeadCenter);
@@ -534,6 +535,7 @@ function resolveAgentHeadCenter({
   preferredHeadCenter,
   currentHeadCenter,
   arrangeForCamera,
+  collisionScale,
 }: {
   markerId: string;
   group: THREE.Group;
@@ -545,6 +547,7 @@ function resolveAgentHeadCenter({
   preferredHeadCenter: THREE.Vector3;
   currentHeadCenter: THREE.Vector3 | null;
   arrangeForCamera: boolean;
+  collisionScale: number;
 }) {
   group.updateMatrixWorld(true);
   camera.updateMatrixWorld(true);
@@ -552,7 +555,12 @@ function resolveAgentHeadCenter({
   const state = getMarkerAgentState(markerId);
   const preferredWorld = group.localToWorld(preferredHeadCenter.clone());
   const preferredScreen = projectToScreen(preferredWorld, camera, size);
-  const radiusPx = estimateScreenRadius(preferredWorld, HEAD_RADIUS * headScale, camera, size);
+  const radiusPx = estimateScreenRadius(
+    preferredWorld,
+    HEAD_RADIUS * headScale,
+    camera,
+    size,
+  ) * collisionScale;
   if (state.hasTarget && state.visible) {
     state.targetScreen.add(
       preferredScreen.clone().sub(state.preferredScreen),
