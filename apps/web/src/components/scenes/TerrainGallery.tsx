@@ -27,7 +27,6 @@ const DEFAULT_TERRAIN_CAMERA_POSITION = new THREE.Vector3(0, -12, 10);
 const LOCAL_PLACEMENT_RADIUS_KM = 0.5;
 const SAME_LOCATION_THRESHOLD_METERS = 15;
 const REGIONAL_CAMERA_FIT_SCALE = 0.5;
-const REGIONAL_FLOWER_HEAD_PLANE_CLEARANCE = 0.42;
 const LOCAL_CAMERA_FIT_SCALE = 0.55;
 const REGIONAL_DEM_ZOOM_OFFSET = 5;
 const LOCAL_DEM_ZOOM_OFFSET = 3;
@@ -791,15 +790,6 @@ export default function TerrainGallery({
       };
     });
   }, [focusedPlacement, projection, terrain, visiblePlacements]);
-  const flowerHeadPlaneZ = useMemo(() => {
-    const highestAnchor = placementLayout.reduce(
-      (highest, item) => Math.max(highest, item.position[2]),
-      Number.NEGATIVE_INFINITY,
-    );
-    return Number.isFinite(highestAnchor)
-      ? highestAnchor + REGIONAL_FLOWER_HEAD_PLANE_CLEARANCE
-      : REGIONAL_FLOWER_HEAD_PLANE_CLEARANCE;
-  }, [placementLayout]);
 
   const focusPlacement = useCallback(
     (
@@ -1460,7 +1450,6 @@ export default function TerrainGallery({
             position={position}
             brandColorOne={placement.partner_brand_color_one}
             brandColorTwo={placement.partner_brand_color_two}
-            headPlaneZ={flowerHeadPlaneZ}
             isForked={isForked}
             isSelected={
               usesTouchPreview &&

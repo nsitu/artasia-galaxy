@@ -7,7 +7,6 @@ interface Props {
   position: [number, number, number];
   brandColorOne?: string;
   brandColorTwo?: string;
-  headPlaneZ: number;
   isForked?: boolean;
   isSelected?: boolean;
   onClick?: () => void;
@@ -16,8 +15,8 @@ interface Props {
 }
 
 const BASE_LIFT = 0.025;
-const MIN_STEM_HEIGHT = 0.18;
-const HEAD_LAYOUT_RADIUS = 0.28;
+const MIN_STEM_HEIGHT = 0.38;
+const MAX_STEM_HEIGHT = 0.92;
 const HEAD_RADIUS = 0.2295;
 const PETAL_LOBE_COUNT = 10;
 const STEM_RADIUS = 0.011;
@@ -26,7 +25,7 @@ const HEAD_MIN_SCALE_DISTANCE = 1.6;
 const HEAD_MIN_SCALE = 0.24;
 const HEAD_MAX_SCALE = 1.08;
 const HEAD_AGENT_PADDING_PX = 10;
-const HEAD_AGENT_REPULSION = 0.5;
+const HEAD_AGENT_REPULSION = 0.62;
 const HEAD_AGENT_EASE = 0.18;
 const HEAD_AGENT_TETHER_EXTENSION = 1.9;
 const DEFAULT_HEAD_COLOR = "#ff1f2d";
@@ -40,7 +39,6 @@ export default function PlaceMarker({
   position,
   brandColorOne,
   brandColorTwo,
-  headPlaneZ,
   isForked = false,
   isSelected = false,
   onClick,
@@ -51,16 +49,21 @@ export default function PlaceMarker({
   const headRef = useRef<THREE.Group>(null);
   const stemRef = useRef<THREE.Mesh>(null);
   const currentHeadCenter = useRef<THREE.Vector3 | null>(null);
-  const lastStemDirection = useRef(new THREE.Vector3(0, 0, 1));
+  const lastStemAttachment = useRef<THREE.Vector3 | null>(null);
   const selectionScale = useRef(1);
   const selectedRotation = useRef(0);
   const camera = useThree((state) => state.camera);
   const size = useThree((state) => state.size);
   const [x, y, z] = position;
   const flowerColors = useMemo(() => getFlowerColors(brandColorOne, brandColorTwo), [brandColorOne, brandColorTwo]);
-  const stemHeight = Math.max(
-    MIN_STEM_HEIGHT,
-    headPlaneZ - (z + BASE_LIFT),
+  const stemHeight = useMemo(
+    () => getNaturalStemHeight(markerId),
+    [markerId],
+  );
+  const headLayoutRadius = THREE.MathUtils.clamp(
+    stemHeight * 0.72,
+    0.3,
+    0.7,
   );
 
   const headGeometry = useMemo(() => createPetalledHeadGeometry(), []);
@@ -105,7 +108,7 @@ export default function PlaceMarker({
       camera,
       size,
       stemHeight,
-      trackingRadius: HEAD_LAYOUT_RADIUS,
+      trackingRadius: headLayoutRadius,
       headScale,
       preferredHeadCenter: planeHeadCenter,
       currentHeadCenter: currentHeadCenter.current,
@@ -114,6 +117,12 @@ export default function PlaceMarker({
     head.position.copy(resolvedHeadCenter);
     head.scale.setScalar(headScale);
     orientHeadToCamera(head, group, camera);
+    const headUp = new THREE.Vector3(0, 1, 0)
+      .applyQuaternion(head.quaternion)
+      .normalize();
+    const stemAttachment = resolvedHeadCenter
+      .clone()
+      .addScaledVector(headUp, -HEAD_RADIUS * headScale * 0.72);
     if (isSelected) {
       selectedRotation.current =
         (selectedRotation.current + delta * 1.35) % (Math.PI * 2);
@@ -122,26 +131,21 @@ export default function PlaceMarker({
       selectedRotation.current = 0;
     }
 
-    const stemOffset = resolvedHeadCenter
-      .clone()
-      .sub(new THREE.Vector3(0, 0, stemHeight));
-    const stemDirection = stemOffset.lengthSq() > 0.000001
-      ? stemOffset.normalize()
-      : UP;
     if (
-      lastStemDirection.current.angleTo(stemDirection) > 0.025 ||
+      !lastStemAttachment.current ||
+      lastStemAttachment.current.distanceToSquared(stemAttachment) > 0.000025 ||
       stemRef.current.geometry === initialStemGeometry
     ) {
       const curve = createStemCurve(
-        new THREE.Vector3(0, 0, stemHeight),
-        resolvedHeadCenter,
+        stemAttachment,
+        headUp,
         stemHeight,
         isForked,
       );
-      const nextGeometry = new THREE.TubeGeometry(curve, 18, STEM_RADIUS, 8, false);
+      const nextGeometry = new THREE.TubeGeometry(curve, 24, STEM_RADIUS, 8, false);
       stem.geometry.dispose();
       stem.geometry = nextGeometry;
-      lastStemDirection.current.copy(stemDirection);
+      lastStemAttachment.current = stemAttachment.clone();
     }
   });
 
@@ -170,7 +174,7 @@ export default function PlaceMarker({
 
   return (
     <group ref={groupRef} position={[x, y, z + BASE_LIFT]}>
-      <mesh ref={stemRef} geometry={initialStemGeometry}>
+      <mesh ref={stemRef} geometry={initialStemGeometry} renderOrder={1}>
         <meshStandardMaterial
           color={isSelected ? "#8cff98" : "#49d05a"}
           emissive={isSelected ? "#3ecf55" : "#000000"}
@@ -190,14 +194,14 @@ export default function PlaceMarker({
           opacity={isSelected ? 1 : 0.82}
         />
       </mesh>
-      <group ref={headRef} position={[0, 0, stemHeight]} {...pointerHandlers}>
+      <group ref={headRef} position={[0, 0, stemHeight]} renderOrder={3} {...pointerHandlers}>
         <mesh geometry={headGeometry}>
           <meshStandardMaterial
             color={flowerColors.head}
             emissive={flowerColors.headEmissive}
             roughness={0.55}
             transparent
-            opacity={0.78}
+            opacity={0.94}
             side={THREE.DoubleSide}
             polygonOffset
             polygonOffsetFactor={-3}
@@ -210,7 +214,7 @@ export default function PlaceMarker({
             emissive={flowerColors.centerEmissive}
             roughness={0.75}
             transparent
-            opacity={0.84}
+            opacity={0.97}
             side={THREE.DoubleSide}
             polygonOffset
             polygonOffsetFactor={-4}
@@ -322,10 +326,33 @@ function resolveAgentHeadCenter({
     const minDistance = radiusPx + other.radiusPx + HEAD_AGENT_PADDING_PX;
     if (distance >= minDistance) continue;
 
-    screenOffset.add(delta.multiplyScalar(((minDistance - distance) / distance) * HEAD_AGENT_REPULSION));
+    const direction = delta.divideScalar(distance);
+    const upwardPreference = new THREE.Vector2(
+      direction.x >= 0 ? 0.34 : -0.34,
+      -1,
+    ).normalize();
+    direction.lerp(upwardPreference, 0.38).normalize();
+    screenOffset.add(
+      direction.multiplyScalar(
+        (minDistance - distance) * HEAD_AGENT_REPULSION,
+      ),
+    );
   }
 
   const resolvedScreen = preferredScreen.add(screenOffset);
+  const viewportPadding = radiusPx + 8;
+  resolvedScreen.set(
+    THREE.MathUtils.clamp(
+      resolvedScreen.x,
+      viewportPadding,
+      Math.max(viewportPadding, size.width - viewportPadding),
+    ),
+    THREE.MathUtils.clamp(
+      resolvedScreen.y,
+      viewportPadding,
+      Math.max(viewportPadding, size.height - viewportPadding),
+    ),
+  );
   const resolvedWorld = screenToWorldOnCameraPlane(resolvedScreen, preferredWorld, camera, size);
   const resolvedLocal = group.worldToLocal(resolvedWorld);
   const sphereCenter = new THREE.Vector3(0, 0, stemHeight);
@@ -350,11 +377,7 @@ function resolveAgentHeadCenter({
 }
 
 function getStableMarkerAngle(markerId: string) {
-  let hash = 0;
-  for (let index = 0; index < markerId.length; index += 1) {
-    hash = (hash * 31 + markerId.charCodeAt(index)) | 0;
-  }
-  return ((Math.abs(hash) % 360) * Math.PI) / 180;
+  return getStableUnit(markerId) * Math.PI * 2;
 }
 
 function projectToScreen(point: THREE.Vector3, camera: THREE.Camera, size: { width: number; height: number }) {
@@ -402,41 +425,49 @@ function estimateScreenRadius(
 }
 
 function createStemCurve(
-  sphereCenter: THREE.Vector3,
-  headCenter: THREE.Vector3,
+  attachment: THREE.Vector3,
+  headUp: THREE.Vector3,
   stemHeight: number,
   isForked = false,
 ) {
-  const lowerStem = new THREE.Vector3(0, 0, stemHeight * 0.48);
-  if (sphereCenter.distanceToSquared(headCenter) < 0.000001) {
-    return new THREE.CatmullRomCurve3([
-      new THREE.Vector3(0, 0, 0),
-      lowerStem,
-      headCenter,
-    ]);
-  }
+  const base = new THREE.Vector3(0, 0, 0);
+  const lowerControl = new THREE.Vector3(0, 0, stemHeight * 0.34);
+  const upperControlDistance = THREE.MathUtils.clamp(
+    stemHeight * 0.28,
+    0.12,
+    0.3,
+  );
+  const upperControl = attachment
+    .clone()
+    .addScaledVector(headUp, -upperControlDistance);
+
   if (isForked) {
-    const branchControl = new THREE.Vector3(
-      headCenter.x * 0.48,
-      headCenter.y * 0.48,
-      THREE.MathUtils.lerp(lowerStem.z, headCenter.z, 0.58),
+    const forkHeight = stemHeight * 0.48;
+    const forkPoint = new THREE.Vector3(0, 0, forkHeight);
+    const trunk = new THREE.CubicBezierCurve3(
+      base,
+      new THREE.Vector3(0, 0, forkHeight * 0.3),
+      new THREE.Vector3(0, 0, forkHeight * 0.76),
+      forkPoint,
     );
-    return new THREE.CatmullRomCurve3([
-      new THREE.Vector3(0, 0, 0),
-      new THREE.Vector3(0, 0, stemHeight * 0.24),
-      lowerStem,
-      branchControl,
-      headCenter,
-    ]);
+    const branch = new THREE.CubicBezierCurve3(
+      forkPoint,
+      forkPoint.clone().addScaledVector(UP, stemHeight * 0.18),
+      upperControl,
+      attachment,
+    );
+    const curve = new THREE.CurvePath<THREE.Vector3>();
+    curve.add(trunk);
+    curve.add(branch);
+    return curve;
   }
-  const neckControl = sphereCenter.clone().lerp(headCenter, 0.42);
-  return new THREE.CatmullRomCurve3([
-    new THREE.Vector3(0, 0, 0),
-    lowerStem,
-    sphereCenter,
-    neckControl,
-    headCenter,
-  ]);
+
+  return new THREE.CubicBezierCurve3(
+    base,
+    lowerControl,
+    upperControl,
+    attachment,
+  );
 }
 
 function createPetalledHeadGeometry() {
@@ -463,12 +494,35 @@ function createPetalledHeadGeometry() {
 }
 
 function createInitialStemGeometry(stemHeight: number, isForked: boolean) {
-  const sphereCenter = new THREE.Vector3(0, 0, stemHeight);
+  const attachment = new THREE.Vector3(
+    0,
+    0,
+    stemHeight - HEAD_RADIUS * 0.72,
+  );
   return new THREE.TubeGeometry(
-    createStemCurve(sphereCenter, sphereCenter, stemHeight, isForked),
-    18,
+    createStemCurve(attachment, UP, stemHeight, isForked),
+    24,
     STEM_RADIUS,
     8,
     false,
   );
+}
+
+function getNaturalStemHeight(markerId: string) {
+  const unit = getStableUnit(markerId);
+  const eased = THREE.MathUtils.smoothstep(unit, 0, 1);
+  return THREE.MathUtils.lerp(MIN_STEM_HEIGHT, MAX_STEM_HEIGHT, eased);
+}
+
+function getStableUnit(value: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = Math.imul(hash ^ value.charCodeAt(index), 16777619);
+  }
+  hash ^= hash >>> 16;
+  hash = Math.imul(hash, 2246822507);
+  hash ^= hash >>> 13;
+  hash = Math.imul(hash, 3266489909);
+  hash ^= hash >>> 16;
+  return (hash >>> 0) / 4294967295;
 }
