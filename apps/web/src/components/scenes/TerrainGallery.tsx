@@ -1452,8 +1452,11 @@ export default function TerrainGallery({
             brandColorTwo={placement.partner_brand_color_two}
             isForked={isForked}
             isSelected={
-              usesTouchPreview &&
-              previewPlacement?.placement_id === placement.placement_id
+              (
+                usesTouchPreview
+                  ? previewPlacement
+                  : hoveredPlacement
+              )?.placement_id === placement.placement_id
             }
             onClick={
               focusedPlacement
