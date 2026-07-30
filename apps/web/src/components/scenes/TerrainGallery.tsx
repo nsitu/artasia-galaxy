@@ -770,6 +770,9 @@ export default function TerrainGallery({
     return projected.map(({ placement, x, y, z }) => {
       const anchorGroup =
         anchorGroups.get(getPlacementAnchorKey(placement)) ?? [];
+      const orderedAnchorGroup = [...anchorGroup].sort(
+        (a, b) => a.placement.placement_id - b.placement.placement_id,
+      );
       const anchorX = anchorGroup.length > 1
         ? anchorGroup.reduce((sum, item) => sum + item.x, 0) / anchorGroup.length
         : x;
@@ -782,6 +785,11 @@ export default function TerrainGallery({
       return {
         placement,
         isForked: anchorGroup.length > 1,
+        clusterIndex: orderedAnchorGroup.findIndex(
+          (item) =>
+            item.placement.placement_id === placement.placement_id,
+        ),
+        clusterCount: orderedAnchorGroup.length,
         position: [
           anchorX,
           anchorY,
@@ -1443,7 +1451,13 @@ export default function TerrainGallery({
         )}
 
       {sceneReadyForMarkers &&
-        placementLayout.map(({ placement, position, isForked }) => (
+        placementLayout.map(({
+          placement,
+          position,
+          isForked,
+          clusterIndex,
+          clusterCount,
+        }) => (
           <PlaceMarker
             key={placement.placement_id}
             markerId={String(placement.placement_id)}
@@ -1451,6 +1465,8 @@ export default function TerrainGallery({
             brandColorOne={placement.partner_brand_color_one}
             brandColorTwo={placement.partner_brand_color_two}
             isForked={isForked}
+            clusterIndex={clusterIndex}
+            clusterCount={clusterCount}
             isSelected={
               (
                 usesTouchPreview

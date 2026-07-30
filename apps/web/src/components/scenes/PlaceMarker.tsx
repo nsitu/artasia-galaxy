@@ -8,6 +8,8 @@ interface Props {
   brandColorOne?: string;
   brandColorTwo?: string;
   isForked?: boolean;
+  clusterIndex?: number;
+  clusterCount?: number;
   isSelected?: boolean;
   onClick?: () => void;
   onPointerEnter?: () => void;
@@ -17,6 +19,8 @@ interface Props {
 const BASE_LIFT = 0.025;
 const MIN_STEM_HEIGHT = 0.38;
 const MAX_STEM_HEIGHT = 0.92;
+const CLUSTER_FORK_HEIGHT = 0.3;
+const CLUSTER_BASE_STEM_HEIGHT = 0.72;
 const HEAD_RADIUS = 0.2295;
 const PETAL_LOBE_COUNT = 10;
 const STEM_RADIUS = 0.011;
@@ -41,6 +45,8 @@ export default function PlaceMarker({
   brandColorOne,
   brandColorTwo,
   isForked = false,
+  clusterIndex = 0,
+  clusterCount = 1,
   isSelected = false,
   onClick,
   onPointerEnter,
@@ -58,10 +64,17 @@ export default function PlaceMarker({
   const size = useThree((state) => state.size);
   const [x, y, z] = position;
   const flowerColors = useMemo(() => getFlowerColors(brandColorOne, brandColorTwo), [brandColorOne, brandColorTwo]);
-  const stemHeight = useMemo(
-    () => getNaturalStemHeight(markerId),
-    [markerId],
-  );
+  const clusterLane = clusterIndex - (clusterCount - 1) / 2;
+  const rendersClusterTrunk = !isForked || clusterIndex === 0;
+  const stemHeight = useMemo(() => {
+    if (!isForked) return getNaturalStemHeight(markerId);
+    const distanceFromCenter = Math.abs(clusterLane);
+    return THREE.MathUtils.clamp(
+      CLUSTER_BASE_STEM_HEIGHT - distanceFromCenter * 0.08,
+      0.54,
+      MAX_STEM_HEIGHT,
+    );
+  }, [clusterLane, isForked, markerId]);
   const headLayoutRadius = THREE.MathUtils.clamp(
     stemHeight * 0.72,
     0.3,
@@ -75,8 +88,13 @@ export default function PlaceMarker({
   const centerGeometry = useMemo(() => new THREE.CircleGeometry(HEAD_RADIUS * 0.34, 24), []);
   const baseGeometry = useMemo(() => new THREE.SphereGeometry(STEM_RADIUS * 1.45, 12, 8), []);
   const initialStemGeometry = useMemo(
-    () => createInitialStemGeometry(stemHeight, isForked, STEM_RADIUS),
-    [isForked, stemHeight]
+    () => createInitialStemGeometry(
+      stemHeight,
+      isForked,
+      rendersClusterTrunk,
+      STEM_RADIUS,
+    ),
+    [isForked, rendersClusterTrunk, stemHeight]
   );
 
   useEffect(() => {
@@ -96,9 +114,9 @@ export default function PlaceMarker({
     const stem = stemRef.current;
     if (!group || !head || !stem) return;
 
-    const planeHeadCenter = new THREE.Vector3(0, 0, stemHeight);
+    const naturalHeadCenter = new THREE.Vector3(0, 0, stemHeight);
     const cameraLocal = group.worldToLocal(camera.position.clone());
-    const cameraDistance = cameraLocal.distanceTo(planeHeadCenter);
+    const cameraDistance = cameraLocal.distanceTo(naturalHeadCenter);
     const anchorIsVisible = isAnchorInsideViewport(group, camera);
 
     selectionScale.current = THREE.MathUtils.lerp(
@@ -108,6 +126,24 @@ export default function PlaceMarker({
     );
     const headScale =
       getCameraResponsiveHeadScale(cameraDistance) * selectionScale.current;
+    const preferredHeadCenter = naturalHeadCenter.clone();
+    if (isForked && clusterCount > 1) {
+      const cameraWorldQuaternion = camera.getWorldQuaternion(
+        new THREE.Quaternion(),
+      );
+      const groupWorldQuaternion = group
+        .getWorldQuaternion(new THREE.Quaternion())
+        .invert();
+      const cameraLocalQuaternion =
+        groupWorldQuaternion.multiply(cameraWorldQuaternion);
+      const cameraRight = new THREE.Vector3(1, 0, 0)
+        .applyQuaternion(cameraLocalQuaternion)
+        .normalize();
+      preferredHeadCenter.addScaledVector(
+        cameraRight,
+        clusterLane * HEAD_RADIUS * headScale * 2.55,
+      );
+    }
     const resolvedHeadCenter = resolveAgentHeadCenter({
       markerId,
       group,
@@ -116,7 +152,7 @@ export default function PlaceMarker({
       stemHeight,
       trackingRadius: headLayoutRadius,
       headScale,
-      preferredHeadCenter: planeHeadCenter,
+      preferredHeadCenter,
       currentHeadCenter: currentHeadCenter.current,
       arrangeForCamera: anchorIsVisible,
     });
@@ -149,6 +185,7 @@ export default function PlaceMarker({
         headUp,
         stemHeight,
         isForked,
+        rendersClusterTrunk,
       );
       const nextGeometry = new THREE.TubeGeometry(curve, 24, stemRadius, 8, false);
       stem.geometry.dispose();
@@ -193,7 +230,7 @@ export default function PlaceMarker({
           opacity={isSelected ? 1 : 0.82}
         />
       </mesh>
-      <mesh geometry={baseGeometry}>
+      {rendersClusterTrunk && <mesh geometry={baseGeometry}>
         <meshStandardMaterial
           color={isSelected ? "#79f18a" : "#33b84a"}
           emissive={isSelected ? "#2eaa43" : "#000000"}
@@ -202,7 +239,7 @@ export default function PlaceMarker({
           transparent
           opacity={isSelected ? 1 : 0.82}
         />
-      </mesh>
+      </mesh>}
       <group ref={headRef} position={[0, 0, stemHeight]} renderOrder={3} {...pointerHandlers}>
         <mesh geometry={headGeometry}>
           <meshStandardMaterial
@@ -466,6 +503,7 @@ function createStemCurve(
   headUp: THREE.Vector3,
   stemHeight: number,
   isForked = false,
+  includeClusterTrunk = true,
 ) {
   const base = new THREE.Vector3(0, 0, 0);
   const lowerControl = new THREE.Vector3(0, 0, stemHeight * 0.34);
@@ -479,7 +517,7 @@ function createStemCurve(
     .addScaledVector(headUp, -upperControlDistance);
 
   if (isForked) {
-    const forkHeight = stemHeight * 0.48;
+    const forkHeight = Math.min(CLUSTER_FORK_HEIGHT, stemHeight * 0.56);
     const forkPoint = new THREE.Vector3(0, 0, forkHeight);
     const trunk = new THREE.CubicBezierCurve3(
       base,
@@ -487,15 +525,30 @@ function createStemCurve(
       new THREE.Vector3(0, 0, forkHeight * 0.76),
       forkPoint,
     );
+    const approachDistance = THREE.MathUtils.clamp(
+      stemHeight * 0.3,
+      0.16,
+      0.28,
+    );
+    const approachPoint = attachment
+      .clone()
+      .addScaledVector(headUp, -approachDistance);
     const branch = new THREE.CubicBezierCurve3(
       forkPoint,
       forkPoint.clone().addScaledVector(UP, stemHeight * 0.18),
+      approachPoint.clone().addScaledVector(headUp, -0.08),
+      approachPoint,
+    );
+    const neck = new THREE.CubicBezierCurve3(
+      approachPoint,
+      approachPoint.clone().addScaledVector(headUp, 0.08),
       upperControl,
       attachment,
     );
     const curve = new THREE.CurvePath<THREE.Vector3>();
-    curve.add(trunk);
+    if (includeClusterTrunk) curve.add(trunk);
     curve.add(branch);
+    curve.add(neck);
     return curve;
   }
 
@@ -533,6 +586,7 @@ function createPetalledHeadGeometry() {
 function createInitialStemGeometry(
   stemHeight: number,
   isForked: boolean,
+  includeClusterTrunk: boolean,
   stemRadius: number,
 ) {
   const attachment = new THREE.Vector3(
@@ -541,7 +595,13 @@ function createInitialStemGeometry(
     stemHeight - HEAD_RADIUS * 0.72,
   );
   return new THREE.TubeGeometry(
-    createStemCurve(attachment, UP, stemHeight, isForked),
+    createStemCurve(
+      attachment,
+      UP,
+      stemHeight,
+      isForked,
+      includeClusterTrunk,
+    ),
     24,
     stemRadius,
     8,
