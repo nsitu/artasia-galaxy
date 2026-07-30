@@ -125,7 +125,7 @@ const presenterLogoStyle: React.CSSProperties = {
 
 const presenterTextStyle: React.CSSProperties = {
   marginBottom: "clamp(0.35rem, 1.1vw, 0.5rem)",
-  color: "#c1c9d7",
+  color: "#ffffff",
   fontSize: 10,
   fontVariant: "small-caps",
   letterSpacing: "0.16em",
@@ -150,7 +150,7 @@ const titleStyle: React.CSSProperties = {
 const descriptionStyle: React.CSSProperties = {
   maxWidth: 520,
   margin: 0,
-  color: "#c1c9d7",
+  color: "#ffffff",
   fontSize: 15,
   lineHeight: 1.6,
 };
@@ -180,7 +180,7 @@ const loadingStyle: React.CSSProperties = {
   alignItems: "center",
   gap: 8,
   margin: 0,
-  color: "#8490a3",
+  color: "#ffffff",
   fontSize: 11,
 };
 

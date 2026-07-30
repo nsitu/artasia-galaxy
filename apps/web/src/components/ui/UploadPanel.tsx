@@ -1883,6 +1883,9 @@ export default function UploadPanel({
 
   async function saveAllAssetChanges() {
     if (!selectedAsset || !authUser?.authenticated) return;
+    const destinationPlacementKey =
+      managePlacementKey ||
+      (selectedAsset.placement_id ? String(selectedAsset.placement_id) : "");
     const placementChanged =
       Boolean(managePlacementKey) &&
       managePlacementKey !==
@@ -2070,7 +2073,13 @@ export default function UploadPanel({
 
       closeAssetManager();
       setWorkspaceMode("browse");
-      setApplicationPath("/admin", true);
+      setRouteSelectionResolved(false);
+      setApplicationPath(
+        destinationPlacementKey
+          ? `/admin/browse?site=${encodeURIComponent(destinationPlacementKey)}`
+          : "/admin/browse",
+        true,
+      );
       setNotice({ tone: "success", message });
     } catch (err) {
       setError((err as Error).message);

@@ -98,6 +98,7 @@ export default function PlaceMarker({
   const headGeometry = useMemo(() => createPetalledHeadGeometry(), []);
   const centerGeometry = useMemo(() => new THREE.CircleGeometry(HEAD_RADIUS * 0.34, 24), []);
   const baseGeometry = useMemo(() => new THREE.SphereGeometry(STEM_RADIUS * 1.45, 12, 8), []);
+  const leafGeometry = useMemo(() => createLeafGeometry(), []);
   const initialStemGeometry = useMemo(
     () => createInitialStemGeometry(
       baseStemHeight,
@@ -114,10 +115,11 @@ export default function PlaceMarker({
       headGeometry.dispose();
       centerGeometry.dispose();
       baseGeometry.dispose();
+      leafGeometry.dispose();
       stemRef.current?.geometry.dispose();
       markerAgents.delete(state.id);
     };
-  }, [baseGeometry, centerGeometry, headGeometry, initialStemGeometry, markerId]);
+  }, [baseGeometry, centerGeometry, headGeometry, initialStemGeometry, leafGeometry, markerId]);
 
   useFrame((_, delta) => {
     const group = groupRef.current;
@@ -291,11 +293,11 @@ export default function PlaceMarker({
       {hasAssets && (
         <group ref={leafRef} position={[0, 0, baseStemHeight * 0.42]}>
           <mesh
-            rotation={[0, 0, hashString(markerId) % 2 ? 0.65 : -0.65]}
-            scale={[1.45, 0.62, 1]}
+            geometry={leafGeometry}
+            rotation={[0, 0, hashString(markerId) % 2 ? 0.42 : -0.42]}
+            scale={[hashString(markerId) % 2 ? 1 : -1, 1, 1]}
             renderOrder={2}
           >
-            <circleGeometry args={[0.09, 18]} />
             <meshStandardMaterial
               color={stemColors.stem}
               roughness={0.7}
@@ -845,6 +847,15 @@ function createInitialStemGeometry(
     8,
     false,
   );
+}
+
+function createLeafGeometry() {
+  const shape = new THREE.Shape();
+  shape.moveTo(0, 0);
+  shape.bezierCurveTo(0.022, 0.028, 0.062, 0.034, 0.095, 0);
+  shape.bezierCurveTo(0.062, -0.034, 0.022, -0.028, 0, 0);
+  shape.closePath();
+  return new THREE.ShapeGeometry(shape, 12);
 }
 
 function getNaturalStemHeight(markerId: string) {
