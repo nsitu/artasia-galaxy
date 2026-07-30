@@ -281,7 +281,7 @@ export default function PlaceMarker({
         />
       </mesh>}
       <group ref={headRef} position={[0, 0, baseStemHeight]} {...pointerHandlers}>
-        <mesh geometry={headGeometry} renderOrder={3}>
+        <mesh geometry={headGeometry} renderOrder={isSelected ? 6 : 3}>
           <meshStandardMaterial
             color={flowerColors.head}
             emissive={flowerColors.headEmissive}
@@ -294,7 +294,7 @@ export default function PlaceMarker({
             polygonOffsetUnits={-3}
           />
         </mesh>
-        <mesh geometry={centerGeometry} position={[0, 0, 0.003]} renderOrder={4}>
+        <mesh geometry={centerGeometry} position={[0, 0, 0.003]} renderOrder={isSelected ? 7 : 4}>
           <meshStandardMaterial
             color={flowerColors.center}
             emissive={flowerColors.centerEmissive}

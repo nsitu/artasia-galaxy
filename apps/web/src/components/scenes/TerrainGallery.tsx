@@ -540,6 +540,7 @@ export default function TerrainGallery({
       (state as unknown as { controls?: TerrainOrbitControls }).controls,
   );
   const usesTouchPreview = useTouchPreviewMode();
+  const panAnimationFrame = useRef<number | null>(null);
   const photos = useGalleryStore((s) => s.photos);
   const photoScope = useGalleryStore((s) => s.photoScope);
   const galleryLoading = useGalleryStore((s) => s.loading);
@@ -840,12 +841,22 @@ export default function TerrainGallery({
   const panToPlacement = useCallback(
     (position: [number, number, number]) => {
       if (!usesTouchPreview || !controls?.target) return;
-      const nextTarget = new THREE.Vector3(...position);
-      const delta = nextTarget.clone().sub(controls.target);
-      camera.position.add(delta);
-      controls.target.copy(nextTarget);
-      camera.lookAt(nextTarget);
-      controls.update?.();
+      const nextTarget = new THREE.Vector3(position[0], position[1], position[2] + 0.65);
+      if (panAnimationFrame.current !== null) cancelAnimationFrame(panAnimationFrame.current);
+      const startTarget = controls.target.clone();
+      const startPosition = camera.position.clone();
+      const endPosition = startPosition.clone().add(nextTarget.clone().sub(startTarget));
+      const startedAt = performance.now();
+      const animatePan = (timestamp: number) => {
+        const progress = Math.min(1, (timestamp - startedAt) / 300);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        controls.target!.lerpVectors(startTarget, nextTarget, eased);
+        camera.position.lerpVectors(startPosition, endPosition, eased);
+        camera.lookAt(controls.target!);
+        controls.update?.();
+        panAnimationFrame.current = progress < 1 ? requestAnimationFrame(animatePan) : null;
+      };
+      panAnimationFrame.current = requestAnimationFrame(animatePan);
     },
     [camera, controls, usesTouchPreview],
   );
@@ -1173,11 +1184,17 @@ export default function TerrainGallery({
       const startTarget =
         controls?.target?.clone() ?? finalFrame.target.clone();
       const panOffset = new THREE.Vector3();
+      const cameraPanOffset = new THREE.Vector3();
       const lastRenderedTarget = startTarget.clone();
+      const lastRenderedPosition = startPosition.clone();
       const animate = (now: number) => {
         if (controls?.target) {
           panOffset.add(controls.target.clone().sub(lastRenderedTarget));
         }
+        // Orbit controls can move both the target and camera while the intro
+        // zoom is running. Preserve both user deltas so the closing frame does
+        // not snap back to the original map center.
+        cameraPanOffset.add(camera.position.clone().sub(lastRenderedPosition));
         const progress = Math.min(
           1,
           (now - startedAt) / INTRO_CAMERA_DURATION_MS,
@@ -1185,7 +1202,8 @@ export default function TerrainGallery({
         const eased = 1 - (1 - progress) ** 3;
         camera.position
           .lerpVectors(startPosition, finalFrame.position, eased)
-          .add(panOffset);
+          .add(panOffset)
+          .add(cameraPanOffset);
         const target = startTarget
           .clone()
           .lerp(finalFrame.target, eased)
@@ -1194,6 +1212,7 @@ export default function TerrainGallery({
         camera.lookAt(target);
         controls?.target?.copy(target);
         lastRenderedTarget.copy(target);
+        lastRenderedPosition.copy(camera.position);
         controls?.update?.();
         if (progress < 1) {
           frameId = window.requestAnimationFrame(animate);
