@@ -226,41 +226,42 @@ export default function PlaceMarker({
           emissive={isSelected ? "#3ecf55" : "#000000"}
           emissiveIntensity={isSelected ? 0.7 : 0}
           roughness={0.62}
-          transparent
-          opacity={isSelected ? 1 : 0.82}
+          transparent={false}
+          opacity={1}
+          depthWrite={false}
         />
       </mesh>
-      {rendersClusterTrunk && <mesh geometry={baseGeometry}>
+      {rendersClusterTrunk && <mesh geometry={baseGeometry} renderOrder={1}>
         <meshStandardMaterial
           color={isSelected ? "#79f18a" : "#33b84a"}
           emissive={isSelected ? "#2eaa43" : "#000000"}
           emissiveIntensity={isSelected ? 0.55 : 0}
           roughness={0.72}
-          transparent
-          opacity={isSelected ? 1 : 0.82}
+          transparent={false}
+          opacity={1}
         />
       </mesh>}
-      <group ref={headRef} position={[0, 0, stemHeight]} renderOrder={3} {...pointerHandlers}>
-        <mesh geometry={headGeometry}>
+      <group ref={headRef} position={[0, 0, stemHeight]} {...pointerHandlers}>
+        <mesh geometry={headGeometry} renderOrder={3}>
           <meshStandardMaterial
             color={flowerColors.head}
             emissive={flowerColors.headEmissive}
             roughness={0.55}
-            transparent
-            opacity={0.94}
+            transparent={false}
+            opacity={1}
             side={THREE.DoubleSide}
             polygonOffset
             polygonOffsetFactor={-3}
             polygonOffsetUnits={-3}
           />
         </mesh>
-        <mesh geometry={centerGeometry} position={[0, 0, 0.003]}>
+        <mesh geometry={centerGeometry} position={[0, 0, 0.003]} renderOrder={4}>
           <meshStandardMaterial
             color={flowerColors.center}
             emissive={flowerColors.centerEmissive}
             roughness={0.75}
-            transparent
-            opacity={0.97}
+            transparent={false}
+            opacity={1}
             side={THREE.DoubleSide}
             polygonOffset
             polygonOffsetFactor={-4}
@@ -525,30 +526,18 @@ function createStemCurve(
       new THREE.Vector3(0, 0, forkHeight * 0.76),
       forkPoint,
     );
-    const approachDistance = THREE.MathUtils.clamp(
-      stemHeight * 0.3,
-      0.16,
-      0.28,
-    );
-    const approachPoint = attachment
-      .clone()
-      .addScaledVector(headUp, -approachDistance);
     const branch = new THREE.CubicBezierCurve3(
       forkPoint,
-      forkPoint.clone().addScaledVector(UP, stemHeight * 0.18),
-      approachPoint.clone().addScaledVector(headUp, -0.08),
-      approachPoint,
-    );
-    const neck = new THREE.CubicBezierCurve3(
-      approachPoint,
-      approachPoint.clone().addScaledVector(headUp, 0.08),
+      forkPoint.clone().addScaledVector(
+        UP,
+        THREE.MathUtils.clamp(stemHeight * 0.28, 0.14, 0.24),
+      ),
       upperControl,
       attachment,
     );
     const curve = new THREE.CurvePath<THREE.Vector3>();
     if (includeClusterTrunk) curve.add(trunk);
     curve.add(branch);
-    curve.add(neck);
     return curve;
   }
 
