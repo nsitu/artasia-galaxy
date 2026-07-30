@@ -3,7 +3,7 @@
 Artasia Galaxy is a browser-based 3D gallery for photos hosted in Immich. The current MVP is deployed at:
 
 ```text
-https://galaxy.artsforall.co
+https://atlas.artsforall.co
 ```
 
 The MVP includes:
@@ -185,7 +185,7 @@ IMMICH_API_KEY=...
 WORDPRESS_URL=http://host.docker.internal
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
-GOOGLE_REDIRECT_URI=https://galaxy.artsforall.co/api/v1/auth/google/callback
+GOOGLE_REDIRECT_URI=https://atlas.artsforall.co/api/v1/auth/google/callback
 GOOGLE_ALLOWED_DOMAIN=artsforall.co
 SESSION_SECRET=...
 ```
@@ -203,23 +203,24 @@ The viewer runs at `/`. The authenticated admin area starts at `/admin`; the upl
 Google sign-in is handled by the Node app through `/api/v1/auth/google/start` and `/api/v1/auth/google/callback`. The Google OAuth client must allow this redirect URI:
 
 ```text
-https://galaxy.artsforall.co/api/v1/auth/google/callback
+https://atlas.artsforall.co/api/v1/auth/google/callback
 ```
 
 The auth session is an HTTP-only signed cookie. `GOOGLE_ALLOWED_DOMAIN` restricts accepted Google Workspace accounts, and `SESSION_SECRET` signs both the OAuth state cookie and the app session cookie. Changing `SESSION_SECRET` logs current browser sessions out.
 
 ## nginx
 
-nginx terminates HTTPS for:
+nginx terminates HTTPS for the canonical Atlas hostname and temporarily preserves the legacy Galaxy hostname:
 
 ```text
+atlas.artsforall.co
 galaxy.artsforall.co
 ```
 
-The Galaxy HTTPS server block lives at:
+The Atlas HTTPS server block lives at:
 
 ```text
-/opt/bitnami/nginx/conf/server_blocks/galaxy-https-server-block.conf
+/opt/bitnami/nginx/conf/server_blocks/atlas-https-server-block.conf
 ```
 
 It proxies requests to:
@@ -277,7 +278,7 @@ curl http://127.0.0.1:3000/api/v1/health
 Check public HTTPS:
 
 ```bash
-curl -Ik https://galaxy.artsforall.co
+curl -Ik https://atlas.artsforall.co
 ```
 
 Restart the app manually:

@@ -49,7 +49,7 @@ function artasia_get_gallery_availability(): ?array
 
     $endpoint = apply_filters(
         'artasia_gallery_availability_url',
-        'https://galaxy.artsforall.co/api/v1/placements/gallery-availability'
+        artasia_atlas_base_url() . '/api/v1/placements/gallery-availability'
     );
     $response = wp_remote_get($endpoint, [
         'timeout'     => 3,
@@ -263,7 +263,7 @@ function artasia_render_sites(int $project_id): string
                                 $section = trim((string) get_post_meta($placement->ID, 'artasia_section', true));
                                 $placement_label = $placement->post_title
                                     . ($section !== '' ? ' — ' . $section : '');
-                                $galaxy_url = 'https://galaxy.artsforall.co/sites/' . rawurlencode($placement->post_name);
+                                $atlas_url = artasia_atlas_base_url() . '/sites/' . rawurlencode($placement->post_name);
                                 $place_id = intval(get_post_meta($placement->ID, 'artasia_place_id', true));
                                 $place = $place_lookup[$place_id] ?? null;
                                 $documentation = $documentation_lookup[$placement->ID] ?? null;
@@ -281,7 +281,7 @@ function artasia_render_sites(int $project_id): string
                                     <?php if ($show_gallery || ($documentation && $documentation_base_url)) : ?>
                                         <div class="artasia-sites__actions">
                                             <?php if ($show_gallery) : ?>
-                                                <a class="artasia-sites__action" href="<?php echo esc_url($galaxy_url); ?>" target="_blank" rel="noopener noreferrer">Gallery</a>
+                                                <a class="artasia-sites__action" href="<?php echo esc_url($atlas_url); ?>" target="_blank" rel="noopener noreferrer">Gallery</a>
                                             <?php endif; ?>
                                             <?php if ($documentation && $documentation_base_url) : ?>
                                                 <a class="artasia-sites__action" href="<?php echo esc_url(add_query_arg('documentation', $documentation->post_name, $documentation_base_url)); ?>">Documentation</a>

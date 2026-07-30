@@ -6,6 +6,11 @@ if (!defined('ABSPATH')) {
 
 const ARTASIA_TOOLS_PAGE_SLUG = 'artasia-tools';
 
+function artasia_atlas_base_url(): string
+{
+    return rtrim((string) apply_filters('artasia_atlas_base_url', 'https://atlas.artsforall.co'), '/');
+}
+
 function artasia_register_tools_page(): void
 {
     add_submenu_page(
@@ -21,7 +26,7 @@ add_action('admin_menu', 'artasia_register_tools_page');
 
 function artasia_default_reconcile_url(): string
 {
-    return 'https://galaxy.artsforall.co/api/v1/reconcile';
+    return artasia_atlas_base_url() . '/api/v1/reconcile';
 }
 
 function artasia_get_reconcile_url(): string
