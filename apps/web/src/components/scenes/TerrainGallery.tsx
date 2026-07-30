@@ -1648,6 +1648,7 @@ export function PlacementPreviewPanel({
   placement: MapPlacement;
   onOpen: () => void;
 }) {
+  const isMobile = useIsMobileBreakpoint();
   const siteDetails = formatSiteDetails(placement);
   const participantDetails = formatParticipantDetails(placement);
   const partnerLogo = placement.partner_white_logo?.url
@@ -1655,11 +1656,20 @@ export function PlacementPreviewPanel({
     : placement.partner_logo;
 
   return (
-    <section style={placementPreviewPanelStyle} aria-label="Placement preview">
+    <section
+      style={{
+        ...placementPreviewPanelStyle,
+        ...(isMobile ? placementPreviewMobilePanelStyle : {}),
+      }}
+      aria-label="Placement preview"
+    >
       <button
         type="button"
         onClick={onOpen}
-        style={placementPreviewButtonStyle}
+        style={{
+          ...placementPreviewButtonStyle,
+          ...(isMobile ? placementPreviewMobileButtonStyle : {}),
+        }}
       >
         {partnerLogo?.url && (
           <img
@@ -1669,10 +1679,13 @@ export function PlacementPreviewPanel({
               placement.partner_name ||
               "Partner logo"
             }
-            style={placement.partner_white_logo?.url ? placementPreviewWhiteLogoStyle : placementPreviewLogoStyle}
+            style={{
+              ...(placement.partner_white_logo?.url ? placementPreviewWhiteLogoStyle : placementPreviewLogoStyle),
+              ...(isMobile ? placementPreviewMobileLogoStyle : {}),
+            }}
           />
         )}
-        <span style={placementPreviewContentStyle}>
+        <span style={{ ...placementPreviewContentStyle, ...(isMobile ? placementPreviewMobileContentStyle : {}) }}>
           <span style={placementPreviewNameStyle}>
             {placement.placement_name}
           </span>
@@ -1686,7 +1699,7 @@ export function PlacementPreviewPanel({
             <span style={placementPreviewMetaStyle}>{participantDetails}</span>
           )}
         </span>
-        <span style={placementPreviewActionStyle}>View</span>
+        <span style={{ ...placementPreviewActionStyle, ...(isMobile ? placementPreviewMobileActionStyle : {}) }}>View</span>
       </button>
     </section>
   );
@@ -1940,6 +1953,39 @@ const placementPreviewLogoStyle: React.CSSProperties = {
   background: "rgba(255,255,255,0.92)",
   borderRadius: 4,
   padding: 5,
+};
+
+const placementPreviewMobilePanelStyle: React.CSSProperties = {
+  left: 0,
+  right: 0,
+  bottom: 0,
+  zIndex: 17,
+};
+
+const placementPreviewMobileButtonStyle: React.CSSProperties = {
+  flexDirection: "column",
+  alignItems: "stretch",
+  gap: 10,
+  padding: 14,
+  borderRadius: "14px 14px 0 0",
+};
+
+const placementPreviewMobileLogoStyle: React.CSSProperties = {
+  width: "100%",
+  height: 72,
+};
+
+const placementPreviewMobileContentStyle: React.CSSProperties = {
+  width: "100%",
+};
+
+const placementPreviewMobileActionStyle: React.CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  padding: "11px 12px",
+  borderRadius: 8,
+  textAlign: "center",
+  background: "rgba(255,255,255,0.12)",
 };
 
 const placementPreviewWhiteLogoStyle: React.CSSProperties = {

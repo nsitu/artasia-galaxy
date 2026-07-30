@@ -851,6 +851,11 @@ const responsiveTopNavStyles = `
     }
 
     .atlas-top-nav {
+      left: 0 !important;
+      right: 0 !important;
+      padding: 8px 12px 10px;
+      box-sizing: border-box;
+      background: rgba(0, 0, 0, 0.42);
       flex-wrap: wrap;
       align-items: flex-start !important;
     }
@@ -1022,7 +1027,8 @@ const backButtonStyle: React.CSSProperties = {
   borderRadius: 999,
   display: "inline-flex",
   alignItems: "center",
-  gap: 6,
+  justifyContent: "center",
+  lineHeight: 0,
   background: "rgba(10,10,20,0.82)",
   color: "#eef2f8",
   border: "1px solid rgba(255,255,255,0.18)",
