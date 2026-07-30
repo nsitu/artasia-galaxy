@@ -281,7 +281,6 @@ export default function ArtScene() {
               <svg viewBox="0 0 16 16" aria-hidden="true" style={backChevronStyle}>
                 <path d="M10.5 2.5 5 8l5.5 5.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              <span>Back</span>
             </button>
           )}
 
@@ -770,9 +769,7 @@ const presentedByStyle: React.CSSProperties = {
   alignItems: "end",
   gap: 8,
   padding: "6px 8px",
-  borderRadius: 999,
   color: "#c1c9d7",
-  background: "rgba(10, 10, 20, 0.72)",
   textDecoration: "none",
   fontFamily: "monospace",
   pointerEvents: "auto",
@@ -887,8 +884,9 @@ const menuItemStyle: React.CSSProperties = {
 
 const backButtonStyle: React.CSSProperties = {
   pointerEvents: "auto",
+  width: 40,
   height: 40,
-  padding: "0 12px 0 10px",
+  padding: 0,
   borderRadius: 999,
   display: "inline-flex",
   alignItems: "center",
