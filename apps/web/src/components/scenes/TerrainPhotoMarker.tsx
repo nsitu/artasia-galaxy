@@ -710,10 +710,12 @@ export function OrbitingPhotoBanner({
   const pointerInsideRef = useRef(false);
   const texture = usePhotoTexture(url);
   const orbit = useMemo(() => ({
-    radius: stableRange(`${id}:radius`, ORBIT_MIN_UNITS, ORBIT_MAX_UNITS),
+    radius: orbitRadius != null
+      ? orbitRadius + stableRange(`${id}:activity-radius-offset`, -0.04, 0.04)
+      : stableRange(`${id}:radius`, ORBIT_MIN_UNITS, ORBIT_MAX_UNITS),
     phase: stableRange(`${id}:phase`, 0, Math.PI * 2),
     speed: stableRange(`${id}:speed`, ORBIT_SPEED_MIN, ORBIT_SPEED_MAX),
-  }), [id]);
+  }), [id, orbitRadius]);
   const cutout = useMemo(() => createCutoutCorners(id), [id]);
   const fallbackBorderColor = useMemo(() => {
     const index = Math.min(
@@ -817,7 +819,9 @@ export function OrbitingAudioMarker({
   const assignedIconTexture = useMaterialSymbolTexture(iconName);
   playbackStopRef.current = onPlaybackStop;
   const orbit = useMemo(() => ({
-    radius: orbitRadius ?? stableRange(`${id}:radius`, ORBIT_MIN_UNITS, ORBIT_MAX_UNITS),
+    radius: orbitRadius != null
+      ? orbitRadius + stableRange(`${id}:activity-radius-offset`, -0.04, 0.04)
+      : stableRange(`${id}:radius`, ORBIT_MIN_UNITS, ORBIT_MAX_UNITS),
     phase: stableRange(`${id}:phase`, 0, Math.PI * 2),
     speed: stableRange(`${id}:speed`, ORBIT_SPEED_MIN, ORBIT_SPEED_MAX),
   }), [id, orbitRadius]);

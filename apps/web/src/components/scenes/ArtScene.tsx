@@ -102,6 +102,7 @@ export default function ArtScene() {
   const [linkedAudioPlaying, setLinkedAudioPlaying] = useState(false);
   const lightboxSwipeStartRef = useRef<{ x: number; y: number } | null>(null);
   const [lightboxSwipeOffset, setLightboxSwipeOffset] = useState(0);
+  const [lightboxSwipeSettling, setLightboxSwipeSettling] = useState(false);
   const lightboxSuppressClickRef = useRef(false);
 
   const handleIntroReady = useCallback(() => {
@@ -226,6 +227,7 @@ export default function ArtScene() {
   const handleLightboxPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (event.pointerType !== "touch") return;
     lightboxSwipeStartRef.current = { x: event.clientX, y: event.clientY };
+    setLightboxSwipeSettling(false);
     setLightboxSwipeOffset(0);
   }, []);
 
@@ -238,15 +240,24 @@ export default function ArtScene() {
   const handleLightboxPointerUp = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const start = lightboxSwipeStartRef.current;
     lightboxSwipeStartRef.current = null;
-    setLightboxSwipeOffset(0);
     if (!start || event.pointerType !== "touch") return;
 
     const deltaX = event.clientX - start.x;
     const deltaY = event.clientY - start.y;
-    if (Math.abs(deltaX) < 48 || Math.abs(deltaX) < Math.abs(deltaY)) return;
+    if (Math.abs(deltaX) < 48 || Math.abs(deltaX) < Math.abs(deltaY)) {
+      setLightboxSwipeSettling(true);
+      setLightboxSwipeOffset(0);
+      return;
+    }
 
     lightboxSuppressClickRef.current = true;
-    selectAdjacentPhoto(deltaX < 0 ? 1 : -1);
+    setLightboxSwipeSettling(true);
+    setLightboxSwipeOffset(deltaX < 0 ? -window.innerWidth : window.innerWidth);
+    window.setTimeout(() => {
+      selectAdjacentPhoto(deltaX < 0 ? 1 : -1);
+      setLightboxSwipeSettling(false);
+      setLightboxSwipeOffset(0);
+    }, 180);
   }, [selectAdjacentPhoto]);
   const handleBackActionChange = useCallback((action: (() => void) | null) => {
     setBackAction(action ? () => action : null);
@@ -504,7 +515,11 @@ export default function ArtScene() {
               playsInline
               preload="metadata"
               aria-label={selectedPhoto.fileName}
-              style={{ ...photoLightboxImageStyle, transform: `translateX(${lightboxSwipeOffset}px)` }}
+              style={{
+                ...photoLightboxImageStyle,
+                transform: `translateX(${lightboxSwipeOffset}px)`,
+                transition: lightboxSwipeSettling ? "transform 180ms ease-out" : "none",
+              }}
               onClick={(event) => event.stopPropagation()}
             />
           ) : (
@@ -512,7 +527,12 @@ export default function ArtScene() {
               className="atlas-photo-lightbox-media"
               src={selectedPhoto.previewUrl}
               alt={selectedPhoto.fileName}
-              style={{ ...photoLightboxImageStyle, ...photoAdjustmentFilterStyle(selectedPhoto.adjustments), transform: `translateX(${lightboxSwipeOffset}px)` }}
+              style={{
+                ...photoLightboxImageStyle,
+                ...photoAdjustmentFilterStyle(selectedPhoto.adjustments),
+                transform: `translateX(${lightboxSwipeOffset}px)`,
+                transition: lightboxSwipeSettling ? "transform 180ms ease-out" : "none",
+              }}
               onClick={(event) => event.stopPropagation()}
             />
           )}

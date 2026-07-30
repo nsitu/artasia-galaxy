@@ -694,8 +694,13 @@ export default function TerrainGallery({
       const rank = activity
         ? activityOptions.findIndex((option) => option.id === activity.id)
         : -1;
+      const outerRank = Math.max(0, activityOptions.length - 1);
+      const currentOuterRadius = 0.78 + outerRank * 0.3;
+      const expandedStep = outerRank > 0
+        ? (currentOuterRadius * 2 - 0.78) / outerRank
+        : 0;
       return {
-        orbitRadius: rank >= 0 ? 0.78 + rank * 0.3 : 0.78,
+        orbitRadius: rank >= 0 ? 0.78 + rank * expandedStep : 0.78,
         ...(activity ? { activityId: activity.id } : {}),
         ...(activity?.colour ? { orbitColour: activity.colour } : {}),
       };
