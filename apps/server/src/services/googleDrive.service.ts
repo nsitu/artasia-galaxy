@@ -1,5 +1,6 @@
 import { google, type drive_v3 } from "googleapis";
 import { OAuth2Client } from "google-auth-library";
+import { extname } from "node:path";
 
 const GOOGLE_MIME_TYPE_FOLDER = "application/vnd.google-apps.folder";
 const IMAGE_MIME_TYPES = [
@@ -20,6 +21,34 @@ const AUDIO_MIME_TYPES = [
   "audio/x-m4a",
 ];
 const SUPPORTED_MIME_TYPES = [...IMAGE_MIME_TYPES, ...VIDEO_MIME_TYPES, ...AUDIO_MIME_TYPES];
+
+const MIME_TYPE_EXTENSIONS: Readonly<Record<string, string>> = {
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+  "image/gif": ".gif",
+  "image/webp": ".webp",
+  "image/bmp": ".bmp",
+  "image/heic": ".heic",
+  "image/heif": ".heif",
+  "video/mp4": ".mp4",
+  "video/quicktime": ".mov",
+  "video/x-msvideo": ".avi",
+  "audio/mpeg": ".mp3",
+  "audio/mp3": ".mp3",
+  "audio/mp4": ".m4a",
+  "audio/m4a": ".m4a",
+  "audio/x-m4a": ".m4a",
+};
+
+/**
+ * Google Drive permits names without extensions, while Immich also consults
+ * the multipart filename when choosing an upload decoder.
+ */
+export function ensureDriveFileExtension(name: string, mimeType: string): string {
+  if (extname(name)) return name;
+  const extension = MIME_TYPE_EXTENSIONS[mimeType.toLowerCase()];
+  return extension ? `${name}${extension}` : name;
+}
 
 interface DriveFile {
   id: string;

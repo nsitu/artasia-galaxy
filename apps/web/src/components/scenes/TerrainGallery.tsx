@@ -1446,6 +1446,10 @@ export default function TerrainGallery({
             brandColorOne={placement.partner_brand_color_one}
             brandColorTwo={placement.partner_brand_color_two}
             heightScale={heightScale}
+            isSelected={
+              usesTouchPreview &&
+              previewPlacement?.placement_id === placement.placement_id
+            }
             onClick={
               focusedPlacement
                 ? undefined
@@ -1959,6 +1963,9 @@ const placementPreviewMobilePanelStyle: React.CSSProperties = {
   left: 0,
   right: 0,
   bottom: 0,
+  width: "100vw",
+  margin: 0,
+  overflow: "hidden",
   zIndex: 17,
 };
 
@@ -1967,12 +1974,15 @@ const placementPreviewMobileButtonStyle: React.CSSProperties = {
   alignItems: "stretch",
   gap: 10,
   padding: 14,
-  borderRadius: "14px 14px 0 0",
+  boxSizing: "border-box",
+  borderRadius: 0,
 };
 
 const placementPreviewMobileLogoStyle: React.CSSProperties = {
-  width: "100%",
+  width: "min(50vw, 280px)",
   height: 72,
+  alignSelf: "flex-start",
+  objectPosition: "left center",
 };
 
 const placementPreviewMobileContentStyle: React.CSSProperties = {

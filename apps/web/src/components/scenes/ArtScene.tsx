@@ -374,7 +374,7 @@ export default function ArtScene() {
             onClick={() => setMenuOpen((current) => !current)}
             style={menuButtonStyle}
           >
-            <span style={menuIconStyle}>
+            <span className="atlas-menu-icon" style={menuIconStyle}>
               <span style={menuLineStyle} />
               <span style={menuLineStyle} />
               <span style={menuLineStyle} />
@@ -868,6 +868,21 @@ const responsiveTopNavStyles = `
       order: 2;
     }
 
+    .atlas-menu-wrap > button {
+      width: 64px !important;
+      height: 64px !important;
+      border-radius: 14px !important;
+    }
+
+    .atlas-menu-icon {
+      width: 26px !important;
+      gap: 5px !important;
+    }
+
+    .atlas-menu-icon > span {
+      height: 3px !important;
+    }
+
     .atlas-top-controls {
       order: 3;
       flex: 1 0 100% !important;
@@ -1081,7 +1096,14 @@ const filterSelectStyle: React.CSSProperties = {
   color: "#f4f7fb",
   border: "1px solid rgba(255,255,255,0.18)",
   borderRadius: 999,
-  padding: "0 34px 0 14px",
+  padding: "0 44px 0 14px",
+  appearance: "none",
+  WebkitAppearance: "none",
+  backgroundImage:
+    "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='m1 1 5 5 5-5' fill='none' stroke='%23eef3fb' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")",
+  backgroundRepeat: "no-repeat",
+  backgroundPosition: "right 16px center",
+  backgroundSize: "12px 8px",
   fontFamily: "monospace",
   fontSize: 12,
   outline: "none",

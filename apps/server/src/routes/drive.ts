@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { readAuthSession } from "../services/auth.service.js";
 import {
   createDriveClient,
+  ensureDriveFileExtension,
   GoogleDriveClient,
 } from "../services/googleDrive.service.js";
 import {
@@ -271,6 +272,10 @@ router.post("/sync", async (req: Request, res: Response) => {
         // Get file info
         const fileInfo = await client.getFileInfo(fileId);
         fileName = fileInfo.name;
+        const uploadFileName = ensureDriveFileExtension(
+          fileInfo.name,
+          fileInfo.mimeType,
+        );
 
         if (!fileInfo.isSupported) {
           results.push({
@@ -345,7 +350,7 @@ router.post("/sync", async (req: Request, res: Response) => {
         } else {
           uploadResult = await uploadAssetStream({
             stream,
-            filename: fileInfo.name,
+            filename: uploadFileName,
             mimeType: fileInfo.mimeType,
             deviceAssetId,
             createdAt: fileDate,

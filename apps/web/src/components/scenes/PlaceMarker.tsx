@@ -9,6 +9,7 @@ interface Props {
   brandColorOne?: string;
   brandColorTwo?: string;
   heightScale?: number;
+  isSelected?: boolean;
   onClick?: () => void;
   onPointerEnter?: () => void;
   onPointerLeave?: () => void;
@@ -44,6 +45,7 @@ export default function PlaceMarker({
   brandColorOne,
   brandColorTwo,
   heightScale,
+  isSelected = false,
   onClick,
   onPointerEnter,
   onPointerLeave,
@@ -54,6 +56,8 @@ export default function PlaceMarker({
   const currentDirection = useRef(new THREE.Vector3(0, 0, 1));
   const currentHeadCenter = useRef<THREE.Vector3 | null>(null);
   const lastStemDirection = useRef(new THREE.Vector3(0, 0, 1));
+  const selectionScale = useRef(1);
+  const selectedRotation = useRef(0);
   const camera = useThree((state) => state.camera);
   const size = useThree((state) => state.size);
   const [x, y, z] = position;
@@ -81,7 +85,7 @@ export default function PlaceMarker({
     };
   }, [baseGeometry, centerGeometry, headGeometry, initialStemGeometry, markerId]);
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     const group = groupRef.current;
     const head = headRef.current;
     const stem = stemRef.current;
@@ -93,7 +97,13 @@ export default function PlaceMarker({
     const targetDirection = getTiltLimitedDirection(cameraLocal, sphereCenter);
     currentDirection.current.lerp(targetDirection, TRACKING_EASE).normalize();
 
-    const headScale = getCameraResponsiveHeadScale(cameraDistance);
+    selectionScale.current = THREE.MathUtils.lerp(
+      selectionScale.current,
+      isSelected ? 1.38 : 1,
+      0.14,
+    );
+    const headScale =
+      getCameraResponsiveHeadScale(cameraDistance) * selectionScale.current;
     const preferredHeadCenter = sphereCenter.clone().add(currentDirection.current.clone().multiplyScalar(trackingRadius));
     const resolvedHeadCenter = resolveAgentHeadCenter({
       markerId,
@@ -110,6 +120,13 @@ export default function PlaceMarker({
     head.position.copy(resolvedHeadCenter);
     head.scale.setScalar(headScale);
     orientHeadToCamera(head, group, camera);
+    if (isSelected) {
+      selectedRotation.current =
+        (selectedRotation.current + delta * 1.35) % (Math.PI * 2);
+      head.rotateZ(selectedRotation.current);
+    } else {
+      selectedRotation.current = 0;
+    }
 
     const stemDirection = resolvedHeadCenter.clone().sub(sphereCenter).normalize();
     if (lastStemDirection.current.angleTo(stemDirection) > 0.025) {
@@ -147,10 +164,24 @@ export default function PlaceMarker({
   return (
     <group ref={groupRef} position={[x, y, z + BASE_LIFT]}>
       <mesh ref={stemRef} geometry={initialStemGeometry}>
-        <meshStandardMaterial color="#49d05a" roughness={0.62} transparent opacity={0.82} />
+        <meshStandardMaterial
+          color={isSelected ? "#8cff98" : "#49d05a"}
+          emissive={isSelected ? "#3ecf55" : "#000000"}
+          emissiveIntensity={isSelected ? 0.7 : 0}
+          roughness={0.62}
+          transparent
+          opacity={isSelected ? 1 : 0.82}
+        />
       </mesh>
       <mesh geometry={baseGeometry}>
-        <meshStandardMaterial color="#33b84a" roughness={0.72} transparent opacity={0.82} />
+        <meshStandardMaterial
+          color={isSelected ? "#79f18a" : "#33b84a"}
+          emissive={isSelected ? "#2eaa43" : "#000000"}
+          emissiveIntensity={isSelected ? 0.55 : 0}
+          roughness={0.72}
+          transparent
+          opacity={isSelected ? 1 : 0.82}
+        />
       </mesh>
       <group ref={headRef} position={[0, 0, stemHeight + trackingRadius]} {...pointerHandlers}>
         <mesh geometry={headGeometry}>
