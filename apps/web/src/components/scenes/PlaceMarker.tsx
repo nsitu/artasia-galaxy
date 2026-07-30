@@ -20,6 +20,7 @@ const MAX_STEM_HEIGHT = 0.92;
 const HEAD_RADIUS = 0.2295;
 const PETAL_LOBE_COUNT = 10;
 const STEM_RADIUS = 0.011;
+const SELECTED_STEM_RADIUS_MULTIPLIER = 1.3;
 const HEAD_FULL_SCALE_DISTANCE = 8;
 const HEAD_MIN_SCALE_DISTANCE = 1.6;
 const HEAD_MIN_SCALE = 0.24;
@@ -50,6 +51,7 @@ export default function PlaceMarker({
   const stemRef = useRef<THREE.Mesh>(null);
   const currentHeadCenter = useRef<THREE.Vector3 | null>(null);
   const lastStemAttachment = useRef<THREE.Vector3 | null>(null);
+  const lastStemRadius = useRef(0);
   const selectionScale = useRef(1);
   const selectedRotation = useRef(0);
   const camera = useThree((state) => state.camera);
@@ -65,12 +67,15 @@ export default function PlaceMarker({
     0.3,
     0.7,
   );
+  const stemRadius = STEM_RADIUS * (
+    isSelected ? SELECTED_STEM_RADIUS_MULTIPLIER : 1
+  );
 
   const headGeometry = useMemo(() => createPetalledHeadGeometry(), []);
   const centerGeometry = useMemo(() => new THREE.CircleGeometry(HEAD_RADIUS * 0.34, 24), []);
   const baseGeometry = useMemo(() => new THREE.SphereGeometry(STEM_RADIUS * 1.45, 12, 8), []);
   const initialStemGeometry = useMemo(
-    () => createInitialStemGeometry(stemHeight, isForked),
+    () => createInitialStemGeometry(stemHeight, isForked, STEM_RADIUS),
     [isForked, stemHeight]
   );
 
@@ -136,6 +141,7 @@ export default function PlaceMarker({
     if (
       !lastStemAttachment.current ||
       lastStemAttachment.current.distanceToSquared(stemAttachment) > 0.000025 ||
+      lastStemRadius.current !== stemRadius ||
       stemRef.current.geometry === initialStemGeometry
     ) {
       const curve = createStemCurve(
@@ -144,10 +150,11 @@ export default function PlaceMarker({
         stemHeight,
         isForked,
       );
-      const nextGeometry = new THREE.TubeGeometry(curve, 24, STEM_RADIUS, 8, false);
+      const nextGeometry = new THREE.TubeGeometry(curve, 24, stemRadius, 8, false);
       stem.geometry.dispose();
       stem.geometry = nextGeometry;
       lastStemAttachment.current = stemAttachment.clone();
+      lastStemRadius.current = stemRadius;
     }
   });
 
@@ -523,7 +530,11 @@ function createPetalledHeadGeometry() {
   return new THREE.ShapeGeometry(shape, totalSegments);
 }
 
-function createInitialStemGeometry(stemHeight: number, isForked: boolean) {
+function createInitialStemGeometry(
+  stemHeight: number,
+  isForked: boolean,
+  stemRadius: number,
+) {
   const attachment = new THREE.Vector3(
     0,
     0,
@@ -532,7 +543,7 @@ function createInitialStemGeometry(stemHeight: number, isForked: boolean) {
   return new THREE.TubeGeometry(
     createStemCurve(attachment, UP, stemHeight, isForked),
     24,
-    STEM_RADIUS,
+    stemRadius,
     8,
     false,
   );

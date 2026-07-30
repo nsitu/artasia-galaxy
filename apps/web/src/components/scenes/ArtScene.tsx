@@ -872,9 +872,18 @@ function TouchDoubleTapZoom({ enabled }: { enabled: boolean }) {
     let moved = false;
     let lastTapAt = 0;
     let lastTapPosition = new THREE.Vector2();
+    let zoomAnimationFrame: number | null = null;
+
+    function stopZoomAnimation() {
+      if (zoomAnimationFrame !== null) {
+        cancelAnimationFrame(zoomAnimationFrame);
+        zoomAnimationFrame = null;
+      }
+    }
 
     function onPointerDown(event: PointerEvent) {
       if (event.pointerType !== "touch" || !event.isPrimary) return;
+      stopZoomAnimation();
       pointerId = event.pointerId;
       pointerStart.set(event.clientX, event.clientY);
       moved = false;
@@ -915,10 +924,25 @@ function TouchDoubleTapZoom({ enabled }: { enabled: boolean }) {
       const currentDistance = offset.length();
       if (currentDistance > 1.5) {
         const nextDistance = Math.max(1.5, currentDistance * 0.78);
-        camera.position
-          .copy(terrainControls.target)
+        const startPosition = camera.position.clone();
+        const endPosition = terrainControls.target
+          .clone()
           .add(offset.setLength(nextDistance));
-        terrainControls.update?.();
+        const startedAt = performance.now();
+
+        function animateZoom(timestamp: number) {
+          const progress = Math.min(1, (timestamp - startedAt) / 200);
+          const eased = 1 - Math.pow(1 - progress, 3);
+          camera.position.lerpVectors(startPosition, endPosition, eased);
+          terrainControls.update?.();
+          if (progress < 1) {
+            zoomAnimationFrame = requestAnimationFrame(animateZoom);
+          } else {
+            zoomAnimationFrame = null;
+          }
+        }
+
+        zoomAnimationFrame = requestAnimationFrame(animateZoom);
       }
       lastTapAt = 0;
       event.preventDefault();
@@ -936,6 +960,7 @@ function TouchDoubleTapZoom({ enabled }: { enabled: boolean }) {
     element.addEventListener("pointercancel", onPointerCancel);
 
     return () => {
+      stopZoomAnimation();
       element.removeEventListener("pointerdown", onPointerDown);
       element.removeEventListener("pointermove", onPointerMove);
       element.removeEventListener("pointerup", onPointerUp);
