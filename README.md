@@ -1,4 +1,4 @@
-# Artasia Galaxy
+# Artasia Atlas
 
 Run the project from the repo root with two terminals:
 

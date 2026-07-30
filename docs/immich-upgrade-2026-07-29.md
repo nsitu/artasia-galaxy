@@ -8,7 +8,7 @@ Post-upgrade checks passed:
 - `immich-admin version` reported `v3.1.0`.
 - `immich-admin schema-check` reported current migrations and no schema drift.
 - The existing PostgreSQL 14/VectorChord 0.4.3 image remained compatible.
-- Immich and the Artasia Galaxy integration were tested successfully.
+- Immich and the Artasia Atlas integration were tested successfully.
 
 ## Recovery
 

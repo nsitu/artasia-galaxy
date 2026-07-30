@@ -1,6 +1,6 @@
-# Artasia Galaxy MVP
+# Artasia Atlas MVP
 
-Artasia Galaxy is a browser-based 3D gallery for photos hosted in Immich. The current MVP is deployed at:
+Artasia Atlas is a browser-based 3D gallery for photos hosted in Immich. The current MVP is deployed at:
 
 ```text
 https://atlas.artsforall.co
@@ -190,7 +190,7 @@ GOOGLE_ALLOWED_DOMAIN=artsforall.co
 SESSION_SECRET=...
 ```
 
-`IMMICH_URL` uses the public Immich HTTPS URL because the Galaxy app runs inside Docker. Inside the container, `127.0.0.1` refers to the Galaxy container, not the VM host.
+`IMMICH_URL` uses the public Immich HTTPS URL because the Atlas app runs inside Docker. Inside the container, `127.0.0.1` refers to the application container, not the VM host.
 
 `WORDPRESS_URL` has the same container boundary. Using the public URL is also valid:
 

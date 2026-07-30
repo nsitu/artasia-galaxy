@@ -3768,7 +3768,7 @@ export default function UploadPanel({
               />
               <span style={fieldHelpStyle}>
                 Stored in Immich as an <code>icon:name</code> tag and used by
-                the Galaxy viewer for sound assets.
+                the Atlas viewer for sound assets.
               </span>
             </div>
           )}
@@ -3892,7 +3892,7 @@ export default function UploadPanel({
                   type="button"
                   role="switch"
                   aria-checked={manageUseGpsLocation}
-                  aria-label="Use GPS location in the Galaxy viewer"
+                  aria-label="Use GPS location in the Atlas viewer"
                   onClick={() =>
                     setManageUseGpsLocation((current) => !current)
                   }

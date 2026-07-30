@@ -96,7 +96,7 @@ function artasia_render_tools_page(): void
         <?php endif; ?>
 
         <h2>Reconcile Immich</h2>
-        <p>Trigger a manual reconcile between WordPress placement data and Immich tags. The Galaxy server will sync human-readable tags on existing assets via the durable <code>placement:&lt;id&gt;</code> anchor tags, archive orphaned placements, and restore previously archived ones.</p>
+        <p>Trigger a manual reconcile between WordPress placement data and Immich tags. The Atlas server will sync human-readable tags on existing assets via the durable <code>placement:&lt;id&gt;</code> anchor tags, archive orphaned placements, and restore previously archived ones.</p>
 
         <h3>Settings</h3>
         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
@@ -107,14 +107,14 @@ function artasia_render_tools_page(): void
                     <th scope="row"><label for="artasia_reconcile_url">Reconcile endpoint URL</label></th>
                     <td>
                         <input type="url" id="artasia_reconcile_url" name="artasia_reconcile_url" value="<?php echo esc_attr($reconcile_url); ?>" class="regular-text" />
-                        <p class="description">Galaxy <code>/api/v1/reconcile</code> endpoint. Production default: <code><?php echo esc_html(artasia_default_reconcile_url()); ?></code>.</p>
+                        <p class="description">Atlas <code>/api/v1/reconcile</code> endpoint. Production default: <code><?php echo esc_html(artasia_default_reconcile_url()); ?></code>.</p>
                     </td>
                 </tr>
                 <tr>
                     <th scope="row"><label for="artasia_reconcile_secret">Reconcile secret</label></th>
                     <td>
                         <input type="password" id="artasia_reconcile_secret" name="artasia_reconcile_secret" value="" placeholder="<?php echo $reconcile_secret_set ? '(stored — leave blank to keep)' : ''; ?>" class="regular-text" autocomplete="new-password" />
-                        <p class="description">Shared secret matching the Galaxy server's <code>RECONCILE_SECRET</code> env var. Sent via the <code>x-reconcile-secret</code> header.</p>
+                        <p class="description">Shared secret matching the Atlas server's <code>RECONCILE_SECRET</code> env var. Sent via the <code>x-reconcile-secret</code> header.</p>
                     </td>
                 </tr>
             </table>
@@ -130,7 +130,7 @@ function artasia_render_tools_page(): void
                 <?php wp_nonce_field('artasia_reconcile_run', 'artasia_reconcile_run_nonce'); ?>
                 <p class="submit">
                     <button type="submit" class="button button-primary" id="artasia-reconcile-run">Run reconcile now</button>
-                    <span class="description">Sends an authenticated POST to the Galaxy reconcile endpoint. May take a few seconds depending on the number of placements and assets.</span>
+                    <span class="description">Sends an authenticated POST to the Atlas reconcile endpoint. May take a few seconds depending on the number of placements and assets.</span>
                 </p>
             </form>
         <?php endif; ?>

@@ -317,7 +317,7 @@ function artasia_placement_meta_box_html(WP_Post $post): void
                     <input type="checkbox" id="artasia_publish_site" name="artasia_publish_site" value="1" <?php checked($publish_site); ?> />
                     Publish this placement in Artasia site listings
                 </label>
-                <p class="description">Controls visibility in the <code>[artasia_sites]</code> shortcode and Artasia Sites Elementor widget only. It does not affect the Galaxy viewer.</p>
+                <p class="description">Controls visibility in the <code>[artasia_sites]</code> shortcode and Artasia Sites Elementor widget only. It does not affect the Atlas viewer.</p>
             </td>
         </tr>
         <tr>
@@ -706,7 +706,7 @@ function artasia_activity_meta_box_html(WP_Post $post): void
             <td>
                 <input type="color" id="artasia_activity_colour" name="artasia_activity_colour" value="<?php echo esc_attr($colour); ?>" />
                 <code><?php echo esc_html($colour); ?></code>
-                <p class="description">Choose the hex colour used to identify this activity in the Galaxy Viewer.</p>
+                <p class="description">Choose the hex colour used to identify this activity in the Atlas Viewer.</p>
             </td>
         </tr>
     </table>

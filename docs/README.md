@@ -1,6 +1,6 @@
 # Documentation
 
-This folder contains documentation for the Artasia Galaxy system as it exists now.
+This folder contains documentation for the Artasia Atlas system as it exists now.
 
 - [MVP](mvp.md): current architecture, deployment, runtime configuration, and maintenance notes.
 
