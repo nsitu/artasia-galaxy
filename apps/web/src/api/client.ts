@@ -86,6 +86,12 @@ export interface UploadPlacement {
     mime_type: string;
     alt: string;
   } | null;
+  partner_white_logo?: {
+    id: number;
+    url: string;
+    mime_type: string;
+    alt: string;
+  } | null;
   partner_brand_color_one?: string;
   partner_brand_color_two?: string;
   delivery_weekday?: string;
@@ -114,6 +120,12 @@ export interface MapPlacement {
   placement_slug?: string;
   partner_name?: string;
   partner_logo?: {
+    id: number;
+    url: string;
+    mime_type: string;
+    alt: string;
+  } | null;
+  partner_white_logo?: {
     id: number;
     url: string;
     mime_type: string;

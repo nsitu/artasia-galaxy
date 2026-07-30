@@ -22,6 +22,12 @@ export interface WpPartner {
     mime_type: string;
     alt: string;
   } | null;
+  white_logo?: {
+    id: number;
+    url: string;
+    mime_type: string;
+    alt: string;
+  } | null;
 }
 
 export interface WpPerson {

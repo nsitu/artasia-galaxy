@@ -33,6 +33,12 @@ export interface ArtasiaPlacement {
     mime_type: string;
     alt: string;
   } | null;
+  partner_white_logo?: {
+    id: number;
+    url: string;
+    mime_type: string;
+    alt: string;
+  } | null;
   partner_brand_color_one?: string;
   partner_brand_color_two?: string;
   delivery_weekday?: string;
@@ -54,6 +60,12 @@ export interface ArtasiaMapPlacement {
   placement_slug?: string;
   partner_name?: string;
   partner_logo?: {
+    id: number;
+    url: string;
+    mime_type: string;
+    alt: string;
+  } | null;
+  partner_white_logo?: {
     id: number;
     url: string;
     mime_type: string;
@@ -160,6 +172,7 @@ function mapWpPlacement(wp: WpArtasiaPlacement): ArtasiaPlacement {
     is_earlyon: Boolean(wp.is_earlyon),
     partner_name: wp.partner?.name ?? "",
     ...(wp.partner?.logo ? { partner_logo: mapPartnerLogo(wp.partner.logo) } : {}),
+    ...(wp.partner?.white_logo ? { partner_white_logo: mapPartnerLogo(wp.partner.white_logo) } : {}),
     ...(wp.partner?.brand_color_one ? { partner_brand_color_one: wp.partner.brand_color_one } : {}),
     ...(wp.partner?.brand_color_two ? { partner_brand_color_two: wp.partner.brand_color_two } : {}),
     ...(wp.delivery_weekday ? { delivery_weekday: wp.delivery_weekday } : {}),
@@ -220,6 +233,7 @@ export async function getMapPlacements(): Promise<ArtasiaMapPlacement[]> {
       ...(wp.placement_slug ? { placement_slug: wp.placement_slug } : {}),
       ...(wp.partner?.name ? { partner_name: wp.partner.name } : {}),
       ...(wp.partner?.logo ? { partner_logo: mapPartnerLogo(wp.partner.logo) } : {}),
+      ...(wp.partner?.white_logo ? { partner_white_logo: mapPartnerLogo(wp.partner.white_logo) } : {}),
       ...(wp.partner?.brand_color_one ? { partner_brand_color_one: wp.partner.brand_color_one } : {}),
       ...(wp.partner?.brand_color_two ? { partner_brand_color_two: wp.partner.brand_color_two } : {}),
       ...(wp.team_member ? { team_member: mapWpUploader(wp.team_member) } : {}),

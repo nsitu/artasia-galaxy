@@ -122,7 +122,7 @@ const presenterLogoStyle: React.CSSProperties = {
 };
 
 const presenterTextStyle: React.CSSProperties = {
-  marginBottom: "0.5rem",
+  marginBottom: "clamp(0.35rem, 1.1vw, 0.5rem)",
   color: "#c1c9d7",
   fontSize: 10,
   fontVariant: "small-caps",

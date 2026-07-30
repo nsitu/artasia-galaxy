@@ -1545,6 +1545,9 @@ export function FocusedPlacementOverlay({
   const peopleLabel =
     people.length > 1 ? "Artist Educators" : "Artist Educator";
   const siteDetails = formatSiteDetails(placement);
+  const partnerLogo = placement.partner_white_logo?.url
+    ? placement.partner_white_logo
+    : placement.partner_logo;
 
   useEffect(() => {
     setExpanded(true);
@@ -1565,22 +1568,22 @@ export function FocusedPlacementOverlay({
           ...(!expanded ? siteDetailsHeaderCollapsedStyle : {}),
         }}
       >
-        {placement.partner_logo?.url && (
+        {partnerLogo?.url && (
           <img
-            src={placement.partner_logo.url}
+            src={partnerLogo.url}
             alt={
-              placement.partner_logo.alt ||
+              partnerLogo.alt ||
               placement.partner_name ||
               "Partner logo"
             }
-            style={partnerLogoStyle}
+            style={placement.partner_white_logo?.url ? partnerWhiteLogoStyle : partnerLogoStyle}
           />
         )}
         <div style={siteDetailsTitleWrapStyle}>
+          <div style={siteNameStyle}>{placement.placement_name}</div>
           <div style={sitePartnerStyle}>
             {placement.partner_name || "Partner organization"}
           </div>
-          <div style={siteNameStyle}>{placement.placement_name}</div>
         </div>
         <button
           type="button"
@@ -1647,6 +1650,9 @@ export function PlacementPreviewPanel({
 }) {
   const siteDetails = formatSiteDetails(placement);
   const participantDetails = formatParticipantDetails(placement);
+  const partnerLogo = placement.partner_white_logo?.url
+    ? placement.partner_white_logo
+    : placement.partner_logo;
 
   return (
     <section style={placementPreviewPanelStyle} aria-label="Placement preview">
@@ -1655,23 +1661,23 @@ export function PlacementPreviewPanel({
         onClick={onOpen}
         style={placementPreviewButtonStyle}
       >
-        {placement.partner_logo?.url && (
+        {partnerLogo?.url && (
           <img
-            src={placement.partner_logo.url}
+            src={partnerLogo.url}
             alt={
-              placement.partner_logo.alt ||
+              partnerLogo.alt ||
               placement.partner_name ||
               "Partner logo"
             }
-            style={placementPreviewLogoStyle}
+            style={placement.partner_white_logo?.url ? placementPreviewWhiteLogoStyle : placementPreviewLogoStyle}
           />
         )}
         <span style={placementPreviewContentStyle}>
-          <span style={placementPreviewPartnerStyle}>
-            {placement.partner_name || "Partner organization"}
-          </span>
           <span style={placementPreviewNameStyle}>
             {placement.placement_name}
+          </span>
+          <span style={placementPreviewPartnerStyle}>
+            {placement.partner_name || "Partner organization"}
           </span>
           {siteDetails && (
             <span style={placementPreviewMetaStyle}>{siteDetails}</span>
@@ -1936,6 +1942,12 @@ const placementPreviewLogoStyle: React.CSSProperties = {
   padding: 5,
 };
 
+const placementPreviewWhiteLogoStyle: React.CSSProperties = {
+  ...placementPreviewLogoStyle,
+  background: "transparent",
+  padding: 0,
+};
+
 const placementPreviewContentStyle: React.CSSProperties = {
   minWidth: 0,
   flex: "1 1 auto",
@@ -1944,16 +1956,17 @@ const placementPreviewContentStyle: React.CSSProperties = {
 };
 
 const placementPreviewPartnerStyle: React.CSSProperties = {
-  color: "#f4f7fb",
-  fontSize: 12,
-  fontWeight: 700,
+  color: "#aeb7c6",
+  fontSize: 11,
+  fontWeight: 400,
   lineHeight: 1.25,
   overflowWrap: "anywhere",
 };
 
 const placementPreviewNameStyle: React.CSSProperties = {
-  color: "#cfd6e2",
-  fontSize: 11,
+  color: "#f4f7fb",
+  fontSize: 14,
+  fontWeight: 700,
   lineHeight: 1.3,
   overflowWrap: "anywhere",
 };
@@ -2022,16 +2035,23 @@ const partnerLogoStyle: React.CSSProperties = {
   padding: 5,
 };
 
+const partnerWhiteLogoStyle: React.CSSProperties = {
+  ...partnerLogoStyle,
+  background: "transparent",
+  padding: 0,
+};
+
 const sitePartnerStyle: React.CSSProperties = {
-  color: "#f4f7fb",
+  color: "#aeb7c6",
   fontSize: 12,
-  fontWeight: 700,
+  fontWeight: 400,
   lineHeight: 1.25,
 };
 
 const siteNameStyle: React.CSSProperties = {
-  color: "#aeb7c6",
-  fontSize: 11,
+  color: "#f4f7fb",
+  fontSize: 16,
+  fontWeight: 700,
   lineHeight: 1.35,
   marginTop: 3,
 };

@@ -93,11 +93,14 @@ export default function ArtScene() {
   const [activityFilterOptions, setActivityFilterOptions] = useState<ActivityOption[]>([]);
   const [selectedActivityFilter, setSelectedActivityFilter] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [webglError, setWebglError] = useState<string | null>(() => getWebGL2SupportError());
   const menuRef = useRef<HTMLDivElement | null>(null);
   const linkedAudioRef = useRef<HTMLAudioElement | null>(null);
   const [linkedAudioPlaying, setLinkedAudioPlaying] = useState(false);
+  const lightboxSwipeStartRef = useRef<{ x: number; y: number } | null>(null);
+  const lightboxSuppressClickRef = useRef(false);
 
   const handleIntroReady = useCallback(() => {
     setIntroPhase((current) => current === "loading" ? "ready" : current);
@@ -172,6 +175,7 @@ export default function ArtScene() {
 
   const menuItems = useMemo(
     () => [
+      { href: "#about", label: "About", action: "about" as const },
       { href: "/admin", label: "Admin" },
       { href: "/partners", label: "Partners" },
     ],
@@ -210,6 +214,30 @@ export default function ArtScene() {
       setLinkedAudioPlaying(false);
     }
   }, []);
+
+  const selectAdjacentPhoto = useCallback((direction: -1 | 1) => {
+    if (selectedPhotoIndex === null || photos.length < 2) return;
+    const nextIndex = (selectedPhotoIndex + direction + photos.length) % photos.length;
+    selectPhoto(nextIndex);
+  }, [photos.length, selectedPhotoIndex, selectPhoto]);
+
+  const handleLightboxPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== "touch") return;
+    lightboxSwipeStartRef.current = { x: event.clientX, y: event.clientY };
+  }, []);
+
+  const handleLightboxPointerUp = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const start = lightboxSwipeStartRef.current;
+    lightboxSwipeStartRef.current = null;
+    if (!start || event.pointerType !== "touch") return;
+
+    const deltaX = event.clientX - start.x;
+    const deltaY = event.clientY - start.y;
+    if (Math.abs(deltaX) < 48 || Math.abs(deltaX) < Math.abs(deltaY)) return;
+
+    lightboxSuppressClickRef.current = true;
+    selectAdjacentPhoto(deltaX < 0 ? 1 : -1);
+  }, [selectAdjacentPhoto]);
   const handleBackActionChange = useCallback((action: (() => void) | null) => {
     setBackAction(action ? () => action : null);
   }, []);
@@ -262,15 +290,16 @@ export default function ArtScene() {
   }, [focusedPlacementDetails]);
 
   return (
-    <div style={{ width: "100vw", height: "100vh", position: "relative" }}>
-      <div style={topNavStyle}>
-        <div style={homeBrandStyle}>
+    <div className={window.location.pathname.startsWith("/sites/") ? "atlas-site-view" : undefined} style={{ width: "100vw", height: "100vh", position: "relative" }}>
+      <style>{responsiveTopNavStyles}</style>
+      <div className="atlas-top-nav" style={topNavStyle}>
+        <div className="atlas-home-brand" style={homeBrandStyle}>
           <a href="/" aria-label="Artasia home" style={homeLogoLinkStyle}>
             <img src="/artasia-atlas.svg" alt="Artasia Atlas" style={homeLogoImageStyle} />
           </a>
         </div>
 
-        <div style={topControlGroupStyle}>
+        <div className="atlas-top-controls" style={topControlGroupStyle}>
           {backAction && (
             <button
               type="button"
@@ -336,7 +365,7 @@ export default function ArtScene() {
           )}
         </div>
 
-        <div ref={menuRef} style={menuWrapStyle}>
+        <div ref={menuRef} className="atlas-menu-wrap" style={menuWrapStyle}>
           <button
             type="button"
             aria-label="Open navigation menu"
@@ -354,8 +383,17 @@ export default function ArtScene() {
 
           {menuOpen && (
             <div role="menu" style={menuPanelStyle}>
-              {menuItems.map((item) => (
-                <a
+                {menuItems.map((item) => item.action === "about" ? (
+                  <button
+                    key={item.href}
+                    type="button"
+                    role="menuitem"
+                    style={{ ...menuItemStyle, textAlign: "left", border: 0, cursor: "pointer" }}
+                    onClick={() => { setMenuOpen(false); setAboutOpen(true); }}
+                  >
+                    {item.label}
+                  </button>
+                ) : <a
                   key={item.href}
                   role="menuitem"
                   href={item.href}
@@ -363,14 +401,14 @@ export default function ArtScene() {
                   onClick={() => setMenuOpen(false)}
                 >
                   {item.label}
-                </a>
-              ))}
+                </a>)}
             </div>
           )}
         </div>
       </div>
 
       <a
+        className="atlas-presented-by"
         href="https://artsforall.co"
         target="_blank"
         rel="noopener noreferrer"
@@ -380,6 +418,18 @@ export default function ArtScene() {
         <span style={presentedByTextStyle}>PRESENTED BY</span>
         <img src="/afa-horizontal.svg" alt="Arts For All" style={presentedByLogoStyle} />
       </a>
+
+      {aboutOpen && (
+        <div role="dialog" aria-modal="true" aria-label="About Atlas" style={aboutOverlayStyle}>
+          <div style={aboutCardStyle}>
+            <button type="button" aria-label="Close About" onClick={() => setAboutOpen(false)} style={aboutCloseStyle}>×</button>
+            <div style={aboutEyebrowStyle}>ARTS FOR ALL PRESENTS</div>
+            <img src="/artasia-atlas.svg" alt="ArtAsia Atlas" style={aboutLogoStyle} />
+            <p style={aboutTextStyle}>Explore artist-led learning experiences and creative spaces across our community.</p>
+            <a href="https://artsforall.co" target="_blank" rel="noopener noreferrer" style={aboutLinkStyle}>Visit Arts For All</a>
+          </div>
+        </div>
+      )}
 
       {error && <div style={errorStyle}>{error}</div>}
       <div style={buildStampStyle}>{__ARTASIA_BUILD_LABEL__}</div>
@@ -403,11 +453,19 @@ export default function ArtScene() {
 
       {selectedPhoto && (
         <div
-          style={photoLightboxStyle}
           role="dialog"
           aria-modal="true"
           aria-label={selectedPhoto.fileName}
-          onClick={() => selectPhoto(null)}
+          onPointerDown={handleLightboxPointerDown}
+          onPointerUp={handleLightboxPointerUp}
+          onClick={() => {
+            if (lightboxSuppressClickRef.current) {
+              lightboxSuppressClickRef.current = false;
+              return;
+            }
+            selectPhoto(null);
+          }}
+          style={{ ...photoLightboxStyle, touchAction: "pan-y" }}
         >
           {selectedPhoto.mediaKind === "video" && selectedPhoto.videoUrl ? (
             <video
@@ -473,6 +531,38 @@ export default function ArtScene() {
               </a>
             )}
           </div>
+          {photos.length > 1 && (
+            <>
+              <button
+                type="button"
+                className="atlas-lightbox-nav-button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  selectAdjacentPhoto(-1);
+                }}
+                aria-label="Previous artwork"
+                style={{ ...photoLightboxNavStyle, left: 16 }}
+              >
+                <svg viewBox="0 0 16 16" aria-hidden="true" style={photoLightboxNavIconStyle}>
+                  <path d="m10.5 2.5-5.5 5.5 5.5 5.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="atlas-lightbox-nav-button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  selectAdjacentPhoto(1);
+                }}
+                aria-label="Next artwork"
+                style={{ ...photoLightboxNavStyle, right: 16 }}
+              >
+                <svg viewBox="0 0 16 16" aria-hidden="true" style={photoLightboxNavIconStyle}>
+                  <path d="m5.5 2.5 5.5 5.5-5.5 5.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </>
+          )}
           <button
             type="button"
             onClick={() => selectPhoto(null)}
@@ -751,6 +841,48 @@ const topNavStyle: React.CSSProperties = {
   pointerEvents: "none",
 };
 
+const responsiveTopNavStyles = `
+  @media (max-width: 640px) {
+    .atlas-site-view .atlas-presented-by {
+      display: none !important;
+    }
+    .atlas-lightbox-nav-button {
+      display: none !important;
+    }
+
+    .atlas-top-nav {
+      flex-wrap: wrap;
+      align-items: flex-start !important;
+    }
+
+    .atlas-home-brand {
+      flex: 1 1 auto !important;
+    }
+
+    .atlas-menu-wrap {
+      order: 2;
+    }
+
+    .atlas-top-controls {
+      order: 3;
+      flex: 1 0 100% !important;
+      width: 100%;
+      margin-top: 4px;
+      justify-content: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .atlas-top-controls > label {
+      flex: 1 1 220px;
+    }
+
+    .atlas-top-controls > label select {
+      width: 100% !important;
+      max-width: none;
+    }
+  }
+`;
+
 const topControlGroupStyle: React.CSSProperties = {
   flex: "1 1 auto",
   minWidth: 0,
@@ -780,7 +912,7 @@ const presentedByTextStyle: React.CSSProperties = {
   fontVariant: "small-caps",
   letterSpacing: "0.14em",
   lineHeight: 1,
-  marginBottom: "0.5rem"
+  marginBottom: "clamp(0.35rem, 1.1vw, 0.5rem)",
 };
 
 const presentedByLogoStyle: React.CSSProperties = {
@@ -1071,6 +1203,43 @@ const photoLightboxCloseStyle: React.CSSProperties = {
   color: "#eef2f8",
   border: "1px solid rgba(255,255,255,0.18)",
   boxShadow: "0 10px 26px rgba(0,0,0,0.28)",
+};
+
+const aboutOverlayStyle: React.CSSProperties = {
+  position: "fixed", inset: 0, zIndex: 40, display: "grid", placeItems: "center",
+  padding: 24, background: "rgba(5, 7, 14, 0.78)", backdropFilter: "blur(8px)",
+};
+const aboutCardStyle: React.CSSProperties = {
+  position: "relative", width: "min(420px, 100%)", padding: "42px 28px 30px",
+  borderRadius: 18, background: "rgba(16, 19, 31, 0.96)", border: "1px solid rgba(255,255,255,0.16)",
+  color: "#eef3fb", textAlign: "center", boxShadow: "0 24px 70px rgba(0,0,0,0.45)",
+};
+const aboutCloseStyle: React.CSSProperties = { position: "absolute", top: 10, right: 14, border: 0, background: "transparent", color: "#cfd6e2", fontSize: 28, cursor: "pointer" };
+const aboutEyebrowStyle: React.CSSProperties = { color: "#aeb7c6", fontFamily: "monospace", fontSize: 10, letterSpacing: "0.16em" };
+const aboutLogoStyle: React.CSSProperties = { display: "block", width: "min(260px, 80%)", height: "auto", margin: "18px auto" };
+const aboutTextStyle: React.CSSProperties = { margin: "0 auto 22px", maxWidth: 320, color: "#c1c9d7", lineHeight: 1.55, fontSize: 14 };
+const aboutLinkStyle: React.CSSProperties = { color: "#fff", fontFamily: "monospace", fontSize: 12, textDecoration: "underline" };
+
+const photoLightboxNavStyle: React.CSSProperties = {
+  position: "absolute",
+  top: "50%",
+  transform: "translateY(-50%)",
+  width: 48,
+  height: 48,
+  display: "grid",
+  placeItems: "center",
+  padding: 0,
+  border: "1px solid rgba(255,255,255,0.18)",
+  borderRadius: 999,
+  background: "rgba(10,10,20,0.82)",
+  color: "#eef2f8",
+  boxShadow: "0 10px 26px rgba(0,0,0,0.28)",
+  cursor: "pointer",
+};
+
+const photoLightboxNavIconStyle: React.CSSProperties = {
+  width: 20,
+  height: 20,
 };
 
 const photoLightboxCloseIconStyle: React.CSSProperties = {
