@@ -963,6 +963,9 @@ export default function UploadPanel({
     timeOfDayFilter,
     workspaceMode,
   ]);
+  const showMySitesButton = browseUploaderOptions.some(
+    ({ uploader }) => uploader.id === matchedAuthUploaderId(),
+  );
 
   const selectedPlacement = useMemo(() => {
     if (!options || !placementKey) return null;
@@ -2622,6 +2625,7 @@ export default function UploadPanel({
       await logoutAuthUser();
       setAuthUser({ authenticated: false });
       onSignedOut?.();
+      window.location.assign("/");
     } catch (err) {
       setError((err as Error).message);
     }
@@ -4170,7 +4174,7 @@ export default function UploadPanel({
           >
             <img src="/artasia-atlas.svg" alt="Artasia Atlas" style={logoStyle} />
             <div>
-              <h1 style={titleStyle}>Atlas Admin</h1>
+              <h1 style={titleStyle}>Admin</h1>
             </div>
           </a>
           <div ref={menuRef} style={navMenuWrapStyle}>
@@ -4219,14 +4223,15 @@ export default function UploadPanel({
                 {authUser.email ? ` (${authUser.email})` : ""}
               </span>
               <div style={authActionGroupStyle}>
-                <button
-                  type="button"
-                  onClick={selectMySites}
-                  disabled={!authUser.uploader_id && !authUser.uploader?.id}
-                  style={secondaryButtonStyle}
-                >
-                  My Sites
-                </button>
+                {showMySitesButton && (
+                  <button
+                    type="button"
+                    onClick={selectMySites}
+                    style={secondaryButtonStyle}
+                  >
+                    My Sites
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={signOut}

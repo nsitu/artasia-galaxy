@@ -118,6 +118,7 @@ export interface MapPlacement {
   placement_id: number;
   placement_name: string;
   placement_slug?: string;
+  is_earlyon: boolean;
   partner_name?: string;
   partner_logo?: {
     id: number;

@@ -58,6 +58,7 @@ export interface ArtasiaMapPlacement {
   placement_id: number;
   placement_name: string;
   placement_slug?: string;
+  is_earlyon: boolean;
   partner_name?: string;
   partner_logo?: {
     id: number;
@@ -230,6 +231,7 @@ export async function getMapPlacements(): Promise<ArtasiaMapPlacement[]> {
     return [{
       placement_id: wp.placement_id,
       placement_name: wp.placement_name,
+      is_earlyon: Boolean(wp.is_earlyon),
       ...(wp.placement_slug ? { placement_slug: wp.placement_slug } : {}),
       ...(wp.partner?.name ? { partner_name: wp.partner.name } : {}),
       ...(wp.partner?.logo ? { partner_logo: mapPartnerLogo(wp.partner.logo) } : {}),

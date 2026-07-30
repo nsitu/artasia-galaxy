@@ -1691,19 +1691,30 @@ export function PlacementPreviewPanel({
           ...(isMobile ? placementPreviewMobileButtonStyle : {}),
         }}
       >
-        {partnerLogo?.url && (
-          <img
-            src={partnerLogo.url}
-            alt={
-              partnerLogo.alt ||
-              placement.partner_name ||
-              "Partner logo"
-            }
-            style={{
-              ...(placement.partner_white_logo?.url ? placementPreviewWhiteLogoStyle : placementPreviewLogoStyle),
-              ...(isMobile ? placementPreviewMobileLogoStyle : {}),
-            }}
-          />
+        {(partnerLogo?.url || (isMobile && placement.is_earlyon)) && (
+          <span style={isMobile ? placementPreviewMobileLogoRowStyle : placementPreviewDesktopLogoRowStyle}>
+            {partnerLogo?.url && (
+              <img
+                src={partnerLogo.url}
+                alt={
+                  partnerLogo.alt ||
+                  placement.partner_name ||
+                  "Partner logo"
+                }
+                style={{
+                  ...(placement.partner_white_logo?.url ? placementPreviewWhiteLogoStyle : placementPreviewLogoStyle),
+                  ...(isMobile ? placementPreviewMobileLogoStyle : {}),
+                }}
+              />
+            )}
+            {isMobile && placement.is_earlyon && (
+              <img
+                src="/early-on-white.svg"
+                alt="EarlyON"
+                style={placementPreviewEarlyOnLogoStyle}
+              />
+            )}
+          </span>
         )}
         <span style={{ ...placementPreviewContentStyle, ...(isMobile ? placementPreviewMobileContentStyle : {}) }}>
           <span style={placementPreviewNameStyle}>
@@ -1998,6 +2009,26 @@ const placementPreviewMobileLogoStyle: React.CSSProperties = {
   width: "min(50vw, 280px)",
   height: 72,
   alignSelf: "flex-start",
+  objectPosition: "left center",
+};
+
+const placementPreviewDesktopLogoRowStyle: React.CSSProperties = {
+  display: "contents",
+};
+
+const placementPreviewMobileLogoRowStyle: React.CSSProperties = {
+  width: "100%",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "flex-start",
+  gap: 16,
+};
+
+const placementPreviewEarlyOnLogoStyle: React.CSSProperties = {
+  width: "min(30vw, 160px)",
+  height: 58,
+  flex: "0 1 auto",
+  objectFit: "contain",
   objectPosition: "left center",
 };
 
