@@ -1607,7 +1607,7 @@ export function FocusedPlacementOverlay({
   adminHref?: string;
 }) {
   const isMobile = useIsMobileBreakpoint();
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(!isMobile);
   const people = [
     placement.team_member,
     placement.secondary_team_member,
@@ -1623,8 +1623,8 @@ export function FocusedPlacementOverlay({
     : placement.partner_logo;
 
   useEffect(() => {
-    setExpanded(true);
-  }, [placement.placement_id]);
+    setExpanded(!isMobile);
+  }, [isMobile, placement.placement_id]);
 
   return (
     <section
@@ -1943,14 +1943,14 @@ const siteDetailsStyle: React.CSSProperties = {
 };
 
 const mobileSiteDetailsStyle: React.CSSProperties = {
-  bottom: 12,
-  left: 12,
-  right: 12,
+  bottom: 0,
+  left: 0,
+  right: 0,
   transform: "none",
   width: "auto",
   maxWidth: "none",
   zIndex: 13,
-  borderRadius: 16,
+  borderRadius: 0,
   padding: 12,
   overflow: "hidden",
 };
