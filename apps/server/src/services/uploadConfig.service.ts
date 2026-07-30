@@ -57,6 +57,7 @@ export interface ArtasiaPlacement {
 export interface ArtasiaMapPlacement {
   placement_id: number;
   placement_name: string;
+  section?: string;
   placement_slug?: string;
   is_earlyon: boolean;
   partner_name?: string;
@@ -165,6 +166,7 @@ function mapWpPlacement(wp: WpArtasiaPlacement): ArtasiaPlacement {
   return {
     placement_id: wp.placement_id,
     placement_name: wp.placement_name,
+    ...(wp.section ? { section: wp.section } : {}),
     ...(wp.placement_slug ? { placement_slug: wp.placement_slug } : {}),
     ...(wp.team_member?.id ? { team_member_id: wp.team_member.id } : {}),
     ...(wp.team_member?.name ? { team_member_name: wp.team_member.name } : {}),
@@ -231,6 +233,7 @@ export async function getMapPlacements(): Promise<ArtasiaMapPlacement[]> {
     return [{
       placement_id: wp.placement_id,
       placement_name: wp.placement_name,
+      ...(wp.section ? { section: wp.section } : {}),
       is_earlyon: Boolean(wp.is_earlyon),
       ...(wp.placement_slug ? { placement_slug: wp.placement_slug } : {}),
       ...(wp.partner?.name ? { partner_name: wp.partner.name } : {}),

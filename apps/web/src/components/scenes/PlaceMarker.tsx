@@ -671,7 +671,16 @@ function createStemCurve(
   const base = new THREE.Vector3(0, 0, 0);
 
   if (isForked) {
-    const forkHeight = Math.min(CLUSTER_FORK_HEIGHT, stemHeight * 0.56);
+    // Let the shared trunk fork across a range of heights. Short stems fork
+    // close to the terrain anchor, while taller stems get a little more
+    // breathing room before branching. This avoids a uniformly mid-stem
+    // pitchfork silhouette and allows the anchor itself to read as the root.
+    const forkProgress = THREE.MathUtils.smoothstep(stemHeight, 0.42, 0.9);
+    const forkHeight = THREE.MathUtils.clamp(
+      THREE.MathUtils.lerp(0.055, CLUSTER_FORK_HEIGHT, forkProgress),
+      0.045,
+      stemHeight * 0.48,
+    );
     const forkPoint = new THREE.Vector3(0, 0, forkHeight);
     const trunk = new THREE.CubicBezierCurve3(
       base,

@@ -1400,7 +1400,13 @@ export default function TerrainGallery({
   if (isPreparingTerrain || hasNoTerrainLocations) return null;
 
   return (
-    <group>
+    <group
+      onClick={
+        usesTouchPreview && previewPlacement
+          ? () => setPreviewPlacement(null)
+          : undefined
+      }
+    >
       <FlowerLayoutCoordinator />
       {terrain && terrainMatchesRequest && <primitive object={terrain} />}
 
@@ -1494,7 +1500,11 @@ export default function TerrainGallery({
                 : () => {
                     if (usesTouchPreview) {
                       setHoveredPlacement(null);
-                      setPreviewPlacement(placement);
+                      setPreviewPlacement((current) =>
+                        current?.placement_id === placement.placement_id
+                          ? null
+                          : placement,
+                      );
                       panToPlacement(position);
                       return;
                     }
@@ -1741,10 +1751,7 @@ export function PlacementPreviewPanel({
         )}
         <span style={{ ...placementPreviewContentStyle, ...(isMobile ? placementPreviewMobileContentStyle : {}) }}>
           <span style={placementPreviewNameStyle}>
-            {placement.placement_name}
-          </span>
-          <span style={placementPreviewPartnerStyle}>
-            {placement.partner_name || "Partner organization"}
+            {formatPlacementDisplayName(placement)}
           </span>
           {siteDetails && (
             <span style={placementPreviewMetaStyle}>{siteDetails}</span>
@@ -1769,16 +1776,10 @@ function formatSiteDetails(placement: MapPlacement) {
 }
 
 function formatParticipantDetails(placement: MapPlacement) {
-  const details: string[] = [];
-  if (placement.participant_count != null)
-    details.push(String(placement.participant_count));
-
   const ageRange = placement.participant_age?.trim();
-  if (ageRange) {
-    details.push(/\d/.test(ageRange) ? `age ${ageRange}` : ageRange);
-  }
-
-  return details.join(", ");
+  return ageRange
+    ? (/\d/.test(ageRange) ? `age ${ageRange}` : ageRange)
+    : "";
 }
 
 function SiteDetail({ label, value }: { label: string; value: string }) {
@@ -2295,6 +2296,13 @@ function getPlacementAnchorKey(placement: MapPlacement) {
   if (placeName) return `place:${placeName}|${city}`;
   if (address) return `address:${address}|${city}`;
   return `coordinates:${placement.lat.toFixed(5)}:${placement.lng.toFixed(5)}`;
+}
+
+function formatPlacementDisplayName(placement: MapPlacement) {
+  const section = placement.section?.trim();
+  return section
+    ? `${placement.placement_name} - ${section}`
+    : placement.placement_name;
 }
 
 function haversineMeters(a: [number, number], b: [number, number]) {
