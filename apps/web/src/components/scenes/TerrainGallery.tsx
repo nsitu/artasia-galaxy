@@ -12,7 +12,7 @@ import {
   OrbitingPhotoBanner,
   TerrainPhotoFlower,
 } from "./TerrainPhotoMarker";
-import PlaceMarker, { getAgeBasedFlowerHeightScale } from "./PlaceMarker";
+import PlaceMarker from "./PlaceMarker";
 import {
   createMaxDetailTerrainRequest,
   createTerrainRequest,
@@ -26,8 +26,8 @@ const LOCAL_TERRAIN_ELEVATION_SCALE = 1.25;
 const DEFAULT_TERRAIN_CAMERA_POSITION = new THREE.Vector3(0, -12, 10);
 const LOCAL_PLACEMENT_RADIUS_KM = 0.5;
 const SAME_LOCATION_THRESHOLD_METERS = 15;
-const REGIONAL_FLOWER_DENSITY_RADIUS = 0.62;
 const REGIONAL_CAMERA_FIT_SCALE = 0.5;
+const REGIONAL_FLOWER_HEAD_PLANE_CLEARANCE = 0.42;
 const LOCAL_CAMERA_FIT_SCALE = 0.55;
 const REGIONAL_DEM_ZOOM_OFFSET = 5;
 const LOCAL_DEM_ZOOM_OFFSET = 3;
@@ -762,20 +762,8 @@ export default function TerrainGallery({
     });
 
     return projected.map(({ placement, x, y, z }) => {
-      const neighborCount = focusedPlacement
-        ? 0
-        : projected.filter(
-            (other) =>
-              other.placement.placement_id !== placement.placement_id &&
-              Math.hypot(other.x - x, other.y - y) <=
-                REGIONAL_FLOWER_DENSITY_RADIUS,
-          ).length;
-
       return {
         placement,
-        heightScale: focusedPlacement
-          ? undefined
-          : getDensityAwareFlowerHeightScale(placement, neighborCount),
         position: [
           x,
           y,
@@ -784,6 +772,15 @@ export default function TerrainGallery({
       };
     });
   }, [focusedPlacement, projection, terrain, visiblePlacements]);
+  const flowerHeadPlaneZ = useMemo(() => {
+    const highestAnchor = placementLayout.reduce(
+      (highest, item) => Math.max(highest, item.position[2]),
+      Number.NEGATIVE_INFINITY,
+    );
+    return Number.isFinite(highestAnchor)
+      ? highestAnchor + REGIONAL_FLOWER_HEAD_PLANE_CLEARANCE
+      : REGIONAL_FLOWER_HEAD_PLANE_CLEARANCE;
+  }, [placementLayout]);
 
   const focusPlacement = useCallback(
     (
@@ -1437,15 +1434,14 @@ export default function TerrainGallery({
         )}
 
       {sceneReadyForMarkers &&
-        placementLayout.map(({ placement, position, heightScale }) => (
+        placementLayout.map(({ placement, position }) => (
           <PlaceMarker
             key={placement.placement_id}
             markerId={String(placement.placement_id)}
             position={position}
-            participantAge={placement.participant_age}
             brandColorOne={placement.partner_brand_color_one}
             brandColorTwo={placement.partner_brand_color_two}
-            heightScale={heightScale}
+            headPlaneZ={flowerHeadPlaneZ}
             isSelected={
               usesTouchPreview &&
               previewPlacement?.placement_id === placement.placement_id
@@ -2213,17 +2209,6 @@ function terrainPhaseLabel(phase: TerrainPhase) {
 
 function formatRadius(radiusKm: number) {
   return `${radiusKm.toFixed(radiusKm >= 10 ? 0 : 1)} km`;
-}
-
-function getDensityAwareFlowerHeightScale(
-  placement: MapPlacement,
-  neighborCount: number,
-) {
-  const density = clamp(neighborCount / 6, 0, 1);
-  return (
-    getAgeBasedFlowerHeightScale(placement.participant_age) *
-    THREE.MathUtils.lerp(1, 1.35, density)
-  );
 }
 
 function haversineMeters(a: [number, number], b: [number, number]) {

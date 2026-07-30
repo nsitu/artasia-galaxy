@@ -5,10 +5,9 @@ import * as THREE from "three";
 interface Props {
   markerId: string;
   position: [number, number, number];
-  participantAge?: string;
   brandColorOne?: string;
   brandColorTwo?: string;
-  heightScale?: number;
+  headPlaneZ: number;
   isSelected?: boolean;
   onClick?: () => void;
   onPointerEnter?: () => void;
@@ -16,14 +15,11 @@ interface Props {
 }
 
 const BASE_LIFT = 0.025;
-const STEM_HEIGHT = 0.34;
-const TRACKING_RADIUS = 0.18;
+const MIN_STEM_HEIGHT = 0.18;
+const HEAD_LAYOUT_RADIUS = 0.28;
 const HEAD_RADIUS = 0.2295;
 const PETAL_LOBE_COUNT = 10;
 const STEM_RADIUS = 0.011;
-const MAX_TILT = THREE.MathUtils.degToRad(48);
-const MIN_UPWARDNESS = 0.34;
-const TRACKING_EASE = 0.12;
 const HEAD_FULL_SCALE_DISTANCE = 8;
 const HEAD_MIN_SCALE_DISTANCE = 1.6;
 const HEAD_MIN_SCALE = 0.24;
@@ -41,10 +37,9 @@ const UP = new THREE.Vector3(0, 0, 1);
 export default function PlaceMarker({
   markerId,
   position,
-  participantAge,
   brandColorOne,
   brandColorTwo,
-  heightScale,
+  headPlaneZ,
   isSelected = false,
   onClick,
   onPointerEnter,
@@ -53,7 +48,6 @@ export default function PlaceMarker({
   const groupRef = useRef<THREE.Group>(null);
   const headRef = useRef<THREE.Group>(null);
   const stemRef = useRef<THREE.Mesh>(null);
-  const currentDirection = useRef(new THREE.Vector3(0, 0, 1));
   const currentHeadCenter = useRef<THREE.Vector3 | null>(null);
   const lastStemDirection = useRef(new THREE.Vector3(0, 0, 1));
   const selectionScale = useRef(1);
@@ -61,20 +55,18 @@ export default function PlaceMarker({
   const camera = useThree((state) => state.camera);
   const size = useThree((state) => state.size);
   const [x, y, z] = position;
-  const resolvedHeightScale = useMemo(
-    () => heightScale ?? getAgeBasedFlowerHeightScale(participantAge),
-    [heightScale, participantAge],
-  );
   const flowerColors = useMemo(() => getFlowerColors(brandColorOne, brandColorTwo), [brandColorOne, brandColorTwo]);
-  const stemHeight = STEM_HEIGHT * resolvedHeightScale;
-  const trackingRadius = TRACKING_RADIUS * resolvedHeightScale;
+  const stemHeight = Math.max(
+    MIN_STEM_HEIGHT,
+    headPlaneZ - (z + BASE_LIFT),
+  );
 
   const headGeometry = useMemo(() => createPetalledHeadGeometry(), []);
   const centerGeometry = useMemo(() => new THREE.CircleGeometry(HEAD_RADIUS * 0.34, 24), []);
   const baseGeometry = useMemo(() => new THREE.SphereGeometry(STEM_RADIUS * 1.45, 12, 8), []);
   const initialStemGeometry = useMemo(
-    () => createInitialStemGeometry(stemHeight, trackingRadius),
-    [stemHeight, trackingRadius]
+    () => createInitialStemGeometry(stemHeight),
+    [stemHeight]
   );
 
   useEffect(() => {
@@ -94,11 +86,9 @@ export default function PlaceMarker({
     const stem = stemRef.current;
     if (!group || !head || !stem) return;
 
-    const sphereCenter = new THREE.Vector3(0, 0, stemHeight);
+    const planeHeadCenter = new THREE.Vector3(0, 0, stemHeight);
     const cameraLocal = group.worldToLocal(camera.position.clone());
-    const cameraDistance = cameraLocal.distanceTo(sphereCenter);
-    const targetDirection = getTiltLimitedDirection(cameraLocal, sphereCenter);
-    currentDirection.current.lerp(targetDirection, TRACKING_EASE).normalize();
+    const cameraDistance = cameraLocal.distanceTo(planeHeadCenter);
 
     selectionScale.current = THREE.MathUtils.lerp(
       selectionScale.current,
@@ -107,16 +97,15 @@ export default function PlaceMarker({
     );
     const headScale =
       getCameraResponsiveHeadScale(cameraDistance) * selectionScale.current;
-    const preferredHeadCenter = sphereCenter.clone().add(currentDirection.current.clone().multiplyScalar(trackingRadius));
     const resolvedHeadCenter = resolveAgentHeadCenter({
       markerId,
       group,
       camera,
       size,
       stemHeight,
-      trackingRadius,
+      trackingRadius: HEAD_LAYOUT_RADIUS,
       headScale,
-      preferredHeadCenter,
+      preferredHeadCenter: planeHeadCenter,
       currentHeadCenter: currentHeadCenter.current,
     });
     currentHeadCenter.current = resolvedHeadCenter.clone();
@@ -131,9 +120,21 @@ export default function PlaceMarker({
       selectedRotation.current = 0;
     }
 
-    const stemDirection = resolvedHeadCenter.clone().sub(sphereCenter).normalize();
-    if (lastStemDirection.current.angleTo(stemDirection) > 0.025) {
-      const curve = createStemCurve(sphereCenter, resolvedHeadCenter, stemHeight);
+    const stemOffset = resolvedHeadCenter
+      .clone()
+      .sub(new THREE.Vector3(0, 0, stemHeight));
+    const stemDirection = stemOffset.lengthSq() > 0.000001
+      ? stemOffset.normalize()
+      : UP;
+    if (
+      lastStemDirection.current.angleTo(stemDirection) > 0.025 ||
+      stemRef.current.geometry === initialStemGeometry
+    ) {
+      const curve = createStemCurve(
+        new THREE.Vector3(0, 0, stemHeight),
+        resolvedHeadCenter,
+        stemHeight,
+      );
       const nextGeometry = new THREE.TubeGeometry(curve, 18, STEM_RADIUS, 8, false);
       stem.geometry.dispose();
       stem.geometry = nextGeometry;
@@ -186,7 +187,7 @@ export default function PlaceMarker({
           opacity={isSelected ? 1 : 0.82}
         />
       </mesh>
-      <group ref={headRef} position={[0, 0, stemHeight + trackingRadius]} {...pointerHandlers}>
+      <group ref={headRef} position={[0, 0, stemHeight]} {...pointerHandlers}>
         <mesh geometry={headGeometry}>
           <meshStandardMaterial
             color={flowerColors.head}
@@ -245,21 +246,6 @@ function darkenHexColor(value: string, fallback: string) {
   const color = normalizeHexColor(value);
   if (!color) return fallback;
   return new THREE.Color(color).multiplyScalar(0.38).getStyle();
-}
-
-function getTiltLimitedDirection(cameraLocal: THREE.Vector3, sphereCenter: THREE.Vector3) {
-  const ideal = cameraLocal.sub(sphereCenter).normalize();
-  if (!Number.isFinite(ideal.x) || !Number.isFinite(ideal.y) || !Number.isFinite(ideal.z)) {
-    return UP.clone();
-  }
-
-  ideal.z = Math.max(ideal.z, MIN_UPWARDNESS);
-  ideal.normalize();
-
-  const angleFromUp = UP.angleTo(ideal);
-  if (angleFromUp <= MAX_TILT) return ideal;
-
-  return UP.clone().lerp(ideal, MAX_TILT / angleFromUp).normalize();
 }
 
 function getCameraResponsiveHeadScale(cameraDistance: number) {
@@ -401,6 +387,13 @@ function estimateScreenRadius(
 
 function createStemCurve(sphereCenter: THREE.Vector3, headCenter: THREE.Vector3, stemHeight: number) {
   const lowerStem = new THREE.Vector3(0, 0, stemHeight * 0.48);
+  if (sphereCenter.distanceToSquared(headCenter) < 0.000001) {
+    return new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0, 0, 0),
+      lowerStem,
+      headCenter,
+    ]);
+  }
   const neckControl = sphereCenter.clone().lerp(headCenter, 0.42);
   return new THREE.CatmullRomCurve3([
     new THREE.Vector3(0, 0, 0),
@@ -434,26 +427,13 @@ function createPetalledHeadGeometry() {
   return new THREE.ShapeGeometry(shape, totalSegments);
 }
 
-function createInitialStemGeometry(stemHeight: number, trackingRadius: number) {
+function createInitialStemGeometry(stemHeight: number) {
   const sphereCenter = new THREE.Vector3(0, 0, stemHeight);
-  const headCenter = new THREE.Vector3(0, 0, stemHeight + trackingRadius);
-  return new THREE.TubeGeometry(createStemCurve(sphereCenter, headCenter, stemHeight), 18, STEM_RADIUS, 8, false);
-}
-
-export function getAgeBasedFlowerHeightScale(participantAge?: string) {
-  const age = parseRepresentativeAge(participantAge);
-  if (age === null) return 1;
-  const normalized = THREE.MathUtils.clamp((age - 4) / 16, 0, 1);
-  return THREE.MathUtils.lerp(0.8, 1.8, normalized);
-}
-
-function parseRepresentativeAge(value?: string): number | null {
-  const normalized = value?.trim().toLowerCase();
-  if (!normalized) return null;
-  if (normalized.includes("adult")) return 20;
-  if (normalized.includes("school")) return 9;
-
-  const ages = normalized.match(/\d+(?:\.\d+)?/g)?.map(Number) ?? [];
-  if (ages.length >= 2) return (Math.min(...ages) + Math.max(...ages)) / 2;
-  return ages.length === 1 ? ages[0] : null;
+  return new THREE.TubeGeometry(
+    createStemCurve(sphereCenter, sphereCenter, stemHeight),
+    18,
+    STEM_RADIUS,
+    8,
+    false,
+  );
 }
