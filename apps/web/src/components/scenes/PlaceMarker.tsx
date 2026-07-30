@@ -57,6 +57,8 @@ export default function PlaceMarker({
   const currentHeadCenter = useRef<THREE.Vector3 | null>(null);
   const lastStemAttachment = useRef<THREE.Vector3 | null>(null);
   const lastStemRadius = useRef(0);
+  const lastIncludesClusterTrunk = useRef<boolean | null>(null);
+  const currentStemHeight = useRef<number | null>(null);
   const selectionScale = useRef(1);
   const selectedRotation = useRef(0);
   const camera = useThree((state) => state.camera);
@@ -65,7 +67,8 @@ export default function PlaceMarker({
   const flowerColors = useMemo(() => getFlowerColors(brandColorOne, brandColorTwo), [brandColorOne, brandColorTwo]);
   const clusterLane = clusterIndex - (clusterCount - 1) / 2;
   const rendersClusterTrunk = !isForked || clusterIndex === 0;
-  const stemHeight = useMemo(() => {
+  const includesActiveClusterTrunk = rendersClusterTrunk || isSelected;
+  const baseStemHeight = useMemo(() => {
     if (!isForked) return getNaturalStemHeight(markerId);
     const distanceFromCenter = Math.abs(clusterLane);
     return THREE.MathUtils.clamp(
@@ -75,7 +78,7 @@ export default function PlaceMarker({
     );
   }, [clusterLane, isForked, markerId]);
   const headLayoutRadius = THREE.MathUtils.clamp(
-    stemHeight * 0.72,
+    baseStemHeight * 0.72,
     0.3,
     0.7,
   );
@@ -88,12 +91,12 @@ export default function PlaceMarker({
   const baseGeometry = useMemo(() => new THREE.SphereGeometry(STEM_RADIUS * 1.45, 12, 8), []);
   const initialStemGeometry = useMemo(
     () => createInitialStemGeometry(
-      stemHeight,
+      baseStemHeight,
       isForked,
       rendersClusterTrunk,
       STEM_RADIUS,
     ),
-    [isForked, rendersClusterTrunk, stemHeight]
+    [baseStemHeight, isForked, rendersClusterTrunk]
   );
 
   useEffect(() => {
@@ -113,10 +116,33 @@ export default function PlaceMarker({
     const stem = stemRef.current;
     if (!group || !head || !stem) return;
 
+    const anchorNdc = getAnchorNdc(group, camera);
+    const anchorScreenY = ((1 - anchorNdc.y) / 2) * size.height;
+    const upperViewportProgress = THREE.MathUtils.smoothstep(
+      anchorScreenY / Math.max(1, size.height),
+      0.12,
+      0.38,
+    );
+    const targetStemHeight =
+      baseStemHeight *
+      THREE.MathUtils.lerp(0.6, 1, upperViewportProgress);
+    currentStemHeight.current = currentStemHeight.current === null
+      ? targetStemHeight
+      : THREE.MathUtils.lerp(
+          currentStemHeight.current,
+          targetStemHeight,
+          0.12,
+        );
+    const stemHeight = currentStemHeight.current;
     const naturalHeadCenter = new THREE.Vector3(0, 0, stemHeight);
     const cameraLocal = group.worldToLocal(camera.position.clone());
     const cameraDistance = cameraLocal.distanceTo(naturalHeadCenter);
-    const anchorIsVisible = isAnchorInsideViewport(group, camera);
+    const anchorIsVisible = isNdcInsideViewport(anchorNdc);
+    const adaptiveHeadLayoutRadius = THREE.MathUtils.clamp(
+      stemHeight * 0.72,
+      0.3,
+      headLayoutRadius,
+    );
 
     selectionScale.current = THREE.MathUtils.lerp(
       selectionScale.current,
@@ -153,7 +179,7 @@ export default function PlaceMarker({
       camera,
       size,
       stemHeight,
-      trackingRadius: headLayoutRadius,
+      trackingRadius: adaptiveHeadLayoutRadius,
       headScale,
       preferredHeadCenter,
       currentHeadCenter: currentHeadCenter.current,
@@ -181,6 +207,7 @@ export default function PlaceMarker({
       !lastStemAttachment.current ||
       lastStemAttachment.current.distanceToSquared(stemAttachment) > 0.000025 ||
       lastStemRadius.current !== stemRadius ||
+      lastIncludesClusterTrunk.current !== includesActiveClusterTrunk ||
       stemRef.current.geometry === initialStemGeometry
     ) {
       const curve = createStemCurve(
@@ -188,13 +215,15 @@ export default function PlaceMarker({
         headUp,
         stemHeight,
         isForked,
-        rendersClusterTrunk,
+        includesActiveClusterTrunk,
+        THREE.MathUtils.lerp(0.25, 0.68, upperViewportProgress),
       );
       const nextGeometry = new THREE.TubeGeometry(curve, 24, stemRadius, 8, false);
       stem.geometry.dispose();
       stem.geometry = nextGeometry;
       lastStemAttachment.current = stemAttachment.clone();
       lastStemRadius.current = stemRadius;
+      lastIncludesClusterTrunk.current = includesActiveClusterTrunk;
     }
   });
 
@@ -234,7 +263,7 @@ export default function PlaceMarker({
           depthWrite={false}
         />
       </mesh>
-      {rendersClusterTrunk && <mesh geometry={baseGeometry} renderOrder={1}>
+      {includesActiveClusterTrunk && <mesh geometry={baseGeometry} renderOrder={1}>
         <meshStandardMaterial
           color={isSelected ? "#79f18a" : "#33b84a"}
           emissive={isSelected ? "#2eaa43" : "#000000"}
@@ -244,7 +273,7 @@ export default function PlaceMarker({
           opacity={1}
         />
       </mesh>}
-      <group ref={headRef} position={[0, 0, stemHeight]} {...pointerHandlers}>
+      <group ref={headRef} position={[0, 0, baseStemHeight]} {...pointerHandlers}>
         <mesh geometry={headGeometry} renderOrder={3}>
           <meshStandardMaterial
             color={flowerColors.head}
@@ -533,12 +562,15 @@ function resolveAgentHeadCenter({
   return easedLocal;
 }
 
-function isAnchorInsideViewport(group: THREE.Group, camera: THREE.Camera) {
+function getAnchorNdc(group: THREE.Group, camera: THREE.Camera) {
   group.updateMatrixWorld(true);
   camera.updateMatrixWorld(true);
-  const anchorNdc = group
+  return group
     .localToWorld(new THREE.Vector3(0, 0, 0))
     .project(camera);
+}
+
+function isNdcInsideViewport(anchorNdc: THREE.Vector3) {
   return (
     anchorNdc.z >= -1 &&
     anchorNdc.z <= 1 &&
@@ -603,17 +635,9 @@ function createStemCurve(
   stemHeight: number,
   isForked = false,
   includeClusterTrunk = true,
+  cameraEntryWeight = 0.68,
 ) {
   const base = new THREE.Vector3(0, 0, 0);
-  const lowerControl = new THREE.Vector3(0, 0, stemHeight * 0.34);
-  const upperControlDistance = THREE.MathUtils.clamp(
-    stemHeight * 0.28,
-    0.12,
-    0.3,
-  );
-  const upperControl = attachment
-    .clone()
-    .addScaledVector(headUp, -upperControlDistance);
 
   if (isForked) {
     const forkHeight = Math.min(CLUSTER_FORK_HEIGHT, stemHeight * 0.56);
@@ -624,13 +648,25 @@ function createStemCurve(
       new THREE.Vector3(0, 0, forkHeight * 0.76),
       forkPoint,
     );
+    const branchChord = attachment.clone().sub(forkPoint);
+    const branchLength = Math.max(branchChord.length(), 0.001);
+    const branchDirection = branchChord.divideScalar(branchLength);
+    const entryDirection = getForwardEntryDirection(
+      branchDirection,
+      headUp,
+      cameraEntryWeight,
+    );
+    const branchHandle = Math.min(
+      branchLength * 0.32,
+      THREE.MathUtils.clamp(stemHeight * 0.26, 0.1, 0.24),
+    );
     const branch = new THREE.CubicBezierCurve3(
       forkPoint,
       forkPoint.clone().addScaledVector(
         UP,
-        THREE.MathUtils.clamp(stemHeight * 0.28, 0.14, 0.24),
+        branchHandle,
       ),
-      upperControl,
+      attachment.clone().addScaledVector(entryDirection, -branchHandle),
       attachment,
     );
     const curve = new THREE.CurvePath<THREE.Vector3>();
@@ -639,12 +675,44 @@ function createStemCurve(
     return curve;
   }
 
+  const chord = attachment.clone().sub(base);
+  const chordLength = Math.max(chord.length(), 0.001);
+  const chordDirection = chord.divideScalar(chordLength);
+  const lowerDirection = getForwardEntryDirection(
+    chordDirection,
+    UP,
+    0.58,
+  );
+  const entryDirection = getForwardEntryDirection(
+    chordDirection,
+    headUp,
+    cameraEntryWeight,
+  );
+  const handleLength = Math.min(
+    chordLength * 0.32,
+    THREE.MathUtils.clamp(stemHeight * 0.28, 0.1, 0.26),
+  );
   return new THREE.CubicBezierCurve3(
     base,
-    lowerControl,
-    upperControl,
+    base.clone().addScaledVector(lowerDirection, handleLength),
+    attachment.clone().addScaledVector(entryDirection, -handleLength),
     attachment,
   );
+}
+
+function getForwardEntryDirection(
+  chordDirection: THREE.Vector3,
+  preferredDirection: THREE.Vector3,
+  preferredWeight: number,
+) {
+  const direction = chordDirection
+    .clone()
+    .lerp(preferredDirection, preferredWeight)
+    .normalize();
+  if (direction.dot(chordDirection) < 0.35) {
+    direction.lerp(chordDirection, 0.65).normalize();
+  }
+  return direction;
 }
 
 function createPetalledHeadGeometry() {
