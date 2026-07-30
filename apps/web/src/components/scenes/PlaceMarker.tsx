@@ -85,6 +85,10 @@ export default function PlaceMarker({
   const stemRadius = STEM_RADIUS * (
     isSelected ? SELECTED_STEM_RADIUS_MULTIPLIER : 1
   );
+  const stemColors = useMemo(
+    () => getStemColors(markerId, isSelected),
+    [isSelected, markerId],
+  );
 
   const headGeometry = useMemo(() => createPetalledHeadGeometry(), []);
   const centerGeometry = useMemo(() => new THREE.CircleGeometry(HEAD_RADIUS * 0.34, 24), []);
@@ -254,8 +258,8 @@ export default function PlaceMarker({
     <group ref={groupRef} position={[x, y, z + BASE_LIFT]}>
       <mesh ref={stemRef} geometry={initialStemGeometry} renderOrder={1}>
         <meshStandardMaterial
-          color={isSelected ? "#8cff98" : "#49d05a"}
-          emissive={isSelected ? "#3ecf55" : "#000000"}
+          color={stemColors.stem}
+          emissive={stemColors.stemEmissive}
           emissiveIntensity={isSelected ? 0.7 : 0}
           roughness={0.62}
           transparent={false}
@@ -265,8 +269,8 @@ export default function PlaceMarker({
       </mesh>
       {includesActiveClusterTrunk && <mesh geometry={baseGeometry} renderOrder={1}>
         <meshStandardMaterial
-          color={isSelected ? "#79f18a" : "#33b84a"}
-          emissive={isSelected ? "#2eaa43" : "#000000"}
+          color={stemColors.base}
+          emissive={stemColors.baseEmissive}
           emissiveIntensity={isSelected ? 0.55 : 0}
           roughness={0.72}
           transparent={false}
@@ -364,6 +368,33 @@ function getCameraResponsiveHeadScale(
     );
   }
   return 1;
+}
+
+function getStemColors(markerId: string, isSelected: boolean) {
+  // Keep stems recognisably green, but give neighbouring markers a stable,
+  // subtle hue shift so their paths remain legible when they overlap.
+  const hash = hashString(markerId);
+  const hue = 0.34 + ((hash % 17) - 8) * 0.0045;
+  const stem = new THREE.Color().setHSL(
+    hue,
+    isSelected ? 0.62 : 0.72,
+    isSelected ? 0.7 : 0.39,
+  );
+  const base = stem.clone().multiplyScalar(isSelected ? 0.9 : 0.82);
+  return {
+    stem: stem.getStyle(),
+    stemEmissive: isSelected ? stem.clone().multiplyScalar(0.35).getStyle() : "#000000",
+    base: base.getStyle(),
+    baseEmissive: isSelected ? base.clone().multiplyScalar(0.32).getStyle() : "#000000",
+  };
+}
+
+function hashString(value: string) {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+  return hash;
 }
 
 type MarkerAgentState = {

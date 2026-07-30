@@ -837,6 +837,19 @@ export default function TerrainGallery({
     focusPlacement(previewPlacement);
   }, [focusPlacement, previewPlacement]);
 
+  const panToPlacement = useCallback(
+    (position: [number, number, number]) => {
+      if (!usesTouchPreview || !controls?.target) return;
+      const nextTarget = new THREE.Vector3(...position);
+      const delta = nextTarget.clone().sub(controls.target);
+      camera.position.add(delta);
+      controls.target.copy(nextTarget);
+      camera.lookAt(nextTarget);
+      controls.update?.();
+    },
+    [camera, controls, usesTouchPreview],
+  );
+
   useEffect(() => {
     const onPopState = () => {
       setRequestedSiteSlug(getSiteSlugFromPath(window.location.pathname));
@@ -1482,6 +1495,7 @@ export default function TerrainGallery({
                     if (usesTouchPreview) {
                       setHoveredPlacement(null);
                       setPreviewPlacement(placement);
+                      panToPlacement(position);
                       return;
                     }
                     focusPlacement(placement);
