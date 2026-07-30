@@ -14,8 +14,8 @@ export default function WelcomeOverlay({
   const startButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
-    startButtonRef.current?.focus();
-  }, []);
+    if (ready) startButtonRef.current?.focus();
+  }, [ready]);
 
   return (
     <div
@@ -24,6 +24,7 @@ export default function WelcomeOverlay({
       aria-modal="true"
       aria-labelledby="welcome-title"
     >
+      <style>{spinnerKeyframes}</style>
       <div style={cardStyle}>
         <div style={presenterStyle}>
           <a
@@ -44,7 +45,7 @@ export default function WelcomeOverlay({
           Welcome to Artasia Atlas! Explore creative projects made by children
           and communities across the Greater Hamilton Area.
         </p>
-        <button
+        {ready && <button
           ref={startButtonRef}
           type="button"
           disabled={!ready}
@@ -52,8 +53,8 @@ export default function WelcomeOverlay({
           style={{ ...buttonStyle, ...(ready ? {} : disabledButtonStyle) }}
         >
           Start Exploring
-        </button>
-        {!ready && <p style={loadingStyle}>Preparing the map…</p>}
+        </button>}
+        {!ready && <p style={loadingStyle}><span aria-hidden="true" style={spinnerStyle} />Preparing the map…</p>}
       </div>
     </div>
   );
@@ -174,7 +175,26 @@ const disabledButtonStyle: React.CSSProperties = {
 };
 
 const loadingStyle: React.CSSProperties = {
-  margin: "-8px 0 0",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 8,
+  margin: 0,
   color: "#8490a3",
   fontSize: 11,
 };
+
+const spinnerStyle: React.CSSProperties = {
+  width: 12,
+  height: 12,
+  flex: "0 0 auto",
+  border: "2px solid rgba(132, 144, 163, 0.35)",
+  borderTopColor: "#c7ec9d",
+  borderRadius: "50%",
+  animation: "atlas-welcome-spin 800ms linear infinite",
+};
+
+const spinnerKeyframes = `
+  @keyframes atlas-welcome-spin {
+    to { transform: rotate(360deg); }
+  }
+`;
