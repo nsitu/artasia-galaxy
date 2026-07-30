@@ -101,6 +101,7 @@ export default function ArtScene() {
   const linkedAudioRef = useRef<HTMLAudioElement | null>(null);
   const [linkedAudioPlaying, setLinkedAudioPlaying] = useState(false);
   const lightboxSwipeStartRef = useRef<{ x: number; y: number } | null>(null);
+  const [lightboxSwipeOffset, setLightboxSwipeOffset] = useState(0);
   const lightboxSuppressClickRef = useRef(false);
 
   const handleIntroReady = useCallback(() => {
@@ -225,11 +226,19 @@ export default function ArtScene() {
   const handleLightboxPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (event.pointerType !== "touch") return;
     lightboxSwipeStartRef.current = { x: event.clientX, y: event.clientY };
+    setLightboxSwipeOffset(0);
+  }, []);
+
+  const handleLightboxPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const start = lightboxSwipeStartRef.current;
+    if (!start || event.pointerType !== "touch") return;
+    setLightboxSwipeOffset(event.clientX - start.x);
   }, []);
 
   const handleLightboxPointerUp = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const start = lightboxSwipeStartRef.current;
     lightboxSwipeStartRef.current = null;
+    setLightboxSwipeOffset(0);
     if (!start || event.pointerType !== "touch") return;
 
     const deltaX = event.clientX - start.x;
@@ -469,10 +478,12 @@ export default function ArtScene() {
 
       {selectedPhoto && (
         <div
+          className="atlas-photo-lightbox"
           role="dialog"
           aria-modal="true"
           aria-label={selectedPhoto.fileName}
           onPointerDown={handleLightboxPointerDown}
+          onPointerMove={handleLightboxPointerMove}
           onPointerUp={handleLightboxPointerUp}
           onClick={() => {
             if (lightboxSuppressClickRef.current) {
@@ -485,6 +496,7 @@ export default function ArtScene() {
         >
           {selectedPhoto.mediaKind === "video" && selectedPhoto.videoUrl ? (
             <video
+              className="atlas-photo-lightbox-media"
               src={selectedPhoto.videoUrl}
               poster={selectedPhoto.previewUrl}
               controls
@@ -492,18 +504,23 @@ export default function ArtScene() {
               playsInline
               preload="metadata"
               aria-label={selectedPhoto.fileName}
-              style={photoLightboxImageStyle}
+              style={{ ...photoLightboxImageStyle, transform: `translateX(${lightboxSwipeOffset}px)` }}
               onClick={(event) => event.stopPropagation()}
             />
           ) : (
             <img
+              className="atlas-photo-lightbox-media"
               src={selectedPhoto.previewUrl}
               alt={selectedPhoto.fileName}
-              style={{ ...photoLightboxImageStyle, ...photoAdjustmentFilterStyle(selectedPhoto.adjustments) }}
+              style={{ ...photoLightboxImageStyle, ...photoAdjustmentFilterStyle(selectedPhoto.adjustments), transform: `translateX(${lightboxSwipeOffset}px)` }}
               onClick={(event) => event.stopPropagation()}
             />
           )}
-          <div style={photoLightboxMetadataStyle} onClick={(event) => event.stopPropagation()}>
+          <div
+            className="atlas-photo-lightbox-metadata"
+            style={photoLightboxMetadataStyle}
+            onClick={(event) => event.stopPropagation()}
+          >
             <div style={photoLightboxTitleStyle}>{selectedPhoto.fileName}</div>
             {selectedDescription && (
               <div style={photoLightboxDescriptionStyle}>
@@ -992,6 +1009,30 @@ const responsiveTopNavStyles = `
     }
     .atlas-lightbox-nav-button {
       display: none !important;
+    }
+    .atlas-photo-lightbox {
+      position: fixed !important;
+      width: 100vw;
+      height: 100dvh;
+      min-height: 100svh;
+      box-sizing: border-box;
+      flex-direction: column;
+      gap: 12px;
+      padding: max(72px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)) !important;
+      overflow: hidden;
+    }
+    .atlas-photo-lightbox-media {
+      min-height: 0;
+      max-width: 100% !important;
+      max-height: none !important;
+      flex: 1 1 auto;
+    }
+    .atlas-photo-lightbox-metadata {
+      position: static !important;
+      flex: 0 0 auto;
+      width: 100% !important;
+      max-height: 32dvh !important;
+      overflow-y: auto;
     }
 
     .atlas-top-nav {
