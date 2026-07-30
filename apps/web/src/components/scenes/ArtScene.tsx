@@ -266,11 +266,10 @@ export default function ArtScene() {
       <div style={topNavStyle}>
         <div style={homeBrandStyle}>
           <a href="/" aria-label="Artasia home" style={homeLogoLinkStyle}>
-            <img src="/artasia.svg" alt="" style={homeLogoImageStyle} />
+            <img src="/artasia-atlas.svg" alt="Artasia Atlas" style={homeLogoImageStyle} />
           </a>
           <div style={homePartnerLogoRowStyle} aria-label="Artasia partners">
             <img src="/spider.png" alt="Spider" style={homeSpiderLogoStyle} />
-            <img src="/atlas.svg" alt="Atlas" style={homeAtlasLogoStyle} />
           </div>
         </div>
 
@@ -897,12 +896,6 @@ const homePartnerLogoRowStyle: React.CSSProperties = {
 const homeSpiderLogoStyle: React.CSSProperties = {
   width: "clamp(40px, 8vw, 60px)",
   height: 64,
-  objectFit: "contain",
-};
-
-const homeAtlasLogoStyle: React.CSSProperties = {
-  width: "clamp(60px, 12vw, 92px)",
-  height: 30,
   objectFit: "contain",
 };
 

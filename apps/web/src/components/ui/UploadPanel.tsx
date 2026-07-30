@@ -4168,7 +4168,7 @@ export default function UploadPanel({
             aria-label="Atlas Admin home"
             style={headerBrandStyle}
           >
-            <img src="/artasia.svg" alt="Artasia" style={logoStyle} />
+            <img src="/artasia-atlas.svg" alt="Artasia Atlas" style={logoStyle} />
             <div>
               <h1 style={titleStyle}>Atlas Admin</h1>
             </div>

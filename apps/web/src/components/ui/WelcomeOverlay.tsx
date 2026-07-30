@@ -26,9 +26,8 @@ export default function WelcomeOverlay({
     >
       <div style={cardStyle}>
         <div style={brandRowStyle}>
-          <img src="/artasia.svg" alt="Artasia" style={logoStyle} />
+          <img src="/artasia-atlas.svg" alt="Artasia Atlas" style={logoStyle} />
           <img src="/spider.png" alt="Spider" style={spiderLogoStyle} />
-          <img src="/atlas.svg" alt="Atlas" style={atlasLogoStyle} />
         </div>
         <p style={descriptionStyle}>
           Welcome to Artasia Atlas! Explore creative projects made by children
@@ -78,9 +77,8 @@ const cardStyle: React.CSSProperties = {
 };
 
 const logoStyle: React.CSSProperties = {
-  width: "clamp(120px, 35vw, 210px)",
+  width: "clamp(180px, 48vw, 300px)",
   height: "auto",
-  maxHeight: 70,
   objectFit: "contain",
 };
 
@@ -96,12 +94,6 @@ const brandRowStyle: React.CSSProperties = {
 const spiderLogoStyle: React.CSSProperties = {
   width: "clamp(56px, 14vw, 96px)",
   height: "clamp(68px, 18vw, 116px)",
-  objectFit: "contain",
-};
-
-const atlasLogoStyle: React.CSSProperties = {
-  width: "clamp(82px, 22vw, 150px)",
-  height: "clamp(28px, 7vw, 48px)",
   objectFit: "contain",
 };
 
