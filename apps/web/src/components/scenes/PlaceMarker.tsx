@@ -269,7 +269,7 @@ export default function PlaceMarker({
           depthWrite={false}
         />
       </mesh>
-      {includesActiveClusterTrunk && <mesh geometry={baseGeometry} renderOrder={1}>
+      {includesActiveClusterTrunk && <mesh geometry={baseGeometry} renderOrder={2}>
         <meshStandardMaterial
           color={stemColors.base}
           emissive={stemColors.baseEmissive}
@@ -277,6 +277,7 @@ export default function PlaceMarker({
           roughness={0.72}
           transparent={false}
           opacity={1}
+          depthTest={false}
         />
       </mesh>}
       <group ref={headRef} position={[0, 0, baseStemHeight]} {...pointerHandlers}>
