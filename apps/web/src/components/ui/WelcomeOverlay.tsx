@@ -104,10 +104,10 @@ const brandRowStyle: React.CSSProperties = {
 
 const presenterStyle: React.CSSProperties = {
   display: "flex",
-  alignItems: "center",
+  alignItems: "flex-end",
   justifyContent: "center",
   gap: 8,
-  marginBottom: 2,
+  marginBottom: -16,
 };
 
 const presenterLogoLinkStyle: React.CSSProperties = {
@@ -122,6 +122,7 @@ const presenterLogoStyle: React.CSSProperties = {
 };
 
 const presenterTextStyle: React.CSSProperties = {
+  marginBottom: "0.5rem",
   color: "#c1c9d7",
   fontSize: 10,
   fontVariant: "small-caps",

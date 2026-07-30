@@ -767,7 +767,7 @@ const presentedByStyle: React.CSSProperties = {
   bottom: 14,
   zIndex: 16,
   display: "inline-flex",
-  alignItems: "center",
+  alignItems: "end",
   gap: 8,
   padding: "6px 8px",
   borderRadius: 999,
@@ -783,6 +783,7 @@ const presentedByTextStyle: React.CSSProperties = {
   fontVariant: "small-caps",
   letterSpacing: "0.14em",
   lineHeight: 1,
+  marginBottom: "0.5rem"
 };
 
 const presentedByLogoStyle: React.CSSProperties = {
