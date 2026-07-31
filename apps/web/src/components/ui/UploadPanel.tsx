@@ -329,7 +329,10 @@ export default function UploadPanel({
   const driveDefaultRequestRef = useRef(0);
 
   function placementLabel(location: UploadOptions["placements"][number]) {
-    return location.placement_name;
+    const section = location.section?.trim();
+    return section
+      ? `${location.placement_name} - ${section}`
+      : location.placement_name;
   }
 
   function groupedPlacementsByPartner(placements: UploadOptions["placements"]) {

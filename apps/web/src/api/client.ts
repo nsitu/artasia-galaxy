@@ -73,6 +73,7 @@ export async function fetchSlideshow(params: {
 export interface UploadPlacement {
   placement_id: number;
   placement_name: string;
+  section?: string;
   placement_slug?: string;
   google_drive_folder_id?: string;
   team_member_id?: number;
