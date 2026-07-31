@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   assignAssetActivityTag,
   assignAssetPlacement,
@@ -325,6 +325,8 @@ export default function UploadPanel({
   } | null>(null);
   const [driveLoading, setDriveLoading] = useState(false);
   const [driveDefaultOpening, setDriveDefaultOpening] = useState(false);
+  const drivePlacementIdRef = useRef<number | null>(null);
+  const driveDefaultRequestRef = useRef(0);
 
   function placementLabel(location: UploadOptions["placements"][number]) {
     return location.placement_name;
@@ -958,10 +960,11 @@ export default function UploadPanel({
     );
   }, [options, placementKey]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (workspaceMode !== "import" || !routeSelectionResolved) return;
     void openDriveImportDefault(
       selectedPlacement?.google_drive_folder_id,
+      selectedPlacement?.placement_id ?? null,
     );
   }, [
     routeSelectionResolved,
@@ -2783,11 +2786,21 @@ export default function UploadPanel({
 
   async function openDriveImportDefault(
     configuredFolderId = selectedPlacement?.google_drive_folder_id,
+    placementId = selectedPlacement?.placement_id ?? null,
   ) {
+    const requestId = ++driveDefaultRequestRef.current;
+    const placementChanged = drivePlacementIdRef.current !== placementId;
+    drivePlacementIdRef.current = placementId;
     setWorkspaceMode("import");
     setSelectedDriveFiles(new Set());
     setDriveFolders([]);
     setDriveFiles([]);
+    if (placementChanged) {
+      setFolderPath([]);
+      setDriveType("chooser");
+      setCurrentDriveId(undefined);
+      setSelectedDriveFolder("root");
+    }
     setDriveDefaultOpening(true);
     setDriveLoading(true);
     setError(null);
@@ -2796,6 +2809,7 @@ export default function UploadPanel({
     try {
       if (configuredFolderId) {
         const { folder, path } = await fetchDriveFolder(configuredFolderId);
+        if (requestId !== driveDefaultRequestRef.current) return;
         if (folder.driveId) {
           setDriveType("sharedDrives");
           setCurrentDriveId(folder.driveId);
@@ -2813,6 +2827,7 @@ export default function UploadPanel({
       }
 
       const sharedDrives = await fetchDriveFolders("sharedDrives", "root");
+      if (requestId !== driveDefaultRequestRef.current) return;
       const defaultDrive = (sharedDrives.folders ?? []).find((folder) =>
         normalizeDriveName(folder.name).includes(DEFAULT_SHARED_DRIVE_NAME),
       );
@@ -2827,6 +2842,7 @@ export default function UploadPanel({
         "root",
         defaultDrive.id,
       );
+      if (requestId !== driveDefaultRequestRef.current) return;
       const documentationFolder = (rootFolders.folders ?? []).find(
         (folder) =>
           normalizeDriveName(folder.name) === DEFAULT_SHARED_DRIVE_FOLDER,
@@ -2846,14 +2862,17 @@ export default function UploadPanel({
         { id: documentationFolder.id, name: documentationFolder.name },
       ]);
     } catch (err) {
+      if (requestId !== driveDefaultRequestRef.current) return;
       console.warn(
         "[drive] Failed to open default Artasia Documentation folder",
         err,
       );
       resetDriveFolderPath();
     } finally {
-      setDriveDefaultOpening(false);
-      setDriveLoading(false);
+      if (requestId === driveDefaultRequestRef.current) {
+        setDriveDefaultOpening(false);
+        setDriveLoading(false);
+      }
     }
   }
 
@@ -3161,15 +3180,38 @@ export default function UploadPanel({
                 </div>
               ))}
             </div>
-            <a
-              href={googleDriveFolderUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={openDriveFolderLinkStyle}
-            >
-              <span style={materialSymbolStyle} aria-hidden="true">open_in_new</span>
-              Open in Google Drive
-            </a>
+            <div style={driveFolderActionsStyle}>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(googleDriveFolderUrl);
+                    setNotice({
+                      tone: "success",
+                      message: "Google Drive link copied.",
+                    });
+                  } catch {
+                    setNotice({
+                      tone: "warning",
+                      message: "Could not copy the Google Drive link.",
+                    });
+                  }
+                }}
+                style={copyDriveFolderLinkStyle}
+              >
+                <span style={materialSymbolStyle} aria-hidden="true">content_copy</span>
+                Copy Google Drive Link
+              </button>
+              <a
+                href={googleDriveFolderUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={openDriveFolderLinkStyle}
+              >
+                <span style={materialSymbolStyle} aria-hidden="true">open_in_new</span>
+                Open in Google Drive
+              </a>
+            </div>
           </div>
         )}
 
@@ -6387,6 +6429,22 @@ const openDriveFolderLinkStyle: React.CSSProperties = {
   textDecoration: "none",
   fontSize: 13,
   whiteSpace: "nowrap",
+};
+
+const driveFolderActionsStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 12,
+  flex: "0 0 auto",
+};
+
+const copyDriveFolderLinkStyle: React.CSSProperties = {
+  ...openDriveFolderLinkStyle,
+  padding: 0,
+  border: 0,
+  background: "transparent",
+  fontFamily: "inherit",
+  cursor: "pointer",
 };
 
 function normalizedMediaFileKey(fileName: string) {
