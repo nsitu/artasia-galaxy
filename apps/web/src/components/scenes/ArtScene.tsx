@@ -94,15 +94,21 @@ export default function ArtScene() {
   const [activityFilterOptions, setActivityFilterOptions] = useState<ActivityOption[]>([]);
   const [selectedActivityFilter, setSelectedActivityFilter] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [openFilter, setOpenFilter] = useState<"partner" | "activity" | null>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [webglError, setWebglError] = useState<string | null>(() => getWebGL2SupportError());
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const topControlsRef = useRef<HTMLDivElement | null>(null);
   const linkedAudioRef = useRef<HTMLAudioElement | null>(null);
   const [linkedAudioPlaying, setLinkedAudioPlaying] = useState(false);
   const lightboxSwipeStartRef = useRef<{ x: number; y: number } | null>(null);
   const [lightboxSwipeOffset, setLightboxSwipeOffset] = useState(0);
   const [lightboxSwipeSettling, setLightboxSwipeSettling] = useState(false);
+  const [lightboxZoom, setLightboxZoom] = useState(1);
+  const lightboxZoomRef = useRef(1);
+  const lightboxTouchPointsRef = useRef(new Map<number, { x: number; y: number }>());
+  const lightboxPinchRef = useRef<{ distance: number; zoom: number } | null>(null);
   const lightboxSuppressClickRef = useRef(false);
 
   const handleIntroReady = useCallback(() => {
@@ -170,6 +176,9 @@ export default function ArtScene() {
       if (!menuRef.current.contains(event.target as Node)) {
         setMenuOpen(false);
       }
+      if (!topControlsRef.current?.contains(event.target as Node)) {
+        setOpenFilter(null);
+      }
     }
 
     document.addEventListener("pointerdown", onDocumentPointerDown);
@@ -192,6 +201,12 @@ export default function ArtScene() {
       activityFilterOptions.find((activity) => activity.id === activityId),
     )
     .filter((activity): activity is ActivityOption => Boolean(activity)) ?? [];
+  useEffect(() => {
+    lightboxZoomRef.current = 1;
+    setLightboxZoom(1);
+    lightboxTouchPointsRef.current.clear();
+    lightboxPinchRef.current = null;
+  }, [selectedPhoto?.id]);
   const selectedActivityColour =
     activityFilterOptions.find(
       (activity) => String(activity.id) === selectedActivityFilter,
@@ -231,18 +246,52 @@ export default function ArtScene() {
 
   const handleLightboxPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (event.pointerType !== "touch") return;
+    lightboxTouchPointsRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (lightboxTouchPointsRef.current.size === 2) {
+      const [first, second] = [...lightboxTouchPointsRef.current.values()];
+      lightboxPinchRef.current = {
+        distance: Math.hypot(second.x - first.x, second.y - first.y),
+        zoom: lightboxZoomRef.current,
+      };
+      lightboxSwipeStartRef.current = null;
+      setLightboxSwipeOffset(0);
+      return;
+    }
     lightboxSwipeStartRef.current = { x: event.clientX, y: event.clientY };
     setLightboxSwipeSettling(false);
     setLightboxSwipeOffset(0);
   }, []);
 
   const handleLightboxPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === "touch" && lightboxTouchPointsRef.current.has(event.pointerId)) {
+      lightboxTouchPointsRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    }
+    if (lightboxPinchRef.current && lightboxTouchPointsRef.current.size >= 2) {
+      const [first, second] = [...lightboxTouchPointsRef.current.values()];
+      const distance = Math.hypot(second.x - first.x, second.y - first.y);
+      const nextZoom = THREE.MathUtils.clamp(
+        lightboxPinchRef.current.zoom * distance / Math.max(1, lightboxPinchRef.current.distance),
+        1,
+        4,
+      );
+      lightboxZoomRef.current = nextZoom;
+      setLightboxZoom(nextZoom);
+      lightboxSuppressClickRef.current = true;
+      return;
+    }
     const start = lightboxSwipeStartRef.current;
-    if (!start || event.pointerType !== "touch") return;
+    if (!start || event.pointerType !== "touch" || lightboxZoomRef.current > 1.01) return;
     setLightboxSwipeOffset(event.clientX - start.x);
   }, []);
 
   const handleLightboxPointerUp = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    lightboxTouchPointsRef.current.delete(event.pointerId);
+    if (lightboxPinchRef.current) {
+      if (lightboxTouchPointsRef.current.size < 2) lightboxPinchRef.current = null;
+      lightboxSwipeStartRef.current = null;
+      lightboxSuppressClickRef.current = true;
+      return;
+    }
     const start = lightboxSwipeStartRef.current;
     lightboxSwipeStartRef.current = null;
     if (!start || event.pointerType !== "touch") return;
@@ -264,6 +313,16 @@ export default function ArtScene() {
       setLightboxSwipeOffset(0);
     }, 180);
   }, [selectAdjacentPhoto]);
+  const handleLightboxWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const nextZoom = THREE.MathUtils.clamp(
+      lightboxZoomRef.current * Math.exp(-event.deltaY * 0.0015),
+      1,
+      4,
+    );
+    lightboxZoomRef.current = nextZoom;
+    setLightboxZoom(nextZoom);
+  }, []);
   const handleBackActionChange = useCallback((action: (() => void) | null) => {
     setBackAction(action ? () => action : null);
   }, []);
@@ -325,7 +384,7 @@ export default function ArtScene() {
           </a>
         </div>
 
-        <div className="atlas-top-controls" style={topControlGroupStyle}>
+        <div ref={topControlsRef} className="atlas-top-controls" style={topControlGroupStyle}>
           {backAction && (
             <button
               type="button"
@@ -340,54 +399,60 @@ export default function ArtScene() {
           )}
 
           {!focusedPlacementDetails && partnerFilterOptions.length > 0 && (
-            <label style={filterControlStyle}>
-              <select
-                aria-label="Filter placements by partner"
-                value={selectedPartnerFilter}
-                onChange={(event) => {
-                  const partner = event.target.value;
-                  setSelectedPartnerFilter(partner);
-                  updatePartnerPath(partner);
-                }}
-                style={filterSelectStyle}
+            <div style={filterControlStyle}>
+              <button
+                type="button"
+                aria-expanded={openFilter === "partner"}
+                aria-haspopup="listbox"
+                onClick={() => setOpenFilter((current) => current === "partner" ? null : "partner")}
+                style={filterTriggerStyle}
               >
-                <option value="" style={filterOptionStyle}>All partners</option>
-                {partnerFilterOptions.map((option) => (
-                  <option key={option.value} value={option.value} style={filterOptionStyle}>
-                    {option.label} ({option.count})
-                  </option>
-                ))}
-              </select>
-            </label>
+                <span>{selectedPartnerFilter || "All partners"}</span>
+                <ChevronIcon expanded={openFilter === "partner"} />
+              </button>
+              {openFilter === "partner" && (
+                <div role="listbox" aria-label="Filter placements by partner" style={filterMenuStyle}>
+                  <FilterOption active={!selectedPartnerFilter} onSelect={() => {
+                    setSelectedPartnerFilter(""); updatePartnerPath(""); setOpenFilter(null);
+                  }}>All partners</FilterOption>
+                  {partnerFilterOptions.map((option) => (
+                    <FilterOption key={option.value} active={selectedPartnerFilter === option.value} onSelect={() => {
+                      setSelectedPartnerFilter(option.value); updatePartnerPath(option.value); setOpenFilter(null);
+                    }}>{option.label} ({option.count})</FilterOption>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
 
           {focusedPlacementDetails && activityFilterOptions.length > 0 && (
-            <label style={filterControlStyle}>
-              <select
-                aria-label="Filter photos by activity"
-                value={selectedActivityFilter}
-                onChange={(event) => setSelectedActivityFilter(event.target.value)}
+            <div style={filterControlStyle}>
+              <button
+                type="button"
+                aria-expanded={openFilter === "activity"}
+                aria-haspopup="listbox"
+                onClick={() => setOpenFilter((current) => current === "activity" ? null : "activity")}
                 style={{
-                  ...filterSelectStyle,
-                  width: "auto",
+                  ...filterTriggerStyle,
                   ...getActivityColourStyle(selectedActivityColour),
                 }}
               >
-                <option value="" style={filterOptionStyle}>All Activities</option>
-                {activityFilterOptions.map((option) => (
-                  <option
-                    key={option.id}
-                    value={String(option.id)}
-                    style={{
-                      ...filterOptionStyle,
-                      ...getActivityColourStyle(option.colour),
-                    }}
-                  >
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+                <span>{activityFilterOptions.find((option) => String(option.id) === selectedActivityFilter)?.label || "All Activities"}</span>
+                <ChevronIcon expanded={openFilter === "activity"} />
+              </button>
+              {openFilter === "activity" && (
+                <div role="listbox" aria-label="Filter photos by activity" style={filterMenuStyle}>
+                  <FilterOption active={!selectedActivityFilter} onSelect={() => {
+                    setSelectedActivityFilter(""); setOpenFilter(null);
+                  }}>All Activities</FilterOption>
+                  {activityFilterOptions.map((option) => (
+                    <FilterOption key={option.id} active={selectedActivityFilter === String(option.id)} colour={option.colour} onSelect={() => {
+                      setSelectedActivityFilter(String(option.id)); setOpenFilter(null);
+                    }}>{option.label}</FilterOption>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </div>
 
@@ -503,6 +568,8 @@ export default function ArtScene() {
           onPointerDown={handleLightboxPointerDown}
           onPointerMove={handleLightboxPointerMove}
           onPointerUp={handleLightboxPointerUp}
+          onPointerCancel={handleLightboxPointerUp}
+          onWheel={handleLightboxWheel}
           onClick={() => {
             if (lightboxSuppressClickRef.current) {
               lightboxSuppressClickRef.current = false;
@@ -510,7 +577,7 @@ export default function ArtScene() {
             }
             selectPhoto(null);
           }}
-          style={{ ...photoLightboxStyle, touchAction: "pan-y" }}
+          style={{ ...photoLightboxStyle, touchAction: "none" }}
         >
           {focusedPlacementDetails && (
             <div style={photoLightboxPlacementStyle}>
@@ -532,7 +599,8 @@ export default function ArtScene() {
               aria-label={selectedPhoto.fileName}
               style={{
                 ...photoLightboxImageStyle,
-                transform: `translateX(${lightboxSwipeOffset}px)`,
+                transform: `translateX(${lightboxSwipeOffset}px) scale(${lightboxZoom})`,
+                transformOrigin: "center",
                 transition: lightboxSwipeSettling ? "transform 180ms ease-out" : "none",
               }}
               onClick={(event) => event.stopPropagation()}
@@ -545,7 +613,8 @@ export default function ArtScene() {
               style={{
                 ...photoLightboxImageStyle,
                 ...photoAdjustmentFilterStyle(selectedPhoto.adjustments),
-                transform: `translateX(${lightboxSwipeOffset}px)`,
+                transform: `translateX(${lightboxSwipeOffset}px) scale(${lightboxZoom})`,
+                transformOrigin: "center",
                 transition: lightboxSwipeSettling ? "transform 180ms ease-out" : "none",
               }}
               onClick={(event) => event.stopPropagation()}
@@ -759,6 +828,42 @@ function photoAdjustmentFilterStyle(adjustments?: { brightness?: number; contras
   return {
     filter: `brightness(${brightness / 100}) contrast(${contrast / 100}) saturate(${saturation / 100})`,
   };
+}
+
+function ChevronIcon({ expanded }: { expanded: boolean }) {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" style={{ width: 16, height: 16, transform: expanded ? "rotate(180deg)" : "none" }}>
+      <path d="m3.5 5.75 4.5 4.5 4.5-4.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function FilterOption({
+  children,
+  active,
+  colour,
+  onSelect,
+}: {
+  children: React.ReactNode;
+  active: boolean;
+  colour?: string;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="option"
+      aria-selected={active}
+      onClick={onSelect}
+      style={{
+        ...filterMenuOptionStyle,
+        ...(colour ? getActivityColourStyle(colour) : {}),
+        ...(active ? filterMenuOptionActiveStyle : {}),
+      }}
+    >
+      {children}
+    </button>
+  );
 }
 
 function adjustmentPercent(value?: number) {
@@ -1128,13 +1233,8 @@ const responsiveTopNavStyles = `
       flex-wrap: wrap;
     }
 
-    .atlas-top-controls > label {
+    .atlas-top-controls > div {
       flex: 1 1 220px;
-    }
-
-    .atlas-top-controls > label select {
-      width: 100% !important;
-      max-width: none;
     }
   }
 `;
@@ -1144,7 +1244,7 @@ const topControlGroupStyle: React.CSSProperties = {
   minWidth: 0,
   display: "flex",
   alignItems: "center",
-  gap: 8,
+  gap: 0,
   pointerEvents: "none",
 };
 
@@ -1315,34 +1415,62 @@ const homeLogoImageStyle: React.CSSProperties = {
 const filterControlStyle: React.CSSProperties = {
   pointerEvents: "auto",
   minWidth: 0,
+  width: "clamp(180px, 28vw, 320px)",
+  position: "relative",
 };
 
-const filterSelectStyle: React.CSSProperties = {
-  width: "clamp(116px, 28vw, 320px)",
-  maxWidth: "100%",
+const filterTriggerStyle: React.CSSProperties = {
+  width: "100%",
   height: 40,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 16,
   background: "rgba(10,10,20,0.82)",
   color: "#f4f7fb",
   border: "1px solid rgba(255,255,255,0.18)",
-  borderRadius: 999,
-  padding: "0 44px 0 14px",
-  appearance: "none",
-  WebkitAppearance: "none",
-  backgroundImage:
-    "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='m1 1 5 5 5-5' fill='none' stroke='%23eef3fb' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")",
-  backgroundRepeat: "no-repeat",
-  backgroundPosition: "right 16px center",
-  backgroundSize: "12px 8px",
+  borderRadius: 0,
+  padding: "0 14px",
   fontFamily: "monospace",
   fontSize: 12,
   outline: "none",
-  boxShadow: "0 10px 26px rgba(0,0,0,0.28)",
+  boxShadow: "none",
+  cursor: "pointer",
+  textAlign: "left",
+};
+
+const filterMenuStyle: React.CSSProperties = {
+  position: "absolute",
+  top: "100%",
+  left: 0,
+  right: 0,
+  zIndex: 20,
+  display: "flex",
+  flexDirection: "column",
+  maxHeight: "min(55vh, 420px)",
+  overflowY: "auto",
+  background: "#121620",
+  border: "1px solid rgba(255,255,255,0.18)",
+  borderTop: 0,
+};
+
+const filterMenuOptionStyle: React.CSSProperties = {
+  width: "100%",
+  minHeight: 40,
+  padding: "9px 14px",
+  border: 0,
+  borderBottom: "1px solid rgba(255,255,255,0.12)",
+  borderRadius: 0,
+  background: "#121620",
+  color: "#f4f7fb",
+  fontFamily: "monospace",
+  fontSize: 12,
+  textAlign: "left",
   cursor: "pointer",
 };
 
-const filterOptionStyle: React.CSSProperties = {
-  background: "#121620",
-  color: "#f4f7fb",
+const filterMenuOptionActiveStyle: React.CSSProperties = {
+  boxShadow: "inset 4px 0 0 #ffffff",
 };
 
 const errorStyle: React.CSSProperties = {
@@ -1438,7 +1566,7 @@ const photoLightboxActivityBadgeStyle: React.CSSProperties = {
   alignItems: "center",
   minHeight: 24,
   padding: "3px 9px",
-  borderRadius: 999,
+  borderRadius: 0,
   fontSize: 11,
   fontWeight: 700,
   lineHeight: 1.2,
@@ -1479,7 +1607,7 @@ const photoLightboxCloseStyle: React.CSSProperties = {
   background: "rgba(10,10,20,0.82)",
   color: "#eef2f8",
   border: "1px solid rgba(255,255,255,0.18)",
-  boxShadow: "0 10px 26px rgba(0,0,0,0.28)",
+  boxShadow: "none",
 };
 
 const photoLightboxPlacementStyle: React.CSSProperties = {
