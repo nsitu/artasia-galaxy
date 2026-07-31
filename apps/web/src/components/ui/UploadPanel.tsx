@@ -3092,63 +3092,84 @@ export default function UploadPanel({
   }
 
   function renderDriveBrowser() {
+    const googleDriveFolderUrl =
+      selectedDriveFolder !== "root" &&
+      selectedDriveFolder !== "__shared_drives__"
+        ? `https://drive.google.com/drive/folders/${encodeURIComponent(selectedDriveFolder)}`
+        : driveType === "sharedDrives" && currentDriveId
+          ? `https://drive.google.com/drive/folders/${encodeURIComponent(currentDriveId)}`
+          : driveType === "sharedDrives"
+            ? "https://drive.google.com/drive/shared-drives"
+            : "https://drive.google.com/drive/my-drive";
+
     return (
       <div style={driveBrowserStyle}>
         {/* Breadcrumb navigation */}
         {folderPath.length > 0 && (
-          <div style={{ ...driveBrowserHeaderStyle, gap: 4, overflow: "auto" }}>
-            {folderPath.map((breadcrumb, index) => (
-              <div
-                key={breadcrumb.id}
-                style={{ display: "flex", alignItems: "center", gap: 4 }}
-              >
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (index === 0) {
-                      if (driveType === "myDrive") {
-                        setSelectedDriveFolder("root");
-                        setFolderPath([{ id: "root", name: "My Drive" }]);
-                      } else {
-                        setCurrentDriveId(undefined);
-                        setSelectedDriveFolder("root");
-                        setFolderPath([
-                          { id: "__shared_drives__", name: "Shared Drives" },
-                        ]);
-                      }
-                    } else {
-                      const newPath = folderPath.slice(0, index + 1);
-                      setFolderPath(newPath);
-                      if (driveType === "sharedDrives" && index === 1) {
-                        setCurrentDriveId(breadcrumb.id);
-                        setSelectedDriveFolder("root");
-                      } else {
-                        setSelectedDriveFolder(newPath[newPath.length - 1].id);
-                      }
-                    }
-                  }}
-                  style={{
-                    background: "transparent",
-                    color:
-                      selectedDriveFolder === breadcrumb.id
-                        ? "#d8e7ff"
-                        : "#9aa3b3",
-                    border: "none",
-                    cursor: "pointer",
-                    padding: 0,
-                    textDecoration:
-                      selectedDriveFolder === breadcrumb.id
-                        ? "underline"
-                        : "none",
-                  }}
+          <div style={driveBrowserHeaderStyle}>
+            <div style={driveBreadcrumbsStyle}>
+              {folderPath.map((breadcrumb, index) => (
+                <div
+                  key={breadcrumb.id}
+                  style={{ display: "flex", alignItems: "center", gap: 4 }}
                 >
-                  {breadcrumb.name}
-                </button>
-                {index < folderPath.length - 1 && (
-                  <span style={{ color: "#666" }}>/</span>
-                )}
-              </div>
-            ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (index === 0) {
+                        if (driveType === "myDrive") {
+                          setSelectedDriveFolder("root");
+                          setFolderPath([{ id: "root", name: "My Drive" }]);
+                        } else {
+                          setCurrentDriveId(undefined);
+                          setSelectedDriveFolder("root");
+                          setFolderPath([
+                            { id: "__shared_drives__", name: "Shared Drives" },
+                          ]);
+                        }
+                      } else {
+                        const newPath = folderPath.slice(0, index + 1);
+                        setFolderPath(newPath);
+                        if (driveType === "sharedDrives" && index === 1) {
+                          setCurrentDriveId(breadcrumb.id);
+                          setSelectedDriveFolder("root");
+                        } else {
+                          setSelectedDriveFolder(newPath[newPath.length - 1].id);
+                        }
+                      }
+                    }}
+                    style={{
+                      background: "transparent",
+                      color:
+                        selectedDriveFolder === breadcrumb.id
+                          ? "#d8e7ff"
+                          : "#9aa3b3",
+                      border: "none",
+                      cursor: "pointer",
+                      padding: 0,
+                      textDecoration:
+                        selectedDriveFolder === breadcrumb.id
+                          ? "underline"
+                          : "none",
+                    }}
+                  >
+                    {breadcrumb.name}
+                  </button>
+                  {index < folderPath.length - 1 && (
+                    <span style={{ color: "#666" }}>/</span>
+                  )}
+                </div>
+              ))}
+            </div>
+            <a
+              href={googleDriveFolderUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={openDriveFolderLinkStyle}
+            >
+              <span style={materialSymbolStyle} aria-hidden="true">open_in_new</span>
+              Open in Google Drive
+            </a>
           </div>
         )}
 
@@ -6345,6 +6366,27 @@ const driveBrowserHeaderStyle: React.CSSProperties = {
   display: "flex",
   gap: 8,
   alignItems: "center",
+  justifyContent: "space-between",
+  minWidth: 0,
+};
+
+const driveBreadcrumbsStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 4,
+  minWidth: 0,
+  overflowX: "auto",
+};
+
+const openDriveFolderLinkStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  flex: "0 0 auto",
+  color: "#d8e7ff",
+  textDecoration: "none",
+  fontSize: 13,
+  whiteSpace: "nowrap",
 };
 
 function normalizedMediaFileKey(fileName: string) {
