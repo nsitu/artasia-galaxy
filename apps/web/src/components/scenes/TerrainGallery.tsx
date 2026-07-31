@@ -585,6 +585,8 @@ export default function TerrainGallery({
   );
   const terrainCacheRef = useRef<Map<string, TerrainCacheEntry>>(new Map());
   const introStartSetRef = useRef(false);
+  const previousPartnerFilterRef = useRef(selectedPartnerFilter);
+  const partnerFitAnimationRef = useRef<number | null>(null);
 
   const partnerFilterOptions = useMemo<PartnerFilterOption[]>(() => {
     const counts = new Map<string, number>();
@@ -848,6 +850,65 @@ export default function TerrainGallery({
       };
     });
   }, [focusedPlacement, projection, terrain, visiblePlacements]);
+
+  useEffect(() => {
+    const filterChanged = previousPartnerFilterRef.current !== selectedPartnerFilter;
+    previousPartnerFilterRef.current = selectedPartnerFilter;
+    if (
+      !filterChanged ||
+      focusedPlacement ||
+      placementLayout.length === 0 ||
+      !controls?.target ||
+      (introEnabled && introPhase !== "complete")
+    ) return;
+
+    const bounds = new THREE.Box3();
+    for (const item of placementLayout) {
+      bounds.expandByPoint(new THREE.Vector3(...item.position));
+    }
+    const target = bounds.getCenter(new THREE.Vector3());
+    const clusterRadius = Math.max(
+      0.8,
+      bounds.getBoundingSphere(new THREE.Sphere()).radius + 0.75,
+    );
+    const verticalFov = camera instanceof THREE.PerspectiveCamera
+      ? THREE.MathUtils.degToRad(camera.fov)
+      : THREE.MathUtils.degToRad(50);
+    const aspect = camera instanceof THREE.PerspectiveCamera ? camera.aspect : 1;
+    const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * aspect);
+    const limitingFov = Math.min(verticalFov, horizontalFov);
+    const distance = THREE.MathUtils.clamp(
+      clusterRadius * 1.25 / Math.tan(limitingFov / 2),
+      2.2,
+      65,
+    );
+    const startTarget = controls.target.clone();
+    const startPosition = camera.position.clone();
+    const direction = startPosition.clone().sub(startTarget).normalize();
+    const endPosition = target.clone().addScaledVector(direction, distance);
+    const startedAt = performance.now();
+    if (partnerFitAnimationRef.current !== null) {
+      cancelAnimationFrame(partnerFitAnimationRef.current);
+    }
+    const animateFit = (timestamp: number) => {
+      const progress = Math.min(1, (timestamp - startedAt) / 550);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      controls.target!.lerpVectors(startTarget, target, eased);
+      camera.position.lerpVectors(startPosition, endPosition, eased);
+      camera.lookAt(controls.target!);
+      controls.update?.();
+      partnerFitAnimationRef.current = progress < 1
+        ? requestAnimationFrame(animateFit)
+        : null;
+    };
+    partnerFitAnimationRef.current = requestAnimationFrame(animateFit);
+    return () => {
+      if (partnerFitAnimationRef.current !== null) {
+        cancelAnimationFrame(partnerFitAnimationRef.current);
+        partnerFitAnimationRef.current = null;
+      }
+    };
+  }, [camera, controls, focusedPlacement, introEnabled, introPhase, placementLayout, selectedPartnerFilter]);
 
   const focusPlacement = useCallback(
     (
