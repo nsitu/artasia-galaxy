@@ -402,10 +402,11 @@ export default function ArtScene() {
             <div style={filterControlStyle}>
               <button
                 type="button"
+                className="atlas-partner-filter-trigger"
                 aria-expanded={openFilter === "partner"}
                 aria-haspopup="listbox"
                 onClick={() => setOpenFilter((current) => current === "partner" ? null : "partner")}
-                style={filterTriggerStyle}
+                style={{ ...filterTriggerStyle, ...partnerFilterTriggerStyle }}
               >
                 <span>{selectedPartnerFilter || "All partners"}</span>
                 <ChevronIcon expanded={openFilter === "partner"} />
@@ -1248,6 +1249,10 @@ const responsiveTopNavStyles = `
     .atlas-top-controls > div {
       flex: 1 1 220px;
     }
+
+    .atlas-partner-filter-trigger {
+      height: 40px !important;
+    }
   }
 `;
 
@@ -1328,9 +1333,9 @@ const menuButtonStyle: React.CSSProperties = {
   height: "5rem",
   display: "grid",
   placeItems: "center",
-  background: "rgba(255,255,255,0.035)",
+  background: "transparent",
   color: "#ccc",
-  border: "1px solid rgba(255,255,255,0.15)",
+  border: 0,
   borderRadius: 0,
   cursor: "pointer",
 };
@@ -1451,6 +1456,11 @@ const filterTriggerStyle: React.CSSProperties = {
   boxShadow: "none",
   cursor: "pointer",
   textAlign: "left",
+};
+
+const partnerFilterTriggerStyle: React.CSSProperties = {
+  height: "5rem",
+  border: 0,
 };
 
 const filterMenuStyle: React.CSSProperties = {
