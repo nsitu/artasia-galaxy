@@ -430,15 +430,24 @@ export default function ArtScene() {
             <div style={filterControlStyle}>
               <button
                 type="button"
+                className="atlas-activity-filter-trigger"
                 aria-expanded={openFilter === "activity"}
                 aria-haspopup="listbox"
                 onClick={() => setOpenFilter((current) => current === "activity" ? null : "activity")}
-                style={{
-                  ...filterTriggerStyle,
-                  ...getActivityColourStyle(selectedActivityColour),
-                }}
+                style={{ ...filterTriggerStyle, ...partnerFilterTriggerStyle }}
               >
-                <span>{activityFilterOptions.find((option) => String(option.id) === selectedActivityFilter)?.label || "All Activities"}</span>
+                <span style={activityFilterLabelStyle}>
+                  {selectedActivityColour && (
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        ...activityColourDotStyle,
+                        background: selectedActivityColour,
+                      }}
+                    />
+                  )}
+                  {activityFilterOptions.find((option) => String(option.id) === selectedActivityFilter)?.label || "All Activities"}
+                </span>
                 <ChevronIcon expanded={openFilter === "activity"} />
               </button>
               {openFilter === "activity" && (
@@ -1274,7 +1283,8 @@ const responsiveTopNavStyles = `
       flex: 1 1 220px;
     }
 
-    .atlas-partner-filter-trigger {
+    .atlas-partner-filter-trigger,
+    .atlas-activity-filter-trigger {
       height: 40px !important;
     }
   }
