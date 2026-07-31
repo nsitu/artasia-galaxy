@@ -1238,7 +1238,12 @@ export default function TerrainGallery({
         { position: startPosition, target: finalFrame.target },
         controls,
       );
-      if (!introStartSetRef.current) {
+      if (
+        !introStartSetRef.current &&
+        placementsResolved &&
+        !galleryLoading &&
+        !loading
+      ) {
         introStartSetRef.current = true;
         onIntroReady?.();
       }
@@ -1297,10 +1302,13 @@ export default function TerrainGallery({
     camera,
     controls,
     focusedPlacement,
+    galleryLoading,
     introEnabled,
     introPhase,
+    loading,
     onIntroComplete,
     onIntroReady,
+    placementsResolved,
     terrain,
     terrainMatchesRequest,
   ]);
@@ -1323,7 +1331,14 @@ export default function TerrainGallery({
   ]);
 
   useEffect(() => {
-    if (!introEnabled || focusedPlacement || introStartSetRef.current) return;
+    if (
+      !introEnabled ||
+      focusedPlacement ||
+      introStartSetRef.current ||
+      galleryLoading ||
+      loading ||
+      !placementsResolved
+    ) return;
     if (
       phase === "flat" ||
       phase === "error" ||
@@ -1334,7 +1349,9 @@ export default function TerrainGallery({
     }
   }, [
     focusedPlacement,
+    galleryLoading,
     introEnabled,
+    loading,
     onIntroReady,
     phase,
     placementsResolved,

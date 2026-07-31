@@ -56,12 +56,7 @@ function getContrastingTextColour(backgroundColour: string): string | undefined 
 }
 
 function getActivityColourStyle(colour?: string): React.CSSProperties {
-  if (!colour?.trim()) {
-    return {
-      backgroundColor: "rgba(10,10,20,0.82)",
-      color: "#f4f7fb",
-    };
-  }
+  if (!colour?.trim()) return {};
 
   const textColour = getContrastingTextColour(colour);
   return {
@@ -441,7 +436,7 @@ export default function ArtScene() {
         aria-label="Presented by Arts For All"
         style={presentedByStyle}
       >
-        <span style={presentedByTextStyle}>PRESENTED BY</span>
+        
         <img src="/afa-horizontal.svg" alt="Arts For All" style={presentedByLogoStyle} />
       </a>
 
@@ -474,7 +469,9 @@ export default function ArtScene() {
 
       {error && <div style={errorStyle}>{error}</div>}
       <div style={buildStampStyle}>{__ARTASIA_BUILD_LABEL__}</div>
-      {terrainNotice && <LoadingIndicator {...terrainNotice} />}
+      {terrainNotice && (!showWelcomeIntro || introPhase === "complete") && (
+        <LoadingIndicator {...terrainNotice} />
+      )}
       {focusedPlacementDetails && (
         <FocusedPlacementOverlay
           placement={focusedPlacementDetails}
@@ -1145,14 +1142,7 @@ const presentedByStyle: React.CSSProperties = {
   fontFamily: "monospace",
   pointerEvents: "auto",
 };
-
-const presentedByTextStyle: React.CSSProperties = {
-  fontSize: 10,
-  fontVariant: "small-caps",
-  letterSpacing: "0.14em",
-  lineHeight: 1,
-  marginBottom: "clamp(0.35rem, 1.1vw, 0.5rem)",
-};
+ 
 
 const presentedByLogoStyle: React.CSSProperties = {
   width: "clamp(84px, 16vw, 116px)",
