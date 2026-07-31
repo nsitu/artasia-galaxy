@@ -1207,12 +1207,16 @@ const responsiveTopNavStyles = `
 
     .atlas-menu-wrap {
       order: 2;
+      margin-top: -8px;
+      margin-right: -12px;
     }
 
     .atlas-menu-wrap > button {
-      width: 64px !important;
-      height: 64px !important;
-      border-radius: 14px !important;
+      width: 5rem !important;
+      height: 5rem !important;
+      border-radius: 0 !important;
+      border-top: 0 !important;
+      border-right: 0 !important;
     }
 
     .atlas-menu-icon {
@@ -1226,11 +1230,11 @@ const responsiveTopNavStyles = `
 
     .atlas-top-controls {
       order: 3;
-      flex: 1 0 100% !important;
-      width: 100%;
-      margin-top: 4px;
+      flex: 1 0 calc(100% + 24px) !important;
+      width: calc(100% + 24px);
+      margin: 4px -12px -10px;
       justify-content: flex-start;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
     }
 
     .atlas-top-controls > div {
@@ -1365,18 +1369,20 @@ const menuItemStyle: React.CSSProperties = {
 
 const backButtonStyle: React.CSSProperties = {
   pointerEvents: "auto",
-  width: 40,
+  flex: "0 0 48px",
+  width: 48,
   height: 40,
   padding: 0,
-  borderRadius: 999,
+  borderRadius: 0,
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
   lineHeight: 0,
   background: "rgba(10,10,20,0.82)",
   color: "#eef2f8",
-  border: "1px solid rgba(255,255,255,0.18)",
-  boxShadow: "0 10px 26px rgba(0,0,0,0.28)",
+  border: 0,
+  borderRight: "1px solid rgba(255,255,255,0.18)",
+  boxShadow: "none",
   cursor: "pointer",
   fontFamily: "monospace",
   fontSize: 12,
