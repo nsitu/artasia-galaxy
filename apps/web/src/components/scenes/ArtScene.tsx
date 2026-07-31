@@ -379,7 +379,7 @@ export default function ArtScene() {
       <style>{responsiveTopNavStyles}</style>
       <div className="atlas-top-nav" style={topNavStyle}>
         <div className="atlas-home-brand" style={homeBrandStyle}>
-          <a href="/" aria-label="Artasia home" style={homeLogoLinkStyle}>
+          <a className="atlas-home-logo-link" href="/" aria-label="Artasia home" style={homeLogoLinkStyle}>
             <img src="/artasia-atlas.svg" alt="Artasia Atlas" style={homeLogoImageStyle} />
           </a>
         </div>
@@ -474,13 +474,19 @@ export default function ArtScene() {
           </button>
 
           {menuOpen && (
-            <div role="menu" style={menuPanelStyle}>
+            <div className="atlas-menu-panel" role="menu" style={menuPanelStyle}>
                 {menuItems.map((item) => item.action === "about" ? (
                   <button
                     key={item.href}
                     type="button"
                     role="menuitem"
-                    style={{ ...menuItemStyle, textAlign: "left", border: 0, cursor: "pointer" }}
+                    style={{
+                      ...menuItemStyle,
+                      textAlign: "left",
+                      border: 0,
+                      borderBottom: "1px solid rgba(255,255,255,0.12)",
+                      cursor: "pointer",
+                    }}
                     onClick={() => { setMenuOpen(false); setAboutOpen(true); }}
                   >
                     {item.label}
@@ -1165,7 +1171,16 @@ const topNavStyle: React.CSSProperties = {
 };
 
 const responsiveTopNavStyles = `
+  .atlas-home-logo-link {
+    padding-bottom: 8px;
+    box-sizing: border-box;
+  }
+
   @media (max-width: 640px) {
+    .atlas-home-logo-link {
+      padding-bottom: 12px;
+    }
+
     .atlas-site-view .atlas-presented-by {
       display: none !important;
     }
@@ -1214,6 +1229,11 @@ const responsiveTopNavStyles = `
       box-sizing: border-box;
     }
 
+    .atlas-home-logo-link {
+      padding-bottom: 8px;
+      box-sizing: border-box;
+    }
+
     .atlas-menu-wrap {
       order: 2;
       margin: 0;
@@ -1234,6 +1254,10 @@ const responsiveTopNavStyles = `
 
     .atlas-menu-icon > span {
       height: 3px !important;
+    }
+
+    .atlas-menu-panel {
+      top: calc(100% + 40px) !important;
     }
 
     .atlas-top-controls {
@@ -1356,28 +1380,31 @@ const menuLineStyle: React.CSSProperties = {
 
 const menuPanelStyle: React.CSSProperties = {
   position: "absolute",
-  top: 48,
+  top: "100%",
   right: 0,
-  minWidth: 152,
-  padding: 8,
-  borderRadius: 12,
-  background: "rgba(12, 14, 22, 0.94)",
+  minWidth: 184,
+  padding: 0,
+  borderRadius: 0,
+  background: "rgba(8,10,16,0.78)",
+  backdropFilter: "blur(8px)",
   border: "1px solid rgba(255,255,255,0.14)",
+  borderTop: 0,
   boxShadow: "0 18px 40px rgba(0,0,0,0.35)",
   display: "grid",
-  gap: 6,
+  gap: 0,
   zIndex: 20,
 };
 
 const menuItemStyle: React.CSSProperties = {
   display: "block",
-  padding: "10px 12px",
-  borderRadius: 8,
+  padding: "12px 14px",
+  borderRadius: 0,
   textDecoration: "none",
   color: "#eef3fb",
   fontSize: 13,
   fontFamily: "monospace",
-  background: "rgba(255,255,255,0.03)",
+  background: "transparent",
+  borderBottom: "1px solid rgba(255,255,255,0.12)",
 };
 
 const backButtonStyle: React.CSSProperties = {
@@ -1425,7 +1452,7 @@ const homeBrandStyle: React.CSSProperties = {
 
 const homeLogoImageStyle: React.CSSProperties = {
   width: "9.92rem",
-  height: "5rem",
+  height: "100%",
   aspectRatio: "484.7404381 / 244.2527827",
   objectFit: "contain",
   display: "block",
