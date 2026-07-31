@@ -2137,15 +2137,26 @@ export default function UploadPanel({
     if (!confirmed) return;
 
     const assetId = selectedAsset.id;
+    const placementId = selectedAsset.placement_id;
     setDeletingAsset(true);
     setError(null);
     try {
       await deleteUploadAsset({ assetId });
-      closeAssetManager();
       setPlacementAssets((current) =>
         current.filter((asset) => asset.id !== assetId),
       );
-      refreshVisibleAssets();
+      closeAssetManager();
+      setWorkspaceMode("browse");
+      if (placementId) {
+        setPlacementKey(String(placementId));
+        setSiteScope("placement");
+      }
+      setApplicationPath(
+        placementId
+          ? `/admin/browse?site=${encodeURIComponent(String(placementId))}`
+          : "/admin/browse",
+        true,
+      );
     } catch (err) {
       setError((err as Error).message);
     } finally {
