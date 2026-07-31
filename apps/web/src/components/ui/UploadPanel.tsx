@@ -976,6 +976,20 @@ export default function UploadPanel({
     );
   }, [options, placementKey]);
 
+  const existingPlacementFileKeys = useMemo(() => {
+    if (!selectedPlacement) return new Set<string>();
+    return new Set(
+      placementAssets
+        .filter((asset) => asset.placement_id === selectedPlacement.placement_id)
+        .map((asset) => normalizedMediaFileKey(asset.fileName))
+        .filter(Boolean),
+    );
+  }, [placementAssets, selectedPlacement]);
+
+  function driveFileIsImported(file: DriveFile) {
+    return existingPlacementFileKeys.has(normalizedMediaFileKey(file.name));
+  }
+
   const driveOwnerOptions = useMemo(() => {
     if (!options || !selectedPlacement) return [];
     return options.uploaders.filter((uploader) =>
@@ -3176,6 +3190,17 @@ export default function UploadPanel({
                     onClick={(e) => e.stopPropagation()}
                     style={driveFileCheckboxStyle}
                   />
+                  {!assetsLoading && (
+                    <span
+                      style={
+                        driveFileIsImported(file)
+                          ? driveFileImportedBadgeStyle
+                          : driveFileNewBadgeStyle
+                      }
+                    >
+                      {driveFileIsImported(file) ? "Imported" : "New"}
+                    </span>
+                  )}
                   {file.thumbnailLink ? (
                     <img
                       src={file.thumbnailLink}
@@ -6349,6 +6374,14 @@ const driveBrowserHeaderStyle: React.CSSProperties = {
   alignItems: "center",
 };
 
+function normalizedMediaFileKey(fileName: string) {
+  return fileName
+    .normalize("NFKC")
+    .trim()
+    .toLocaleLowerCase()
+    .replace(/\.(?:jpe?g|png|gif|webp|heic|heif|avif|tiff?|bmp|mp4|mov|m4v|webm|avi|mkv|mp3|m4a|wav|aac|ogg|flac)$/i, "");
+}
+
 const driveFileListStyle: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fill, minmax(236px, 1fr))",
@@ -6400,6 +6433,33 @@ const driveFileCheckboxStyle: React.CSSProperties = {
   cursor: "pointer",
   accentColor: "#9ec1ff",
   zIndex: 1,
+};
+
+const driveFileBadgeStyle: React.CSSProperties = {
+  position: "absolute",
+  top: 8,
+  right: 8,
+  zIndex: 1,
+  padding: "4px 8px",
+  borderRadius: 999,
+  fontSize: 11,
+  fontWeight: 700,
+  lineHeight: 1.2,
+  boxShadow: "0 2px 8px rgba(0,0,0,0.35)",
+};
+
+const driveFileImportedBadgeStyle: React.CSSProperties = {
+  ...driveFileBadgeStyle,
+  color: "#082b17",
+  background: "#70df93",
+  border: "1px solid #a1efb7",
+};
+
+const driveFileNewBadgeStyle: React.CSSProperties = {
+  ...driveFileBadgeStyle,
+  color: "#eef3fb",
+  background: "#42526d",
+  border: "1px solid #71809a",
 };
 
 const driveFileMetaStyle: React.CSSProperties = {
