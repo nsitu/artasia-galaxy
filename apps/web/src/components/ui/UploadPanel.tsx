@@ -2898,6 +2898,11 @@ export default function UploadPanel({
   }
 
   function renderAssetCard(asset: PlacementAsset) {
+    const activity = options?.activities.find(
+      (candidate) => candidate.id === asset.activity_id,
+    );
+    const activityLabel = asset.activity_label?.trim() || activity?.label;
+    const activityColour = activity?.colour?.trim();
     return (
       <button
         key={asset.id}
@@ -2928,6 +2933,22 @@ export default function UploadPanel({
                 ? "Video"
                 : "Image"}
           </span>
+          {activityLabel && (
+            <span
+              style={{
+                ...activityAssetBadgeStyle,
+                ...(activityColour
+                  ? {
+                      background: activityColour,
+                      borderColor: activityColour,
+                      color: readableBadgeTextColour(activityColour),
+                    }
+                  : {}),
+              }}
+            >
+              {activityLabel}
+            </span>
+          )}
         </span>
         <span style={assetNameStyle}>{asset.fileName}</span>
         <span style={assetDateStyle}>
@@ -6427,6 +6448,24 @@ const driveBrowserHeaderStyle: React.CSSProperties = {
   justifyContent: "space-between",
   minWidth: 0,
 };
+
+const activityAssetBadgeStyle: React.CSSProperties = {
+  ...archivedAssetBadgeStyle,
+  background: "rgba(148, 163, 184, 0.18)",
+  border: "1px solid rgba(148, 163, 184, 0.45)",
+  color: "#e2e8f0",
+};
+
+function readableBadgeTextColour(background: string) {
+  const match = background.match(/^#([0-9a-f]{6})$/i);
+  if (!match) return "#fff";
+  const value = parseInt(match[1], 16);
+  const red = (value >> 16) & 255;
+  const green = (value >> 8) & 255;
+  const blue = value & 255;
+  const luminance = (0.299 * red + 0.587 * green + 0.114 * blue) / 255;
+  return luminance > 0.62 ? "#111827" : "#fff";
+}
 
 const driveBreadcrumbsStyle: React.CSSProperties = {
   display: "flex",

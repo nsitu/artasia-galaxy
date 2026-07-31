@@ -1147,12 +1147,17 @@ function TouchDoubleTapZoom({ enabled }: { enabled: boolean }) {
 const topNavStyle: React.CSSProperties = {
   position: "absolute",
   top: 0,
-  left: 16,
-  right: 16,
+  left: 0,
+  right: 0,
   zIndex: 16,
   display: "flex",
   alignItems: "center",
-  gap: 12,
+  gap: 0,
+  minHeight: "5rem",
+  padding: "0 16px",
+  boxSizing: "border-box",
+  background: "rgba(0, 0, 0, 0.42)",
+  backdropFilter: "blur(8px)",
   fontFamily: "monospace",
   color: "#aaa",
   pointerEvents: "none",
@@ -1194,21 +1199,23 @@ const responsiveTopNavStyles = `
     .atlas-top-nav {
       left: 0 !important;
       right: 0 !important;
-      padding: 8px 12px 10px;
+      padding: 0 !important;
       box-sizing: border-box;
       background: rgba(0, 0, 0, 0.42);
       flex-wrap: wrap;
       align-items: flex-start !important;
+      gap: 0 !important;
     }
 
     .atlas-home-brand {
       flex: 1 1 auto !important;
+      padding-left: 12px;
+      box-sizing: border-box;
     }
 
     .atlas-menu-wrap {
       order: 2;
-      margin-top: -8px;
-      margin-right: -12px;
+      margin: 0;
     }
 
     .atlas-menu-wrap > button {
@@ -1230,11 +1237,12 @@ const responsiveTopNavStyles = `
 
     .atlas-top-controls {
       order: 3;
-      flex: 1 0 calc(100% + 24px) !important;
-      width: calc(100% + 24px);
-      margin: 4px -12px -10px;
+      flex: 1 0 100% !important;
+      width: 100%;
+      margin: 0;
       justify-content: flex-start;
       flex-wrap: nowrap;
+      border-top: 1px solid rgba(255,255,255,0.12);
     }
 
     .atlas-top-controls > div {
@@ -1316,14 +1324,14 @@ const menuWrapStyle: React.CSSProperties = {
 
 const menuButtonStyle: React.CSSProperties = {
   pointerEvents: "auto",
-  width: 40,
-  height: 40,
+  width: "5rem",
+  height: "5rem",
   display: "grid",
   placeItems: "center",
-  background: "rgba(255,255,255,0.08)",
+  background: "rgba(255,255,255,0.035)",
   color: "#ccc",
   border: "1px solid rgba(255,255,255,0.15)",
-  borderRadius: 10,
+  borderRadius: 0,
   cursor: "pointer",
 };
 
@@ -1378,7 +1386,7 @@ const backButtonStyle: React.CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   lineHeight: 0,
-  background: "rgba(10,10,20,0.82)",
+  background: "rgba(0,0,0,0.18)",
   color: "#eef2f8",
   border: 0,
   borderRight: "1px solid rgba(255,255,255,0.18)",
@@ -1432,7 +1440,7 @@ const filterTriggerStyle: React.CSSProperties = {
   alignItems: "center",
   justifyContent: "space-between",
   gap: 16,
-  background: "rgba(10,10,20,0.82)",
+  background: "rgba(0,0,0,0.18)",
   color: "#f4f7fb",
   border: "1px solid rgba(255,255,255,0.18)",
   borderRadius: 0,
@@ -1455,7 +1463,8 @@ const filterMenuStyle: React.CSSProperties = {
   flexDirection: "column",
   maxHeight: "min(55vh, 420px)",
   overflowY: "auto",
-  background: "#121620",
+  background: "rgba(8,10,16,0.78)",
+  backdropFilter: "blur(8px)",
   border: "1px solid rgba(255,255,255,0.18)",
   borderTop: 0,
 };
@@ -1467,7 +1476,7 @@ const filterMenuOptionStyle: React.CSSProperties = {
   border: 0,
   borderBottom: "1px solid rgba(255,255,255,0.12)",
   borderRadius: 0,
-  background: "#121620",
+  background: "transparent",
   color: "#f4f7fb",
   fontFamily: "monospace",
   fontSize: 12,
