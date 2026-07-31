@@ -286,6 +286,27 @@ export class GoogleDriveClient {
       throw new Error(`Cycle detected in Google Drive folder ancestry for ${folderId}`);
     }
 
+    const sharedDriveId = path[path.length - 1]?.driveId;
+    if (sharedDriveId) {
+      const sharedDrive = await this.drive.drives.get({
+        driveId: sharedDriveId,
+        fields: "id,name",
+      });
+      if (sharedDrive.data.id && sharedDrive.data.name) {
+        const sharedDriveRoot: DriveFolder = {
+          id: sharedDrive.data.id,
+          name: sharedDrive.data.name,
+          mimeType: GOOGLE_MIME_TYPE_FOLDER,
+          driveId: sharedDrive.data.id,
+        };
+        if (path[0]?.id === sharedDrive.data.id) {
+          path[0] = sharedDriveRoot;
+        } else {
+          path.unshift(sharedDriveRoot);
+        }
+      }
+    }
+
     return path;
   }
 
