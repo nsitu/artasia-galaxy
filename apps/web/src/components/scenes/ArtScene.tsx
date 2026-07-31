@@ -187,6 +187,11 @@ export default function ArtScene() {
 
   const selectedPhoto = selectedPhotoIndex !== null ? photos[selectedPhotoIndex] : null;
   const selectedDescription = selectedPhoto?.exifInfo?.description?.trim();
+  const selectedPhotoActivities = selectedPhoto?.activityIds
+    ?.map((activityId) =>
+      activityFilterOptions.find((activity) => activity.id === activityId),
+    )
+    .filter((activity): activity is ActivityOption => Boolean(activity)) ?? [];
   const selectedActivityColour =
     activityFilterOptions.find(
       (activity) => String(activity.id) === selectedActivityFilter,
@@ -552,6 +557,21 @@ export default function ArtScene() {
             onClick={(event) => event.stopPropagation()}
           >
             <div style={photoLightboxTitleStyle}>{selectedPhoto.fileName}</div>
+            {selectedPhotoActivities.length > 0 && (
+              <div style={photoLightboxActivityListStyle}>
+                {selectedPhotoActivities.map((activity) => (
+                  <span
+                    key={activity.id}
+                    style={{
+                      ...photoLightboxActivityBadgeStyle,
+                      ...getActivityColourStyle(activity.colour),
+                    }}
+                  >
+                    {activity.label}
+                  </span>
+                ))}
+              </div>
+            )}
             {selectedDescription && (
               <div style={photoLightboxDescriptionStyle}>
                 {selectedDescription}
@@ -1404,6 +1424,24 @@ const photoLightboxDescriptionStyle: React.CSSProperties = {
   color: "#c7ccd6",
   whiteSpace: "pre-wrap",
   overflowWrap: "anywhere",
+};
+
+const photoLightboxActivityListStyle: React.CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 6,
+  marginBottom: 8,
+};
+
+const photoLightboxActivityBadgeStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  minHeight: 24,
+  padding: "3px 9px",
+  borderRadius: 999,
+  fontSize: 11,
+  fontWeight: 700,
+  lineHeight: 1.2,
 };
 
 const photoLightboxAudioStyle: React.CSSProperties = {
