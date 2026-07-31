@@ -270,6 +270,25 @@ export class GoogleDriveClient {
     return res.data as DriveFolder;
   }
 
+  async getFolderPath(folderId: string): Promise<DriveFolder[]> {
+    const path: DriveFolder[] = [];
+    const visited = new Set<string>();
+    let currentId: string | undefined = folderId;
+
+    while (currentId && !visited.has(currentId) && path.length < 100) {
+      visited.add(currentId);
+      const folder = await this.getFolder(currentId);
+      path.unshift(folder);
+      currentId = folder.parents?.[0];
+    }
+
+    if (currentId && visited.has(currentId)) {
+      throw new Error(`Cycle detected in Google Drive folder ancestry for ${folderId}`);
+    }
+
+    return path;
+  }
+
   /**
    * Check if a MIME type is supported audio
    */

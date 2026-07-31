@@ -2795,22 +2795,18 @@ export default function UploadPanel({
 
     try {
       if (configuredFolderId) {
-        const folder = await fetchDriveFolder(configuredFolderId);
+        const { folder, path } = await fetchDriveFolder(configuredFolderId);
         if (folder.driveId) {
           setDriveType("sharedDrives");
           setCurrentDriveId(folder.driveId);
           setFolderPath([
             { id: "__shared_drives__", name: "Shared Drives" },
-            { id: folder.driveId, name: "Shared Drive" },
-            { id: folder.id, name: folder.name },
+            ...path,
           ]);
         } else {
           setDriveType("myDrive");
           setCurrentDriveId(undefined);
-          setFolderPath([
-            { id: "root", name: "My Drive" },
-            { id: folder.id, name: folder.name },
-          ]);
+          setFolderPath(path);
         }
         setSelectedDriveFolder(folder.id);
         return;

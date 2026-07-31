@@ -172,8 +172,8 @@ router.get("/folders/:folderId", async (req: Request, res: Response) => {
     const folderId = Array.isArray(req.params.folderId)
       ? String(req.params.folderId[0])
       : req.params.folderId;
-    const folder = await getDriveClient(req).getFolder(folderId);
-    res.json({ folder });
+    const path = await getDriveClient(req).getFolderPath(folderId);
+    res.json({ folder: path[path.length - 1], path });
   } catch (err) {
     res
       .status(err instanceof Error && err.message.includes("Not authenticated") ? 401 : 500)

@@ -777,14 +777,16 @@ export interface DriveFoldersResponse {
   folders?: DriveFolder[];
 }
 
-export async function fetchDriveFolder(folderId: string): Promise<DriveFolder> {
+export async function fetchDriveFolder(folderId: string): Promise<{
+  folder: DriveFolder;
+  path: DriveFolder[];
+}> {
   const res = await fetch(`/api/v1/drive/folders/${encodeURIComponent(folderId)}`);
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(body.error ?? `HTTP ${res.status}`);
   }
-  const body = (await res.json()) as { folder: DriveFolder };
-  return body.folder;
+  return res.json();
 }
 
 /**
