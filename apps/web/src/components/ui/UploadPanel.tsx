@@ -38,6 +38,7 @@ import {
   type CropParameters,
   type DriveFile,
   type DriveFolder,
+  type DriveSyncResult,
   type LinkedAudioOption,
   type RotationDegrees,
   type UploadOptions,
@@ -327,6 +328,10 @@ export default function UploadPanel({
     new Set(),
   );
   const [driveSyncing, setDriveSyncing] = useState(false);
+  const [driveSyncProgress, setDriveSyncProgress] = useState<{
+    current: number;
+    total: number;
+  } | null>(null);
   const [driveLoading, setDriveLoading] = useState(false);
   const [driveDefaultOpening, setDriveDefaultOpening] = useState(false);
 
@@ -2666,12 +2671,18 @@ export default function UploadPanel({
     setNotice(null);
 
     try {
-      const results = await syncDriveFiles({
-        fileIds: Array.from(selectedDriveFiles),
-        placementId: placementKey ? parseInt(placementKey, 10) : null,
-        activityId: activityTagFilter ? parseInt(activityTagFilter, 10) : null,
-        uploaderId: driveOwnerKey ? parseInt(driveOwnerKey, 10) : null,
-      });
+      const fileIds = Array.from(selectedDriveFiles);
+      const results: DriveSyncResult[] = [];
+      for (let index = 0; index < fileIds.length; index += 1) {
+        setDriveSyncProgress({ current: index + 1, total: fileIds.length });
+        const fileResults = await syncDriveFiles({
+          fileIds: [fileIds[index]],
+          placementId: placementKey ? parseInt(placementKey, 10) : null,
+          activityId: activityTagFilter ? parseInt(activityTagFilter, 10) : null,
+          uploaderId: driveOwnerKey ? parseInt(driveOwnerKey, 10) : null,
+        });
+        results.push(...fileResults);
+      }
 
       const succeeded = results.filter((r) => r.status === "success").length;
       const failed = results.filter((r) => r.status === "failed").length;
@@ -2718,6 +2729,7 @@ export default function UploadPanel({
       setError((err as Error).message);
     } finally {
       setDriveSyncing(false);
+      setDriveSyncProgress(null);
     }
   }
 
@@ -3262,9 +3274,12 @@ export default function UploadPanel({
               }
               style={primaryActionButtonStyle}
             >
-              {driveSyncing
-                ? `Importing ${selectedDriveFiles.size} file${selectedDriveFiles.size === 1 ? "" : "s"}...`
-                : `Import ${selectedDriveFiles.size} file${selectedDriveFiles.size === 1 ? "" : "s"}`}
+              {driveSyncing && <span aria-hidden="true" style={loadingSpinnerStyle} />}
+              {driveSyncing && driveSyncProgress
+                ? `Importing ${driveSyncProgress.current}/${driveSyncProgress.total} files`
+                : driveSyncing
+                  ? "Importing files"
+                  : `Import ${selectedDriveFiles.size} file${selectedDriveFiles.size === 1 ? "" : "s"}`}
             </button>
           )}
         </div>
@@ -5225,6 +5240,10 @@ const dangerButtonStyle: React.CSSProperties = {
 };
 
 const primaryActionButtonStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 8,
   color: "#0b0d12",
   background: "#e8edf8",
   border: "1px solid rgba(255,255,255,0.3)",
