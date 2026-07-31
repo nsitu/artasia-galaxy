@@ -388,6 +388,7 @@ export default function ArtScene() {
           {backAction && (
             <button
               type="button"
+              className="atlas-back-button"
               aria-label="Back to regional view"
               onClick={backAction}
               style={backButtonStyle}
@@ -1289,7 +1290,8 @@ const responsiveTopNavStyles = `
     }
 
     .atlas-partner-filter-trigger,
-    .atlas-activity-filter-trigger {
+    .atlas-activity-filter-trigger,
+    .atlas-back-button {
       height: 40px !important;
     }
   }
@@ -1426,7 +1428,7 @@ const backButtonStyle: React.CSSProperties = {
   pointerEvents: "auto",
   flex: "0 0 48px",
   width: 48,
-  height: 40,
+  height: "5rem",
   padding: 0,
   borderRadius: 0,
   display: "inline-flex",
