@@ -58,6 +58,7 @@ export interface WpArtasiaPlacement {
   program_context: string;
   is_earlyon: boolean;
   section?: string;
+  google_drive_folder_id?: string;
   delivery_weekday?: string;
   delivery_start_time?: string;
   delivery_end_time?: string;

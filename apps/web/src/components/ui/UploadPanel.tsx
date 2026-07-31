@@ -10,6 +10,7 @@ import {
   fetchAudioTrimJob,
   fetchAuthUser,
   fetchDriveFiles,
+  fetchDriveFolder,
   fetchDriveFolders,
   flattenUploadAsset,
   fetchLinkedAudioOptions,
@@ -281,12 +282,6 @@ export default function UploadPanel({
       setRouteSelectionResolved(false);
     }
     if (nextMode === workspaceMode) {
-      if (
-        nextMode === "import" &&
-        window.location.pathname === "/admin/import"
-      ) {
-        void openDriveImportDefault();
-      }
       return;
     }
 
@@ -295,9 +290,6 @@ export default function UploadPanel({
     setItems([]);
     setNotice(null);
 
-    if (nextMode === "import") {
-      void openDriveImportDefault();
-    }
   }, [appPath]);
 
   const cropResizeRef = useRef<{
@@ -966,6 +958,18 @@ export default function UploadPanel({
     );
   }, [options, placementKey]);
 
+  useEffect(() => {
+    if (workspaceMode !== "import" || !routeSelectionResolved) return;
+    void openDriveImportDefault(
+      selectedPlacement?.google_drive_folder_id,
+    );
+  }, [
+    routeSelectionResolved,
+    selectedPlacement?.google_drive_folder_id,
+    selectedPlacement?.placement_id,
+    workspaceMode,
+  ]);
+
   const existingPlacementFileKeys = useMemo(() => {
     if (!selectedPlacement) return new Set<string>();
     return new Set(
@@ -1447,7 +1451,10 @@ export default function UploadPanel({
     setBrowsePartnerKey("");
     selectPlacement(placement);
     setWorkspaceMode("import");
-    void openDriveImportDefault();
+    setApplicationPath(
+      `/admin/import?site=${encodeURIComponent(String(placement.placement_id))}`,
+      true,
+    );
   }
 
   function returnToSiteSelection() {
@@ -2774,7 +2781,9 @@ export default function UploadPanel({
     return name.trim().toLocaleLowerCase();
   }
 
-  async function openDriveImportDefault() {
+  async function openDriveImportDefault(
+    configuredFolderId = selectedPlacement?.google_drive_folder_id,
+  ) {
     setWorkspaceMode("import");
     setSelectedDriveFiles(new Set());
     setDriveFolders([]);
@@ -2785,6 +2794,28 @@ export default function UploadPanel({
     setNotice(null);
 
     try {
+      if (configuredFolderId) {
+        const folder = await fetchDriveFolder(configuredFolderId);
+        if (folder.driveId) {
+          setDriveType("sharedDrives");
+          setCurrentDriveId(folder.driveId);
+          setFolderPath([
+            { id: "__shared_drives__", name: "Shared Drives" },
+            { id: folder.driveId, name: "Shared Drive" },
+            { id: folder.id, name: folder.name },
+          ]);
+        } else {
+          setDriveType("myDrive");
+          setCurrentDriveId(undefined);
+          setFolderPath([
+            { id: "root", name: "My Drive" },
+            { id: folder.id, name: folder.name },
+          ]);
+        }
+        setSelectedDriveFolder(folder.id);
+        return;
+      }
+
       const sharedDrives = await fetchDriveFolders("sharedDrives", "root");
       const defaultDrive = (sharedDrives.folders ?? []).find((folder) =>
         normalizeDriveName(folder.name).includes(DEFAULT_SHARED_DRIVE_NAME),
@@ -4369,7 +4400,6 @@ export default function UploadPanel({
               setSelectedAsset(null);
               setAssetMode("placements");
               setSelectedDriveFiles(new Set());
-              void openDriveImportDefault();
               setApplicationPath("/admin/import", true);
             }}
             style={{

@@ -210,6 +210,7 @@ function artasia_get_expanded_placements(): WP_REST_Response
             'program_context' => get_post_meta($placement->ID, 'artasia_program_context', true) ?: '',
             'is_earlyon' => (bool) get_post_meta($placement->ID, 'artasia_is_earlyon', true),
             'section' => get_post_meta($placement->ID, 'artasia_section', true) ?: '',
+            'google_drive_folder_id' => get_post_meta($placement->ID, 'artasia_google_drive_folder_id', true) ?: '',
             'delivery_weekday' => get_post_meta($placement->ID, 'artasia_delivery_weekday', true) ?: '',
             'delivery_start_time' => get_post_meta($placement->ID, 'artasia_delivery_start_time', true) ?: '',
             'delivery_end_time' => get_post_meta($placement->ID, 'artasia_delivery_end_time', true) ?: '',

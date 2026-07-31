@@ -21,6 +21,7 @@ export interface ArtasiaPlacement {
   placement_id: number;
   placement_name: string;
   placement_slug?: string;
+  google_drive_folder_id?: string;
   team_member_id?: number;
   team_member_name?: string;
   secondary_team_member_id?: number;
@@ -168,6 +169,7 @@ function mapWpPlacement(wp: WpArtasiaPlacement): ArtasiaPlacement {
     placement_name: wp.placement_name,
     ...(wp.section ? { section: wp.section } : {}),
     ...(wp.placement_slug ? { placement_slug: wp.placement_slug } : {}),
+    ...(wp.google_drive_folder_id ? { google_drive_folder_id: wp.google_drive_folder_id } : {}),
     ...(wp.team_member?.id ? { team_member_id: wp.team_member.id } : {}),
     ...(wp.team_member?.name ? { team_member_name: wp.team_member.name } : {}),
     ...(wp.secondary_team_member?.id ? { secondary_team_member_id: wp.secondary_team_member.id } : {}),

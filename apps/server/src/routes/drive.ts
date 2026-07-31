@@ -167,6 +167,20 @@ interface DriveSyncRequest {
   activityId?: number | null;
 }
 
+router.get("/folders/:folderId", async (req: Request, res: Response) => {
+  try {
+    const folderId = Array.isArray(req.params.folderId)
+      ? String(req.params.folderId[0])
+      : req.params.folderId;
+    const folder = await getDriveClient(req).getFolder(folderId);
+    res.json({ folder });
+  } catch (err) {
+    res
+      .status(err instanceof Error && err.message.includes("Not authenticated") ? 401 : 500)
+      .json({ error: (err as Error).message });
+  }
+});
+
 interface DriveSyncResult {
   fileId: string;
   fileName: string;

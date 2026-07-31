@@ -281,6 +281,7 @@ function artasia_placement_meta_box_html(WP_Post $post): void
     $description = get_post_meta($post->ID, 'artasia_placement_description', true);
     $is_earlyon     = (bool) get_post_meta($post->ID, 'artasia_is_earlyon', true);
     $section        = get_post_meta($post->ID, 'artasia_section', true);
+    $google_drive_folder_id = get_post_meta($post->ID, 'artasia_google_drive_folder_id', true);
     $participant_count = get_post_meta($post->ID, 'artasia_participant_count', true);
     $participant_age = get_post_meta($post->ID, 'artasia_participant_age', true);
     $delivery_weekday = get_post_meta($post->ID, 'artasia_delivery_weekday', true);
@@ -466,6 +467,13 @@ function artasia_placement_meta_box_html(WP_Post $post): void
             </td>
         </tr>
         <tr>
+            <th><label for="artasia_google_drive_folder_id">Google Drive Import Folder</label></th>
+            <td>
+                <input type="text" id="artasia_google_drive_folder_id" name="artasia_google_drive_folder_id" value="<?php echo esc_attr($google_drive_folder_id); ?>" class="widefat" placeholder="Folder ID or Google Drive folder URL" />
+                <p class="description">Atlas Admin will open this folder first when importing files for this placement. Paste either the folder ID or its full Google Drive URL.</p>
+            </td>
+        </tr>
+        <tr>
             <th><label for="artasia_placement_description_editor">Description</label></th>
             <td>
                 <?php
@@ -539,6 +547,7 @@ function artasia_save_placement_meta(int $post_id): void
     update_post_meta($post_id, 'artasia_team_member_id', intval($_POST['artasia_team_member_id'] ?? 0));
     update_post_meta($post_id, 'artasia_secondary_team_member_id', intval($_POST['artasia_secondary_team_member_id'] ?? 0));
     update_post_meta($post_id, 'artasia_section', sanitize_text_field($_POST['artasia_section'] ?? ''));
+    update_post_meta($post_id, 'artasia_google_drive_folder_id', artasia_sanitize_google_drive_folder_id($_POST['artasia_google_drive_folder_id'] ?? ''));
     update_post_meta($post_id, 'artasia_delivery_weekday', artasia_sanitize_placement_weekday($_POST['artasia_delivery_weekday'] ?? ''));
     update_post_meta($post_id, 'artasia_delivery_start_time', artasia_sanitize_placement_time($_POST['artasia_delivery_start_time'] ?? ''));
     update_post_meta($post_id, 'artasia_delivery_end_time', artasia_sanitize_placement_time($_POST['artasia_delivery_end_time'] ?? ''));

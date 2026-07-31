@@ -74,6 +74,7 @@ export interface UploadPlacement {
   placement_id: number;
   placement_name: string;
   placement_slug?: string;
+  google_drive_folder_id?: string;
   team_member_id?: number;
   team_member_name?: string;
   secondary_team_member_id?: number;
@@ -774,6 +775,16 @@ export interface DriveFoldersResponse {
   myDrive?: DriveFolder;
   subfolders?: DriveFolder[];
   folders?: DriveFolder[];
+}
+
+export async function fetchDriveFolder(folderId: string): Promise<DriveFolder> {
+  const res = await fetch(`/api/v1/drive/folders/${encodeURIComponent(folderId)}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  const body = (await res.json()) as { folder: DriveFolder };
+  return body.folder;
 }
 
 /**

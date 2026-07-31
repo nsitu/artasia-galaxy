@@ -4,6 +4,16 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+function artasia_sanitize_google_drive_folder_id($value): string
+{
+    $value = trim(sanitize_text_field(wp_unslash((string) $value)));
+    if (preg_match('~/folders/([A-Za-z0-9_-]+)~', $value, $matches)) {
+        return $matches[1];
+    }
+
+    return preg_match('/^[A-Za-z0-9_-]+$/', $value) ? $value : '';
+}
+
 function artasia_register_meta_fields(): void
 {
     // --- Place meta ---
@@ -180,6 +190,13 @@ function artasia_register_meta_fields(): void
         'default'      => '',
         'show_in_rest' => true,
         'sanitize_callback' => 'sanitize_text_field',
+    ]);
+    register_post_meta('artasia_placement', 'artasia_google_drive_folder_id', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_google_drive_folder_id',
     ]);
     register_post_meta('artasia_placement', 'artasia_delivery_weekday', [
         'type'         => 'string',

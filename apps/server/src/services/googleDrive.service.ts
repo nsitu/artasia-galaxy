@@ -256,6 +256,20 @@ export class GoogleDriveClient {
     return VIDEO_MIME_TYPES.includes(mimeType);
   }
 
+  async getFolder(folderId: string): Promise<DriveFolder> {
+    const res = await this.drive.files.get({
+      fileId: folderId,
+      fields: "id,name,mimeType,parents,driveId",
+      supportsAllDrives: true,
+    });
+
+    if (!res.data.id || res.data.mimeType !== GOOGLE_MIME_TYPE_FOLDER) {
+      throw new Error(`Google Drive folder ${folderId} not found`);
+    }
+
+    return res.data as DriveFolder;
+  }
+
   /**
    * Check if a MIME type is supported audio
    */
