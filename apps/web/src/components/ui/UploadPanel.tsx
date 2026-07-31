@@ -161,7 +161,6 @@ export default function UploadPanel({
   const [options, setOptions] = useState<UploadOptions | null>(null);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [uploaderKey, setUploaderKey] = useState("");
-  const [driveOwnerKey, setDriveOwnerKey] = useState("");
   const [browsePartnerKey, setBrowsePartnerKey] = useState("");
   const [browseContextFilter, setBrowseContextFilter] =
     useState<BrowseContextFilter>("all");
@@ -472,7 +471,6 @@ export default function UploadPanel({
     const params = new URLSearchParams(appSearch);
     const requestedSiteId = Number(params.get("site"));
     const requestedActivityId = Number(params.get("activity"));
-    const requestedOwnerId = Number(params.get("owner"));
     const site = options.placements.find(
       (placement) =>
         params.has("site") &&
@@ -485,24 +483,11 @@ export default function UploadPanel({
         Number.isInteger(requestedActivityId) &&
         candidate.id === requestedActivityId,
     );
-    const owner = options.uploaders.find(
-      (candidate) =>
-        mode === "import" &&
-        site != null &&
-        params.has("owner") &&
-        Number.isInteger(requestedOwnerId) &&
-        candidate.id === requestedOwnerId &&
-        candidate.id !== site.team_member_id &&
-        placementIncludesUploader(site, candidate.id),
-    );
 
     setPlacementKey(site ? String(site.placement_id) : "");
     setSiteScope(site ? "placement" : mode === "browse" ? "all" : "select");
     setAssetMode("placements");
     setActivityTagFilter(activity ? String(activity.id) : "");
-    if (mode === "import") {
-      setDriveOwnerKey(owner ? String(owner.id) : "");
-    }
     setSelectedAsset(null);
     setItems([]);
     setNotice(null);
@@ -995,13 +980,6 @@ export default function UploadPanel({
     return existingPlacementFileKeys.has(normalizedMediaFileKey(file.name));
   }
 
-  const driveOwnerOptions = useMemo(() => {
-    if (!options || !selectedPlacement) return [];
-    return options.uploaders.filter((uploader) =>
-      placementIncludesUploader(selectedPlacement, uploader.id),
-    );
-  }, [options, selectedPlacement]);
-
   const browsePlacementOptions = useMemo(() => {
     const placements =
       selectedPlacement &&
@@ -1467,7 +1445,6 @@ export default function UploadPanel({
 
   function importToPlacement(placement: UploadOptions["placements"][number]) {
     setBrowsePartnerKey("");
-    setDriveOwnerKey("");
     selectPlacement(placement);
     setWorkspaceMode("import");
     void openDriveImportDefault();
@@ -2679,7 +2656,6 @@ export default function UploadPanel({
           fileIds: [fileIds[index]],
           placementId: placementKey ? parseInt(placementKey, 10) : null,
           activityId: activityTagFilter ? parseInt(activityTagFilter, 10) : null,
-          uploaderId: driveOwnerKey ? parseInt(driveOwnerKey, 10) : null,
         });
         results.push(...fileResults);
       }
@@ -2894,9 +2870,6 @@ export default function UploadPanel({
           </span>
         </span>
         <span style={assetNameStyle}>{asset.fileName}</span>
-        <span style={assetDateStyle}>
-          {asset.uploader_name ?? "No team member album"}
-        </span>
         <span style={assetDateStyle}>
           {new Date(asset.createdAt).toLocaleDateString()}
         </span>
@@ -3782,21 +3755,6 @@ export default function UploadPanel({
             </select>
           </label>
           <label style={labelStyle}>
-            Asset Owner
-            <select
-              value={manageUploaderKey}
-              onChange={(e) => setManageUploaderKey(e.target.value)}
-              style={inputStyle}
-            >
-              <option value="">Select a team member</option>
-              {(options?.uploaders ?? []).map((uploader) => (
-                <option key={uploader.id} value={String(uploader.id)}>
-                  {uploader.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label style={labelStyle}>
             Program Week / Activity
             <select
               value={manageActivityTag}
@@ -4601,36 +4559,6 @@ export default function UploadPanel({
                       </div>
                     )}
                 </>
-              )}
-
-              {workspaceMode === "import" && selectedPlacement && (
-                <label style={labelStyle}>
-                  Asset Owner
-                  <select
-                    value={driveOwnerKey}
-                    onChange={(event) => setDriveOwnerKey(event.target.value)}
-                    style={inputStyle}
-                  >
-                    <option value="">
-                      {selectedPlacement.team_member_name
-                        ? `Primary team member: ${selectedPlacement.team_member_name}`
-                        : "No primary team member assigned"}
-                    </option>
-                    {driveOwnerOptions
-                      .filter(
-                        (uploader) =>
-                          uploader.id !== selectedPlacement.team_member_id,
-                      )
-                      .map((uploader) => (
-                        <option key={uploader.id} value={String(uploader.id)}>
-                          {uploader.name}
-                        </option>
-                      ))}
-                  </select>
-                  <span style={fieldHelpStyle}>
-                    Defaults to this site&apos;s primary team member.
-                  </span>
-                </label>
               )}
 
               {workspaceMode !== "upload" && workspaceMode !== "import" && (
