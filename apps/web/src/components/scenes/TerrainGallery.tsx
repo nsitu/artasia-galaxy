@@ -587,6 +587,9 @@ export default function TerrainGallery({
   const introStartSetRef = useRef(false);
   const previousPartnerFilterRef = useRef(selectedPartnerFilter);
   const partnerFitAnimationRef = useRef<number | null>(null);
+  const lastFramedActivityFilterRef = useRef(selectedActivityFilter);
+  const activityFitPlacementRef = useRef<number | null>(null);
+  const activityFitAnimationRef = useRef<number | null>(null);
 
   const partnerFilterOptions = useMemo<PartnerFilterOption[]>(() => {
     const counts = new Map<string, number>();
@@ -785,6 +788,65 @@ export default function TerrainGallery({
     }
     return [...rings.values()];
   }, [localPhotoLayout]);
+
+  useEffect(() => {
+    const placementId = focusedPlacement?.placement_id ?? null;
+    if (activityFitPlacementRef.current !== placementId) {
+      activityFitPlacementRef.current = placementId;
+      lastFramedActivityFilterRef.current = selectedActivityFilter;
+      return;
+    }
+    if (
+      !focusedPlacement ||
+      lastFramedActivityFilterRef.current === selectedActivityFilter ||
+      activityOrbitRings.length === 0 ||
+      galleryLoading ||
+      !controls?.target
+    ) return;
+
+    const center = new THREE.Vector3(...activityOrbitRings[0].center);
+    center.z += 0.72;
+    const outerRadius = Math.max(...activityOrbitRings.map((ring) => ring.radius));
+    const contentRadius = Math.max(1, outerRadius + 0.75);
+    const verticalFov = camera instanceof THREE.PerspectiveCamera
+      ? THREE.MathUtils.degToRad(camera.fov)
+      : THREE.MathUtils.degToRad(50);
+    const aspect = camera instanceof THREE.PerspectiveCamera ? camera.aspect : 1;
+    const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * aspect);
+    const limitingFov = Math.min(verticalFov, horizontalFov);
+    const distance = THREE.MathUtils.clamp(
+      contentRadius * 1.35 / Math.tan(limitingFov / 2),
+      2.4,
+      70,
+    );
+    const startTarget = controls.target.clone();
+    const startPosition = camera.position.clone();
+    const direction = startPosition.clone().sub(startTarget).normalize();
+    const endPosition = center.clone().addScaledVector(direction, distance);
+    const startedAt = performance.now();
+    if (activityFitAnimationRef.current !== null) {
+      cancelAnimationFrame(activityFitAnimationRef.current);
+    }
+    const animateFit = (timestamp: number) => {
+      const progress = Math.min(1, (timestamp - startedAt) / 550);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      controls.target!.lerpVectors(startTarget, center, eased);
+      camera.position.lerpVectors(startPosition, endPosition, eased);
+      camera.lookAt(controls.target!);
+      controls.update?.();
+      activityFitAnimationRef.current = progress < 1
+        ? requestAnimationFrame(animateFit)
+        : null;
+    };
+    lastFramedActivityFilterRef.current = selectedActivityFilter;
+    activityFitAnimationRef.current = requestAnimationFrame(animateFit);
+    return () => {
+      if (activityFitAnimationRef.current !== null) {
+        cancelAnimationFrame(activityFitAnimationRef.current);
+        activityFitAnimationRef.current = null;
+      }
+    };
+  }, [activityOrbitRings, camera, controls, focusedPlacement, galleryLoading, selectedActivityFilter]);
 
   useEffect(() => {
     if (
