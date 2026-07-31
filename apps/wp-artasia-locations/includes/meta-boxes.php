@@ -467,10 +467,10 @@ function artasia_placement_meta_box_html(WP_Post $post): void
             </td>
         </tr>
         <tr>
-            <th><label for="artasia_google_drive_folder_id">Google Drive Import Folder</label></th>
+            <th><label for="artasia_google_drive_folder_id">Google Drive Documentation Folder</label></th>
             <td>
                 <input type="text" id="artasia_google_drive_folder_id" name="artasia_google_drive_folder_id" value="<?php echo esc_attr($google_drive_folder_id); ?>" class="widefat" placeholder="Folder ID or Google Drive folder URL" />
-                <p class="description">Atlas Admin will open this folder first when importing files for this placement. Paste either the folder ID or its full Google Drive URL.</p>
+                <p class="description"><a href="https://atlas.artsforall.co/admin" target="_blank" rel="noopener noreferrer">Atlas Admin</a> will open this folder first when importing files for this placement. The folder is assumed to store images, videos, and other assets documenting the placement. Paste either the folder ID or its full Google Drive URL.</p>
             </td>
         </tr>
         <tr>
