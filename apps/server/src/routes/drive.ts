@@ -6,8 +6,6 @@ import {
   GoogleDriveClient,
 } from "../services/googleDrive.service.js";
 import {
-  addAssetsToAlbum,
-  ensureAlbum,
   uploadAsset,
   uploadAssetStream,
   tagAsset,
@@ -167,7 +165,6 @@ interface DriveSyncRequest {
   fileIds: string[];
   placementId?: number | null;
   activityId?: number | null;
-  uploaderId?: number | null;
 }
 
 interface DriveSyncResult {
@@ -175,15 +172,13 @@ interface DriveSyncResult {
   fileName: string;
   status: "success" | "failed";
   assetId?: string;
-  uploaderId?: number;
-  uploaderName?: string;
   error?: string;
 }
 
 /**
  * POST /api/v1/drive/sync
  * Download and import selected files from Google Drive
- * Body: { fileIds: string[], placementId?: number, activityId?: number, uploaderId?: number }
+ * Body: { fileIds: string[], placementId?: number, activityId?: number }
  */
 router.post("/sync", async (req: Request, res: Response) => {
   try {
@@ -196,7 +191,7 @@ router.post("/sync", async (req: Request, res: Response) => {
     const client = getDriveClient(req);
     const config = await getUploadConfig();
 
-    const { fileIds, placementId, activityId, uploaderId } = req.body as DriveSyncRequest;
+    const { fileIds, placementId, activityId } = req.body as DriveSyncRequest;
 
     if (!Array.isArray(fileIds) || fileIds.length === 0) {
       res.status(400).json({ error: "No files specified" });
@@ -211,15 +206,7 @@ router.post("/sync", async (req: Request, res: Response) => {
     // Validate placement and activity if specified
     let placementTags: string[] = [];
     let activityTags: string[] = [];
-    let owner: { id: number; name: string } | null = null;
     let placementConfig: (typeof config.placements)[number] | undefined;
-
-    const requestedUploaderId = Number(uploaderId);
-    const hasRequestedOwner = uploaderId !== null && uploaderId !== undefined;
-    if (hasRequestedOwner && !Number.isInteger(requestedUploaderId)) {
-      res.status(400).json({ error: "Invalid asset owner ID" });
-      return;
-    }
 
     if (placementId !== null && placementId !== undefined) {
       placementConfig = config.placements.find(
@@ -233,26 +220,6 @@ router.post("/sync", async (req: Request, res: Response) => {
         `placement:${placementId}`,
         placementConfig.placement_name,
       ];
-    }
-
-    if (hasRequestedOwner) {
-      owner = config.uploaders.find((uploader) => uploader.id === requestedUploaderId) ?? null;
-      if (!owner) {
-        res.status(400).json({ error: "Invalid asset owner" });
-        return;
-      }
-      if (
-        placementConfig &&
-        owner.id !== placementConfig.team_member_id &&
-        owner.id !== placementConfig.secondary_team_member_id
-      ) {
-        res.status(400).json({ error: "Select a team member assigned to this placement" });
-        return;
-      }
-    } else if (placementConfig?.team_member_id) {
-      owner = config.uploaders.find(
-        (uploader) => uploader.id === placementConfig.team_member_id,
-      ) ?? null;
     }
 
     if (activityId !== null && activityId !== undefined) {
@@ -377,17 +344,11 @@ router.post("/sync", async (req: Request, res: Response) => {
         if (allTags.length > 0) {
           await tagAsset(uploadResult.id, allTags);
         }
-        if (owner) {
-          const album = await ensureAlbum(owner.name);
-          await addAssetsToAlbum(album.id, [uploadResult.id]);
-        }
-
         results.push({
           fileId,
           fileName: fileInfo.name,
           status: "success",
           assetId: uploadResult.id,
-          ...(owner ? { uploaderId: owner.id, uploaderName: owner.name } : {}),
         });
       } catch (err) {
         results.push({

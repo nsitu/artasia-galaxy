@@ -827,8 +827,6 @@ export interface DriveSyncResult {
   fileName: string;
   status: "success" | "failed";
   assetId?: string;
-  uploaderId?: number;
-  uploaderName?: string;
   error?: string;
 }
 
@@ -836,7 +834,6 @@ export async function syncDriveFiles(params: {
   fileIds: string[];
   placementId?: number | null;
   activityId?: number | null;
-  uploaderId?: number | null;
 }): Promise<DriveSyncResult[]> {
   const res = await fetch("/api/v1/drive/sync", {
     method: "POST",
