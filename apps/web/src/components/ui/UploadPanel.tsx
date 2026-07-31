@@ -3453,7 +3453,9 @@ export default function UploadPanel({
                   <span style={siteActionIconStyle} aria-hidden="true">
                     add_to_drive
                   </span>
-                  Import
+                  {placement.google_drive_folder_id?.trim()
+                    ? "Import *"
+                    : "Import"}
                 </button>
                 <a
                   href={placementViewerUrl(placement)}
