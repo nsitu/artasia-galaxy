@@ -873,10 +873,15 @@ function FilterOption({
       onClick={onSelect}
       style={{
         ...filterMenuOptionStyle,
-        ...(colour ? getActivityColourStyle(colour) : {}),
         ...(active ? filterMenuOptionActiveStyle : {}),
       }}
     >
+      {colour && (
+        <span
+          aria-hidden="true"
+          style={{ ...activityColourDotStyle, background: colour }}
+        />
+      )}
       {children}
     </button>
   );
@@ -1519,6 +1524,9 @@ const filterMenuStyle: React.CSSProperties = {
 const filterMenuOptionStyle: React.CSSProperties = {
   width: "100%",
   minHeight: 40,
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
   padding: "9px 14px",
   border: 0,
   borderBottom: "1px solid rgba(255,255,255,0.12)",
@@ -1533,6 +1541,21 @@ const filterMenuOptionStyle: React.CSSProperties = {
 
 const filterMenuOptionActiveStyle: React.CSSProperties = {
   boxShadow: "inset 4px 0 0 #ffffff",
+};
+
+const activityFilterLabelStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 10,
+  minWidth: 0,
+};
+
+const activityColourDotStyle: React.CSSProperties = {
+  width: 11,
+  height: 11,
+  flex: "0 0 11px",
+  borderRadius: "50%",
+  boxShadow: "0 0 0 1px rgba(255,255,255,0.25)",
 };
 
 const errorStyle: React.CSSProperties = {
