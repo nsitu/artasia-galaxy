@@ -15,6 +15,7 @@ const MAX_DURATION_SECONDS = parseInt(
   process.env.DRIVE_AUDIO_MAX_DURATION_SECONDS ?? `${DEFAULT_MAX_DURATION_SECONDS}`,
   10,
 );
+const DURATION_TOLERANCE_SECONDS = 1.25;
 
 export interface PreparedAudioVideo {
   filePath: string;
@@ -40,6 +41,10 @@ function outputFilename(originalName: string) {
   const extension = extname(safeName);
   const stem = extension ? safeName.slice(0, -extension.length) : safeName;
   return `${stem || "audio"}.mp4`;
+}
+
+function durationTolerance(expectedSeconds: number) {
+  return Math.max(DURATION_TOLERANCE_SECONDS, expectedSeconds * 0.02);
 }
 
 function runProcess(
@@ -140,6 +145,8 @@ export async function prepareAudioAsVideo(params: {
         "aac",
         "-b:a",
         "192k",
+        "-t",
+        durationSeconds.toFixed(3),
         "-shortest",
         "-movflags",
         "+faststart",
@@ -151,6 +158,16 @@ export async function prepareAudioAsVideo(params: {
     const outputStats = await stat(outputPath);
     if (outputStats.size === 0) {
       throw new Error("Audio conversion produced an empty video");
+    }
+
+    const outputDurationSeconds = await probeDuration(outputPath);
+    if (
+      Math.abs(outputDurationSeconds - durationSeconds) >
+      durationTolerance(durationSeconds)
+    ) {
+      throw new Error(
+        `Audio conversion duration mismatch: source ${durationSeconds.toFixed(2)}s, output ${outputDurationSeconds.toFixed(2)}s`,
+      );
     }
 
     return {
