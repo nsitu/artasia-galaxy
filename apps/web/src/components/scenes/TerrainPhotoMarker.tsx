@@ -500,6 +500,11 @@ const STEM_HOVER_EMISSIVE = new THREE.Color("#d7ff8f");
 const BASE_COLOR = new THREE.Color("#33b84a");
 const BASE_SELECTED_COLOR = new THREE.Color("#9df7a8");
 
+const AUDIO_ICON_HIT_RADIUS = 0.45;
+const AUDIO_ICON_RING_INNER_RADIUS = 0.32;
+const AUDIO_ICON_RING_OUTER_RADIUS = 0.41;
+const AUDIO_ICON_SIZE = 0.82;
+
 const tempVector = new THREE.Vector3();
 const materialSymbolTexturePromises = new Map<
   string,
@@ -847,9 +852,9 @@ export function OrbitingAudioMarker({
   }), [id, orbitRadius]);
   const triangle = useMemo(() => {
     const shape = new THREE.Shape();
-    shape.moveTo(-0.055, -0.09);
-    shape.lineTo(0.105, 0);
-    shape.lineTo(-0.055, 0.09);
+    shape.moveTo(-0.11, -0.18);
+    shape.lineTo(0.21, 0);
+    shape.lineTo(-0.11, 0.18);
     shape.closePath();
     return shape;
   }, []);
@@ -932,7 +937,7 @@ export function OrbitingAudioMarker({
           }}
         >
           <mesh position={[0, 0, -0.001]}>
-            <circleGeometry args={[0.225, 48]} />
+            <circleGeometry args={[AUDIO_ICON_HIT_RADIUS, 48]} />
             <meshBasicMaterial
               transparent
               opacity={0}
@@ -942,7 +947,7 @@ export function OrbitingAudioMarker({
           </mesh>
           {assignedIconTexture ? (
             <mesh position={[0, 0, 0.002]}>
-              <planeGeometry args={[0.36, 0.36]} />
+              <planeGeometry args={[AUDIO_ICON_SIZE, AUDIO_ICON_SIZE]} />
               <meshBasicMaterial
                 map={assignedIconTexture}
                 color={color}
@@ -956,14 +961,20 @@ export function OrbitingAudioMarker({
           ) : (
             <>
               <mesh>
-                <ringGeometry args={[0.16, 0.205, 48]} />
+                <ringGeometry
+                  args={[
+                    AUDIO_ICON_RING_INNER_RADIUS,
+                    AUDIO_ICON_RING_OUTER_RADIUS,
+                    48,
+                  ]}
+                />
                 <meshBasicMaterial
                   color={color}
                   side={THREE.DoubleSide}
                   toneMapped={false}
                 />
               </mesh>
-              <mesh position={[0.018, 0, 0.002]}>
+              <mesh position={[0.036, 0, 0.002]}>
                 <shapeGeometry args={[triangle]} />
                 <meshBasicMaterial
                   color={color}
