@@ -39,6 +39,19 @@ const MIME_TYPE_EXTENSIONS: Readonly<Record<string, string>> = {
   "audio/m4a": ".m4a",
   "audio/x-m4a": ".m4a",
 };
+const COMPARABLE_MEDIA_EXTENSIONS = new Set([
+  ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".heic", ".heif",
+  ".mp4", ".mov", ".m4v", ".webm", ".avi", ".mkv",
+  ".mp3", ".m4a", ".wav", ".aac", ".ogg", ".flac",
+]);
+
+function comparableMediaFilename(name: string) {
+  const normalized = name.trim().toLocaleLowerCase();
+  const extension = extname(normalized);
+  return COMPARABLE_MEDIA_EXTENSIONS.has(extension)
+    ? normalized.slice(0, -extension.length)
+    : normalized;
+}
 
 /**
  * Google Drive permits names without extensions, while Immich also consults
@@ -254,6 +267,60 @@ export class GoogleDriveClient {
    */
   static isVideo(mimeType: string): boolean {
     return VIDEO_MIME_TYPES.includes(mimeType);
+  }
+
+  /**
+   * Searches a placement folder and all of its subfolders for a single media
+   * filename. Audio imports are stored as MP4s, so matching compares media
+   * stems as well as the original filename.
+   */
+  async findUniqueFileInFolderTree(folderId: string, filename: string): Promise<{
+    file?: DriveFile;
+    matchCount: number;
+  }> {
+    const rootFolder = await this.getFolder(folderId);
+    const driveId = rootFolder.driveId;
+    const queue = [folderId];
+    const visitedFolders = new Set<string>();
+    const matches = new Map<string, DriveFile>();
+    const targetName = filename.trim().toLocaleLowerCase();
+    const targetComparableName = comparableMediaFilename(filename);
+    const maxFolders = 2_000;
+
+    while (queue.length > 0) {
+      const currentFolderId = queue.shift();
+      if (!currentFolderId || visitedFolders.has(currentFolderId)) continue;
+      visitedFolders.add(currentFolderId);
+      if (visitedFolders.size > maxFolders) {
+        throw new Error(`Google Drive lookup stopped after ${maxFolders} folders. Narrow the placement folder before trying again.`);
+      }
+
+      let pageToken: string | undefined;
+      do {
+        const page = await this.listFiles(currentFolderId, pageToken, driveId);
+        for (const file of page.files) {
+          if (GoogleDriveClient.isFolder(file.mimeType)) {
+            queue.push(file.id);
+            continue;
+          }
+          const candidateName = ensureDriveFileExtension(file.name, file.mimeType)
+            .trim()
+            .toLocaleLowerCase();
+          if (
+            candidateName === targetName ||
+            comparableMediaFilename(candidateName) === targetComparableName
+          ) {
+            matches.set(file.id, file);
+          }
+        }
+        pageToken = page.nextPageToken;
+      } while (pageToken);
+    }
+
+    return {
+      ...(matches.size === 1 ? { file: matches.values().next().value as DriveFile } : {}),
+      matchCount: matches.size,
+    };
   }
 
   async getFolder(folderId: string): Promise<DriveFolder> {

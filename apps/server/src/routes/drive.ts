@@ -6,15 +6,70 @@ import {
   GoogleDriveClient,
 } from "../services/googleDrive.service.js";
 import {
+  copyAssetRelationships,
+  getAsset,
+  listAssetIdsByTag,
+  listTags,
   uploadAsset,
   uploadAssetStream,
   tagAsset,
+  tagAssets,
+  updateAsset,
+  type ImmichAsset,
 } from "../infra/ImmichClient.js";
 import { getUploadConfig } from "../services/uploadConfig.service.js";
 import { prepareAudioAsVideo } from "../services/audioToVideo.service.js";
 import { UPLOAD_LIMITS } from "../services/uploadLimits.js";
 
 const router = Router();
+const DRIVE_SOURCE_TAG_PREFIX = "source:drive:";
+
+function driveSourceTag(fileId: string) {
+  return `${DRIVE_SOURCE_TAG_PREFIX}${fileId}`;
+}
+
+function normalizeFilename(value: string) {
+  return value.trim().toLocaleLowerCase();
+}
+
+function tagValues(asset: ImmichAsset) {
+  return (asset.tags ?? [])
+    .flatMap((tag) => [tag.name, tag.value])
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+function assetDriveSourceId(asset: ImmichAsset) {
+  const sourceTags = tagValues(asset).filter((value) =>
+    value.toLocaleLowerCase().startsWith(DRIVE_SOURCE_TAG_PREFIX),
+  );
+  const ids = Array.from(new Set(sourceTags.map((value) => value.slice(DRIVE_SOURCE_TAG_PREFIX.length))));
+  if (ids.length > 1) {
+    throw new Error("This asset has multiple Google Drive source tags and cannot be safely reimported.");
+  }
+  return ids[0] || null;
+}
+
+function assetPlacementId(asset: ImmichAsset) {
+  const placementIds = Array.from(new Set(
+    tagValues(asset)
+      .map((value) => value.match(/^placement:(\d+)$/i)?.[1])
+      .filter((value): value is string => Boolean(value)),
+  ));
+  if (placementIds.length > 1) {
+    throw new Error("This asset has multiple placement tags and cannot be safely matched to Google Drive.");
+  }
+  return placementIds[0] ? Number(placementIds[0]) : null;
+}
+
+function assetActivityId(asset: ImmichAsset) {
+  const activityIds = Array.from(new Set(
+    tagValues(asset)
+      .map((value) => value.match(/^activity:(\d+)$/i)?.[1])
+      .filter((value): value is string => Boolean(value)),
+  ));
+  return activityIds.length === 1 ? Number(activityIds[0]) : null;
+}
 
 /**
  * Middleware to extract and validate Drive client from auth session
@@ -186,8 +241,263 @@ interface DriveSyncResult {
   fileName: string;
   status: "success" | "failed";
   assetId?: string;
+  replacedAssetId?: string;
   error?: string;
 }
+
+async function getAssetsForTag(tagId: string) {
+  const ids = await listAssetIdsByTag(tagId);
+  return Promise.all(ids.map((id) => getAsset(id)));
+}
+
+async function findDriveImportReplacement(params: {
+  fileId: string;
+  filename: string;
+  placementId?: number | null;
+}): Promise<ImmichAsset | null> {
+  const tags = await listTags();
+  const sourceTagName = driveSourceTag(params.fileId).toLocaleLowerCase();
+  const sourceTag = tags.find(
+    (tag) =>
+      tag.name.trim().toLocaleLowerCase() === sourceTagName ||
+      tag.value.trim().toLocaleLowerCase() === sourceTagName,
+  );
+  if (sourceTag) {
+    const matches = (await getAssetsForTag(sourceTag.id)).filter(
+      (asset) => !asset.isArchived && !asset.isTrashed,
+    );
+    if (matches.length === 1) return matches[0];
+    if (matches.length > 1) {
+      throw new Error(
+        `Cannot replace Google Drive file because ${matches.length} active assets share its source tag. Resolve the duplicates first.`,
+      );
+    }
+  }
+
+  if (params.placementId == null) return null;
+  const placementTagName = `placement:${params.placementId}`;
+  const placementTag = tags.find(
+    (tag) =>
+      tag.name.trim().toLocaleLowerCase() === placementTagName ||
+      tag.value.trim().toLocaleLowerCase() === placementTagName,
+  );
+  if (!placementTag) return null;
+
+  const filename = normalizeFilename(params.filename);
+  const matches = (await getAssetsForTag(placementTag.id)).filter(
+    (asset) =>
+      !asset.isArchived &&
+      !asset.isTrashed &&
+      normalizeFilename(asset.originalFileName) === filename,
+  );
+  if (matches.length === 1) return matches[0];
+  if (matches.length > 1) {
+    throw new Error(
+      `Cannot safely replace "${params.filename}" because multiple assets with that name exist at this placement.`,
+    );
+  }
+  return null;
+}
+
+async function archiveReplacedAsset(source: ImmichAsset, targetAssetId: string) {
+  if (source.id === targetAssetId) return;
+
+  await copyAssetRelationships(source.id, targetAssetId);
+  const sourceTagIds = (source.tags ?? []).map((tag) => tag.id);
+  if (sourceTagIds.length > 0) await tagAssets([targetAssetId], sourceTagIds);
+  const latitude = source.exifInfo?.latitude;
+  const longitude = source.exifInfo?.longitude;
+  await updateAsset(targetAssetId, {
+    description: source.exifInfo?.description ?? "",
+    isFavorite: source.isFavorite,
+    ...(typeof latitude === "number" && Number.isFinite(latitude) &&
+    typeof longitude === "number" && Number.isFinite(longitude)
+      ? { latitude, longitude }
+      : {}),
+    dateTimeOriginal: source.fileCreatedAt,
+    visibility: "timeline",
+  });
+  await updateAsset(source.id, { visibility: "archive" });
+}
+
+async function importDriveFile(params: {
+  client: GoogleDriveClient;
+  fileId: string;
+  placementId?: number | null;
+  placementTags: string[];
+  activityTags: string[];
+}): Promise<DriveSyncResult> {
+  let fileName = "Unknown";
+  try {
+    const fileInfo = await params.client.getFileInfo(params.fileId);
+    fileName = fileInfo.name;
+    const uploadFileName = ensureDriveFileExtension(fileInfo.name, fileInfo.mimeType);
+    if (!fileInfo.isSupported) {
+      return { fileId: params.fileId, fileName, status: "failed", error: `Unsupported file type: ${fileInfo.mimeType}` };
+    }
+    if (fileInfo.isAudio && fileInfo.size && fileInfo.size > UPLOAD_LIMITS.maxFileBytes) {
+      return { fileId: params.fileId, fileName, status: "failed", error: `Audio file exceeds the ${Math.round(UPLOAD_LIMITS.maxFileBytes / (1024 * 1024))}MB limit` };
+    }
+    if (fileInfo.size && fileInfo.size > 10 * 1024 * 1024 * 1024) {
+      return { fileId: params.fileId, fileName, status: "failed", error: "File exceeds 10GB limit" };
+    }
+
+    const stream = await params.client.downloadFile(params.fileId);
+    const deviceAssetId = `artasia-galaxy:drive:${params.fileId}`;
+    const fileDate = fileInfo.modifiedTime ? new Date(fileInfo.modifiedTime) : undefined;
+    let uploadResult;
+    let replacement: ImmichAsset | null = null;
+    if (fileInfo.isAudio) {
+      console.log(`[Drive] converting audio file ${params.fileId} to MP4`);
+      const prepared = await prepareAudioAsVideo({ stream, originalName: fileInfo.name });
+      try {
+        replacement = await findDriveImportReplacement({
+          fileId: params.fileId,
+          filename: prepared.filename,
+          placementId: params.placementId,
+        });
+        console.log(`[Drive] converted audio file ${params.fileId}: ${Math.round(prepared.durationSeconds)}s, ${prepared.outputBytes} bytes`);
+        uploadResult = await uploadAsset({
+          filePath: prepared.filePath,
+          filename: prepared.filename,
+          mimeType: prepared.mimeType,
+          deviceAssetId,
+          createdAt: fileDate,
+          modifiedAt: fileDate,
+        });
+      } finally {
+        await prepared.cleanup().catch((err) => {
+          console.warn(`[Drive] failed to clean up audio conversion for ${params.fileId}: ${(err as Error).message}`);
+        });
+      }
+    } else {
+      replacement = await findDriveImportReplacement({
+        fileId: params.fileId,
+        filename: uploadFileName,
+        placementId: params.placementId,
+      });
+      uploadResult = await uploadAssetStream({
+        stream,
+        filename: uploadFileName,
+        mimeType: fileInfo.mimeType,
+        deviceAssetId,
+        createdAt: fileDate,
+        modifiedAt: fileDate,
+      });
+    }
+
+    if (!uploadResult.id) {
+      return { fileId: params.fileId, fileName, status: "failed", error: "Failed to upload to Immich" };
+    }
+    await tagAsset(uploadResult.id, [
+      ...params.placementTags,
+      ...params.activityTags,
+      driveSourceTag(params.fileId),
+      ...(fileInfo.isAudio ? ["media:audio"] : []),
+    ]);
+    if (replacement) await archiveReplacedAsset(replacement, uploadResult.id);
+    return {
+      fileId: params.fileId,
+      fileName,
+      status: "success",
+      assetId: uploadResult.id,
+      ...(replacement && replacement.id !== uploadResult.id ? { replacedAssetId: replacement.id } : {}),
+    };
+  } catch (err) {
+    return { fileId: params.fileId, fileName, status: "failed", error: (err as Error).message };
+  }
+}
+
+/** Link a legacy Immich asset to its uniquely matching file in its placement's Drive folder. */
+router.post("/assets/:assetId/lookup", async (req: Request, res: Response) => {
+  try {
+    const client = getDriveClient(req);
+    const assetId = Array.isArray(req.params.assetId) ? req.params.assetId[0] : req.params.assetId;
+    const asset = await getAsset(assetId.trim());
+    const existingSourceId = assetDriveSourceId(asset);
+    if (existingSourceId) {
+      res.json({ status: "already-linked", fileId: existingSourceId });
+      return;
+    }
+
+    const placementId = assetPlacementId(asset);
+    if (placementId == null) {
+      res.status(400).json({ error: "Assign this asset to one Artasia site before looking it up in Google Drive." });
+      return;
+    }
+    const config = await getUploadConfig();
+    const placement = config.placements.find((candidate) => candidate.placement_id === placementId);
+    const folderId = placement?.google_drive_folder_id?.trim();
+    if (!folderId) {
+      res.status(400).json({ error: "This Artasia site does not have a Google Drive folder configured." });
+      return;
+    }
+
+    const lookup = await client.findUniqueFileInFolderTree(folderId, asset.originalFileName);
+    if (lookup.matchCount === 0) {
+      res.json({ status: "not-found" });
+      return;
+    }
+    if (!lookup.file) {
+      res.status(409).json({
+        error: `Found ${lookup.matchCount} matching files in this site's Google Drive folder. The asset was not linked.`,
+      });
+      return;
+    }
+
+    await tagAsset(asset.id, [driveSourceTag(lookup.file.id)]);
+    res.json({ status: "linked", fileId: lookup.file.id, fileName: lookup.file.name });
+  } catch (err) {
+    res
+      .status(err instanceof Error && err.message.includes("Not authenticated") ? 401 : 500)
+      .json({ error: (err as Error).message });
+  }
+});
+
+/** Reimport one Drive-linked asset, preserving its relationships and archiving its old copy. */
+router.post("/assets/:assetId/reimport", async (req: Request, res: Response) => {
+  try {
+    const client = getDriveClient(req);
+    const assetId = Array.isArray(req.params.assetId) ? req.params.assetId[0] : req.params.assetId;
+    const asset = await getAsset(assetId.trim());
+    const fileId = assetDriveSourceId(asset);
+    if (!fileId) {
+      res.status(400).json({ error: "This asset is not linked to a Google Drive file yet." });
+      return;
+    }
+    const placementId = assetPlacementId(asset);
+    if (placementId == null) {
+      res.status(400).json({ error: "Assign this asset to one Artasia site before reimporting it." });
+      return;
+    }
+    const config = await getUploadConfig();
+    const placement = config.placements.find((candidate) => candidate.placement_id === placementId);
+    if (!placement) {
+      res.status(400).json({ error: "This asset's Artasia site is no longer configured." });
+      return;
+    }
+    const activityId = assetActivityId(asset);
+    const activity = activityId == null
+      ? null
+      : config.activities.find((candidate) => candidate.id === activityId) ?? null;
+    const result = await importDriveFile({
+      client,
+      fileId,
+      placementId,
+      placementTags: [`placement:${placementId}`, placement.placement_name],
+      activityTags: activity ? [`activity:${activity.id}`, activity.label] : [],
+    });
+    if (result.status === "failed") {
+      res.status(502).json({ error: result.error ?? "Google Drive reimport failed." });
+      return;
+    }
+    res.json({ result });
+  } catch (err) {
+    res
+      .status(err instanceof Error && err.message.includes("Not authenticated") ? 401 : 500)
+      .json({ error: (err as Error).message });
+  }
+});
 
 /**
  * POST /api/v1/drive/sync
@@ -246,132 +556,14 @@ router.post("/sync", async (req: Request, res: Response) => {
     }
 
     const results: DriveSyncResult[] = [];
-
     for (const fileId of fileIds) {
-      let fileName = "Unknown";
-      try {
-        // Get file info
-        const fileInfo = await client.getFileInfo(fileId);
-        fileName = fileInfo.name;
-        const uploadFileName = ensureDriveFileExtension(
-          fileInfo.name,
-          fileInfo.mimeType,
-        );
-
-        if (!fileInfo.isSupported) {
-          results.push({
-            fileId,
-            fileName: fileInfo.name,
-            status: "failed",
-            error: `Unsupported file type: ${fileInfo.mimeType}`,
-          });
-          continue;
-        }
-
-        if (
-          fileInfo.isAudio &&
-          fileInfo.size &&
-          fileInfo.size > UPLOAD_LIMITS.maxFileBytes
-        ) {
-          results.push({
-            fileId,
-            fileName: fileInfo.name,
-            status: "failed",
-            error: `Audio file exceeds the ${Math.round(UPLOAD_LIMITS.maxFileBytes / (1024 * 1024))}MB limit`,
-          });
-          continue;
-        }
-
-        // Check file size limits
-        if (fileInfo.size && fileInfo.size > 10 * 1024 * 1024 * 1024) {
-          results.push({
-            fileId,
-            fileName: fileInfo.name,
-            status: "failed",
-            error: "File exceeds 10GB limit",
-          });
-          continue;
-        }
-
-        // Download file
-        const stream = await client.downloadFile(fileId);
-
-        // Create unique device asset ID using Drive file ID
-        const deviceAssetId = `artasia-galaxy:drive:${fileId}`;
-        const fileDate = fileInfo.modifiedTime
-          ? new Date(fileInfo.modifiedTime)
-          : undefined;
-
-        let uploadResult;
-        if (fileInfo.isAudio) {
-          console.log(`[Drive] converting audio file ${fileId} to MP4`);
-          const prepared = await prepareAudioAsVideo({
-            stream,
-            originalName: fileInfo.name,
-          });
-          try {
-            console.log(
-              `[Drive] converted audio file ${fileId}: ${Math.round(prepared.durationSeconds)}s, ${prepared.outputBytes} bytes`,
-            );
-            uploadResult = await uploadAsset({
-              filePath: prepared.filePath,
-              filename: prepared.filename,
-              mimeType: prepared.mimeType,
-              deviceAssetId,
-              createdAt: fileDate,
-              modifiedAt: fileDate,
-            });
-          } finally {
-            await prepared.cleanup().catch((err) => {
-              console.warn(
-                `[Drive] failed to clean up audio conversion for ${fileId}: ${(err as Error).message}`,
-              );
-            });
-          }
-        } else {
-          uploadResult = await uploadAssetStream({
-            stream,
-            filename: uploadFileName,
-            mimeType: fileInfo.mimeType,
-            deviceAssetId,
-            createdAt: fileDate,
-            modifiedAt: fileDate,
-          });
-        }
-
-        if (!uploadResult.id) {
-          results.push({
-            fileId,
-            fileName: fileInfo.name,
-            status: "failed",
-            error: "Failed to upload to Immich",
-          });
-          continue;
-        }
-
-        // Apply tags
-        const allTags = [
-          ...placementTags,
-          ...activityTags,
-          ...(fileInfo.isAudio ? ["media:audio"] : []),
-        ];
-        if (allTags.length > 0) {
-          await tagAsset(uploadResult.id, allTags);
-        }
-        results.push({
-          fileId,
-          fileName: fileInfo.name,
-          status: "success",
-          assetId: uploadResult.id,
-        });
-      } catch (err) {
-        results.push({
-          fileId,
-          fileName,
-          status: "failed",
-          error: (err as Error).message,
-        });
-      }
+      results.push(await importDriveFile({
+        client,
+        fileId,
+        placementId,
+        placementTags,
+        activityTags,
+      }));
     }
 
     res.json({ results });

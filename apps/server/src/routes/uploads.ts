@@ -67,6 +67,7 @@ const UPLOAD_TMP_DIR = join(DATA_DIR, "upload-tmp");
 const SITE_ACTIVITY_STATS_TTL_MS = 30_000;
 const GLOBAL_AUDIO_PLACEMENT_ID = 21639;
 const LINKED_AUDIO_TAG_PREFIX = "linkedaudio:";
+const DRIVE_SOURCE_TAG_PREFIX = "source:drive:";
 // These indexes scan all uploader and published albums. Admin mutations
 // explicitly invalidate them, so keep them warm between Browse requests.
 const ADMIN_BROWSE_INDEX_TTL_MS = 5 * 60_000;
@@ -439,6 +440,11 @@ function mapAdminAsset(
   useGpsLocation = true,
 ) {
   const dimensions = editableAssetDimensions(asset);
+  const driveFileId = (asset.tags ?? [])
+    .flatMap((tag) => [tag.name, tag.value])
+    .map((value) => value.trim())
+    .find((value) => value.toLocaleLowerCase().startsWith(DRIVE_SOURCE_TAG_PREFIX))
+    ?.slice(DRIVE_SOURCE_TAG_PREFIX.length);
   return {
     id: asset.id,
     type: asset.type,
@@ -464,6 +470,7 @@ function mapAdminAsset(
     activity_label: assignment?.activityLabel ?? null,
     iconName: assignment?.iconName ?? null,
     linkedAudioAssetId: assignment?.linkedAudioAssetId ?? null,
+    driveFileId: driveFileId || null,
     uploader_id: uploaderAlbum?.uploaderId ?? null,
     uploader_name: uploaderAlbum?.uploaderName ?? null,
     uploader_album_id: uploaderAlbum?.id ?? null,

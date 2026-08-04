@@ -21,7 +21,9 @@ import {
   fetchUploadAssetAdjustments,
   fetchUploadAsset,
   fetchUntaggedPlacementAssets,
+  lookupUploadAssetDriveSource,
   logoutAuthUser,
+  reimportUploadAssetFromDrive,
   resetUploadAssetEdits,
   setAssetArchived,
   setAssetIcon,
@@ -218,6 +220,7 @@ export default function UploadPanel({
   const [audioDuration, setAudioDuration] = useState(0);
   const [audioTrimStatus, setAudioTrimStatus] = useState<string | null>(null);
   const [deletingAsset, setDeletingAsset] = useState(false);
+  const [driveAssetAction, setDriveAssetAction] = useState<"lookup" | "reimport" | null>(null);
   const [cropEditing, setCropEditing] = useState(false);
   const [cropRect, setCropRect] = useState<CropRect | null>(null);
   const [cropSourceDimensions, setCropSourceDimensions] = useState<{
@@ -1616,6 +1619,7 @@ export default function UploadPanel({
     setAudioTrimStart(0);
     setAudioTrimEnd(duration);
     setAudioTrimStatus(null);
+    setDriveAssetAction(null);
     setCropRefreshKey((current) => current + 1);
     setMediaRefreshAssetId(null);
     setMediaRefreshAttempt(0);
@@ -1658,6 +1662,7 @@ export default function UploadPanel({
     setAudioTrimStart(0);
     setAudioTrimEnd(0);
     setAudioTrimStatus(null);
+    setDriveAssetAction(null);
     setMediaRefreshAssetId(null);
     setMediaRefreshAttempt(0);
   }
@@ -2161,6 +2166,75 @@ export default function UploadPanel({
       setError((err as Error).message);
     } finally {
       setDeletingAsset(false);
+    }
+  }
+
+  async function lookupSelectedAssetDriveSource() {
+    if (!selectedAsset) return;
+    if (!authUser?.authenticated) {
+      setError("Sign in with Google to look up Drive files.");
+      return;
+    }
+
+    setDriveAssetAction("lookup");
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await lookupUploadAssetDriveSource(selectedAsset.id);
+      if (result.status === "not-found") {
+        setNotice({
+          tone: "warning",
+          message: `No matching file was found in this site's Google Drive folder for ${selectedAsset.fileName}.`,
+        });
+        return;
+      }
+      const driveFileId = result.fileId ?? selectedAsset.driveFileId ?? null;
+      setSelectedAsset((current) =>
+        current?.id === selectedAsset.id ? { ...current, driveFileId } : current,
+      );
+      setPlacementAssets((current) => current.map((asset) =>
+        asset.id === selectedAsset.id ? { ...asset, driveFileId } : asset,
+      ));
+      setNotice({
+        tone: "success",
+        message: result.status === "linked"
+          ? `Linked this asset to ${result.fileName ?? "its Google Drive source"}.`
+          : "This asset is already linked to its Google Drive source.",
+      });
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setDriveAssetAction(null);
+    }
+  }
+
+  async function reimportSelectedAssetFromDrive() {
+    if (!selectedAsset) return;
+    if (!authUser?.authenticated) {
+      setError("Sign in with Google to reimport Drive files.");
+      return;
+    }
+
+    setDriveAssetAction("reimport");
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await reimportUploadAssetFromDrive(selectedAsset.id);
+      if (!result.assetId) throw new Error("Google Drive reimport did not create an asset.");
+      const replacement = await fetchUploadAsset(result.assetId);
+      setPlacementAssets((current) => current.map((asset) =>
+        asset.id === selectedAsset.id ? replacement : asset,
+      ));
+      openAssetManager(replacement);
+      refreshVisibleAssets();
+      setNotice({
+        tone: "success",
+        message: `Reimported ${result.fileName} and archived the previous asset.`,
+      });
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setDriveAssetAction(null);
     }
   }
 
@@ -2686,6 +2760,7 @@ export default function UploadPanel({
 
       const succeeded = results.filter((r) => r.status === "success").length;
       const failed = results.filter((r) => r.status === "failed").length;
+      const replaced = results.filter((r) => r.replacedAssetId).length;
       const importedItems: UploadItem[] = results.map((result) => ({
         id: `drive-${result.fileId}-${crypto.randomUUID()}`,
         source: "drive",
@@ -2710,6 +2785,10 @@ export default function UploadPanel({
         setNotice({
           tone: failed > 0 ? "warning" : "success",
           message: `Imported ${succeeded} file${succeeded === 1 ? "" : "s"}${
+            replaced > 0
+              ? ` and replaced ${replaced} existing asset${replaced === 1 ? "" : "s"}`
+              : ""
+          }${
             failed > 0 ? ` (${failed} failed)` : ""
           }`,
         });
@@ -4181,6 +4260,33 @@ export default function UploadPanel({
               <div style={audioTrimStatusStyle}>
                 <span>{audioTrimStatus}</span>
               </div>
+            )}
+            {authUser?.authenticated && (
+              <button
+                type="button"
+                onClick={
+                  selectedAsset.driveFileId
+                    ? reimportSelectedAssetFromDrive
+                    : lookupSelectedAssetDriveSource
+                }
+                disabled={
+                  Boolean(driveAssetAction) ||
+                  savingAsset ||
+                  deletingAsset ||
+                  cropSaving ||
+                  adjustmentsSaving ||
+                  captionSaving
+                }
+                style={secondaryButtonStyle}
+              >
+                {driveAssetAction === "lookup"
+                  ? "Looking up Drive file..."
+                  : driveAssetAction === "reimport"
+                    ? "Reimporting from Drive..."
+                    : selectedAsset.driveFileId
+                      ? "Reimport from Drive"
+                      : "Lookup Google Drive"}
+              </button>
             )}
             <button
               type="button"

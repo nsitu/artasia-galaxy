@@ -224,6 +224,7 @@ export interface PlacementAsset {
   activity_label?: string | null;
   iconName?: string | null;
   linkedAudioAssetId?: string | null;
+  driveFileId?: string | null;
   uploader_id?: number | null;
   uploader_name?: string | null;
   uploader_album_id?: string | null;
@@ -841,6 +842,7 @@ export interface DriveSyncResult {
   fileName: string;
   status: "success" | "failed";
   assetId?: string;
+  replacedAssetId?: string;
   error?: string;
 }
 
@@ -865,4 +867,35 @@ export async function syncDriveFiles(params: {
 
   const data = await res.json() as { results?: DriveSyncResult[] };
   return data.results ?? [];
+}
+
+export interface DriveLookupResult {
+  status: "linked" | "already-linked" | "not-found";
+  fileId?: string;
+  fileName?: string;
+}
+
+export async function lookupUploadAssetDriveSource(assetId: string): Promise<DriveLookupResult> {
+  const res = await fetch(`/api/v1/drive/assets/${encodeURIComponent(assetId)}/lookup`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    if (res.status === 401) throw new Error("Please sign in with Google to access Drive");
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function reimportUploadAssetFromDrive(assetId: string): Promise<DriveSyncResult> {
+  const res = await fetch(`/api/v1/drive/assets/${encodeURIComponent(assetId)}/reimport`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    if (res.status === 401) throw new Error("Please sign in with Google to access Drive");
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  const body = await res.json() as { result: DriveSyncResult };
+  return body.result;
 }
