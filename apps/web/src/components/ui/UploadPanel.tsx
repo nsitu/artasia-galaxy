@@ -3921,19 +3921,64 @@ export default function UploadPanel({
         <div style={manageDetailsStyle}>
           <div style={manageHeaderStyle}>
             <h2 style={assetHeadingStyle}>{selectedAsset.fileName}</h2>
-            {assignedPlacement && (
-              <a
-                href={placementViewerUrl(assignedPlacement)}
-                target="_blank"
-                rel="noreferrer"
-                style={siteActionLinkStyle}
-              >
-                <span style={siteActionIconStyle} aria-hidden="true">
-                  open_in_new
-                </span>
-                View
-              </a>
-            )}
+            <div style={detailHeaderActionsStyle}>
+              {assignedPlacement && (
+                <a
+                  href={placementViewerUrl(assignedPlacement)}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={siteActionLinkStyle}
+                >
+                  <span style={siteActionIconStyle} aria-hidden="true">
+                    open_in_new
+                  </span>
+                  View
+                </a>
+              )}
+              {selectedAsset.driveFileId && (
+                <a
+                  href={`https://drive.google.com/open?id=${encodeURIComponent(selectedAsset.driveFileId)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={siteActionLinkStyle}
+                >
+                  <span style={siteActionIconStyle} aria-hidden="true">
+                    add_to_drive
+                  </span>
+                  View in Drive
+                </a>
+              )}
+              {authUser?.authenticated && (
+                <button
+                  type="button"
+                  onClick={
+                    selectedAsset.driveFileId
+                      ? reimportSelectedAssetFromDrive
+                      : lookupSelectedAssetDriveSource
+                  }
+                  disabled={
+                    Boolean(driveAssetAction) ||
+                    savingAsset ||
+                    deletingAsset ||
+                    cropSaving ||
+                    adjustmentsSaving ||
+                    captionSaving
+                  }
+                  style={siteActionButtonStyle}
+                >
+                  <span style={siteActionIconStyle} aria-hidden="true">
+                    {selectedAsset.driveFileId ? "sync" : "manage_search"}
+                  </span>
+                  {driveAssetAction === "lookup"
+                    ? "Looking up..."
+                    : driveAssetAction === "reimport"
+                      ? "Reimporting..."
+                      : selectedAsset.driveFileId
+                        ? "Reimport"
+                        : "Lookup Drive"}
+                </button>
+              )}
+            </div>
           </div>
 
           <label style={labelStyle}>
@@ -4260,33 +4305,6 @@ export default function UploadPanel({
               <div style={audioTrimStatusStyle}>
                 <span>{audioTrimStatus}</span>
               </div>
-            )}
-            {authUser?.authenticated && (
-              <button
-                type="button"
-                onClick={
-                  selectedAsset.driveFileId
-                    ? reimportSelectedAssetFromDrive
-                    : lookupSelectedAssetDriveSource
-                }
-                disabled={
-                  Boolean(driveAssetAction) ||
-                  savingAsset ||
-                  deletingAsset ||
-                  cropSaving ||
-                  adjustmentsSaving ||
-                  captionSaving
-                }
-                style={secondaryButtonStyle}
-              >
-                {driveAssetAction === "lookup"
-                  ? "Looking up Drive file..."
-                  : driveAssetAction === "reimport"
-                    ? "Reimporting from Drive..."
-                    : selectedAsset.driveFileId
-                      ? "Reimport from Drive"
-                      : "Lookup Google Drive"}
-              </button>
             )}
             <button
               type="button"

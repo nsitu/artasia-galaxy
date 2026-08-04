@@ -39,6 +39,21 @@ function tagValues(asset: ImmichAsset) {
     .filter(Boolean);
 }
 
+function assetHasTagNames(asset: ImmichAsset, requiredTagNames: string[]) {
+  const assetTags = new Set(tagValues(asset).map((value) => value.toLocaleLowerCase()));
+  return requiredTagNames.every((name) => assetTags.has(name.toLocaleLowerCase()));
+}
+
+async function waitForAssetTags(assetId: string, requiredTagNames: string[]) {
+  const retries = 20;
+  for (let attempt = 0; attempt < retries; attempt += 1) {
+    const asset = await getAsset(assetId);
+    if (assetHasTagNames(asset, requiredTagNames)) return asset;
+    await new Promise<void>((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error("Immich did not make the imported asset tags available in time. The previous asset was left unchanged.");
+}
+
 function assetDriveSourceId(asset: ImmichAsset) {
   const sourceTags = tagValues(asset).filter((value) =>
     value.toLocaleLowerCase().startsWith(DRIVE_SOURCE_TAG_PREFIX),
@@ -389,12 +404,14 @@ async function importDriveFile(params: {
     if (!uploadResult.id) {
       return { fileId: params.fileId, fileName, status: "failed", error: "Failed to upload to Immich" };
     }
-    await tagAsset(uploadResult.id, [
+    const allTags = [
       ...params.placementTags,
       ...params.activityTags,
       driveSourceTag(params.fileId),
       ...(fileInfo.isAudio ? ["media:audio"] : []),
-    ]);
+    ];
+    await tagAsset(uploadResult.id, allTags);
+    await waitForAssetTags(uploadResult.id, allTags);
     if (replacement) await archiveReplacedAsset(replacement, uploadResult.id);
     return {
       fileId: params.fileId,
@@ -445,7 +462,9 @@ router.post("/assets/:assetId/lookup", async (req: Request, res: Response) => {
       return;
     }
 
-    await tagAsset(asset.id, [driveSourceTag(lookup.file.id)]);
+    const sourceTag = driveSourceTag(lookup.file.id);
+    await tagAsset(asset.id, [sourceTag]);
+    await waitForAssetTags(asset.id, [sourceTag]);
     res.json({ status: "linked", fileId: lookup.file.id, fileName: lookup.file.name });
   } catch (err) {
     res
