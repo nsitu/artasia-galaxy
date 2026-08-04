@@ -508,6 +508,7 @@ const SITE_PATH_PREFIX = "/sites/";
 interface TerrainGalleryProps {
   introEnabled?: boolean;
   introPhase?: IntroPhase;
+  introPanOffsetRef?: { current: boolean };
   onIntroReady?: () => void;
   onIntroComplete?: () => void;
   onNoticeChange?: (notice: TerrainNotice | null) => void;
@@ -528,6 +529,7 @@ interface TerrainGalleryProps {
 export default function TerrainGallery({
   introEnabled = false,
   introPhase = "complete",
+  introPanOffsetRef,
   onIntroReady,
   onIntroComplete,
   onNoticeChange,
@@ -1380,17 +1382,15 @@ export default function TerrainGallery({
       const startTarget =
         controls?.target?.clone() ?? finalFrame.target.clone();
       const panOffset = new THREE.Vector3();
-      const cameraPanOffset = new THREE.Vector3();
       const lastRenderedTarget = startTarget.clone();
-      const lastRenderedPosition = startPosition.clone();
       const animate = (now: number) => {
         if (controls?.target) {
-          panOffset.add(controls.target.clone().sub(lastRenderedTarget));
+          const userPanDelta = controls.target.clone().sub(lastRenderedTarget);
+          if (userPanDelta.lengthSq() > 1e-10) {
+            panOffset.add(userPanDelta);
+            if (introPanOffsetRef) introPanOffsetRef.current = true;
+          }
         }
-        // Orbit controls can move both the target and camera while the intro
-        // zoom is running. Preserve both user deltas so the closing frame does
-        // not snap back to the original map center.
-        cameraPanOffset.add(camera.position.clone().sub(lastRenderedPosition));
         const progress = Math.min(
           1,
           (now - startedAt) / INTRO_CAMERA_DURATION_MS,
@@ -1398,8 +1398,7 @@ export default function TerrainGallery({
         const eased = 1 - (1 - progress) ** 3;
         camera.position
           .lerpVectors(startPosition, finalFrame.position, eased)
-          .add(panOffset)
-          .add(cameraPanOffset);
+          .add(panOffset);
         const target = startTarget
           .clone()
           .lerp(finalFrame.target, eased)
@@ -1408,7 +1407,6 @@ export default function TerrainGallery({
         camera.lookAt(target);
         controls?.target?.copy(target);
         lastRenderedTarget.copy(target);
-        lastRenderedPosition.copy(camera.position);
         controls?.update?.();
         if (progress < 1) {
           frameId = window.requestAnimationFrame(animate);
@@ -1420,6 +1418,16 @@ export default function TerrainGallery({
       return () => window.cancelAnimationFrame(frameId);
     }
 
+    if (
+      introEnabled &&
+      !focusedPlacement &&
+      introPhase === "complete" &&
+      introPanOffsetRef?.current
+    ) {
+      introPanOffsetRef.current = false;
+      return;
+    }
+
     applyTerrainCameraFrame(camera, finalFrame, controls);
   }, [
     camera,
@@ -1428,6 +1436,7 @@ export default function TerrainGallery({
     galleryLoading,
     introEnabled,
     introPhase,
+    introPanOffsetRef,
     loading,
     onIntroComplete,
     onIntroReady,
@@ -1881,7 +1890,7 @@ export function FocusedPlacementOverlay({
           />
         )}
         <div style={siteDetailsTitleWrapStyle}>
-          <div style={siteNameStyle}>{placement.placement_name}</div>
+          <div style={siteNameStyle}>{formatPlacementDisplayName(placement)}</div>
           <div style={sitePartnerStyle}>
             {placement.partner_name || "Partner organization"}
           </div>
@@ -1936,7 +1945,8 @@ export function PlacementHoverLabel({
       <div style={placementHoverPartnerStyle}>
         {placement.partner_name || "Placement"}
       </div>
-      <div style={placementHoverNameStyle}>{placement.placement_name}</div>
+      <div style={placementHoverNameStyle}>{formatPlacementDisplayName(placement)}</div>
+      <div style={placementHoverMetaStyle}>{formatArtistEducatorDetails(placement)}</div>
     </section>
   );
 }
@@ -1951,6 +1961,7 @@ export function PlacementPreviewPanel({
   const isMobile = useIsMobileBreakpoint();
   const siteDetails = formatSiteDetails(placement);
   const participantDetails = formatParticipantDetails(placement);
+  const artistEducatorDetails = formatArtistEducatorDetails(placement);
   const partnerLogo = placement.partner_white_logo?.url
     ? placement.partner_white_logo
     : placement.partner_logo;
@@ -2006,6 +2017,7 @@ export function PlacementPreviewPanel({
           {participantDetails && (
             <span style={placementPreviewMetaStyle}>{participantDetails}</span>
           )}
+          <span style={placementPreviewMetaStyle}>{artistEducatorDetails}</span>
         </span>
         <span style={{ ...placementPreviewActionStyle, ...(isMobile ? placementPreviewMobileActionStyle : {}) }}>View</span>
       </button>
@@ -2027,6 +2039,17 @@ function formatParticipantDetails(placement: MapPlacement) {
   return ageRange
     ? (/\d/.test(ageRange) ? `age ${ageRange}` : ageRange)
     : "";
+}
+
+function formatArtistEducatorDetails(placement: MapPlacement) {
+  const people = [
+    placement.team_member,
+    placement.secondary_team_member,
+  ].filter((person): person is NonNullable<MapPlacement["team_member"]> =>
+    Boolean(person?.name),
+  );
+  const label = people.length > 1 ? "Artist Educators" : "Artist Educator";
+  return `${label}: ${people.map((person) => person.name).join(", ") || "Unassigned"}`;
 }
 
 function SiteDetail({ label, value }: { label: string; value: string }) {
@@ -2219,6 +2242,12 @@ const placementHoverNameStyle: React.CSSProperties = {
   fontWeight: 700,
   lineHeight: 1.3,
   overflowWrap: "anywhere",
+};
+
+const placementHoverMetaStyle: React.CSSProperties = {
+  ...placementHoverPartnerStyle,
+  marginTop: 4,
+  marginBottom: 0,
 };
 
 const placementPreviewPanelStyle: React.CSSProperties = {

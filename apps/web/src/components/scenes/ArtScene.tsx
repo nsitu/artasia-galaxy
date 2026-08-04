@@ -110,6 +110,7 @@ export default function ArtScene() {
   const lightboxTouchPointsRef = useRef(new Map<number, { x: number; y: number }>());
   const lightboxPinchRef = useRef<{ distance: number; zoom: number } | null>(null);
   const lightboxSuppressClickRef = useRef(false);
+  const introPanOffsetRef = useRef(false);
 
   const handleIntroReady = useCallback(() => {
     setIntroPhase((current) => current === "loading" ? "ready" : current);
@@ -781,6 +782,7 @@ export default function ArtScene() {
               introPhase={introPhase}
               onIntroReady={handleIntroReady}
               onIntroComplete={handleIntroComplete}
+              introPanOffsetRef={introPanOffsetRef}
               onNoticeChange={setTerrainNotice}
               onBackActionChange={handleBackActionChange}
               onFocusedPlacementChange={setFocusedPlacementDetails}
