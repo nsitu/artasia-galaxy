@@ -1176,7 +1176,7 @@ const topNavStyle: React.CSSProperties = {
   alignItems: "center",
   gap: 0,
   minHeight: "5rem",
-  padding: "0 16px",
+  padding: 0,
   boxSizing: "border-box",
   background: "rgba(0, 0, 0, 0.42)",
   backdropFilter: "blur(8px)",
@@ -1451,11 +1451,8 @@ const backChevronStyle: React.CSSProperties = {
 };
 
 const homeLogoLinkStyle: React.CSSProperties = {
-  flex: "0 0 auto",
-  width: "9.92rem",
-  height: "5rem",
-  display: "grid",
-  placeItems: "center",
+  padding: "0 1rem",
+  height: "4.5rem",
   pointerEvents: "auto",
 };
 
@@ -1463,6 +1460,7 @@ const homeBrandStyle: React.CSSProperties = {
   flex: "0 1 auto",
   minWidth: 0,
   display: "flex",
+  alignSelf: "flex-start",
   alignItems: "center",
   gap: 8,
 };
