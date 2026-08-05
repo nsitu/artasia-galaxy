@@ -15,6 +15,7 @@ import {
   listTags,
   removeAssetsFromAlbum,
   removeAssetEdits,
+  searchAssetIdsByTag,
   searchAssets,
   tagAsset,
   untagAssets,
@@ -68,14 +69,14 @@ const SITE_ACTIVITY_STATS_TTL_MS = 30_000;
 const GLOBAL_AUDIO_PLACEMENT_ID = 21639;
 const LINKED_AUDIO_TAG_PREFIX = "linkedaudio:";
 const DRIVE_SOURCE_TAG_PREFIX = "source:drive:";
-const DRIVE_FILE_ID_CACHE_TTL_MS = 5 * 60_000;
+const ASSET_DETAIL_CACHE_TTL_MS = 30_000;
 // These indexes scan all uploader and published albums. Admin mutations
 // explicitly invalidate them, so keep them warm between Browse requests.
 const ADMIN_BROWSE_INDEX_TTL_MS = 5 * 60_000;
 const AUDIO_OPTION_CACHE_TTL_MS = 60_000;
-const driveFileIdCache = new Map<string, {
+const assetDetailCache = new Map<string, {
   expiresAt: number;
-  driveFileId: string;
+  value: Awaited<ReturnType<typeof getAsset>>;
 }>();
 
 export interface SiteActivityStatsResponse {
@@ -247,18 +248,15 @@ async function getAssetsForPlacementTagIds(tagIds: string[]) {
   const byId = new Map<string, Awaited<ReturnType<typeof searchAssets>>["assets"]["items"][number]>();
   const size = 500;
   const searches = tagIds.flatMap((tagId) =>
-    (["IMAGE", "VIDEO"] as const).flatMap((type) =>
-      (["timeline", "archive"] as const).map((visibility) => ({
-        tagId,
-        type,
-        visibility,
-      })),
-    ),
+    (["timeline", "archive"] as const).map((visibility) => ({
+      tagId,
+      visibility,
+    })),
   );
   const results = await processWithConcurrency(
     searches,
     8,
-    async ({ tagId, type, visibility }) => {
+    async ({ tagId, visibility }) => {
       const assets: Awaited<ReturnType<typeof searchAssets>>["assets"]["items"] = [];
       let page = 1;
       for (;;) {
@@ -266,7 +264,6 @@ async function getAssetsForPlacementTagIds(tagIds: string[]) {
           tagIds: [tagId],
           page,
           size,
-          type,
           visibility,
           withPeople: false,
         });
@@ -330,7 +327,7 @@ async function getActiveAudioAssetsForPlacementTagIds(tagIds: string[]) {
     .map((tag) => tag.id);
   const audioAssetIds = new Set(
     (
-      await Promise.all(audioTagIds.map(searchAdminAssetIdsByTag))
+      await Promise.all(audioTagIds.map(searchAssetIdsByTag))
     ).flat(),
   );
   return candidates.filter((asset) => audioAssetIds.has(asset.id));
@@ -338,22 +335,20 @@ async function getActiveAudioAssetsForPlacementTagIds(tagIds: string[]) {
 
 async function searchAdminAssetIdsByTag(tagId: string) {
   const assetIds = new Set<string>();
-  const size = 100;
-  for (const type of ["IMAGE", "VIDEO"] as const) {
-    for (const visibility of ["timeline", "archive"] as const) {
-      let page = 1;
-      for (;;) {
-        const result = await searchAssets({
-          tagIds: [tagId],
-          page,
-          size,
-          type,
-          visibility,
-        });
-        for (const asset of result.assets.items) assetIds.add(asset.id);
-        if (!result.assets.nextPage || result.assets.items.length < size) break;
-        page += 1;
-      }
+  for (const visibility of ["timeline", "archive"] as const) {
+    let page = 1;
+    for (;;) {
+      const result = await searchAssets({
+        tagIds: [tagId],
+        page,
+        size: 500,
+        visibility,
+        withExif: false,
+        withPeople: false,
+      });
+      for (const asset of result.assets.items) assetIds.add(asset.id);
+      if (!result.assets.nextPage || result.assets.items.length < 500) break;
+      page += 1;
     }
   }
   return Array.from(assetIds);
@@ -388,6 +383,7 @@ function invalidateAdminBrowseIndexes() {
   uploaderAssignmentRequest = null;
   publishedAssetIdCache = null;
   publishedAssetIdRequest = null;
+  assetDetailCache.clear();
   audioOptionCache.clear();
 }
 
@@ -492,39 +488,26 @@ function mapAdminAsset(
   };
 }
 
-function sourceDriveFileId(asset: {
-  tags?: Array<{ name: string; value: string }>;
-}) {
-  return (asset.tags ?? [])
-    .flatMap((tag) => [tag.name, tag.value])
-    .map((value) => value.trim())
-    .find((value) => value.toLocaleLowerCase().startsWith(DRIVE_SOURCE_TAG_PREFIX))
-    ?.slice(DRIVE_SOURCE_TAG_PREFIX.length);
-}
-
-async function getDriveFileIdsForAssets(assetIds: string[]) {
+async function getAssetDetailsForAssets(assetIds: string[]) {
   const now = Date.now();
-  const resolved = new Map<string, string>();
+  const resolved = new Map<string, Awaited<ReturnType<typeof getAsset>>>();
   const unresolvedAssetIds = assetIds.filter((assetId) => {
-    const cached = driveFileIdCache.get(assetId);
+    const cached = assetDetailCache.get(assetId);
     if (!cached || cached.expiresAt <= now) return true;
-    resolved.set(assetId, cached.driveFileId);
+    resolved.set(assetId, cached.value);
     return false;
   });
   const entries = await processWithConcurrency(unresolvedAssetIds, 8, async (assetId) => {
     try {
       const asset = await getAsset(assetId);
-      const driveFileId = sourceDriveFileId(asset);
-      if (driveFileId) {
-        driveFileIdCache.set(assetId, {
-          expiresAt: now + DRIVE_FILE_ID_CACHE_TTL_MS,
-          driveFileId,
-        });
-      }
-      return driveFileId ? [assetId, driveFileId] as const : null;
+      assetDetailCache.set(assetId, {
+        expiresAt: now + ASSET_DETAIL_CACHE_TTL_MS,
+        value: asset,
+      });
+      return [assetId, asset] as const;
     } catch (error) {
       console.warn(
-        `[uploads/assets] failed to resolve Drive metadata for ${assetId}: ${(error as Error).message}`,
+        `[uploads/assets] failed to resolve asset metadata for ${assetId}: ${(error as Error).message}`,
       );
       return null;
     }
@@ -546,16 +529,13 @@ async function searchAssetsByAlbumId(
 ) {
   const byId = new Map<string, Awaited<ReturnType<typeof searchAssets>>["assets"]["items"][number]>();
   const size = options?.compact ? 500 : 100;
-  const searches = (["IMAGE", "VIDEO"] as const).flatMap((type) =>
-    (["timeline", "archive"] as const).map((visibility) => ({
-      type,
-      visibility,
-    })),
-  );
+  const searches = (["timeline", "archive"] as const).map((visibility) => ({
+    visibility,
+  }));
   const results = await processWithConcurrency(
     searches,
     4,
-    async ({ type, visibility }) => {
+    async ({ visibility }) => {
       const assets: Awaited<ReturnType<typeof searchAssets>>["assets"]["items"] =
         [];
       let page = 1;
@@ -564,7 +544,6 @@ async function searchAssetsByAlbumId(
           albumIds: [albumId],
           page,
           size,
-          type,
           visibility,
           ...(options?.compact ? { withExif: false, withPeople: false } : {}),
         });
@@ -584,16 +563,14 @@ async function searchAssetsByAlbumId(
 
 async function searchAllImmichAssets() {
   const byId = new Map<string, Awaited<ReturnType<typeof searchAssets>>["assets"]["items"][number]>();
-  const size = 100;
-  for (const type of ["IMAGE", "VIDEO"] as const) {
-    for (const visibility of ["timeline", "archive"] as const) {
-      let page = 1;
-      for (;;) {
-        const result = await searchAssets({ page, size, type, visibility });
-        for (const asset of result.assets.items) byId.set(asset.id, asset);
-        if (!result.assets.nextPage || result.assets.items.length < size) break;
-        page += 1;
-      }
+  const size = 500;
+  for (const visibility of ["timeline", "archive"] as const) {
+    let page = 1;
+    for (;;) {
+      const result = await searchAssets({ page, size, visibility });
+      for (const asset of result.assets.items) byId.set(asset.id, asset);
+      if (!result.assets.nextPage || result.assets.items.length < size) break;
+      page += 1;
     }
   }
 
@@ -612,10 +589,12 @@ async function buildSiteActivityStats(): Promise<SiteActivityStatsResponse> {
   const activePublishedAssets = publishedAssets.filter(
     (asset) => !asset.isArchived && !asset.isTrashed,
   );
-  const assignments = await getManagementAssignments(
-    activePublishedAssets.map((asset) => asset.id),
-    { includeAudio: false, includeIcons: false },
-  );
+  const assignments = embeddedAssetTagsAvailable(activePublishedAssets)
+    ? mapEmbeddedAssetMetadata(activePublishedAssets, config).assignments
+    : await getManagementAssignments(
+        activePublishedAssets.map((asset) => asset.id),
+        { includeAudio: false, includeIcons: false },
+      );
   const totals = new Map<number, number>();
   const counts = new Map<number, Map<number, number>>();
 
@@ -719,6 +698,52 @@ async function getUploaderAlbumAssignments(uploaderAlbums: UploaderAlbum[]) {
   return assignments;
 }
 
+async function getUploaderAlbumAssignmentsForAssets(
+  assetIds: string[],
+  placementTagIds?: string[],
+) {
+  if (!placementTagIds || placementTagIds.length === 0) {
+    return getCachedUploaderAlbumAssignments();
+  }
+
+  const uploaderAlbums = await getUploaderAlbums();
+  const assetIdSet = new Set(assetIds);
+  const assignments = new Map<string, UploaderAlbum>();
+  const results = await processWithConcurrency(
+    uploaderAlbums,
+    4,
+    async (album) => {
+      const taggedAssetIds = new Set<string>();
+      for (const tagId of placementTagIds) {
+        for (const visibility of ["timeline", "archive"] as const) {
+          let page = 1;
+          for (;;) {
+            const result = await searchAssets({
+              albumIds: [album.id],
+              tagIds: [tagId],
+              page,
+              size: 500,
+              visibility,
+              withExif: false,
+              withPeople: false,
+            });
+            for (const asset of result.assets.items) {
+              if (assetIdSet.has(asset.id)) taggedAssetIds.add(asset.id);
+            }
+            if (!result.assets.nextPage || result.assets.items.length < 500) break;
+            page += 1;
+          }
+        }
+      }
+      return { album, assetIds: taggedAssetIds };
+    },
+  );
+  for (const { album, assetIds: taggedAssetIds } of results) {
+    for (const assetId of taggedAssetIds) assignments.set(assetId, album);
+  }
+  return assignments;
+}
+
 async function getCachedUploaderAlbumAssignments() {
   if (
     uploaderAssignmentCache &&
@@ -775,6 +800,53 @@ async function getCachedPublishedAssetIds() {
     });
   publishedAssetIdRequest = request;
   return request;
+}
+
+async function getPublishedAssetIdsForAssets(
+  assetIds: string[],
+  placementTagIds?: string[],
+) {
+  if (!placementTagIds || placementTagIds.length === 0) {
+    return getCachedPublishedAssetIds();
+  }
+
+  const publishedAlbum = await getPublishedAlbum();
+  const searches = placementTagIds.flatMap((tagId) =>
+    (["timeline", "archive"] as const).map((visibility) => ({
+      tagId,
+      visibility,
+    })),
+  );
+  const results = await processWithConcurrency(
+    searches,
+    8,
+    async ({ tagId, visibility }) => {
+      const assets: Awaited<ReturnType<typeof searchAssets>>["assets"]["items"] = [];
+      let page = 1;
+      for (;;) {
+        const result = await searchAssets({
+          albumIds: [publishedAlbum.id],
+          tagIds: [tagId],
+          visibility,
+          page,
+          size: 500,
+          withExif: false,
+          withPeople: false,
+        });
+        assets.push(...result.assets.items);
+        if (!result.assets.nextPage || result.assets.items.length < 500) break;
+        page += 1;
+      }
+      return assets;
+    },
+  );
+  const assetIdSet = new Set(assetIds);
+  return new Set(
+    results
+      .flat()
+      .map((asset) => asset.id)
+      .filter((assetId) => assetIdSet.has(assetId)),
+  );
 }
 
 async function getUploaderAlbumMemberships(assetId: string, uploaderAlbums: UploaderAlbum[]) {
@@ -836,8 +908,15 @@ async function getManagementAssignments(
     }
   }
 
-  for (const [tagId, placement] of placementByTagId) {
-    const taggedAssetIds = await searchAdminAssetIdsByTag(tagId);
+  const placementMemberships = await processWithConcurrency(
+    Array.from(placementByTagId.entries()),
+    8,
+    async ([tagId, placement]) => ({
+      placement,
+      assetIds: await searchAdminAssetIdsByTag(tagId),
+    }),
+  );
+  for (const { placement, assetIds: taggedAssetIds } of placementMemberships) {
     for (const assetId of taggedAssetIds) {
       if (!assetIdSet.has(assetId)) continue;
       const current = assignments.get(assetId) ?? {};
@@ -847,8 +926,15 @@ async function getManagementAssignments(
     }
   }
 
-  for (const [tagId, activity] of activityByTagId) {
-    const taggedAssetIds = await searchAdminAssetIdsByTag(tagId);
+  const activityMemberships = await processWithConcurrency(
+    Array.from(activityByTagId.entries()),
+    8,
+    async ([tagId, activity]) => ({
+      activity,
+      assetIds: await searchAdminAssetIdsByTag(tagId),
+    }),
+  );
+  for (const { activity, assetIds: taggedAssetIds } of activityMemberships) {
     for (const assetId of taggedAssetIds) {
       if (!assetIdSet.has(assetId)) continue;
       const current = assignments.get(assetId) ?? {};
@@ -865,17 +951,22 @@ async function getManagementAssignments(
         .find((value) => /^icon:[a-z0-9_]+$/.test(value));
       return name ? [{ id: tag.id, iconName: name.slice("icon:".length) }] : [];
     });
-    await Promise.all(
-      iconTags.map(async ({ id, iconName }) => {
-        const taggedAssetIds = await searchAdminAssetIdsByTag(id);
-        for (const assetId of taggedAssetIds) {
-          if (!assetIdSet.has(assetId)) continue;
-          const current = assignments.get(assetId) ?? {};
-          current.iconName = iconName;
-          assignments.set(assetId, current);
-        }
+    const iconMemberships = await processWithConcurrency(
+      iconTags,
+      8,
+      async ({ id, iconName }) => ({
+        iconName,
+        assetIds: await searchAdminAssetIdsByTag(id),
       }),
     );
+    for (const { iconName, assetIds: taggedAssetIds } of iconMemberships) {
+      for (const assetId of taggedAssetIds) {
+        if (!assetIdSet.has(assetId)) continue;
+        const current = assignments.get(assetId) ?? {};
+        current.iconName = iconName;
+        assignments.set(assetId, current);
+      }
+    }
   }
 
   const linkedAudioTags = tags.flatMap((tag) => {
@@ -890,17 +981,22 @@ async function getManagementAssignments(
       ? [{ id: tag.id, linkedAudioAssetId: value.slice(LINKED_AUDIO_TAG_PREFIX.length) }]
       : [];
   });
-  await Promise.all(
-    linkedAudioTags.map(async ({ id, linkedAudioAssetId }) => {
-      const taggedAssetIds = await searchAdminAssetIdsByTag(id);
-      for (const assetId of taggedAssetIds) {
-        if (!assetIdSet.has(assetId)) continue;
-        const current = assignments.get(assetId) ?? {};
-        current.linkedAudioAssetId = linkedAudioAssetId;
-        assignments.set(assetId, current);
-      }
+  const linkedAudioMemberships = await processWithConcurrency(
+    linkedAudioTags,
+    8,
+    async ({ id, linkedAudioAssetId }) => ({
+      linkedAudioAssetId,
+      assetIds: await searchAdminAssetIdsByTag(id),
     }),
   );
+  for (const { linkedAudioAssetId, assetIds: taggedAssetIds } of linkedAudioMemberships) {
+    for (const assetId of taggedAssetIds) {
+      if (!assetIdSet.has(assetId)) continue;
+      const current = assignments.get(assetId) ?? {};
+      current.linkedAudioAssetId = linkedAudioAssetId;
+      assignments.set(assetId, current);
+    }
+  }
 
   const audioTag =
     options?.includeAudio === false
@@ -1026,41 +1122,44 @@ function mapEmbeddedAssetMetadata(
   return { assignments, adjustments, gpsDisabledAssetIds };
 }
 
-async function mapAssetsWithUploaderAlbums(assets: Awaited<ReturnType<typeof getAssetsForPlacementTagIds>>) {
+async function mapAssetsWithUploaderAlbums(
+  assets: Awaited<ReturnType<typeof getAssetsForPlacementTagIds>>,
+  options?: { placementTagIds?: string[] },
+) {
   if (assets.length === 0) return [];
   const usesEmbeddedTags = embeddedAssetTagsAvailable(assets);
-  const [config, albumAssignments, publishedAssetIds] = await Promise.all([
-    usesEmbeddedTags ? getUploadConfig() : Promise.resolve(null),
-    getCachedUploaderAlbumAssignments(),
-    getCachedPublishedAssetIds(),
-  ]);
   const assetIds = assets.map((asset) => asset.id);
-  const embeddedMetadata =
-    usesEmbeddedTags && config
-      ? mapEmbeddedAssetMetadata(assets, config)
-      : null;
-  const [managementAssignments, adjustmentMap, gpsDisabledAssetIds, driveFileIds] =
+  const [config, albumAssignments, publishedAssetIds, detailedAssets] = await Promise.all([
+    getUploadConfig(),
+    getUploaderAlbumAssignmentsForAssets(assetIds, options?.placementTagIds),
+    getPublishedAssetIdsForAssets(assetIds, options?.placementTagIds),
+    usesEmbeddedTags
+      ? Promise.resolve(new Map<string, Awaited<ReturnType<typeof getAsset>>>())
+      : getAssetDetailsForAssets(assetIds),
+  ]);
+  const metadataAssets = assets.map(
+    (asset) => detailedAssets.get(asset.id) ?? asset,
+  );
+  const embeddedMetadata = metadataAssets.every((asset) => Array.isArray(asset.tags))
+    ? mapEmbeddedAssetMetadata(metadataAssets, config)
+    : null;
+  const [managementAssignments, adjustmentMap, gpsDisabledAssetIds] =
     embeddedMetadata
       ? [
           embeddedMetadata.assignments,
           embeddedMetadata.adjustments,
           embeddedMetadata.gpsDisabledAssetIds,
-          new Map<string, string>(),
         ]
       : await Promise.all([
           getManagementAssignments(assetIds),
           getAssetAdjustmentMap(assetIds),
           getGpsDisabledAssetIds(assetIds),
-          getDriveFileIdsForAssets(assetIds),
         ]);
-  return assets.map((asset) => mapAdminAsset(
+  return metadataAssets.map((asset) => mapAdminAsset(
     asset,
     albumAssignments.get(asset.id),
     {
       ...(managementAssignments.get(asset.id) ?? {}),
-      ...(driveFileIds.get(asset.id)
-        ? { driveFileId: driveFileIds.get(asset.id) }
-        : {}),
       published: publishedAssetIds.has(asset.id),
     },
     adjustmentMap.get(asset.id),
@@ -1252,7 +1351,9 @@ router.get("/assets", async (req, res) => {
     }
 
     const searchedAt = Date.now();
-    const mappedAssets = await mapAssetsWithUploaderAlbums(assets);
+    const mappedAssets = await mapAssetsWithUploaderAlbums(assets, {
+      placementTagIds: tagIds,
+    });
     const completedAt = Date.now();
     const resolveDuration = resolvedAt - requestStartedAt;
     const searchDuration = searchedAt - resolvedAt;

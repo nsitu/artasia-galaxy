@@ -1,4 +1,4 @@
-import { getPublishedAlbum, listTags, searchAssetIdsByTag, searchAssets, ImmichAsset } from "../infra/ImmichClient.js";
+import { getPublishedAlbum, listTags, searchAssetIdsByTag, searchAssetIdsByTags, searchAssets, ImmichAsset } from "../infra/ImmichClient.js";
 import { DEFAULT_ASSET_ADJUSTMENTS, getAssetAdjustmentMap, type AssetAdjustments } from "./assetAdjustments.service.js";
 import { activityAnchorTag, getUploadConfig, placementAnchorTag } from "./uploadConfig.service.js";
 import { isAudioAsset } from "./audioAsset.service.js";
@@ -284,18 +284,15 @@ export async function querySlideshow(
       .map((tag) => tag.id);
 
     const taggedResults = await Promise.all(
-      placementTagIds.flatMap((tagId) =>
-        (["IMAGE", "VIDEO"] as const).map((type) =>
-          searchAssets({
-            albumIds: [publishedAlbum.id],
-            tagIds: [tagId],
-            type,
-            visibility: "timeline",
-            size: 500,
-            takenAfter: dateRange.takenAfter,
-            takenBefore: dateRange.takenBefore,
-          }),
-        ),
+      placementTagIds.map((tagId) =>
+        searchAssets({
+          albumIds: [publishedAlbum.id],
+          tagIds: [tagId],
+          visibility: "timeline",
+          size: 500,
+          takenAfter: dateRange.takenAfter,
+          takenBefore: dateRange.takenBefore,
+        }),
       ),
     );
     const byId = new Map<string, ImmichAsset>();
@@ -336,15 +333,13 @@ export async function querySlideshow(
         return { activityId: activity.id, tagIds: [...new Set(tagIds)] };
       });
       const activityMemberships = await Promise.all(
-        activityAssignments.map(async ({ activityId, tagIds }) => ({
-          activityId,
-          assetIds:
-            tagIds.length > 0
-              ? (
-                  await Promise.all(tagIds.map(searchAssetIdsByTag))
-                ).flat()
-              : [],
-        })),
+        activityAssignments.map(async ({ activityId, tagIds }) => {
+          const assetIdsByTag = await searchAssetIdsByTags(tagIds);
+          return {
+            activityId,
+            assetIds: tagIds.flatMap((tagId) => assetIdsByTag.get(tagId) ?? []),
+          };
+        }),
       );
       const placementAssetIds = new Set(assets.map((asset) => asset.id));
       for (const membership of activityMemberships) {
@@ -422,18 +417,24 @@ export async function querySlideshow(
     const enrichment = await Promise.all([
       getAssetAdjustmentMap(assetIds),
       getGpsDisabledAssetIds(assetIds),
-      Promise.all(
-        iconTags.map(async (iconTag) => ({
+      (async () => {
+        const assetIdsByTag = await searchAssetIdsByTags(
+          iconTags.map((iconTag) => iconTag.tagId),
+        );
+        return iconTags.map((iconTag) => ({
           ...iconTag,
-          assetIds: await searchAssetIdsByTag(iconTag.tagId),
-        })),
-      ),
-      Promise.all(
-        linkedAudioTags.map(async (linkedAudioTag) => ({
+          assetIds: assetIdsByTag.get(iconTag.tagId) ?? [],
+        }));
+      })(),
+      (async () => {
+        const assetIdsByTag = await searchAssetIdsByTags(
+          linkedAudioTags.map((linkedAudioTag) => linkedAudioTag.tagId),
+        );
+        return linkedAudioTags.map((linkedAudioTag) => ({
           ...linkedAudioTag,
-          assetIds: await searchAssetIdsByTag(linkedAudioTag.tagId),
-        })),
-      ),
+          assetIds: assetIdsByTag.get(linkedAudioTag.tagId) ?? [],
+        }));
+      })(),
     ]);
     adjustmentMap = enrichment[0];
     gpsDisabledAssetIds = enrichment[1];

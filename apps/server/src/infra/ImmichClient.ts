@@ -5,6 +5,22 @@ import { createReadStream } from "node:fs";
 const IMMICH_URL = process.env.IMMICH_URL ?? "https://photos.artsforall.co";
 const IMMICH_API_KEY = process.env.IMMICH_API_KEY ?? "";
 const PUBLISHED_ALBUM_NAME = "Published";
+const IMMICH_LIST_CACHE_TTL_MS = 30_000;
+
+let tagsCache: { expiresAt: number; value: ImmichTag[] } | null = null;
+let tagsRequest: Promise<ImmichTag[]> | null = null;
+let albumsCache: { expiresAt: number; value: ImmichAlbum[] } | null = null;
+let albumsRequest: Promise<ImmichAlbum[]> | null = null;
+const albumByNameCache = new Map<string, {
+  expiresAt: number;
+  value: ImmichAlbum | null;
+}>();
+const albumByNameRequests = new Map<string, Promise<ImmichAlbum | null>>();
+const tagAssetIdsCache = new Map<string, {
+  expiresAt: number;
+  value: string[];
+}>();
+const tagAssetIdsRequests = new Map<string, Promise<string[]>>();
 
 export interface ImmichAsset {
   id: string;
@@ -268,11 +284,11 @@ export async function searchAssets(params: {
   const body: Record<string, unknown> = {
     page: params.page ?? 1,
     size: params.size ?? 100,
-    type: params.type ?? "IMAGE",
     withExif: params.withExif ?? true,
     withPeople: params.withPeople ?? true,
   };
 
+  if (params.type) body.type = params.type;
   if (params.albumId) body.albumId = params.albumId;
   if (params.albumIds?.length) body.albumIds = params.albumIds;
   if (params.personIds?.length) body.personIds = params.personIds;
@@ -291,28 +307,72 @@ export async function searchAssets(params: {
 }
 
 export async function searchAssetIdsByTag(tagId: string): Promise<string[]> {
-  const assetIds: string[] = [];
-  const size = 100;
-  for (const type of ["IMAGE", "VIDEO"] as const) {
-    let page = 1;
-    for (;;) {
-      const res = await searchAssets({
-        tagIds: [tagId],
-        page,
-        size,
-        type,
-        visibility: "timeline",
+  const cached = tagAssetIdsCache.get(tagId);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  const pending = tagAssetIdsRequests.get(tagId);
+  if (pending) return pending;
+
+  const request = loadAssetIdsByTag(tagId)
+    .then((value) => {
+      tagAssetIdsCache.set(tagId, {
+        expiresAt: Date.now() + IMMICH_LIST_CACHE_TTL_MS,
+        value,
       });
-      for (const item of res.assets.items) assetIds.push(item.id);
-      if (!res.assets.nextPage || res.assets.items.length < size) break;
-      page += 1;
-    }
+      return value;
+    })
+    .finally(() => {
+      tagAssetIdsRequests.delete(tagId);
+    });
+  tagAssetIdsRequests.set(tagId, request);
+  return request;
+}
+
+async function loadAssetIdsByTag(tagId: string): Promise<string[]> {
+  const assetIds: string[] = [];
+  const size = 500;
+  let page = 1;
+  for (;;) {
+    const res = await searchAssets({
+      tagIds: [tagId],
+      page,
+      size,
+      visibility: "timeline",
+      withExif: false,
+      withPeople: false,
+    });
+    for (const item of res.assets.items) assetIds.push(item.id);
+    if (!res.assets.nextPage || res.assets.items.length < size) break;
+    page += 1;
   }
   return assetIds;
 }
 
 export async function listAssetIdsByTag(tagId: string): Promise<string[]> {
   return searchAssetIdsByTag(tagId);
+}
+
+export async function searchAssetIdsByTags(
+  tagIds: Iterable<string>,
+  concurrency = 8,
+): Promise<Map<string, string[]>> {
+  const uniqueTagIds = Array.from(new Set(tagIds));
+  const results = new Map<string, string[]>();
+  let cursor = 0;
+
+  async function worker() {
+    while (cursor < uniqueTagIds.length) {
+      const tagId = uniqueTagIds[cursor++];
+      results.set(tagId, await searchAssetIdsByTag(tagId));
+    }
+  }
+
+  await Promise.all(
+    Array.from(
+      { length: Math.min(Math.max(1, concurrency), uniqueTagIds.length) },
+      worker,
+    ),
+  );
+  return results;
 }
 
 export interface ImmichAlbum {
@@ -324,7 +384,8 @@ export interface ImmichAlbum {
   ownerId?: string;
   albumThumbnailAssetId: string | null;
   assetCount: number;
-  shared: boolean;
+  shared?: boolean;
+  isShared?: boolean;
 }
 
 export interface ImmichTag {
@@ -346,15 +407,54 @@ interface ImmichServerStats {
   usageVideos: number;
 }
 
-export async function listAlbums(): Promise<ImmichAlbum[]> {
-  const res = await immichRequest("/albums");
-  return res.json();
+export async function listAlbums(options?: { forceFresh?: boolean }): Promise<ImmichAlbum[]> {
+  if (!options?.forceFresh && albumsCache && albumsCache.expiresAt > Date.now()) {
+    return albumsCache.value;
+  }
+  if (!options?.forceFresh && albumsRequest) return albumsRequest;
+
+  const request = immichRequest("/albums")
+    .then((res) => res.json() as Promise<ImmichAlbum[]>)
+    .then((value) => {
+      albumsCache = { expiresAt: Date.now() + IMMICH_LIST_CACHE_TTL_MS, value };
+      return value;
+    })
+    .finally(() => {
+      albumsRequest = null;
+    });
+  albumsRequest = request;
+  return request;
 }
 
 export async function findAlbumByName(name: string): Promise<ImmichAlbum | null> {
   const normalized = name.trim().toLowerCase();
-  const albums = await listAlbums();
-  return albums.find((album) => album.albumName.trim().toLowerCase() === normalized) ?? null;
+  const cached = albumByNameCache.get(normalized);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  const pending = albumByNameRequests.get(normalized);
+  if (pending) return pending;
+
+  const params = new URLSearchParams({ name: name.trim() });
+  const request = immichRequest(`/albums?${params.toString()}`)
+    .then((res) => res.json() as Promise<ImmichAlbum[]>)
+    .then((matches) =>
+      matches.find((album) => album.albumName.trim().toLowerCase() === normalized) ?? null,
+    )
+    .catch(async () => {
+      const albums = await listAlbums();
+      return albums.find((album) => album.albumName.trim().toLowerCase() === normalized) ?? null;
+    })
+    .then((value) => {
+      albumByNameCache.set(normalized, {
+        expiresAt: Date.now() + IMMICH_LIST_CACHE_TTL_MS,
+        value,
+      });
+      return value;
+    })
+    .finally(() => {
+      albumByNameRequests.delete(normalized);
+    });
+  albumByNameRequests.set(normalized, request);
+  return request;
 }
 
 export async function ensureAlbum(name: string): Promise<ImmichAlbum> {
@@ -366,7 +466,14 @@ export async function ensureAlbum(name: string): Promise<ImmichAlbum> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ albumName: name }),
   });
-  return res.json();
+  const created = await res.json() as ImmichAlbum;
+  const normalized = created.albumName.trim().toLowerCase();
+  albumByNameCache.set(normalized, {
+    expiresAt: Date.now() + IMMICH_LIST_CACHE_TTL_MS,
+    value: created,
+  });
+  albumsCache = null;
+  return created;
 }
 
 export async function ensureConfiguredAlbums(names: string[]) {
@@ -402,8 +509,20 @@ export async function removeAssetsFromAlbum(albumId: string, assetIds: string[])
 }
 
 export async function listTags(): Promise<ImmichTag[]> {
-  const res = await immichRequest("/tags");
-  return res.json();
+  if (tagsCache && tagsCache.expiresAt > Date.now()) return tagsCache.value;
+  if (tagsRequest) return tagsRequest;
+
+  const request = immichRequest("/tags")
+    .then((res) => res.json() as Promise<ImmichTag[]>)
+    .then((value) => {
+      tagsCache = { expiresAt: Date.now() + IMMICH_LIST_CACHE_TTL_MS, value };
+      return value;
+    })
+    .finally(() => {
+      tagsRequest = null;
+    });
+  tagsRequest = request;
+  return request;
 }
 
 export async function ensureTag(name: string, cachedTags?: ImmichTag[]): Promise<ImmichTag> {
@@ -421,7 +540,12 @@ export async function ensureTag(name: string, cachedTags?: ImmichTag[]): Promise
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
   });
-  return res.json();
+  const created = await res.json() as ImmichTag;
+  tagsCache = {
+    expiresAt: Date.now() + IMMICH_LIST_CACHE_TTL_MS,
+    value: [...(tagsCache?.value ?? []), created],
+  };
+  return created;
 }
 
 export async function tagAsset(assetId: string, tagNames: string[]) {
@@ -452,6 +576,7 @@ export async function tagAsset(assetId: string, tagNames: string[]) {
       tagIds: tags.map((tag) => tag.id),
     }),
   });
+  for (const tag of tags) tagAssetIdsCache.delete(tag.id);
 }
 
 export async function tagAssets(assetIds: string[], tagIds: string[]) {
@@ -480,6 +605,7 @@ export async function tagAssets(assetIds: string[], tagIds: string[]) {
       tagIds,
     }),
   });
+  for (const tagId of tagIds) tagAssetIdsCache.delete(tagId);
 }
 
 export async function untagAssets(assetIds: string[], tagIds: string[]) {
@@ -504,6 +630,7 @@ export async function untagAssets(assetIds: string[], tagIds: string[]) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ids: assetIds }),
     });
+    tagAssetIdsCache.delete(tagId);
   }
 }
 
@@ -513,7 +640,10 @@ export async function renameTag(tagId: string, newName: string): Promise<ImmichT
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name: newName.trim() }),
   });
-  return res.json();
+  const renamed = await res.json() as ImmichTag;
+  tagAssetIdsCache.delete(tagId);
+  tagsCache = null;
+  return renamed;
 }
 
 export async function getServerStatistics(): Promise<ImmichServerStats> {

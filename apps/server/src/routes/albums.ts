@@ -13,7 +13,7 @@ router.get("/", async (_req, res) => {
       assetCount: a.assetCount,
       thumbnailAssetId: a.albumThumbnailAssetId,
       createdAt: a.createdAt,
-      shared: a.shared,
+      shared: a.shared ?? a.isShared ?? false,
     }));
     res.json(normalized);
   } catch (err) {

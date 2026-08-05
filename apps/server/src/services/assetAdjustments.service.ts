@@ -2,7 +2,7 @@ import {
   ensureTag,
   ImmichTag,
   listTags,
-  searchAssetIdsByTag,
+  searchAssetIdsByTags,
   tagAssets,
   untagAssets,
 } from "../infra/ImmichClient.js";
@@ -72,10 +72,13 @@ export async function getAssetAdjustmentMap(
     .filter(isAdjustmentTag)
     .sort((a, b) => tagKey(a).localeCompare(tagKey(b)));
 
+  const assetIdsByTag = await searchAssetIdsByTags(
+    adjustmentTags.map((tag) => tag.id),
+  );
   for (const tag of adjustmentTags) {
     const parsed = parseAdjustmentTag(tag);
     if (!parsed) continue;
-    const taggedAssetIds = await searchAssetIdsByTag(tag.id);
+    const taggedAssetIds = assetIdsByTag.get(tag.id) ?? [];
     for (const assetId of taggedAssetIds) {
       if (assetIdSet && !assetIdSet.has(assetId)) continue;
       const current = map.get(assetId) ?? { ...DEFAULT_ASSET_ADJUSTMENTS };

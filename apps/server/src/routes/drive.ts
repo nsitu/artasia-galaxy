@@ -159,15 +159,14 @@ let activeDriveBulkLookupJobId: string | null = null;
 
 async function searchAllAssetsForDriveLookup() {
   const byId = new Map<string, Awaited<ReturnType<typeof searchAssets>>["assets"]["items"][number]>();
-  for (const type of ["IMAGE", "VIDEO"] as const) {
-    for (const visibility of ["timeline", "archive"] as const) {
-      let page = 1;
-      for (;;) {
-        const result = await searchAssets({ page, size: 100, type, visibility });
-        for (const asset of result.assets.items) byId.set(asset.id, asset);
-        if (!result.assets.nextPage || result.assets.items.length < 100) break;
-        page += 1;
-      }
+  const size = 500;
+  for (const visibility of ["timeline", "archive"] as const) {
+    let page = 1;
+    for (;;) {
+      const result = await searchAssets({ page, size, visibility });
+      for (const asset of result.assets.items) byId.set(asset.id, asset);
+      if (!result.assets.nextPage || result.assets.items.length < size) break;
+      page += 1;
     }
   }
   return Array.from(byId.values());
