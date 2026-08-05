@@ -19,6 +19,7 @@ import {
 } from "../infra/ImmichClient.js";
 import { getUploadConfig } from "../services/uploadConfig.service.js";
 import { prepareAudioAsVideo } from "../services/audioToVideo.service.js";
+import { parseImmichDuration } from "../services/audioAsset.service.js";
 import { UPLOAD_LIMITS } from "../services/uploadLimits.js";
 
 const router = Router();
@@ -44,14 +45,24 @@ function assetHasTagNames(asset: ImmichAsset, requiredTagNames: string[]) {
   return requiredTagNames.every((name) => assetTags.has(name.toLocaleLowerCase()));
 }
 
-async function waitForAssetTags(assetId: string, requiredTagNames: string[]) {
-  const retries = 20;
+async function waitForAssetTags(
+  assetId: string,
+  requiredTagNames: string[],
+  options?: { requireAudioDuration?: boolean },
+) {
+  const retries = options?.requireAudioDuration ? 120 : 20;
   for (let attempt = 0; attempt < retries; attempt += 1) {
     const asset = await getAsset(assetId);
-    if (assetHasTagNames(asset, requiredTagNames)) return asset;
+    const hasAudioDuration =
+      !options?.requireAudioDuration || parseImmichDuration(asset.duration) > 0;
+    if (assetHasTagNames(asset, requiredTagNames) && hasAudioDuration) return asset;
     await new Promise<void>((resolve) => setTimeout(resolve, 250));
   }
-  throw new Error("Immich did not make the imported asset tags available in time. The previous asset was left unchanged.");
+  throw new Error(
+    options?.requireAudioDuration
+      ? "Immich did not make the imported audio duration available in time. The previous asset was left unchanged."
+      : "Immich did not make the imported asset tags available in time. The previous asset was left unchanged.",
+  );
 }
 
 function assetDriveSourceId(asset: ImmichAsset) {
@@ -411,7 +422,9 @@ async function importDriveFile(params: {
       ...(fileInfo.isAudio ? ["media:audio"] : []),
     ];
     await tagAsset(uploadResult.id, allTags);
-    await waitForAssetTags(uploadResult.id, allTags);
+    await waitForAssetTags(uploadResult.id, allTags, {
+      requireAudioDuration: fileInfo.isAudio,
+    });
     if (replacement) await archiveReplacedAsset(replacement, uploadResult.id);
     return {
       fileId: params.fileId,
