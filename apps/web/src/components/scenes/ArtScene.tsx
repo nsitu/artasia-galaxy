@@ -820,6 +820,7 @@ export default function ArtScene() {
           <ambientLight intensity={0.8} />
           <Suspense fallback={null}>
             <TerrainGallery
+              authenticated={authUser?.authenticated ?? null}
               introEnabled={showWelcomeIntro}
               introPhase={introPhase}
               onIntroReady={handleIntroReady}

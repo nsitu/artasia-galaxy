@@ -16,7 +16,10 @@ For local upload config, the server reads JSON from `DATA_DIR`. With the workspa
 
 ```dotenv
 DATA_DIR=../../data
+VITE_MAPBOX_TOKEN=pk.your-mapbox-public-token
 ```
+
+`VITE_MAPBOX_TOKEN` is required for the browser terrain layer. Use a public Mapbox token restricted to your local development origins, then restart the Vite dev server after changing `.env`.
 
 ## Documentation
 

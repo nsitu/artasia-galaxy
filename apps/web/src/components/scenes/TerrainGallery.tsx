@@ -508,6 +508,7 @@ export type PartnerFilterOption = {
 const SITE_PATH_PREFIX = "/sites/";
 
 interface TerrainGalleryProps {
+  authenticated?: boolean | null;
   introEnabled?: boolean;
   introPhase?: IntroPhase;
   introPanOffsetRef?: { current: boolean };
@@ -529,6 +530,7 @@ interface TerrainGalleryProps {
 }
 
 export default function TerrainGallery({
+  authenticated = null,
   introEnabled = false,
   introPhase = "complete",
   introPanOffsetRef,
@@ -1105,6 +1107,11 @@ export default function TerrainGallery({
   }, []);
 
   useEffect(() => {
+    if (authenticated !== true) {
+      setPlacementsWithAssets(new Set());
+      return;
+    }
+
     let cancelled = false;
     fetchSiteActivityStats()
       .then((result) => {
@@ -1121,7 +1128,7 @@ export default function TerrainGallery({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [authenticated]);
 
   useEffect(() => {
     if (!request) {
