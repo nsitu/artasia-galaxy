@@ -2,7 +2,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { Canvas, useThree } from "@react-three/fiber";
 import { MapControls, Preload } from "@react-three/drei";
 import * as THREE from "three";
-import { fetchAuthUser, fetchUploadOptions, type ActivityOption, type AuthUser, type MapPlacement } from "../../api/client";
+import { fetchAuthUser, fetchUploadOptions, type ActivityOption, type AuthUser, type MapPlacement, type Photo } from "../../api/client";
 import { useGalleryStore } from "../../stores/galleryStore";
 import LoadingIndicator from "../ui/LoadingIndicator";
 import WelcomeOverlay from "../ui/WelcomeOverlay";
@@ -391,15 +391,24 @@ export default function ArtScene() {
     }
   }, [activityFilterOptions, selectedActivityFilter]);
 
+  const placementTotalPhotosRef = useRef<Photo[]>([]);
+
   useEffect(() => {
     if (!focusedPlacementDetails) {
-      setSelectedActivityFilter("");
+      placementTotalPhotosRef.current = [];
       return;
     }
-    if (!photos.length || activityFilterOptions.length === 0) return;
+    if (!photos.length) return;
 
+    if (photos.length > placementTotalPhotosRef.current.length) {
+      placementTotalPhotosRef.current = photos;
+    }
+
+    if (!activityFilterOptions.length) return;
+
+    const allPhotos = placementTotalPhotosRef.current;
     const counts = new Map<number, number>();
-    for (const photo of photos) {
+    for (const photo of allPhotos) {
       for (const activityId of photo.activityIds ?? []) {
         counts.set(activityId, (counts.get(activityId) ?? 0) + 1);
       }
