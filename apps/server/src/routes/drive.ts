@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from "express";
+import { randomUUID } from "node:crypto";
 import { readAuthSession } from "../services/auth.service.js";
 import {
   createDriveClient,
@@ -129,6 +130,26 @@ type DriveBulkLookupResult = {
   error?: string;
 };
 
+type DriveBulkLookupSummary = {
+  scanned: number;
+  candidates: number;
+  linked: number;
+  notFound: number;
+  ambiguous: number;
+  skipped: number;
+  failed: number;
+  results: DriveBulkLookupResult[];
+};
+
+type DriveBulkLookupJob = {
+  status: "running" | "completed" | "failed";
+  summary?: DriveBulkLookupSummary;
+  error?: string;
+};
+
+const driveBulkLookupJobs = new Map<string, DriveBulkLookupJob>();
+let activeDriveBulkLookupJobId: string | null = null;
+
 async function searchAllAssetsForDriveLookup() {
   const byId = new Map<string, Awaited<ReturnType<typeof searchAssets>>["assets"]["items"][number]>();
   for (const type of ["IMAGE", "VIDEO"] as const) {
@@ -146,9 +167,7 @@ async function searchAllAssetsForDriveLookup() {
 }
 
 /** Link every unlinked admin asset to a unique matching file in its site's Drive tree. */
-router.post("/assets/lookup-missing", async (req: Request, res: Response) => {
-  try {
-    const client = getDriveClient(req);
+async function runBulkDriveLookup(client: GoogleDriveClient): Promise<DriveBulkLookupSummary> {
     const [assets, config] = await Promise.all([
       searchAllAssetsForDriveLookup(),
       getUploadConfig(),
@@ -293,13 +312,60 @@ router.post("/assets/lookup-missing", async (req: Request, res: Response) => {
       ambiguous: results.filter((result) => result.status === "ambiguous").length,
       skipped: results.filter((result) => result.status === "skipped").length,
       failed: results.filter((result) => result.status === "failed").length,
+      results,
     };
-    res.json({ ...summary, results });
+    return summary;
+}
+
+router.post("/assets/lookup-missing", async (req: Request, res: Response) => {
+  try {
+    const client = getDriveClient(req);
+    if (activeDriveBulkLookupJobId) {
+      res.status(409).json({
+        error: "A Drive maintenance lookup is already running.",
+        jobId: activeDriveBulkLookupJobId,
+      });
+      return;
+    }
+
+    const jobId = randomUUID();
+    const job: DriveBulkLookupJob = { status: "running" };
+    driveBulkLookupJobs.set(jobId, job);
+    activeDriveBulkLookupJobId = jobId;
+    void runBulkDriveLookup(client)
+      .then((summary) => {
+        job.status = "completed";
+        job.summary = summary;
+      })
+      .catch((err) => {
+        job.status = "failed";
+        job.error = (err as Error).message;
+      })
+      .finally(() => {
+        activeDriveBulkLookupJobId = null;
+        setTimeout(() => driveBulkLookupJobs.delete(jobId), 15 * 60_000);
+      });
+
+    res.status(202).json({ jobId, status: job.status });
   } catch (err) {
     res
       .status(err instanceof Error && err.message.includes("Not authenticated") ? 401 : 500)
       .json({ error: (err as Error).message });
   }
+});
+
+router.get("/assets/lookup-missing/:jobId", (req: Request, res: Response) => {
+  if (!readAuthSession(req)) {
+    res.status(401).json({ error: "Not authenticated" });
+    return;
+  }
+  const jobId = (Array.isArray(req.params.jobId) ? req.params.jobId[0] : req.params.jobId).trim();
+  const job = driveBulkLookupJobs.get(jobId);
+  if (!job) {
+    res.status(404).json({ error: "Drive maintenance lookup was not found or has expired." });
+    return;
+  }
+  res.json({ jobId, ...job });
 });
 
 /**

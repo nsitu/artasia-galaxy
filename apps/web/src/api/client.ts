@@ -898,15 +898,42 @@ export interface BulkDriveLookupSummary {
 }
 
 export async function lookupMissingUploadAssetDriveSources(): Promise<BulkDriveLookupSummary> {
-  const res = await fetch("/api/v1/drive/assets/lookup-missing", {
+  const startRes = await fetch("/api/v1/drive/assets/lookup-missing", {
     method: "POST",
   });
-  if (!res.ok) {
-    if (res.status === 401) throw new Error("Please sign in with Google to access Drive");
-    const body = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(body.error ?? `HTTP ${res.status}`);
+  const startBody = await startRes.json().catch(() => ({})) as {
+    jobId?: string;
+    error?: string;
+  };
+  if (!startRes.ok && !(startRes.status === 409 && startBody.jobId)) {
+    if (startRes.status === 401) throw new Error("Please sign in with Google to access Drive");
+    throw new Error(startBody.error ?? `HTTP ${startRes.status}`);
   }
-  return res.json();
+
+  const jobId = startBody.jobId;
+  if (!jobId) throw new Error("Drive maintenance lookup did not return a job ID.");
+
+  for (;;) {
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 1_000));
+    const statusRes = await fetch(
+      `/api/v1/drive/assets/lookup-missing/${encodeURIComponent(jobId)}`,
+    );
+    const statusBody = await statusRes.json().catch(() => ({})) as {
+      status?: "running" | "completed" | "failed";
+      summary?: BulkDriveLookupSummary;
+      error?: string;
+    };
+    if (!statusRes.ok) {
+      if (statusRes.status === 401) throw new Error("Please sign in with Google to access Drive");
+      throw new Error(statusBody.error ?? `HTTP ${statusRes.status}`);
+    }
+    if (statusBody.status === "failed") {
+      throw new Error(statusBody.error ?? "Drive maintenance lookup failed.");
+    }
+    if (statusBody.status === "completed" && statusBody.summary) {
+      return statusBody.summary;
+    }
+  }
 }
 
 export async function reimportUploadAssetFromDrive(assetId: string): Promise<DriveSyncResult> {
