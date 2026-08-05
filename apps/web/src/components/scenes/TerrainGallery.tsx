@@ -10,6 +10,7 @@ import {
 } from "../../api/client";
 import { useGalleryStore } from "../../stores/galleryStore";
 import {
+  OrbitingActivityRing,
   OrbitingAudioMarker,
   OrbitingPhotoBanner,
   TerrainPhotoFlower,
@@ -1657,20 +1658,12 @@ export default function TerrainGallery({
       {terrain && terrainMatchesRequest && <primitive object={terrain} />}
       {sceneReadyForMarkers && focusedPlacement &&
         activityOrbitRings.map((ring) => (
-          <mesh
+          <OrbitingActivityRing
             key={`${ring.radius}:${ring.colour}`}
-            position={[ring.center[0], ring.center[1], ring.center[2] + 0.72]}
-            renderOrder={0}
-          >
-            <ringGeometry args={[ring.radius - 0.012, ring.radius + 0.012, 96]} />
-            <meshBasicMaterial
-              color={ring.colour}
-              transparent
-              opacity={0.72}
-              side={THREE.DoubleSide}
-              depthWrite={false}
-            />
-          </mesh>
+            center={ring.center}
+            radius={ring.radius}
+            colour={ring.colour}
+          />
         ))}
 
       {sceneReadyForMarkers &&
@@ -2188,20 +2181,22 @@ function isMatchingPlacementPhotoScope(
 
 const siteDetailsStyle: React.CSSProperties = {
   position: "fixed",
-  left: "50%",
-  bottom: 16,
-  transform: "translateX(-50%)",
+  left: 0,
+  right: 0,
+  bottom: 0,
+  transform: "none",
   zIndex: 13,
-  width: "min(560px, calc(100vw - 32px))",
-  maxWidth: "calc(100vw - 32px)",
+  width: "100vw",
+  maxWidth: "none",
+  boxSizing: "border-box",
   pointerEvents: "none",
-  background: "rgba(10,10,20,0.82)",
-  border: "1px solid rgba(255,255,255,0.18)",
-  borderRadius: 6,
-  padding: "12px",
+  background: "rgba(10,10,20,0.86)",
+  border: "none",
+  borderRadius: 0,
+  padding: "12px 16px",
   color: "#d8dde7",
   fontFamily: "monospace",
-  boxShadow: "0 12px 32px rgba(0,0,0,0.28)",
+  boxShadow: "none",
 };
 
 const mobileSiteDetailsStyle: React.CSSProperties = {
@@ -2213,7 +2208,7 @@ const mobileSiteDetailsStyle: React.CSSProperties = {
   maxWidth: "none",
   zIndex: 13,
   borderRadius: 0,
-  padding: 12,
+  padding: "12px 12px max(12px, env(safe-area-inset-bottom))",
   overflow: "hidden",
 };
 

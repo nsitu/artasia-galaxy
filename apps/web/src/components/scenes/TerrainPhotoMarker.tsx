@@ -423,7 +423,102 @@ class OrbitingCutoutPhotoMaterial extends THREE.ShaderMaterial {
   set dashGap(value: number) { this.uniforms.dashGap.value = value; }
 }
 
-extend({ FlowerPhotoMaterial, AdjustedPhotoMaterial, OrbitingCutoutPhotoMaterial });
+class OrbitingActivityRingMaterial extends THREE.ShaderMaterial {
+  constructor() {
+    super({
+      uniforms: {
+        ringColour: { value: new THREE.Color("#ffffff") },
+        ringOpacity: { value: 0.72 },
+        innerRadius: { value: 1 },
+        outerRadius: { value: 1.02 },
+        noiseCells: { value: 8 },
+        noiseAmplitude: { value: 0.035 },
+        time: { value: 0 },
+      },
+      vertexShader: `
+        uniform float innerRadius;
+        uniform float outerRadius;
+        uniform float noiseCells;
+        uniform float noiseAmplitude;
+        uniform float time;
+        varying float vNoise;
+
+        float hash(vec2 point) {
+          return fract(sin(dot(point, vec2(127.1, 311.7))) * 43758.5453);
+        }
+
+        vec2 gradient(vec2 point) {
+          float angle = hash(point) * 6.2831853;
+          return vec2(cos(angle), sin(angle));
+        }
+
+        float periodicPerlin(vec2 point, float periodX) {
+          vec2 cell = floor(point);
+          vec2 local = fract(point);
+          vec2 bottomLeft = vec2(mod(cell.x, periodX), cell.y);
+          vec2 bottomRight = vec2(mod(cell.x + 1.0, periodX), cell.y);
+          vec2 topLeft = vec2(mod(cell.x, periodX), cell.y + 1.0);
+          vec2 topRight = vec2(mod(cell.x + 1.0, periodX), cell.y + 1.0);
+          float fadeX = local.x * local.x * (3.0 - 2.0 * local.x);
+          float fadeY = local.y * local.y * (3.0 - 2.0 * local.y);
+          float bottomLeftValue = dot(gradient(bottomLeft), local);
+          float bottomRightValue = dot(gradient(bottomRight), local - vec2(1.0, 0.0));
+          float topLeftValue = dot(gradient(topLeft), local - vec2(0.0, 1.0));
+          float topRightValue = dot(gradient(topRight), local - vec2(1.0, 1.0));
+          float bottom = mix(bottomLeftValue, bottomRightValue, fadeX);
+          float top = mix(topLeftValue, topRightValue, fadeX);
+          return mix(bottom, top, fadeY);
+        }
+
+        void main() {
+          vec3 displaced = position;
+          float radius = length(position.xy);
+          float angle = atan(position.y, position.x);
+          float angularCoordinate = (angle + 3.14159265) / 6.2831853 * noiseCells;
+          float noise = periodicPerlin(vec2(angularCoordinate, time * 0.35), noiseCells);
+          float edgeDirection = radius < (innerRadius + outerRadius) * 0.5 ? -1.0 : 1.0;
+          displaced.xy += normalize(position.xy) * noise * noiseAmplitude * edgeDirection;
+          vNoise = noise;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(displaced, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 ringColour;
+        uniform float ringOpacity;
+        varying float vNoise;
+
+        void main() {
+          gl_FragColor = vec4(ringColour, ringOpacity);
+          #include <colorspace_fragment>
+        }
+      `,
+    });
+  }
+
+  get ringColour() { return this.uniforms.ringColour.value as THREE.Color; }
+  set ringColour(value: THREE.Color | string | number) {
+    this.uniforms.ringColour.value = value instanceof THREE.Color ? value : new THREE.Color(value);
+  }
+  get ringOpacity() { return this.uniforms.ringOpacity.value as number; }
+  set ringOpacity(value: number) { this.uniforms.ringOpacity.value = value; }
+  get innerRadius() { return this.uniforms.innerRadius.value as number; }
+  set innerRadius(value: number) { this.uniforms.innerRadius.value = value; }
+  get outerRadius() { return this.uniforms.outerRadius.value as number; }
+  set outerRadius(value: number) { this.uniforms.outerRadius.value = value; }
+  get noiseCells() { return this.uniforms.noiseCells.value as number; }
+  set noiseCells(value: number) { this.uniforms.noiseCells.value = value; }
+  get noiseAmplitude() { return this.uniforms.noiseAmplitude.value as number; }
+  set noiseAmplitude(value: number) { this.uniforms.noiseAmplitude.value = value; }
+  get time() { return this.uniforms.time.value as number; }
+  set time(value: number) { this.uniforms.time.value = value; }
+}
+
+extend({
+  FlowerPhotoMaterial,
+  AdjustedPhotoMaterial,
+  OrbitingCutoutPhotoMaterial,
+  OrbitingActivityRingMaterial,
+});
 
 declare module "@react-three/fiber" {
   interface ThreeElements {
@@ -462,6 +557,15 @@ declare module "@react-three/fiber" {
       borderWidth?: number;
       dashLength?: number;
       dashGap?: number;
+    };
+    orbitingActivityRingMaterial: ThreeElements["shaderMaterial"] & {
+      ringColour?: THREE.Color | string | number;
+      ringOpacity?: number;
+      innerRadius?: number;
+      outerRadius?: number;
+      noiseCells?: number;
+      noiseAmplitude?: number;
+      time?: number;
     };
   }
 }
@@ -916,6 +1020,50 @@ export function OrbitingPhotoBanner({
           />
         </mesh>
       </Billboard>
+    </group>
+  );
+}
+
+export function OrbitingActivityRing({
+  center,
+  radius,
+  colour,
+}: {
+  center: [number, number, number];
+  radius: number;
+  colour: string;
+}) {
+  const groupRef = useRef<THREE.Group>(null);
+  const materialRef = useRef<OrbitingActivityRingMaterial>(null);
+  const [cx, cy, cz] = center;
+  const innerRadius = radius - 0.012;
+  const outerRadius = radius + 0.012;
+
+  useFrame((state) => {
+    if (groupRef.current) groupRef.current.rotation.z = state.clock.elapsedTime * ORBIT_SPEED;
+    if (materialRef.current) materialRef.current.time = state.clock.elapsedTime;
+  });
+
+  return (
+    <group
+      ref={groupRef}
+      position={[cx, cy, cz + ORBIT_HEIGHT]}
+    >
+      <mesh renderOrder={0}>
+        <ringGeometry args={[innerRadius, outerRadius, 128]} />
+        <orbitingActivityRingMaterial
+          ref={materialRef}
+          ringColour={colour}
+          ringOpacity={0.72}
+          innerRadius={innerRadius}
+          outerRadius={outerRadius}
+          noiseCells={8}
+          noiseAmplitude={0.012}
+          transparent
+          side={THREE.DoubleSide}
+          depthWrite={false}
+        />
+      </mesh>
     </group>
   );
 }
