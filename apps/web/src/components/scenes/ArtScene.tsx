@@ -245,6 +245,26 @@ export default function ArtScene() {
     selectPhoto(nextIndex);
   }, [photos.length, selectedPhotoIndex, selectPhoto]);
 
+  useEffect(() => {
+    if (!selectedPhoto) return;
+
+    const handleLightboxKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        selectPhoto(null);
+      } else if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        selectAdjacentPhoto(-1);
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        selectAdjacentPhoto(1);
+      }
+    };
+
+    document.addEventListener("keydown", handleLightboxKeyDown);
+    return () => document.removeEventListener("keydown", handleLightboxKeyDown);
+  }, [selectAdjacentPhoto, selectPhoto, selectedPhoto]);
+
   const handleLightboxPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (event.pointerType !== "touch") return;
     lightboxTouchPointsRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -711,7 +731,7 @@ export default function ArtScene() {
                   selectAdjacentPhoto(-1);
                 }}
                 aria-label="Previous artwork"
-                style={{ ...photoLightboxNavStyle, left: 16 }}
+                style={{ ...photoLightboxNavStyle, left: 0 }}
               >
                 <svg viewBox="0 0 16 16" aria-hidden="true" style={photoLightboxNavIconStyle}>
                   <path d="m10.5 2.5-5.5 5.5 5.5 5.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -725,7 +745,7 @@ export default function ArtScene() {
                   selectAdjacentPhoto(1);
                 }}
                 aria-label="Next artwork"
-                style={{ ...photoLightboxNavStyle, right: 16 }}
+                style={{ ...photoLightboxNavStyle, right: 0 }}
               >
                 <svg viewBox="0 0 16 16" aria-hidden="true" style={photoLightboxNavIconStyle}>
                   <path d="m5.5 2.5 5.5 5.5-5.5 5.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -1687,13 +1707,20 @@ const photoLightboxEditLinkStyle: React.CSSProperties = {
 };
 
 const photoLightboxCloseStyle: React.CSSProperties = {
-  ...menuButtonStyle,
-  position: "absolute",
-  top: 16,
-  right: 16,
-  background: "rgba(10,10,20,0.82)",
+  pointerEvents: "auto",
+  width: "5rem",
+  height: "5rem",
+  display: "grid",
+  placeItems: "center",
+  padding: 0,
+  background: "rgba(255,255,255,0.1)",
   color: "#eef2f8",
-  border: "1px solid rgba(255,255,255,0.18)",
+  border: "none",
+  borderRadius: 0,
+  cursor: "pointer",
+  position: "absolute",
+  top: 0,
+  right: 0,
   boxShadow: "none",
 };
 
@@ -1751,20 +1778,21 @@ const aboutTextStyle: React.CSSProperties = { margin: "0 auto 22px", maxWidth: 3
 const aboutLinkStyle: React.CSSProperties = { color: "#fff", fontFamily: "monospace", fontSize: 12, textDecoration: "underline" };
 
 const photoLightboxNavStyle: React.CSSProperties = {
+  pointerEvents: "auto",
   position: "absolute",
   top: "50%",
   transform: "translateY(-50%)",
-  width: 48,
-  height: 48,
+  width: "5rem",
+  height: "5rem",
   display: "grid",
   placeItems: "center",
   padding: 0,
-  border: "1px solid rgba(255,255,255,0.18)",
-  borderRadius: 999,
-  background: "rgba(10,10,20,0.82)",
+  background: "rgba(255,255,255,0.1)",
   color: "#eef2f8",
-  boxShadow: "0 10px 26px rgba(0,0,0,0.28)",
+  border: "none",
+  borderRadius: 0,
   cursor: "pointer",
+  boxShadow: "none",
 };
 
 const photoLightboxNavIconStyle: React.CSSProperties = {

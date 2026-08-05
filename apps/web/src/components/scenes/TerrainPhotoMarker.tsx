@@ -302,12 +302,15 @@ class OrbitingCutoutPhotoMaterial extends THREE.ShaderMaterial {
           float edgeDistance;
           float borderMask;
           float cutoutAlpha;
+          float dashMask = 1.0;
 
           if (shapeMode > 0.5) {
             vec2 centered = vUv * 2.0 - 1.0;
             edgeDistance = 0.88 - length(centered);
-            borderMask = 1.0 - smoothstep(borderWidth, borderWidth + 0.008, edgeDistance);
-            cutoutAlpha = smoothstep(-0.002, 0.004, edgeDistance);
+            float circleAngle = atan(centered.y, centered.x) + 3.14159265;
+            float circleDistance = (circleAngle / 6.2831853) * (2.0 * 3.14159265 * 0.88);
+            float circleDashPeriod = dashLength + dashGap;
+            dashMask = 1.0 - step(dashLength, mod(circleDistance, circleDashPeriod));
           } else {
           vec2 point = metricPoint(vUv);
           vec2 bottomLeft = metricPoint(cornerBottomLeft);
@@ -320,7 +323,6 @@ class OrbitingCutoutPhotoMaterial extends THREE.ShaderMaterial {
           float distanceTop = signedEdgeDistance(point, topRight, topLeft);
           float distanceLeft = signedEdgeDistance(point, topLeft, bottomLeft);
           edgeDistance = min(min(distanceBottom, distanceRight), min(distanceTop, distanceLeft));
-          if (edgeDistance < -0.002) discard;
 
           float edgeIndex = 0.0;
           float nearestDistance = distanceBottom;
@@ -351,10 +353,12 @@ class OrbitingCutoutPhotoMaterial extends THREE.ShaderMaterial {
 
           float alongEdge = edgePosition(point, edgeStart, edgeEnd) * length(edgeEnd - edgeStart);
           float dashPeriod = dashLength + dashGap;
-          float dashMask = 1.0 - step(dashLength, mod(alongEdge, dashPeriod));
-          borderMask = (1.0 - smoothstep(borderWidth, borderWidth + 0.008, edgeDistance)) * dashMask;
-          cutoutAlpha = smoothstep(-0.002, 0.004, edgeDistance);
+          dashMask = 1.0 - step(dashLength, mod(alongEdge, dashPeriod));
           }
+
+          float edgeAA = max(fwidth(edgeDistance), 0.002);
+          borderMask = (1.0 - smoothstep(borderWidth, borderWidth + edgeAA, edgeDistance)) * dashMask;
+          cutoutAlpha = smoothstep(-edgeAA, edgeAA, edgeDistance);
 
           vec2 photoUv = vUv;
           if (shapeMode > 0.5) {
