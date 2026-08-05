@@ -82,6 +82,7 @@ function LightboxMedia({
       <AudioLightboxPlayer
         assetId={photo.id}
         audioUrl={photo.audioUrl}
+        iconName={photo.iconName}
         activityColour={activityColour}
         style={mediaStyle}
       />
@@ -660,18 +661,6 @@ export default function ArtScene() {
           )}
         </div>
       </div>
-
-      <a
-        className="atlas-presented-by"
-        href="https://artsforall.co"
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="Presented by Arts For All"
-        style={presentedByStyle}
-      >
-        
-        <img src="/afa-horizontal.svg" alt="Arts For All" style={presentedByLogoStyle} />
-      </a>
 
       {aboutOpen && (
         <div role="dialog" aria-modal="true" aria-label="About Atlas" style={aboutOverlayStyle}>
@@ -1362,9 +1351,6 @@ const responsiveTopNavStyles = `
       padding-bottom: 12px;
     }
 
-    .atlas-site-view .atlas-presented-by {
-      display: none !important;
-    }
     .atlas-lightbox-nav-button {
       display: none !important;
     }
@@ -1481,28 +1467,6 @@ const topControlGroupStyle: React.CSSProperties = {
   alignItems: "center",
   gap: 0,
   pointerEvents: "none",
-};
-
-const presentedByStyle: React.CSSProperties = {
-  position: "fixed",
-  right: 16,
-  bottom: 14,
-  zIndex: 16,
-  display: "inline-flex",
-  alignItems: "end",
-  gap: 8,
-  padding: "6px 8px",
-  color: "#c1c9d7",
-  textDecoration: "none",
-  fontFamily: "monospace",
-  pointerEvents: "auto",
-};
- 
-
-const presentedByLogoStyle: React.CSSProperties = {
-  width: "clamp(84px, 16vw, 116px)",
-  height: "auto",
-  display: "block",
 };
 
 const webglFallbackStyle: React.CSSProperties = {

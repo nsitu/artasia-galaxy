@@ -11,12 +11,14 @@ function formatTime(seconds: number) {
 export default function AudioLightboxPlayer({
   assetId,
   audioUrl,
+  iconName,
   autoPlay = true,
   activityColour = "#b7bac3",
   style,
 }: {
   assetId: string;
   audioUrl: string;
+  iconName?: string;
   autoPlay?: boolean;
   activityColour?: string;
   style?: CSSProperties;
@@ -69,6 +71,8 @@ export default function AudioLightboxPlayer({
     });
   }, [waveform]);
 
+  const displayedIconName = iconName?.trim() || "play_arrow";
+
   function seek(event: React.PointerEvent<SVGSVGElement>) {
     if (duration <= 0 || !audioRef.current) return;
     const bounds = event.currentTarget.getBoundingClientRect();
@@ -97,7 +101,14 @@ export default function AudioLightboxPlayer({
   return (
     <div
       className="atlas-photo-lightbox-audio"
-      style={{ ...audioLightboxPlayerStyle, ...style }}
+      style={{
+        ...audioLightboxPlayerStyle,
+        ...style,
+        padding: 0,
+        background: "transparent",
+        border: "none",
+        boxShadow: "none",
+      }}
       onClick={(event) => event.stopPropagation()}
     >
       <audio
@@ -129,46 +140,42 @@ export default function AudioLightboxPlayer({
             {playing ? "pause" : "play_arrow"}
           </span>
         </button>
+        <div style={audioLightboxWaveformColumnStyle}>
+          <span aria-hidden="true" style={audioLightboxAssetIconStyle}>
+            {displayedIconName}
+          </span>
+          <svg
+            viewBox="0 0 180 100"
+            preserveAspectRatio="none"
+            role="img"
+            aria-label="Audio waveform"
+            onPointerDown={seek}
+            style={audioLightboxWaveformStyle}
+          >
+            {waveformBars.map((peak, index) => {
+              const x = index + 0.5;
+              const height = Math.max(5, peak * 82);
+              const hasPlayed =
+                duration > 0 && (index + 0.5) / waveformBars.length <= currentTime / duration;
+              return (
+                <rect
+                  key={index}
+                  x={x - 0.36}
+                  y={(100 - height) / 2}
+                  width={0.72}
+                  height={height}
+                  rx={0.36}
+                  fill={hasPlayed ? "#fff" : activityColour}
+                  opacity={hasPlayed ? 1 : 0.88}
+                />
+              );
+            })}
+          </svg>
+        </div>
         <span style={audioLightboxTimeStyle}>
           {formatTime(currentTime)} / {formatTime(duration)}
         </span>
       </div>
-      <svg
-        viewBox="0 0 180 100"
-        preserveAspectRatio="none"
-        role="img"
-        aria-label="Audio waveform"
-        onPointerDown={seek}
-        style={audioLightboxWaveformStyle}
-      >
-        {waveformBars.map((peak, index) => {
-          const x = index + 0.5;
-          const height = Math.max(5, peak * 82);
-          return (
-            <rect
-              key={index}
-              x={x - 0.36}
-              y={(100 - height) / 2}
-              width={0.72}
-              height={height}
-              rx={0.36}
-              fill={activityColour}
-              opacity={0.88}
-            />
-          );
-        })}
-        {duration > 0 && (
-          <line
-            x1={(currentTime / duration) * 180}
-            x2={(currentTime / duration) * 180}
-            y1={4}
-            y2={96}
-            stroke="#ffffff"
-            strokeWidth={1.1}
-            vectorEffect="non-scaling-stroke"
-          />
-        )}
-      </svg>
       {!waveform && !waveformError && (
         <span style={audioLightboxMessageStyle}>Generating waveform…</span>
       )}
@@ -181,21 +188,36 @@ export default function AudioLightboxPlayer({
 
 const audioLightboxPlayerStyle: CSSProperties = {
   width: "min(620px, calc(100vw - 48px))",
-  padding: 18,
   boxSizing: "border-box",
-  borderRadius: 8,
-  background: "rgba(10, 10, 20, 0.92)",
-  border: "1px solid rgba(255,255,255,0.18)",
   color: "#eef2f8",
-  boxShadow: "0 18px 60px rgba(0,0,0,0.5)",
   cursor: "default",
 };
 
 const audioLightboxControlsStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "42px minmax(0, 1fr) auto",
+  alignItems: "center",
+  gap: 14,
+  width: "100%",
+};
+
+const audioLightboxWaveformColumnStyle: CSSProperties = {
+  minWidth: 0,
+  width: "100%",
+};
+
+const audioLightboxAssetIconStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
-  gap: 12,
-  marginBottom: 14,
+  justifyContent: "center",
+  width: "80%",
+  aspectRatio: "1",
+  margin: "0 auto 14px",
+  color: "#fff",
+  fontFamily: "'Material Symbols Outlined'",
+  fontSize: "clamp(72px, 16vw, 160px)",
+  lineHeight: 1,
+  fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 48",
 };
 
 const audioLightboxPlayButtonStyle: CSSProperties = {
@@ -225,11 +247,8 @@ const audioLightboxTimeStyle: CSSProperties = {
 const audioLightboxWaveformStyle: CSSProperties = {
   display: "block",
   width: "100%",
-  height: 112,
-  borderRadius: 4,
-  background: "rgba(255,255,255,0.06)",
+  height: 96,
   cursor: "pointer",
-  overflow: "hidden",
 };
 
 const audioLightboxMessageStyle: CSSProperties = {
