@@ -393,6 +393,7 @@ interface AssetManagementAssignment {
   activityLabel?: string;
   iconName?: string;
   linkedAudioAssetId?: string;
+  driveFileId?: string;
   published?: boolean;
   isAudio?: boolean;
 }
@@ -440,11 +441,12 @@ function mapAdminAsset(
   useGpsLocation = true,
 ) {
   const dimensions = editableAssetDimensions(asset);
-  const driveFileId = (asset.tags ?? [])
+  const embeddedDriveFileId = (asset.tags ?? [])
     .flatMap((tag) => [tag.name, tag.value])
     .map((value) => value.trim())
     .find((value) => value.toLocaleLowerCase().startsWith(DRIVE_SOURCE_TAG_PREFIX))
     ?.slice(DRIVE_SOURCE_TAG_PREFIX.length);
+  const driveFileId = assignment?.driveFileId ?? embeddedDriveFileId;
   return {
     id: asset.id,
     type: asset.type,
@@ -852,6 +854,28 @@ async function getManagementAssignments(
     }),
   );
 
+  const driveSourceTags = tags.flatMap((tag) => {
+    const value = [tag.name, tag.value]
+      .map((candidate) => candidate.trim())
+      .find((candidate) =>
+        candidate.toLocaleLowerCase().startsWith(DRIVE_SOURCE_TAG_PREFIX),
+      );
+    return value
+      ? [{ id: tag.id, driveFileId: value.slice(DRIVE_SOURCE_TAG_PREFIX.length) }]
+      : [];
+  });
+  await Promise.all(
+    driveSourceTags.map(async ({ id, driveFileId }) => {
+      const taggedAssetIds = await searchAdminAssetIdsByTag(id);
+      for (const assetId of taggedAssetIds) {
+        if (!assetIdSet.has(assetId)) continue;
+        const current = assignments.get(assetId) ?? {};
+        current.driveFileId = driveFileId;
+        assignments.set(assetId, current);
+      }
+    }),
+  );
+
   const audioTag =
     options?.includeAudio === false
       ? undefined
@@ -948,6 +972,9 @@ function mapEmbeddedAssetMetadata(
       );
       if (linkedAudioMatch) {
         assignment.linkedAudioAssetId = linkedAudioMatch[1];
+      }
+      if (key.startsWith(DRIVE_SOURCE_TAG_PREFIX)) {
+        assignment.driveFileId = key.slice(DRIVE_SOURCE_TAG_PREFIX.length);
       }
       if (key === "media:audio") assignment.isAudio = true;
       if (key === "artasia:gps:disabled") gpsDisabledAssetIds.add(asset.id);
