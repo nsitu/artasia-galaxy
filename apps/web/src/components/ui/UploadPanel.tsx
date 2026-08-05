@@ -2317,7 +2317,7 @@ export default function UploadPanel({
       refreshVisibleAssets();
       setNotice({
         tone: "success",
-        message: `Reimported ${result.fileName} and archived the previous asset.`,
+        message: `Reimported ${result.fileName} and replaced the previous asset.`,
       });
     } catch (err) {
       setError((err as Error).message);
@@ -3140,6 +3140,11 @@ export default function UploadPanel({
           )}
         </span>
         <span style={assetNameStyle}>{asset.fileName}</span>
+        {asset.mediaKind === "audio" && (
+          <span style={assetDurationStyle}>
+            Duration: {formatAssetDuration(asset.durationSeconds)}
+          </span>
+        )}
         <span style={assetDateStyle}>
           {new Date(asset.createdAt).toLocaleDateString()}
         </span>
@@ -6437,6 +6442,12 @@ const assetDateStyle: React.CSSProperties = {
   fontSize: 11,
 };
 
+const assetDurationStyle: React.CSSProperties = {
+  color: "#c6d4e8",
+  fontSize: 11,
+  fontVariantNumeric: "tabular-nums",
+};
+
 const emptyStateStyle: React.CSSProperties = {
   color: "#8f98a8",
   background: "#171a22",
@@ -6765,6 +6776,17 @@ function normalizedMediaFileKey(fileName: string) {
     .trim()
     .toLocaleLowerCase()
     .replace(/\.(?:jpe?g|png|gif|webp|heic|heif|avif|tiff?|bmp|mp4|mov|m4v|webm|avi|mkv|mp3|m4a|wav|aac|ogg|flac)$/i, "");
+}
+
+function formatAssetDuration(seconds: number) {
+  const safeSeconds = Number.isFinite(seconds) ? Math.max(0, Math.round(seconds)) : 0;
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const remainder = safeSeconds % 60;
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
+  }
+  return `${String(minutes).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
 }
 
 const driveFileListStyle: React.CSSProperties = {

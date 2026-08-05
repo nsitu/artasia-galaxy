@@ -8,6 +8,7 @@ import {
 } from "../services/googleDrive.service.js";
 import {
   copyAssetRelationships,
+  deleteAssets,
   getAsset,
   listAssetIdsByTag,
   listTags,
@@ -645,7 +646,7 @@ async function findDriveImportReplacement(params: {
   return null;
 }
 
-async function archiveReplacedAsset(source: ImmichAsset, targetAssetId: string) {
+async function replaceImportedAsset(source: ImmichAsset, targetAssetId: string) {
   if (source.id === targetAssetId) return;
 
   await copyAssetRelationships(source.id, targetAssetId);
@@ -663,7 +664,7 @@ async function archiveReplacedAsset(source: ImmichAsset, targetAssetId: string) 
     dateTimeOriginal: source.fileCreatedAt,
     visibility: "timeline",
   });
-  await updateAsset(source.id, { visibility: "archive" });
+  await deleteAssets([source.id]);
 }
 
 async function importDriveFile(params: {
@@ -745,7 +746,7 @@ async function importDriveFile(params: {
     await waitForAssetTags(uploadResult.id, allTags, {
       requireAudioDuration: fileInfo.isAudio,
     });
-    if (replacement) await archiveReplacedAsset(replacement, uploadResult.id);
+    if (replacement) await replaceImportedAsset(replacement, uploadResult.id);
     return {
       fileId: params.fileId,
       fileName,
@@ -806,7 +807,7 @@ router.post("/assets/:assetId/lookup", async (req: Request, res: Response) => {
   }
 });
 
-/** Reimport one Drive-linked asset, preserving its relationships and archiving its old copy. */
+/** Reimport one Drive-linked asset, preserving its relationships and replacing its old copy. */
 router.post("/assets/:assetId/reimport", async (req: Request, res: Response) => {
   try {
     const client = getDriveClient(req);
