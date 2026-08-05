@@ -243,6 +243,7 @@ class OrbitingCutoutPhotoMaterial extends THREE.ShaderMaterial {
         cornerTopLeft: { value: new THREE.Vector2(0.08, 0.92) },
         shapeMode: { value: 0 },
         imageAspect: { value: 1 },
+        indicatorMix: { value: 0 },
         borderColor: { value: new THREE.Color("#ffffff") },
         borderWidth: { value: 0.04 },
         dashLength: { value: 0.11 },
@@ -268,6 +269,7 @@ class OrbitingCutoutPhotoMaterial extends THREE.ShaderMaterial {
         uniform vec2 cornerTopLeft;
         uniform float shapeMode;
         uniform float imageAspect;
+        uniform float indicatorMix;
         uniform vec3 borderColor;
         uniform float borderWidth;
         uniform float dashLength;
@@ -370,6 +372,8 @@ class OrbitingCutoutPhotoMaterial extends THREE.ShaderMaterial {
           }
           vec4 color = texture2D(photoMap, photoUv);
           color = applyCssLikeAdjustments(color, brightness, contrast, saturation);
+          color.rgb = mix(color.rgb, borderColor, indicatorMix);
+          color.a = mix(color.a, 1.0, indicatorMix);
           color.rgb = mix(color.rgb, borderColor, borderMask);
           gl_FragColor = vec4(color.rgb, color.a * cutoutAlpha);
           #include <colorspace_fragment>
@@ -390,6 +394,8 @@ class OrbitingCutoutPhotoMaterial extends THREE.ShaderMaterial {
   set shapeMode(value: number) { this.uniforms.shapeMode.value = value; }
   get imageAspect() { return this.uniforms.imageAspect.value as number; }
   set imageAspect(value: number) { this.uniforms.imageAspect.value = value; }
+  get indicatorMix() { return this.uniforms.indicatorMix.value as number; }
+  set indicatorMix(value: number) { this.uniforms.indicatorMix.value = value; }
   get cardAspect() { return this.uniforms.cardAspect.value as number; }
   set cardAspect(value: number) { this.uniforms.cardAspect.value = value; }
   get cornerBottomLeft() { return this.uniforms.cornerBottomLeft.value as THREE.Vector2; }
@@ -445,6 +451,7 @@ declare module "@react-three/fiber" {
       cornerTopLeft?: THREE.Vector2;
       shapeMode?: number;
       imageAspect?: number;
+      indicatorMix?: number;
       borderColor?: THREE.Color | string | number;
       borderWidth?: number;
       dashLength?: number;
@@ -518,6 +525,7 @@ const UP = new THREE.Vector3(0, 0, 1);
 const BANNER_MAX_WIDTH = 0.95;
 const BANNER_MAX_HEIGHT = 0.58;
 const CIRCLE_FRAME_SIZE = 0.72;
+const ORBIT_INDICATOR_SCALE = 0.34;
 const ORBIT_MIN_UNITS = 0.72;
 const ORBIT_MAX_UNITS = 2.15;
 const ORBIT_HEIGHT = 0.72;
@@ -749,6 +757,7 @@ export function OrbitingPhotoBanner({
 }: OrbitBannerProps) {
   const groupRef = useRef<THREE.Group>(null);
   const imageRef = useRef<THREE.Mesh>(null);
+  const materialRef = useRef<OrbitingCutoutPhotoMaterial>(null);
   const pointerInsideRef = useRef(false);
   const pointerDragRef = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   const texture = usePhotoTexture(url);
@@ -758,9 +767,10 @@ export function OrbitingPhotoBanner({
     speed: stableRange(`${id}:speed`, ORBIT_SPEED_MIN, ORBIT_SPEED_MAX),
   }), [id, orbitRadius]);
   const cutout = useMemo(() => createCutoutCorners(id), [id]);
-  const pulse = useMemo(() => ({
-    phase: stableRange(`${id}:pulse:phase`, 0, Math.PI * 2),
-    speed: stableRange(`${id}:pulse:speed`, 0.52, 0.78),
+  const wakeCycle = useMemo(() => ({
+    phase: stableRange(`${id}:wake:phase`, 0, 10),
+    period: stableRange(`${id}:wake:period`, 7.5, 11.5),
+    visibleRatio: stableRange(`${id}:wake:visible-ratio`, 0.28, 0.38),
   }), [id]);
   const fallbackBorderColor = useMemo(() => {
     const index = Math.min(
@@ -791,11 +801,28 @@ export function OrbitingPhotoBanner({
       cy + Math.sin(angle) * orbit.radius,
       cz + ORBIT_HEIGHT
     );
-    const pulseScale = isDenseOrbit
-      ? 0.82 + (Math.sin(state.clock.elapsedTime * pulse.speed + pulse.phase) + 1) * 0.11
-      : 1;
-    const targetScale = pulseScale * (isHighlighted || isSelected ? 1.14 : 1);
+    const isEngaged = isHighlighted || isSelected;
+    let indicatorMix = 0;
+    if (isDenseOrbit && !isEngaged) {
+      const cycleTime = (state.clock.elapsedTime + wakeCycle.phase) % wakeCycle.period;
+      const visibleDuration = wakeCycle.period * wakeCycle.visibleRatio;
+      const transitionDuration = Math.min(1.15, wakeCycle.period * 0.12);
+      const collapseStart = visibleDuration - transitionDuration;
+      const wakeStart = wakeCycle.period - transitionDuration;
+      if (cycleTime < collapseStart) {
+        indicatorMix = 0;
+      } else if (cycleTime < visibleDuration) {
+        indicatorMix = THREE.MathUtils.smoothstep(cycleTime, collapseStart, visibleDuration);
+      } else if (cycleTime < wakeStart) {
+        indicatorMix = 1;
+      } else {
+        indicatorMix = 1 - THREE.MathUtils.smoothstep(cycleTime, wakeStart, wakeCycle.period);
+      }
+    }
+    const orbitScale = THREE.MathUtils.lerp(1, ORBIT_INDICATOR_SCALE, indicatorMix);
+    const targetScale = orbitScale * (isEngaged ? 1.14 : 1);
     image.scale.lerp(tempVector.set(targetScale, targetScale, 1), 0.15);
+    if (materialRef.current) materialRef.current.indicatorMix = indicatorMix;
   });
 
   return (
@@ -849,6 +876,7 @@ export function OrbitingPhotoBanner({
         >
           <planeGeometry args={[imageW, imageH]} />
           <orbitingCutoutPhotoMaterial
+            ref={materialRef}
             photoMap={texture}
             brightness={brightness}
             contrast={contrast}
