@@ -474,8 +474,9 @@ type LocalPhotoLayoutItem =
       index: number;
       center: [number, number, number];
       orbitRadius: number;
+      orbitAssetCount: number;
       orbitColour?: string;
-      activityId?: number;
+      activityId: number;
     };
 type TerrainOrbitControls = {
   target?: THREE.Vector3;
@@ -715,12 +716,13 @@ export default function TerrainGallery({
         orbitRadius: rank >= 0
           ? 0.78 + rank * expandedStep
           : untaggedRadius,
+        orbitAssetCount: 0,
         activityId: activity?.id ?? -1,
         orbitColour: activity?.colour ?? "#8a9099",
       };
     };
 
-    return photosForCurrentView.map((photo, index) => {
+    const orbitItems = photosForCurrentView.map<LocalPhotoLayoutItem>((photo, index) => {
       if (photo.mediaKind === "audio") {
         return {
           kind: "orbit",
@@ -773,6 +775,14 @@ export default function TerrainGallery({
         ...orbitForPhoto(photo),
       };
     });
+    const orbitCounts = new Map<number, number>();
+    for (const item of orbitItems) {
+      if (item.kind !== "orbit") continue;
+      orbitCounts.set(item.activityId, (orbitCounts.get(item.activityId) ?? 0) + 1);
+    }
+    return orbitItems.map((item) => item.kind === "orbit"
+      ? { ...item, orbitAssetCount: orbitCounts.get(item.activityId) ?? 1 }
+      : item);
   }, [activityOptions, focusedPlacement, photosForCurrentView, projection, terrain]);
   const activityOrbitRings = useMemo(() => {
     const rings = new Map<number, {
@@ -1674,6 +1684,7 @@ export default function TerrainGallery({
               iconName={item.photo.iconName}
               center={item.kind === "orbit" ? item.center : item.position}
               orbitRadius={item.kind === "orbit" ? item.orbitRadius : undefined}
+              isDenseOrbit={item.kind === "orbit" && item.orbitAssetCount >= 5}
               isPlaying={playingAudioId === item.photo.id}
               isHighlighted={item.index === hoveredIndex}
               onPlaybackStart={() => setPlayingAudioId(item.photo.id)}
@@ -1714,6 +1725,7 @@ export default function TerrainGallery({
               borderColour={selectedActivityColour ?? item.orbitColour}
               center={item.center}
               orbitRadius={item.orbitRadius}
+              isDenseOrbit={item.orbitAssetCount >= 5}
               isSelected={item.index === selectedIndex}
               isHighlighted={item.index === hoveredIndex}
               onClick={() =>

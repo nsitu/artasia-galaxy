@@ -241,6 +241,8 @@ class OrbitingCutoutPhotoMaterial extends THREE.ShaderMaterial {
         cornerBottomRight: { value: new THREE.Vector2(0.92, 0.08) },
         cornerTopRight: { value: new THREE.Vector2(0.92, 0.92) },
         cornerTopLeft: { value: new THREE.Vector2(0.08, 0.92) },
+        shapeMode: { value: 0 },
+        imageAspect: { value: 1 },
         borderColor: { value: new THREE.Color("#ffffff") },
         borderWidth: { value: 0.04 },
         dashLength: { value: 0.11 },
@@ -264,6 +266,8 @@ class OrbitingCutoutPhotoMaterial extends THREE.ShaderMaterial {
         uniform vec2 cornerBottomRight;
         uniform vec2 cornerTopRight;
         uniform vec2 cornerTopLeft;
+        uniform float shapeMode;
+        uniform float imageAspect;
         uniform vec3 borderColor;
         uniform float borderWidth;
         uniform float dashLength;
@@ -295,6 +299,16 @@ class OrbitingCutoutPhotoMaterial extends THREE.ShaderMaterial {
         }
 
         void main() {
+          float edgeDistance;
+          float borderMask;
+          float cutoutAlpha;
+
+          if (shapeMode > 0.5) {
+            vec2 centered = vUv * 2.0 - 1.0;
+            edgeDistance = 0.88 - length(centered);
+            borderMask = 1.0 - smoothstep(borderWidth, borderWidth + 0.008, edgeDistance);
+            cutoutAlpha = smoothstep(-0.002, 0.004, edgeDistance);
+          } else {
           vec2 point = metricPoint(vUv);
           vec2 bottomLeft = metricPoint(cornerBottomLeft);
           vec2 bottomRight = metricPoint(cornerBottomRight);
@@ -305,7 +319,7 @@ class OrbitingCutoutPhotoMaterial extends THREE.ShaderMaterial {
           float distanceRight = signedEdgeDistance(point, bottomRight, topRight);
           float distanceTop = signedEdgeDistance(point, topRight, topLeft);
           float distanceLeft = signedEdgeDistance(point, topLeft, bottomLeft);
-          float edgeDistance = min(min(distanceBottom, distanceRight), min(distanceTop, distanceLeft));
+          edgeDistance = min(min(distanceBottom, distanceRight), min(distanceTop, distanceLeft));
           if (edgeDistance < -0.002) discard;
 
           float edgeIndex = 0.0;
@@ -338,10 +352,19 @@ class OrbitingCutoutPhotoMaterial extends THREE.ShaderMaterial {
           float alongEdge = edgePosition(point, edgeStart, edgeEnd) * length(edgeEnd - edgeStart);
           float dashPeriod = dashLength + dashGap;
           float dashMask = 1.0 - step(dashLength, mod(alongEdge, dashPeriod));
-          float borderMask = (1.0 - smoothstep(borderWidth, borderWidth + 0.008, edgeDistance)) * dashMask;
-          float cutoutAlpha = smoothstep(-0.002, 0.004, edgeDistance);
+          borderMask = (1.0 - smoothstep(borderWidth, borderWidth + 0.008, edgeDistance)) * dashMask;
+          cutoutAlpha = smoothstep(-0.002, 0.004, edgeDistance);
+          }
 
-          vec4 color = texture2D(photoMap, vUv);
+          vec2 photoUv = vUv;
+          if (shapeMode > 0.5) {
+            if (imageAspect > 1.0) {
+              photoUv.x = (photoUv.x - 0.5) / imageAspect + 0.5;
+            } else {
+              photoUv.y = (photoUv.y - 0.5) * imageAspect + 0.5;
+            }
+          }
+          vec4 color = texture2D(photoMap, photoUv);
           color = applyCssLikeAdjustments(color, brightness, contrast, saturation);
           color.rgb = mix(color.rgb, borderColor, borderMask);
           gl_FragColor = vec4(color.rgb, color.a * cutoutAlpha);
@@ -359,6 +382,10 @@ class OrbitingCutoutPhotoMaterial extends THREE.ShaderMaterial {
   set contrast(value: number) { this.uniforms.contrast.value = value; }
   get saturation() { return this.uniforms.saturation.value as number; }
   set saturation(value: number) { this.uniforms.saturation.value = value; }
+  get shapeMode() { return this.uniforms.shapeMode.value as number; }
+  set shapeMode(value: number) { this.uniforms.shapeMode.value = value; }
+  get imageAspect() { return this.uniforms.imageAspect.value as number; }
+  set imageAspect(value: number) { this.uniforms.imageAspect.value = value; }
   get cardAspect() { return this.uniforms.cardAspect.value as number; }
   set cardAspect(value: number) { this.uniforms.cardAspect.value = value; }
   get cornerBottomLeft() { return this.uniforms.cornerBottomLeft.value as THREE.Vector2; }
@@ -412,6 +439,8 @@ declare module "@react-three/fiber" {
       cornerBottomRight?: THREE.Vector2;
       cornerTopRight?: THREE.Vector2;
       cornerTopLeft?: THREE.Vector2;
+      shapeMode?: number;
+      imageAspect?: number;
       borderColor?: THREE.Color | string | number;
       borderWidth?: number;
       dashLength?: number;
@@ -447,6 +476,7 @@ interface FlowerProps extends SharedPhotoProps {
 interface OrbitBannerProps extends SharedPhotoProps {
   center: [number, number, number];
   orbitRadius?: number;
+  isDenseOrbit?: boolean;
 }
 
 interface OrbitAudioProps {
@@ -455,6 +485,7 @@ interface OrbitAudioProps {
   iconName?: string;
   center: [number, number, number];
   orbitRadius?: number;
+  isDenseOrbit?: boolean;
   isPlaying: boolean;
   isHighlighted: boolean;
   onPlaybackStart: () => void;
@@ -482,6 +513,7 @@ const TRACKING_EASE = 0.12;
 const UP = new THREE.Vector3(0, 0, 1);
 const BANNER_MAX_WIDTH = 0.95;
 const BANNER_MAX_HEIGHT = 0.58;
+const CIRCLE_FRAME_SIZE = 0.72;
 const ORBIT_MIN_UNITS = 0.72;
 const ORBIT_MAX_UNITS = 2.15;
 const ORBIT_HEIGHT = 0.72;
@@ -709,6 +741,7 @@ export function OrbitingPhotoBanner({
   onPointerLeave,
   adjustments,
   borderColour: assignedBorderColour,
+  isDenseOrbit = false,
 }: OrbitBannerProps) {
   const groupRef = useRef<THREE.Group>(null);
   const imageRef = useRef<THREE.Mesh>(null);
@@ -721,6 +754,10 @@ export function OrbitingPhotoBanner({
     speed: stableRange(`${id}:speed`, ORBIT_SPEED_MIN, ORBIT_SPEED_MAX),
   }), [id, orbitRadius]);
   const cutout = useMemo(() => createCutoutCorners(id), [id]);
+  const pulse = useMemo(() => ({
+    phase: stableRange(`${id}:pulse:phase`, 0, Math.PI * 2),
+    speed: stableRange(`${id}:pulse:speed`, 0.52, 0.78),
+  }), [id]);
   const fallbackBorderColor = useMemo(() => {
     const index = Math.min(
       CUTOUT_BORDER_COLORS.length - 1,
@@ -733,8 +770,12 @@ export function OrbitingPhotoBanner({
   const brightness = adjustmentScalar(adjustments?.brightness);
   const contrast = adjustmentScalar(adjustments?.contrast);
   const saturation = adjustmentScalar(adjustments?.saturation);
-  const imageW = aspect >= 1 ? BANNER_MAX_WIDTH : BANNER_MAX_HEIGHT * aspect;
-  const imageH = aspect >= 1 ? BANNER_MAX_WIDTH / aspect : BANNER_MAX_HEIGHT;
+  const imageW = isDenseOrbit
+    ? CIRCLE_FRAME_SIZE
+    : aspect >= 1 ? BANNER_MAX_WIDTH : BANNER_MAX_HEIGHT * aspect;
+  const imageH = isDenseOrbit
+    ? CIRCLE_FRAME_SIZE
+    : aspect >= 1 ? BANNER_MAX_WIDTH / aspect : BANNER_MAX_HEIGHT;
 
   useFrame((state) => {
     const group = groupRef.current;
@@ -746,7 +787,10 @@ export function OrbitingPhotoBanner({
       cy + Math.sin(angle) * orbit.radius,
       cz + ORBIT_HEIGHT
     );
-    const targetScale = isHighlighted || isSelected ? 1.14 : 1;
+    const pulseScale = isDenseOrbit
+      ? 0.82 + (Math.sin(state.clock.elapsedTime * pulse.speed + pulse.phase) + 1) * 0.11
+      : 1;
+    const targetScale = pulseScale * (isHighlighted || isSelected ? 1.14 : 1);
     image.scale.lerp(tempVector.set(targetScale, targetScale, 1), 0.15);
   });
 
@@ -770,7 +814,8 @@ export function OrbitingPhotoBanner({
               return;
             }
             pointerDragRef.current = null;
-            if (!isPointInsideCutout(event.uv, cutout)) return;
+            if (!isDenseOrbit && !isPointInsideCutout(event.uv, cutout)) return;
+            if (isDenseOrbit && !isPointInsideCircle(event.uv)) return;
             event.stopPropagation();
             onClick();
           }}
@@ -782,7 +827,9 @@ export function OrbitingPhotoBanner({
             ) > 6) {
               drag.moved = true;
             }
-            const inside = isPointInsideCutout(event.uv, cutout);
+            const inside = isDenseOrbit
+              ? isPointInsideCircle(event.uv)
+              : isPointInsideCutout(event.uv, cutout);
             if (inside === pointerInsideRef.current) return;
             pointerInsideRef.current = inside;
             document.body.style.cursor = inside ? "pointer" : "";
@@ -803,6 +850,8 @@ export function OrbitingPhotoBanner({
             contrast={contrast}
             saturation={saturation}
             cardAspect={imageW / imageH}
+            shapeMode={isDenseOrbit ? 1 : 0}
+            imageAspect={aspect}
             cornerBottomLeft={cutout.bottomLeft}
             cornerBottomRight={cutout.bottomRight}
             cornerTopRight={cutout.topRight}
@@ -832,6 +881,7 @@ export function OrbitingAudioMarker({
   iconName,
   center,
   orbitRadius,
+  isDenseOrbit = false,
   isPlaying,
   isHighlighted,
   onPlaybackStart,
@@ -850,6 +900,10 @@ export function OrbitingAudioMarker({
     phase: stableRange(`${id}:phase`, 0, Math.PI * 2),
     speed: stableRange(`${id}:speed`, ORBIT_SPEED_MIN, ORBIT_SPEED_MAX),
   }), [id, orbitRadius]);
+  const pulse = useMemo(() => ({
+    phase: stableRange(`${id}:pulse:phase`, 0, Math.PI * 2),
+    speed: stableRange(`${id}:pulse:speed`, 0.52, 0.78),
+  }), [id]);
   const triangle = useMemo(() => {
     const shape = new THREE.Shape();
     shape.moveTo(-0.11, -0.18);
@@ -893,7 +947,10 @@ export function OrbitingAudioMarker({
       cy + Math.sin(angle) * orbit.radius,
       cz + ORBIT_HEIGHT,
     );
-    const targetScale = isHighlighted || isPlaying ? 1.16 : 1;
+    const pulseScale = isDenseOrbit
+      ? 0.82 + (Math.sin(state.clock.elapsedTime * pulse.speed + pulse.phase) + 1) * 0.11
+      : 1;
+    const targetScale = pulseScale * (isHighlighted || isPlaying ? 1.16 : 1);
     icon.scale.lerp(tempVector.set(targetScale, targetScale, 1), 0.15);
   });
 
@@ -1178,6 +1235,13 @@ function isPointInsideCutout(point: THREE.Vector2 | undefined, corners: CutoutCo
     if (cross < 0) return false;
   }
   return true;
+}
+
+function isPointInsideCircle(point: THREE.Vector2 | undefined) {
+  if (!point) return false;
+  const centeredX = point.x * 2 - 1;
+  const centeredY = point.y * 2 - 1;
+  return centeredX * centeredX + centeredY * centeredY <= 0.88 * 0.88;
 }
 
 function stableRange(seed: string, min: number, max: number) {
