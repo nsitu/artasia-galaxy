@@ -152,6 +152,7 @@ export interface ActivityOption {
   id: number;
   label: string;
   colour?: string;
+  count?: number;
 }
 
 export interface UploadOptions {
@@ -887,6 +888,22 @@ export async function lookupUploadAssetDriveSource(assetId: string): Promise<Dri
   return res.json();
 }
 
+export interface BulkDriveLookupResult {
+  assetId: string;
+  fileName: string;
+  status: "linked" | "not-found" | "ambiguous" | "skipped" | "failed";
+  placementId?: number;
+  placementName?: string;
+  placementTags?: string[];
+  folderId?: string;
+  folderName?: string;
+  searchedFileName?: string;
+  matches?: Array<{ id: string; name: string }>;
+  fileId?: string;
+  driveFileName?: string;
+  error?: string;
+}
+
 export interface BulkDriveLookupSummary {
   scanned: number;
   candidates: number;
@@ -895,6 +912,7 @@ export interface BulkDriveLookupSummary {
   ambiguous: number;
   skipped: number;
   failed: number;
+  results: BulkDriveLookupResult[];
 }
 
 export async function lookupMissingUploadAssetDriveSources(): Promise<BulkDriveLookupSummary> {

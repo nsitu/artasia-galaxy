@@ -392,6 +392,28 @@ export default function ArtScene() {
   }, [activityFilterOptions, selectedActivityFilter]);
 
   useEffect(() => {
+    if (!focusedPlacementDetails) {
+      setSelectedActivityFilter("");
+      return;
+    }
+    if (!photos.length || activityFilterOptions.length === 0) return;
+
+    const counts = new Map<number, number>();
+    for (const photo of photos) {
+      for (const activityId of photo.activityIds ?? []) {
+        counts.set(activityId, (counts.get(activityId) ?? 0) + 1);
+      }
+    }
+
+    setActivityFilterOptions((prev) =>
+      prev.map((option) => ({
+        ...option,
+        count: counts.get(option.id) ?? 0,
+      })),
+    );
+  }, [focusedPlacementDetails, photos, activityFilterOptions.length]);
+
+  useEffect(() => {
     if (!focusedPlacementDetails) setSelectedActivityFilter("");
   }, [focusedPlacementDetails]);
 
@@ -476,11 +498,11 @@ export default function ArtScene() {
                 <div role="listbox" aria-label="Filter photos by activity" style={filterMenuStyle}>
                   <FilterOption active={!selectedActivityFilter} onSelect={() => {
                     setSelectedActivityFilter(""); setOpenFilter(null);
-                  }}>All Activities</FilterOption>
+                  }}>All Activities ({photos.length})</FilterOption>
                   {activityFilterOptions.map((option) => (
                     <FilterOption key={option.id} active={selectedActivityFilter === String(option.id)} colour={option.colour} onSelect={() => {
                       setSelectedActivityFilter(String(option.id)); setOpenFilter(null);
-                    }}>{option.label}</FilterOption>
+                    }}>{option.label} ({option.count ?? 0})</FilterOption>
                   ))}
                 </div>
               )}

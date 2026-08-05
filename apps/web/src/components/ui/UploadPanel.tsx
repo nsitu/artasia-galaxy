@@ -2224,10 +2224,31 @@ export default function UploadPanel({
     setNotice(null);
     try {
       const summary = await lookupMissingUploadAssetDriveSources();
+      console.groupCollapsed(
+        `[Drive maintenance] scanned ${summary.scanned} assets: linked ${summary.linked}, not found ${summary.notFound}, ambiguous ${summary.ambiguous}, skipped ${summary.skipped}, failed ${summary.failed}`,
+      );
+      console.table(summary.results.map((result) => ({
+        status: result.status,
+        assetId: result.assetId,
+        fileName: result.fileName,
+        placement: result.placementName
+          ? `${result.placementName} (${result.placementId ?? "?"})`
+          : result.placementTags?.join(", "),
+        folder: result.folderName
+          ? `${result.folderName} (${result.folderId ?? "?"})`
+          : result.folderId,
+        searchedFileName: result.searchedFileName,
+        matches: result.matches
+          ?.map((match) => `${match.name} (${match.id})`)
+          .join(" | "),
+        detail: result.error ?? result.driveFileName ?? "",
+      })));
+      console.log("Full Drive maintenance results", summary.results);
+      console.groupEnd();
       refreshVisibleAssets();
       setNotice({
         tone: summary.linked > 0 ? "success" : "warning",
-        message: `Drive maintenance scanned ${summary.scanned} assets: linked ${summary.linked}, not found ${summary.notFound}, ambiguous ${summary.ambiguous}, skipped ${summary.skipped}${summary.failed ? `, failed ${summary.failed}` : ""}.`,
+        message: `Drive maintenance scanned ${summary.scanned} assets: linked ${summary.linked}, not found ${summary.notFound}, ambiguous ${summary.ambiguous}, skipped ${summary.skipped}${summary.failed ? `, failed ${summary.failed}` : ""}. Detailed results were logged to the browser console.`,
       });
     } catch (err) {
       setError((err as Error).message);
@@ -3058,6 +3079,17 @@ export default function UploadPanel({
                 ? "Video"
                 : "Image"}
           </span>
+          {asset.driveFileId && (
+            <span
+              style={driveAssetBadgeStyle}
+              title="Linked to Google Drive"
+              aria-label="Linked to Google Drive"
+            >
+              <span style={driveAssetBadgeIconStyle} aria-hidden="true">
+                add_to_drive
+              </span>
+            </span>
+          )}
           {activityLabel && (
             <span
               style={{
@@ -6329,6 +6361,22 @@ const mediaKindBadgeStyle: React.CSSProperties = {
   background: "rgba(96, 165, 250, 0.12)",
   border: "1px solid rgba(96, 165, 250, 0.35)",
   color: "#93c5fd",
+};
+
+const driveAssetBadgeStyle: React.CSSProperties = {
+  ...archivedAssetBadgeStyle,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "2px 5px",
+  background: "rgba(52, 168, 83, 0.16)",
+  border: "1px solid rgba(52, 168, 83, 0.48)",
+  color: "#8be29c",
+};
+
+const driveAssetBadgeIconStyle: React.CSSProperties = {
+  fontSize: 14,
+  lineHeight: 1,
 };
 
 const assetNameStyle: React.CSSProperties = {

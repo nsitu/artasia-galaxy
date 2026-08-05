@@ -291,7 +291,13 @@ export class GoogleDriveClient {
   async findUniqueFilesInFolderTree(
     folderId: string,
     filenames: string[],
-  ): Promise<Array<{ filename: string; file?: DriveFile; matchCount: number }>> {
+  ): Promise<Array<{
+    filename: string;
+    folderName: string;
+    file?: DriveFile;
+    matches: Array<{ id: string; name: string }>;
+    matchCount: number;
+  }>> {
     const uniqueFilenames = Array.from(
       new Set(filenames.map((filename) => filename.trim()).filter(Boolean)),
     );
@@ -354,9 +360,14 @@ export class GoogleDriveClient {
       const targetMatches = matches.get(filename) ?? new Map<string, DriveFile>();
       return {
         filename,
+        folderName: rootFolder.name,
         ...(targetMatches.size === 1
           ? { file: targetMatches.values().next().value as DriveFile }
           : {}),
+        matches: Array.from(targetMatches.values()).map((file) => ({
+          id: file.id,
+          name: file.name,
+        })),
         matchCount: targetMatches.size,
       };
     });
