@@ -493,6 +493,11 @@ type TerrainCacheEntry = {
   projection: ThreeGeoProjection;
   phase: Extract<TerrainPhase, "ready" | "flat">;
 };
+type TerrainRun = {
+  subscribers: number;
+  releaseTimer: number | null;
+  release: () => void;
+};
 export type TerrainNotice = {
   label: string;
   detail?: string;
@@ -590,6 +595,7 @@ export default function TerrainGallery({
     null,
   );
   const terrainCacheRef = useRef<Map<string, TerrainCacheEntry>>(new Map());
+  const terrainRunsRef = useRef<Map<string, TerrainRun>>(new Map());
   const introStartSetRef = useRef(false);
   const previousPartnerFilterRef = useRef(selectedPartnerFilter);
   const partnerFitAnimationRef = useRef<number | null>(null);
@@ -1155,6 +1161,23 @@ export default function TerrainGallery({
       return;
     }
 
+    const existingRun = requestKey
+      ? terrainRunsRef.current.get(requestKey)
+      : undefined;
+    if (existingRun) {
+      existingRun.subscribers += 1;
+      if (existingRun.releaseTimer !== null) {
+        window.clearTimeout(existingRun.releaseTimer);
+        existingRun.releaseTimer = null;
+      }
+      return () => {
+        existingRun.subscribers -= 1;
+        if (existingRun.subscribers === 0) {
+          existingRun.releaseTimer = window.setTimeout(existingRun.release, 0);
+        }
+      };
+    }
+
     let cancelled = false;
     let renderFrame: number | null = null;
     let requestProjection: ThreeGeoProjection | null = null;
@@ -1166,6 +1189,25 @@ export default function TerrainGallery({
       : createTerrainBenchmark("unknown");
     const longTaskObserver = startLongTaskObserver(bench);
     const uninstallTileDispatchProbe = installTileDispatchProbe(bench);
+    let terrainRun: TerrainRun;
+    const releaseTerrainRun = () => {
+      if (terrainRun.subscribers > 0) return;
+      cancelled = true;
+      abortController.abort();
+      if (renderFrame !== null) window.cancelAnimationFrame(renderFrame);
+      longTaskObserver?.disconnect();
+      uninstallTileDispatchProbe();
+      if (stagedGroup && !committedToCache) disposeObject(stagedGroup);
+      if (requestKey && terrainRunsRef.current.get(requestKey) === terrainRun) {
+        terrainRunsRef.current.delete(requestKey);
+      }
+    };
+    terrainRun = {
+      subscribers: 1,
+      releaseTimer: null,
+      release: releaseTerrainRun,
+    };
+    if (requestKey) terrainRunsRef.current.set(requestKey, terrainRun);
     setLoading(Boolean(MAPBOX_TOKEN));
     setError(null);
     setPhase("projecting");
@@ -1330,12 +1372,10 @@ export default function TerrainGallery({
       });
 
     return () => {
-      cancelled = true;
-      abortController.abort();
-      if (renderFrame !== null) window.cancelAnimationFrame(renderFrame);
-      longTaskObserver?.disconnect();
-      uninstallTileDispatchProbe();
-      if (stagedGroup && !committedToCache) disposeObject(stagedGroup);
+      terrainRun.subscribers -= 1;
+      if (terrainRun.subscribers === 0) {
+        terrainRun.releaseTimer = window.setTimeout(terrainRun.release, 0);
+      }
     };
   }, [request, requestKey, terrainElevationScale, terrainDemZoomOffset]);
 

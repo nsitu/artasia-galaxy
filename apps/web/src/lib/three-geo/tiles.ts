@@ -28,8 +28,74 @@ const MAPBOX_API_TYPES = new Set([
   "mapbox-terrain-vector",
 ]);
 
+// Keep the decoded source bytes in a session cache. Terrain loads can be
+// replayed in development (React StrictMode) or canceled when the focused
+// placement changes; both cases should reuse a tile that is already in flight
+// or has completed instead of issuing another Mapbox request.
+const tileBlobCache = new Map<string, Promise<Blob | null>>();
+
 function isAbortError(err: unknown) {
   return err instanceof DOMException && err.name === "AbortError";
+}
+
+function withAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T | null> {
+  if (!signal) return promise;
+  if (signal.aborted) return Promise.resolve(null);
+
+  return new Promise<T | null>((resolve, reject) => {
+    const onAbort = () => {
+      cleanup();
+      resolve(null);
+    };
+    const cleanup = () => signal.removeEventListener("abort", onAbort);
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      (value) => {
+        cleanup();
+        resolve(value);
+      },
+      (error) => {
+        cleanup();
+        reject(error);
+      },
+    );
+  });
+}
+
+async function fetchTileBlobUncached(url: string): Promise<Blob | null> {
+  try {
+    const response = await fetch(url, {
+      mode: "cors",
+      credentials: "omit",
+    });
+    if (!response.ok) {
+      console.warn(`fetchTileBlob: HTTP ${response.status} for ${url.slice(0, 120)}`);
+      return null;
+    }
+    const blob = await response.blob();
+    return blob.size > 0 ? blob : null;
+  } catch (err) {
+    if (!isAbortError(err)) {
+      console.warn(`fetchTileBlob: error for ${url.slice(0, 120)}`, err);
+    }
+    return null;
+  }
+}
+
+function fetchTileBlob(url: string, signal?: AbortSignal): Promise<Blob | null> {
+  if (signal?.aborted) return Promise.resolve(null);
+
+  let pending = tileBlobCache.get(url);
+  if (!pending) {
+    pending = fetchTileBlobUncached(url);
+    tileBlobCache.set(url, pending);
+    void pending.then((blob) => {
+      if (blob === null && tileBlobCache.get(url) === pending) {
+        tileBlobCache.delete(url);
+      }
+    });
+  }
+  return withAbort(pending, signal);
 }
 
 export function buildMapboxUri(
@@ -61,15 +127,8 @@ export function buildMapboxUri(
  */
 export async function decodeToPixels(url: string, signal?: AbortSignal): Promise<PixelData | null> {
   try {
-    const response = await fetch(url, { mode: "cors", credentials: "omit", signal });
-    if (!response.ok) {
-      console.warn(`decodeToPixels: HTTP ${response.status} for ${url.slice(0, 120)}`);
-      return null;
-    }
-    if (signal?.aborted) return null;
-    const blob = await response.blob();
-    if (!blob.size) return null;
-    if (signal?.aborted) return null;
+    const blob = await fetchTileBlob(url, signal);
+    if (!blob || signal?.aborted) return null;
     // Terrain-RGB tiles encode elevation in exact channel values. Safari/iOS can
     // color-convert decoded image pixels by default, which corrupts the DEM and
     // turns the mesh into extreme spikes after elevation decoding.
@@ -118,15 +177,8 @@ export async function decodeToPixels(url: string, signal?: AbortSignal): Promise
  */
 export async function decodeToTexture(url: string, signal?: AbortSignal): Promise<THREE.Texture | null> {
   try {
-    const response = await fetch(url, { mode: "cors", credentials: "omit", signal });
-    if (!response.ok) {
-      console.warn(`decodeToTexture: HTTP ${response.status} for ${url.slice(0, 120)}`);
-      return null;
-    }
-    if (signal?.aborted) return null;
-    const blob = await response.blob();
-    if (!blob.size) return null;
-    if (signal?.aborted) return null;
+    const blob = await fetchTileBlob(url, signal);
+    if (!blob || signal?.aborted) return null;
     // ImageBitmap textures do not reliably honor THREE.Texture.flipY during
     // WebGL upload, so apply the usual three.js Y flip at decode time.
     const bitmap = await createImageBitmap(blob, { imageOrientation: "flipY" });
