@@ -6408,8 +6408,12 @@ const driveAssetBadgeStyle: React.CSSProperties = {
 };
 
 const driveAssetBadgeIconStyle: React.CSSProperties = {
+  fontFamily: "'Material Symbols Outlined'",
   fontSize: 14,
+  fontWeight: 400,
   lineHeight: 1,
+  fontStyle: "normal",
+  fontVariationSettings: "'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24",
 };
 
 const assetNameStyle: React.CSSProperties = {

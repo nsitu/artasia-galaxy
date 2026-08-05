@@ -68,10 +68,15 @@ const SITE_ACTIVITY_STATS_TTL_MS = 30_000;
 const GLOBAL_AUDIO_PLACEMENT_ID = 21639;
 const LINKED_AUDIO_TAG_PREFIX = "linkedaudio:";
 const DRIVE_SOURCE_TAG_PREFIX = "source:drive:";
+const DRIVE_FILE_ID_CACHE_TTL_MS = 5 * 60_000;
 // These indexes scan all uploader and published albums. Admin mutations
 // explicitly invalidate them, so keep them warm between Browse requests.
 const ADMIN_BROWSE_INDEX_TTL_MS = 5 * 60_000;
 const AUDIO_OPTION_CACHE_TTL_MS = 60_000;
+const driveFileIdCache = new Map<string, {
+  expiresAt: number;
+  driveFileId: string;
+}>();
 
 export interface SiteActivityStatsResponse {
   sites: Record<string, {
@@ -487,6 +492,49 @@ function mapAdminAsset(
   };
 }
 
+function sourceDriveFileId(asset: {
+  tags?: Array<{ name: string; value: string }>;
+}) {
+  return (asset.tags ?? [])
+    .flatMap((tag) => [tag.name, tag.value])
+    .map((value) => value.trim())
+    .find((value) => value.toLocaleLowerCase().startsWith(DRIVE_SOURCE_TAG_PREFIX))
+    ?.slice(DRIVE_SOURCE_TAG_PREFIX.length);
+}
+
+async function getDriveFileIdsForAssets(assetIds: string[]) {
+  const now = Date.now();
+  const resolved = new Map<string, string>();
+  const unresolvedAssetIds = assetIds.filter((assetId) => {
+    const cached = driveFileIdCache.get(assetId);
+    if (!cached || cached.expiresAt <= now) return true;
+    resolved.set(assetId, cached.driveFileId);
+    return false;
+  });
+  const entries = await processWithConcurrency(unresolvedAssetIds, 8, async (assetId) => {
+    try {
+      const asset = await getAsset(assetId);
+      const driveFileId = sourceDriveFileId(asset);
+      if (driveFileId) {
+        driveFileIdCache.set(assetId, {
+          expiresAt: now + DRIVE_FILE_ID_CACHE_TTL_MS,
+          driveFileId,
+        });
+      }
+      return driveFileId ? [assetId, driveFileId] as const : null;
+    } catch (error) {
+      console.warn(
+        `[uploads/assets] failed to resolve Drive metadata for ${assetId}: ${(error as Error).message}`,
+      );
+      return null;
+    }
+  });
+  for (const entry of entries) {
+    if (entry) resolved.set(entry[0], entry[1]);
+  }
+  return resolved;
+}
+
 function assetMediaUrl(asset: Awaited<ReturnType<typeof getAssetsForPlacementTagIds>>[number], kind: "thumbnail" | "preview") {
   const version = encodeURIComponent(asset.updatedAt || asset.fileModifiedAt || asset.checksum || asset.id);
   return `/api/v1/assets/${asset.id}/${kind}?v=${version}&edited=true`;
@@ -854,28 +902,6 @@ async function getManagementAssignments(
     }),
   );
 
-  const driveSourceTags = tags.flatMap((tag) => {
-    const value = [tag.name, tag.value]
-      .map((candidate) => candidate.trim())
-      .find((candidate) =>
-        candidate.toLocaleLowerCase().startsWith(DRIVE_SOURCE_TAG_PREFIX),
-      );
-    return value
-      ? [{ id: tag.id, driveFileId: value.slice(DRIVE_SOURCE_TAG_PREFIX.length) }]
-      : [];
-  });
-  await Promise.all(
-    driveSourceTags.map(async ({ id, driveFileId }) => {
-      const taggedAssetIds = await searchAdminAssetIdsByTag(id);
-      for (const assetId of taggedAssetIds) {
-        if (!assetIdSet.has(assetId)) continue;
-        const current = assignments.get(assetId) ?? {};
-        current.driveFileId = driveFileId;
-        assignments.set(assetId, current);
-      }
-    }),
-  );
-
   const audioTag =
     options?.includeAudio === false
       ? undefined
@@ -1013,23 +1039,28 @@ async function mapAssetsWithUploaderAlbums(assets: Awaited<ReturnType<typeof get
     usesEmbeddedTags && config
       ? mapEmbeddedAssetMetadata(assets, config)
       : null;
-  const [managementAssignments, adjustmentMap, gpsDisabledAssetIds] =
+  const [managementAssignments, adjustmentMap, gpsDisabledAssetIds, driveFileIds] =
     embeddedMetadata
       ? [
           embeddedMetadata.assignments,
           embeddedMetadata.adjustments,
           embeddedMetadata.gpsDisabledAssetIds,
+          new Map<string, string>(),
         ]
       : await Promise.all([
           getManagementAssignments(assetIds),
           getAssetAdjustmentMap(assetIds),
           getGpsDisabledAssetIds(assetIds),
+          getDriveFileIdsForAssets(assetIds),
         ]);
   return assets.map((asset) => mapAdminAsset(
     asset,
     albumAssignments.get(asset.id),
     {
       ...(managementAssignments.get(asset.id) ?? {}),
+      ...(driveFileIds.get(asset.id)
+        ? { driveFileId: driveFileIds.get(asset.id) }
+        : {}),
       published: publishedAssetIds.has(asset.id),
     },
     adjustmentMap.get(asset.id),
