@@ -254,6 +254,7 @@ export default function UploadPanel({
   const [directAssetLoading, setDirectAssetLoading] = useState(
     Boolean(initialAssetId),
   );
+  const hydratedEditAssetIdsRef = useRef(new Set<string>());
   const [notice, setNotice] = useState<{
     tone: NoticeTone;
     message: string;
@@ -528,7 +529,10 @@ export default function UploadPanel({
       return;
     }
     setWorkspaceMode("edit");
-    if (selectedAsset?.id === initialAssetId) {
+    if (
+      selectedAsset?.id === initialAssetId &&
+      hydratedEditAssetIdsRef.current.has(initialAssetId)
+    ) {
       setDirectAssetLoading(false);
       return;
     }
@@ -543,7 +547,24 @@ export default function UploadPanel({
     setDirectAssetLoading(true);
     fetchUploadAsset(initialAssetId)
       .then((asset) => {
-        if (!cancelled) openAssetManager(asset, false);
+        hydratedEditAssetIdsRef.current.add(asset.id);
+        if (cancelled) return;
+        if (selectedAsset?.id === asset.id) {
+          setSelectedAsset((current) =>
+            current?.id === asset.id
+              ? { ...current, driveFileId: asset.driveFileId }
+              : current,
+          );
+          setPlacementAssets((current) =>
+            current.map((currentAsset) =>
+              currentAsset.id === asset.id
+                ? { ...currentAsset, driveFileId: asset.driveFileId }
+                : currentAsset,
+            ),
+          );
+        } else {
+          openAssetManager(asset, false);
+        }
       })
       .catch((err) => {
         if (!cancelled) setError((err as Error).message);
