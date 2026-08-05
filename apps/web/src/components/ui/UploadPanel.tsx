@@ -3050,10 +3050,21 @@ export default function UploadPanel({
     const activityLabel = asset.activity_label?.trim() || activity?.label;
     const activityColour = activity?.colour?.trim();
     return (
-      <button
+      <a
         key={asset.id}
-        type="button"
-        onClick={() => openAssetManager(asset)}
+        href={`/admin/edit/${asset.id}`}
+        onClick={(event) => {
+          if (
+            event.defaultPrevented ||
+            event.button !== 0 ||
+            event.metaKey ||
+            event.ctrlKey ||
+            event.shiftKey ||
+            event.altKey
+          ) return;
+          event.preventDefault();
+          openAssetManager(asset);
+        }}
         style={assetCardStyle}
       >
         <img
@@ -3111,7 +3122,7 @@ export default function UploadPanel({
         <span style={assetDateStyle}>
           {new Date(asset.createdAt).toLocaleDateString()}
         </span>
-      </button>
+      </a>
     );
   }
 
@@ -6303,6 +6314,7 @@ const assetCardStyle: React.CSSProperties = {
   display: "grid",
   gap: 6,
   color: "#ddd",
+  textDecoration: "none",
   background: "#171a22",
   border: "1px solid rgba(255,255,255,0.1)",
   borderRadius: 6,

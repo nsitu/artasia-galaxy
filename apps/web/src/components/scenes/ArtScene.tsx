@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { fetchAuthUser, fetchUploadOptions, type ActivityOption, type AuthUser, type MapPlacement, type Photo } from "../../api/client";
 import { useGalleryStore } from "../../stores/galleryStore";
 import LoadingIndicator from "../ui/LoadingIndicator";
+import AudioLightboxPlayer from "../ui/AudioLightboxPlayer";
 import WelcomeOverlay from "../ui/WelcomeOverlay";
 import { loadMaterialSymbols } from "../../modules/iconLoader";
 import TerrainGallery, {
@@ -55,6 +56,67 @@ function getContrastingTextColour(backgroundColour: string): string | undefined 
   return whiteContrast >= blackContrast ? "#fff" : "#000";
 }
 
+function LightboxMedia({
+  photo,
+  active,
+  zoom = 1,
+  style,
+  onClick,
+}: {
+  photo: Photo;
+  active: boolean;
+  zoom?: number;
+  style: React.CSSProperties;
+  onClick: React.MouseEventHandler<HTMLImageElement | HTMLVideoElement>;
+}) {
+  const mediaStyle: React.CSSProperties = {
+    ...style,
+    transform: active ? `scale(${zoom})` : undefined,
+    transformOrigin: "center",
+  };
+
+  if (active && photo.mediaKind === "audio" && photo.audioUrl) {
+    return (
+      <AudioLightboxPlayer
+        assetId={photo.id}
+        audioUrl={photo.audioUrl}
+        style={mediaStyle}
+      />
+    );
+  }
+
+  if (photo.mediaKind === "video" && photo.videoUrl) {
+    return (
+      <video
+        className="atlas-photo-lightbox-media"
+        src={photo.videoUrl}
+        poster={photo.previewUrl}
+        controls={active}
+        autoPlay={active}
+        playsInline
+        preload={active ? "metadata" : "auto"}
+        aria-label={active ? photo.fileName : undefined}
+        aria-hidden={!active}
+        style={mediaStyle}
+        onClick={onClick}
+      />
+    );
+  }
+
+  return (
+    <img
+      className="atlas-photo-lightbox-media"
+      src={photo.previewUrl}
+      alt={active ? photo.fileName : ""}
+      aria-hidden={!active}
+      loading="eager"
+      decoding="async"
+      style={mediaStyle}
+      onClick={onClick}
+    />
+  );
+}
+
 function getActivityColourStyle(colour?: string): React.CSSProperties {
   if (!colour?.trim()) return {};
 
@@ -103,6 +165,7 @@ export default function ArtScene() {
   const linkedAudioRef = useRef<HTMLAudioElement | null>(null);
   const [linkedAudioPlaying, setLinkedAudioPlaying] = useState(false);
   const lightboxSwipeStartRef = useRef<{ x: number; y: number } | null>(null);
+  const lightboxSwipeTimerRef = useRef<number | null>(null);
   const [lightboxSwipeOffset, setLightboxSwipeOffset] = useState(0);
   const [lightboxSwipeSettling, setLightboxSwipeSettling] = useState(false);
   const [lightboxZoom, setLightboxZoom] = useState(1);
@@ -196,6 +259,14 @@ export default function ArtScene() {
   );
 
   const selectedPhoto = selectedPhotoIndex !== null ? photos[selectedPhotoIndex] : null;
+  const lightboxPreviousPhoto =
+    selectedPhotoIndex !== null && photos.length > 1
+      ? photos[(selectedPhotoIndex - 1 + photos.length) % photos.length]
+      : null;
+  const lightboxNextPhoto =
+    selectedPhotoIndex !== null && photos.length > 1
+      ? photos[(selectedPhotoIndex + 1) % photos.length]
+      : null;
   const selectedDescription = selectedPhoto?.exifInfo?.description?.trim();
   const selectedPhotoActivities = selectedPhoto?.activityIds
     ?.map((activityId) =>
@@ -203,10 +274,22 @@ export default function ArtScene() {
     )
     .filter((activity): activity is ActivityOption => Boolean(activity)) ?? [];
   useEffect(() => {
+    if (lightboxSwipeTimerRef.current !== null) {
+      window.clearTimeout(lightboxSwipeTimerRef.current);
+      lightboxSwipeTimerRef.current = null;
+    }
     lightboxZoomRef.current = 1;
     setLightboxZoom(1);
+    setLightboxSwipeSettling(false);
+    setLightboxSwipeOffset(0);
     lightboxTouchPointsRef.current.clear();
     lightboxPinchRef.current = null;
+    return () => {
+      if (lightboxSwipeTimerRef.current !== null) {
+        window.clearTimeout(lightboxSwipeTimerRef.current);
+        lightboxSwipeTimerRef.current = null;
+      }
+    };
   }, [selectedPhoto?.id]);
   const selectedActivityColour =
     activityFilterOptions.find(
@@ -267,6 +350,10 @@ export default function ArtScene() {
 
   const handleLightboxPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (event.pointerType !== "touch") return;
+    if (lightboxSwipeTimerRef.current !== null) {
+      window.clearTimeout(lightboxSwipeTimerRef.current);
+      lightboxSwipeTimerRef.current = null;
+    }
     lightboxTouchPointsRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
     if (lightboxTouchPointsRef.current.size === 2) {
       const [first, second] = [...lightboxTouchPointsRef.current.values()];
@@ -328,7 +415,8 @@ export default function ArtScene() {
     lightboxSuppressClickRef.current = true;
     setLightboxSwipeSettling(true);
     setLightboxSwipeOffset(deltaX < 0 ? -window.innerWidth : window.innerWidth);
-    window.setTimeout(() => {
+    lightboxSwipeTimerRef.current = window.setTimeout(() => {
+      lightboxSwipeTimerRef.current = null;
       selectAdjacentPhoto(deltaX < 0 ? 1 : -1);
       setLightboxSwipeSettling(false);
       setLightboxSwipeOffset(0);
@@ -656,39 +744,56 @@ export default function ArtScene() {
                 : ""}
             </div>
           )}
-          {selectedPhoto.mediaKind === "video" && selectedPhoto.videoUrl ? (
-            <video
-              className="atlas-photo-lightbox-media"
-              src={selectedPhoto.videoUrl}
-              poster={selectedPhoto.previewUrl}
-              controls
-              autoPlay
-              playsInline
-              preload="metadata"
-              aria-label={selectedPhoto.fileName}
-              style={{
-                ...photoLightboxImageStyle,
-                transform: `translateX(${lightboxSwipeOffset}px) scale(${lightboxZoom})`,
-                transformOrigin: "center",
-                transition: lightboxSwipeSettling ? "transform 180ms ease-out" : "none",
-              }}
-              onClick={(event) => event.stopPropagation()}
-            />
-          ) : (
-            <img
-              className="atlas-photo-lightbox-media"
-              src={selectedPhoto.previewUrl}
-              alt={selectedPhoto.fileName}
-              style={{
-                ...photoLightboxImageStyle,
-                ...photoAdjustmentFilterStyle(selectedPhoto.adjustments),
-                transform: `translateX(${lightboxSwipeOffset}px) scale(${lightboxZoom})`,
-                transformOrigin: "center",
-                transition: lightboxSwipeSettling ? "transform 180ms ease-out" : "none",
-              }}
-              onClick={(event) => event.stopPropagation()}
-            />
-          )}
+          <div
+            className="atlas-photo-lightbox-track"
+            style={{
+              ...photoLightboxTrackStyle,
+              transform: `translate3d(calc(-33.333333% + ${lightboxSwipeOffset}px), 0, 0)`,
+              transition: lightboxSwipeSettling ? "transform 180ms ease-out" : "none",
+            }}
+          >
+            <div className="atlas-photo-lightbox-slide" style={photoLightboxSlideStyle}>
+              {lightboxPreviousPhoto && (
+                <LightboxMedia
+                  key={`${lightboxPreviousPhoto.id}-adjacent`}
+                  photo={lightboxPreviousPhoto}
+                  active={false}
+                  style={{
+                    ...photoLightboxImageStyle,
+                    ...photoAdjustmentFilterStyle(lightboxPreviousPhoto.adjustments),
+                  }}
+                  onClick={(event) => event.stopPropagation()}
+                />
+              )}
+            </div>
+            <div className="atlas-photo-lightbox-slide" style={photoLightboxSlideStyle}>
+              <LightboxMedia
+                key={`${selectedPhoto.id}-active`}
+                photo={selectedPhoto}
+                active
+                zoom={lightboxZoom}
+                style={{
+                  ...photoLightboxImageStyle,
+                  ...photoAdjustmentFilterStyle(selectedPhoto.adjustments),
+                }}
+                onClick={(event) => event.stopPropagation()}
+              />
+            </div>
+            <div className="atlas-photo-lightbox-slide" style={photoLightboxSlideStyle}>
+              {lightboxNextPhoto && (
+                <LightboxMedia
+                  key={`${lightboxNextPhoto.id}-adjacent`}
+                  photo={lightboxNextPhoto}
+                  active={false}
+                  style={{
+                    ...photoLightboxImageStyle,
+                    ...photoAdjustmentFilterStyle(lightboxNextPhoto.adjustments),
+                  }}
+                  onClick={(event) => event.stopPropagation()}
+                />
+              )}
+            </div>
+          </div>
           <div
             className="atlas-photo-lightbox-metadata"
             style={photoLightboxMetadataStyle}
@@ -1273,6 +1378,17 @@ const responsiveTopNavStyles = `
       max-height: none !important;
       flex: 1 1 auto;
     }
+    .atlas-photo-lightbox-audio {
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+    .atlas-photo-lightbox-track {
+      padding: max(72px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)) !important;
+      box-sizing: border-box;
+    }
+    .atlas-photo-lightbox-slide {
+      padding: 0 !important;
+    }
     .atlas-photo-lightbox-metadata {
       position: static !important;
       flex: 0 0 auto;
@@ -1658,6 +1774,30 @@ const photoLightboxImageStyle: React.CSSProperties = {
   objectFit: "contain",
   boxShadow: "0 18px 60px rgba(0,0,0,0.5)",
   cursor: "default",
+};
+
+const photoLightboxTrackStyle: React.CSSProperties = {
+  position: "absolute",
+  top: 0,
+  bottom: 0,
+  left: 0,
+  width: "300%",
+  display: "flex",
+  alignItems: "center",
+  zIndex: 0,
+  willChange: "transform",
+};
+
+const photoLightboxSlideStyle: React.CSSProperties = {
+  flex: "0 0 33.333333%",
+  width: "33.333333%",
+  height: "100%",
+  minWidth: 0,
+  boxSizing: "border-box",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: 24,
 };
 
 const photoLightboxMetadataStyle: React.CSSProperties = {

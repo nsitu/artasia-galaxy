@@ -34,6 +34,7 @@ const LOCAL_CAMERA_FIT_SCALE = 0.55;
 const REGIONAL_DEM_ZOOM_OFFSET = 5;
 const LOCAL_DEM_ZOOM_OFFSET = 3;
 const INTRO_CAMERA_DURATION_MS = 3000;
+const PLACEMENT_ORBIT_FIT_DURATION_MS = 100;
 
 type TerrainBenchmark = {
   key: string;
@@ -567,7 +568,6 @@ export default function TerrainGallery({
   const fetchPhotos = useGalleryStore((s) => s.fetchPhotos);
   const fetchPlacementFocus = useGalleryStore((s) => s.fetchPlacementFocus);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
   const [terrain, setTerrain] = useState<THREE.Group | null>(null);
   const [projection, setProjection] = useState<ThreeGeoProjection | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -602,6 +602,8 @@ export default function TerrainGallery({
   const lastFramedActivityFilterRef = useRef(selectedActivityFilter);
   const activityFitPlacementRef = useRef<number | null>(null);
   const activityFitAnimationRef = useRef<number | null>(null);
+  const placementOrbitFitPlacementRef = useRef<number | null>(null);
+  const placementOrbitFitAnimationRef = useRef<number | null>(null);
 
   const partnerFilterOptions = useMemo<PartnerFilterOption[]>(() => {
     const counts = new Map<string, number>();
@@ -869,16 +871,6 @@ export default function TerrainGallery({
     };
   }, [activityOrbitRings, camera, controls, focusedPlacement, galleryLoading, selectedActivityFilter]);
 
-  useEffect(() => {
-    if (
-      playingAudioId &&
-      !photosForCurrentView.some(
-        (photo) => photo.id === playingAudioId && photo.mediaKind === "audio",
-      )
-    ) {
-      setPlayingAudioId(null);
-    }
-  }, [photosForCurrentView, playingAudioId]);
   const placementLayout = useMemo(() => {
     if (!projection) return [];
     const projected = visiblePlacements.flatMap((placement) => {
@@ -1504,6 +1496,77 @@ export default function TerrainGallery({
   ]);
 
   useEffect(() => {
+    if (!focusedPlacement) {
+      placementOrbitFitPlacementRef.current = null;
+      return;
+    }
+    if (
+      placementOrbitFitPlacementRef.current === focusedPlacement.placement_id ||
+      !sceneReadyForMarkers ||
+      galleryLoading ||
+      activityOrbitRings.length === 0 ||
+      !controls?.target
+    ) return;
+
+    const center = new THREE.Vector3(...activityOrbitRings[0].center);
+    center.z += 0.72;
+    const outerRadius = Math.max(
+      ...activityOrbitRings.map((ring) => ring.radius),
+    );
+    const contentRadius = Math.max(1, outerRadius + 0.75);
+    const verticalFov = camera instanceof THREE.PerspectiveCamera
+      ? THREE.MathUtils.degToRad(camera.fov)
+      : THREE.MathUtils.degToRad(50);
+    const aspect = camera instanceof THREE.PerspectiveCamera ? camera.aspect : 1;
+    const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * aspect);
+    const limitingFov = Math.min(verticalFov, horizontalFov);
+    const distance = THREE.MathUtils.clamp(
+      contentRadius * 1.35 / Math.tan(limitingFov / 2),
+      2.4,
+      70,
+    );
+    const startTarget = controls.target.clone();
+    const startPosition = camera.position.clone();
+    const direction = startPosition.clone().sub(startTarget).normalize();
+    const endPosition = center.clone().addScaledVector(direction, distance);
+    const startedAt = performance.now();
+
+    if (placementOrbitFitAnimationRef.current !== null) {
+      cancelAnimationFrame(placementOrbitFitAnimationRef.current);
+    }
+    placementOrbitFitPlacementRef.current = focusedPlacement.placement_id;
+    const animateFit = (timestamp: number) => {
+      const progress = Math.min(
+        1,
+        (timestamp - startedAt) / PLACEMENT_ORBIT_FIT_DURATION_MS,
+      );
+      const eased = 1 - Math.pow(1 - progress, 3);
+      controls.target!.lerpVectors(startTarget, center, eased);
+      camera.position.lerpVectors(startPosition, endPosition, eased);
+      camera.lookAt(controls.target!);
+      controls.update?.();
+      placementOrbitFitAnimationRef.current = progress < 1
+        ? requestAnimationFrame(animateFit)
+        : null;
+    };
+    placementOrbitFitAnimationRef.current = requestAnimationFrame(animateFit);
+
+    return () => {
+      if (placementOrbitFitAnimationRef.current !== null) {
+        cancelAnimationFrame(placementOrbitFitAnimationRef.current);
+        placementOrbitFitAnimationRef.current = null;
+      }
+    };
+  }, [
+    activityOrbitRings,
+    camera,
+    controls,
+    focusedPlacement,
+    galleryLoading,
+    sceneReadyForMarkers,
+  ]);
+
+  useEffect(() => {
     if (
       !introEnabled ||
       introPhase !== "exiting" ||
@@ -1720,19 +1783,12 @@ export default function TerrainGallery({
             <OrbitingAudioMarker
               key={item.photo.id}
               id={item.photo.id}
-              audioUrl={item.photo.audioUrl}
               iconName={item.photo.iconName}
               center={item.kind === "orbit" ? item.center : item.position}
               orbitRadius={item.kind === "orbit" ? item.orbitRadius : undefined}
               isDenseOrbit={item.kind === "orbit" && item.orbitAssetCount >= 5}
-              isPlaying={playingAudioId === item.photo.id}
               isHighlighted={item.index === hoveredIndex}
-              onPlaybackStart={() => setPlayingAudioId(item.photo.id)}
-              onPlaybackStop={() =>
-                setPlayingAudioId((current) =>
-                  current === item.photo.id ? null : current,
-                )
-              }
+              onClick={() => selectPhoto(item.index)}
               onPointerEnter={() => setHoveredIndex(item.index)}
               onPointerLeave={() => setHoveredIndex(null)}
             />

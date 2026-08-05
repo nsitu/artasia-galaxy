@@ -602,15 +602,12 @@ interface OrbitBannerProps extends SharedPhotoProps {
 
 interface OrbitAudioProps {
   id: string;
-  audioUrl: string;
   iconName?: string;
   center: [number, number, number];
   orbitRadius?: number;
   isDenseOrbit?: boolean;
-  isPlaying: boolean;
   isHighlighted: boolean;
-  onPlaybackStart: () => void;
-  onPlaybackStop: () => void;
+  onClick: () => void;
   onPointerEnter: () => void;
   onPointerLeave: () => void;
 }
@@ -1070,24 +1067,18 @@ export function OrbitingActivityRing({
 
 export function OrbitingAudioMarker({
   id,
-  audioUrl,
   iconName,
   center,
   orbitRadius,
   isDenseOrbit = false,
-  isPlaying,
   isHighlighted,
-  onPlaybackStart,
-  onPlaybackStop,
+  onClick,
   onPointerEnter,
   onPointerLeave,
 }: OrbitAudioProps) {
   const groupRef = useRef<THREE.Group>(null);
   const iconRef = useRef<THREE.Group>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const playbackStopRef = useRef(onPlaybackStop);
   const assignedIconTexture = useMaterialSymbolTexture(iconName);
-  playbackStopRef.current = onPlaybackStop;
   const orbit = useMemo(() => ({
     radius: orbitRadius ?? stableRange(`${id}:radius`, ORBIT_MIN_UNITS, ORBIT_MAX_UNITS),
     phase: stableRange(`${id}:phase`, 0, Math.PI * 2),
@@ -1106,29 +1097,7 @@ export function OrbitingAudioMarker({
     return shape;
   }, []);
   const [cx, cy, cz] = center;
-  const color = isPlaying ? "#eee111" : "#ffffff";
-
-  useEffect(() => {
-    const audio = new Audio(audioUrl);
-    audio.preload = "metadata";
-    const handleEnded = () => playbackStopRef.current();
-    audio.addEventListener("ended", handleEnded);
-    audioRef.current = audio;
-    return () => {
-      audio.pause();
-      audio.removeEventListener("ended", handleEnded);
-      audio.src = "";
-      audioRef.current = null;
-    };
-  }, [audioUrl]);
-
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!isPlaying && audio && !audio.paused) {
-      audio.pause();
-      audio.currentTime = 0;
-    }
-  }, [isPlaying]);
+  const color = "#ffffff";
 
   useFrame((state) => {
     const group = groupRef.current;
@@ -1143,28 +1112,9 @@ export function OrbitingAudioMarker({
     const pulseScale = isDenseOrbit
       ? 0.82 + (Math.sin(state.clock.elapsedTime * pulse.speed + pulse.phase) + 1) * 0.11
       : 1;
-    const targetScale = pulseScale * (isHighlighted || isPlaying ? 1.16 : 1);
+    const targetScale = pulseScale * (isHighlighted ? 1.16 : 1);
     icon.scale.lerp(tempVector.set(targetScale, targetScale, 1), 0.15);
   });
-
-  async function togglePlayback() {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (isPlaying) {
-      audio.pause();
-      audio.currentTime = 0;
-      onPlaybackStop();
-      return;
-    }
-    try {
-      audio.currentTime = 0;
-      await audio.play();
-      onPlaybackStart();
-    } catch (error) {
-      console.warn(`[audio] playback failed for ${id}: ${(error as Error).message}`);
-      onPlaybackStop();
-    }
-  }
 
   return (
     <group ref={groupRef} position={[cx + orbit.radius, cy, cz + ORBIT_HEIGHT]}>
@@ -1173,7 +1123,7 @@ export function OrbitingAudioMarker({
           ref={iconRef}
           onClick={(event) => {
             event.stopPropagation();
-            void togglePlayback();
+            onClick();
           }}
           onPointerOver={(event) => {
             event.stopPropagation();
