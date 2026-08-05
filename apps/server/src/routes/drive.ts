@@ -10,6 +10,7 @@ import {
   getAsset,
   listAssetIdsByTag,
   listTags,
+  searchAssets,
   uploadAsset,
   uploadAssetStream,
   tagAsset,
@@ -118,6 +119,188 @@ function getDriveClient(req: Request): GoogleDriveClient {
 
   return client;
 }
+
+type DriveBulkLookupResult = {
+  assetId: string;
+  fileName: string;
+  status: "linked" | "not-found" | "ambiguous" | "skipped" | "failed";
+  fileId?: string;
+  driveFileName?: string;
+  error?: string;
+};
+
+async function searchAllAssetsForDriveLookup() {
+  const byId = new Map<string, Awaited<ReturnType<typeof searchAssets>>["assets"]["items"][number]>();
+  for (const type of ["IMAGE", "VIDEO"] as const) {
+    for (const visibility of ["timeline", "archive"] as const) {
+      let page = 1;
+      for (;;) {
+        const result = await searchAssets({ page, size: 100, type, visibility });
+        for (const asset of result.assets.items) byId.set(asset.id, asset);
+        if (!result.assets.nextPage || result.assets.items.length < 100) break;
+        page += 1;
+      }
+    }
+  }
+  return Array.from(byId.values());
+}
+
+/** Link every unlinked admin asset to a unique matching file in its site's Drive tree. */
+router.post("/assets/lookup-missing", async (req: Request, res: Response) => {
+  try {
+    const client = getDriveClient(req);
+    const [assets, config] = await Promise.all([
+      searchAllAssetsForDriveLookup(),
+      getUploadConfig(),
+    ]);
+    const placementsById = new Map(
+      config.placements.map((placement) => [placement.placement_id, placement]),
+    );
+    const results: DriveBulkLookupResult[] = [];
+    const groupedCandidates = new Map<
+      string,
+      { folderId: string; asset: ImmichAsset }[]
+    >();
+    let candidates = 0;
+
+    for (const listedAsset of assets) {
+      let asset = listedAsset;
+      if (!Array.isArray(asset.tags)) {
+        asset = await getAsset(asset.id);
+      }
+
+      try {
+        if (assetDriveSourceId(asset)) continue;
+      } catch (err) {
+        results.push({
+          assetId: asset.id,
+          fileName: asset.originalFileName,
+          status: "skipped",
+          error: (err as Error).message,
+        });
+        continue;
+      }
+
+      let placementId: number | null;
+      try {
+        placementId = assetPlacementId(asset);
+      } catch (err) {
+        results.push({
+          assetId: asset.id,
+          fileName: asset.originalFileName,
+          status: "skipped",
+          error: (err as Error).message,
+        });
+        continue;
+      }
+      if (placementId == null) {
+        results.push({
+          assetId: asset.id,
+          fileName: asset.originalFileName,
+          status: "skipped",
+          error: "Asset is not assigned to an Artasia site.",
+        });
+        continue;
+      }
+      const folderId = placementsById.get(placementId)?.google_drive_folder_id?.trim();
+      if (!folderId) {
+        results.push({
+          assetId: asset.id,
+          fileName: asset.originalFileName,
+          status: "skipped",
+          error: "The asset's Artasia site does not have a Google Drive folder configured.",
+        });
+        continue;
+      }
+
+      candidates += 1;
+      const group = groupedCandidates.get(folderId) ?? [];
+      group.push({ folderId, asset });
+      groupedCandidates.set(folderId, group);
+    }
+
+    for (const [folderId, group] of groupedCandidates) {
+      let lookups: Array<{ filename: string; file?: { id: string; name: string }; matchCount: number }>;
+      try {
+        lookups = await client.findUniqueFilesInFolderTree(
+          folderId,
+          group.map(({ asset }) => asset.originalFileName),
+        );
+      } catch (err) {
+        for (const { asset } of group) {
+          results.push({
+            assetId: asset.id,
+            fileName: asset.originalFileName,
+            status: "failed",
+            error: (err as Error).message,
+          });
+        }
+        continue;
+      }
+
+      const lookupByFilename = new Map(lookups.map((lookup) => [lookup.filename, lookup]));
+      for (const { asset } of group) {
+        const lookup = lookupByFilename.get(asset.originalFileName.trim()) ?? {
+          filename: asset.originalFileName.trim(),
+          file: undefined,
+          matchCount: 0,
+        };
+        if (lookup.matchCount === 0) {
+          results.push({
+            assetId: asset.id,
+            fileName: asset.originalFileName,
+            status: "not-found",
+          });
+          continue;
+        }
+        if (!lookup.file) {
+          results.push({
+            assetId: asset.id,
+            fileName: asset.originalFileName,
+            status: "ambiguous",
+            error: `Found ${lookup.matchCount} matching files in the site's Google Drive folder.`,
+          });
+          continue;
+        }
+
+        try {
+          const sourceTag = driveSourceTag(lookup.file.id);
+          await tagAsset(asset.id, [sourceTag]);
+          await waitForAssetTags(asset.id, [sourceTag]);
+          results.push({
+            assetId: asset.id,
+            fileName: asset.originalFileName,
+            status: "linked",
+            fileId: lookup.file.id,
+            driveFileName: lookup.file.name,
+          });
+        } catch (err) {
+          results.push({
+            assetId: asset.id,
+            fileName: asset.originalFileName,
+            status: "failed",
+            error: (err as Error).message,
+          });
+        }
+      }
+    }
+
+    const summary = {
+      scanned: assets.length,
+      candidates,
+      linked: results.filter((result) => result.status === "linked").length,
+      notFound: results.filter((result) => result.status === "not-found").length,
+      ambiguous: results.filter((result) => result.status === "ambiguous").length,
+      skipped: results.filter((result) => result.status === "skipped").length,
+      failed: results.filter((result) => result.status === "failed").length,
+    };
+    res.json({ ...summary, results });
+  } catch (err) {
+    res
+      .status(err instanceof Error && err.message.includes("Not authenticated") ? 401 : 500)
+      .json({ error: (err as Error).message });
+  }
+});
 
 /**
  * GET /api/v1/drive/folders?driveType=myDrive&parentId=root&driveId=...

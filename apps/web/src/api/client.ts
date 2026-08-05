@@ -887,6 +887,28 @@ export async function lookupUploadAssetDriveSource(assetId: string): Promise<Dri
   return res.json();
 }
 
+export interface BulkDriveLookupSummary {
+  scanned: number;
+  candidates: number;
+  linked: number;
+  notFound: number;
+  ambiguous: number;
+  skipped: number;
+  failed: number;
+}
+
+export async function lookupMissingUploadAssetDriveSources(): Promise<BulkDriveLookupSummary> {
+  const res = await fetch("/api/v1/drive/assets/lookup-missing", {
+    method: "POST",
+  });
+  if (!res.ok) {
+    if (res.status === 401) throw new Error("Please sign in with Google to access Drive");
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
 export async function reimportUploadAssetFromDrive(assetId: string): Promise<DriveSyncResult> {
   const res = await fetch(`/api/v1/drive/assets/${encodeURIComponent(assetId)}/reimport`, {
     method: "POST",

@@ -21,6 +21,7 @@ import {
   fetchUploadAssetAdjustments,
   fetchUploadAsset,
   fetchUntaggedPlacementAssets,
+  lookupMissingUploadAssetDriveSources,
   lookupUploadAssetDriveSource,
   logoutAuthUser,
   reimportUploadAssetFromDrive,
@@ -221,6 +222,7 @@ export default function UploadPanel({
   const [audioTrimStatus, setAudioTrimStatus] = useState<string | null>(null);
   const [deletingAsset, setDeletingAsset] = useState(false);
   const [driveAssetAction, setDriveAssetAction] = useState<"lookup" | "reimport" | null>(null);
+  const [driveBulkLookupRunning, setDriveBulkLookupRunning] = useState(false);
   const [cropEditing, setCropEditing] = useState(false);
   const [cropRect, setCropRect] = useState<CropRect | null>(null);
   const [cropSourceDimensions, setCropSourceDimensions] = useState<{
@@ -2206,6 +2208,50 @@ export default function UploadPanel({
     } finally {
       setDriveAssetAction(null);
     }
+  }
+
+  async function lookupMissingDriveSources() {
+    if (!authUser?.authenticated) {
+      setError("Sign in with Google to look up Drive files.");
+      return;
+    }
+    if (!window.confirm("Look up Google Drive files for every unlinked asset? This may take a while.")) {
+      return;
+    }
+
+    setDriveBulkLookupRunning(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const summary = await lookupMissingUploadAssetDriveSources();
+      refreshVisibleAssets();
+      setNotice({
+        tone: summary.linked > 0 ? "success" : "warning",
+        message: `Drive maintenance scanned ${summary.scanned} assets: linked ${summary.linked}, not found ${summary.notFound}, ambiguous ${summary.ambiguous}, skipped ${summary.skipped}${summary.failed ? `, failed ${summary.failed}` : ""}.`,
+      });
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setDriveBulkLookupRunning(false);
+    }
+  }
+
+  function renderDriveMaintenanceButton() {
+    if (!authUser?.authenticated) return null;
+    return (
+      <button
+        type="button"
+        onClick={lookupMissingDriveSources}
+        disabled={driveBulkLookupRunning || assetsLoading || Boolean(driveAssetAction)}
+        title="Look up Drive files for all assets that do not have a known Drive ID"
+        style={secondaryButtonStyle}
+      >
+        <span style={siteActionIconStyle} aria-hidden="true">
+          manage_search
+        </span>
+        {driveBulkLookupRunning ? "Looking up Drive IDs..." : "Lookup missing Drive IDs"}
+      </button>
+    );
   }
 
   async function reimportSelectedAssetFromDrive() {
@@ -5182,6 +5228,7 @@ export default function UploadPanel({
                       {assetsLoading ? "..." : displayedPlacementAssets.length} upload
                       {displayedPlacementAssets.length === 1 ? "" : "s"}
                     </div>
+                    {renderDriveMaintenanceButton()}
                     <button
                       type="button"
                       onClick={refreshVisibleAssets}
@@ -5207,6 +5254,7 @@ export default function UploadPanel({
                       {assetsLoading ? "..." : displayedPlacementAssets.length} upload
                       {displayedPlacementAssets.length === 1 ? "" : "s"}
                     </div>
+                    {renderDriveMaintenanceButton()}
                     <button
                       type="button"
                       onClick={refreshVisibleAssets}

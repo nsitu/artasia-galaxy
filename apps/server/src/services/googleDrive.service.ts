@@ -278,13 +278,40 @@ export class GoogleDriveClient {
     file?: DriveFile;
     matchCount: number;
   }> {
+    return (await this.findUniqueFilesInFolderTree(folderId, [filename]))[0] ?? {
+      matchCount: 0,
+    };
+  }
+
+  /**
+   * Searches a placement folder tree for several filenames in one traversal.
+   * This is used by the admin maintenance lookup so a folder is not crawled
+   * once for every asset it contains.
+   */
+  async findUniqueFilesInFolderTree(
+    folderId: string,
+    filenames: string[],
+  ): Promise<Array<{ filename: string; file?: DriveFile; matchCount: number }>> {
+    const uniqueFilenames = Array.from(
+      new Set(filenames.map((filename) => filename.trim()).filter(Boolean)),
+    );
+    if (uniqueFilenames.length === 0) return [];
+
     const rootFolder = await this.getFolder(folderId);
     const driveId = rootFolder.driveId;
     const queue = [folderId];
     const visitedFolders = new Set<string>();
-    const matches = new Map<string, DriveFile>();
-    const targetName = filename.trim().toLocaleLowerCase();
-    const targetComparableName = comparableMediaFilename(filename);
+    const exactTargets = new Map<string, string[]>();
+    const comparableTargets = new Map<string, string[]>();
+    for (const filename of uniqueFilenames) {
+      const exactMatches = exactTargets.get(filename.toLocaleLowerCase()) ?? [];
+      exactMatches.push(filename);
+      exactTargets.set(filename.toLocaleLowerCase(), exactMatches);
+      const comparableMatches = comparableTargets.get(comparableMediaFilename(filename)) ?? [];
+      comparableMatches.push(filename);
+      comparableTargets.set(comparableMediaFilename(filename), comparableMatches);
+    }
+    const matches = new Map<string, Map<string, DriveFile>>();
     const maxFolders = 2_000;
 
     while (queue.length > 0) {
@@ -306,21 +333,33 @@ export class GoogleDriveClient {
           const candidateName = ensureDriveFileExtension(file.name, file.mimeType)
             .trim()
             .toLocaleLowerCase();
-          if (
-            candidateName === targetName ||
-            comparableMediaFilename(candidateName) === targetComparableName
-          ) {
-            matches.set(file.id, file);
+          const exactTargetsForCandidate = exactTargets.get(candidateName) ?? [];
+          const comparableTargetsForCandidate = comparableTargets.get(
+            comparableMediaFilename(candidateName),
+          );
+          for (const target of new Set([
+            ...exactTargetsForCandidate,
+            ...(comparableTargetsForCandidate ?? []),
+          ])) {
+            const targetMatches = matches.get(target) ?? new Map<string, DriveFile>();
+            targetMatches.set(file.id, file);
+            matches.set(target, targetMatches);
           }
         }
         pageToken = page.nextPageToken;
       } while (pageToken);
     }
 
-    return {
-      ...(matches.size === 1 ? { file: matches.values().next().value as DriveFile } : {}),
-      matchCount: matches.size,
-    };
+    return uniqueFilenames.map((filename) => {
+      const targetMatches = matches.get(filename) ?? new Map<string, DriveFile>();
+      return {
+        filename,
+        ...(targetMatches.size === 1
+          ? { file: targetMatches.values().next().value as DriveFile }
+          : {}),
+        matchCount: targetMatches.size,
+      };
+    });
   }
 
   async getFolder(folderId: string): Promise<DriveFolder> {
