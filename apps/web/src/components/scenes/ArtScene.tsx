@@ -60,12 +60,14 @@ function LightboxMedia({
   photo,
   active,
   zoom = 1,
+  activityColour,
   style,
   onClick,
 }: {
   photo: Photo;
   active: boolean;
   zoom?: number;
+  activityColour?: string;
   style: React.CSSProperties;
   onClick: React.MouseEventHandler<HTMLImageElement | HTMLVideoElement>;
 }) {
@@ -80,6 +82,7 @@ function LightboxMedia({
       <AudioLightboxPlayer
         assetId={photo.id}
         audioUrl={photo.audioUrl}
+        activityColour={activityColour}
         style={mediaStyle}
       />
     );
@@ -273,6 +276,9 @@ export default function ArtScene() {
       activityFilterOptions.find((activity) => activity.id === activityId),
     )
     .filter((activity): activity is ActivityOption => Boolean(activity)) ?? [];
+  const selectedAudioActivityColour = selectedPhotoActivities.find(
+    (activity) => activity.colour?.trim(),
+  )?.colour;
   useEffect(() => {
     if (lightboxSwipeTimerRef.current !== null) {
       window.clearTimeout(lightboxSwipeTimerRef.current);
@@ -772,6 +778,7 @@ export default function ArtScene() {
                 photo={selectedPhoto}
                 active
                 zoom={lightboxZoom}
+                activityColour={selectedAudioActivityColour}
                 style={{
                   ...photoLightboxImageStyle,
                   ...photoAdjustmentFilterStyle(selectedPhoto.adjustments),

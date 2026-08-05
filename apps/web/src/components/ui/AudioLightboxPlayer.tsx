@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { fetchAudioWaveform, type AudioWaveform } from "../../api/client";
 
 function formatTime(seconds: number) {
@@ -11,14 +11,17 @@ function formatTime(seconds: number) {
 export default function AudioLightboxPlayer({
   assetId,
   audioUrl,
+  autoPlay = true,
+  activityColour = "#b7bac3",
   style,
 }: {
   assetId: string;
   audioUrl: string;
+  autoPlay?: boolean;
+  activityColour?: string;
   style?: CSSProperties;
 }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [waveform, setWaveform] = useState<AudioWaveform | null>(null);
   const [waveformError, setWaveformError] = useState<string | null>(null);
   const [duration, setDuration] = useState(0);
@@ -45,47 +48,28 @@ export default function AudioLightboxPlayer({
   }, [assetId]);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !waveform) return;
+    if (!autoPlay) return;
+    const audio = audioRef.current;
+    if (!audio) return;
+    void audio.play().catch(() => {
+      // The play button remains available when the browser blocks autoplay.
+    });
+  }, [audioUrl, autoPlay]);
 
-    const draw = () => {
-      const width = Math.max(1, canvas.clientWidth);
-      const height = Math.max(1, canvas.clientHeight);
-      const ratio = window.devicePixelRatio || 1;
-      canvas.width = Math.round(width * ratio);
-      canvas.height = Math.round(height * ratio);
-      const context = canvas.getContext("2d");
-      if (!context) return;
-      context.setTransform(ratio, 0, 0, ratio, 0, 0);
-      context.clearRect(0, 0, width, height);
-      const center = height / 2;
-      const barWidth = width / Math.max(1, waveform.peaks.length);
-      context.fillStyle = "rgba(191, 211, 255, 0.9)";
-      waveform.peaks.forEach((peak, index) => {
-        const barHeight = Math.max(2, peak * (height - 12));
-        context.fillRect(
-          index * barWidth,
-          center - barHeight / 2,
-          Math.max(1, barWidth - 0.5),
-          barHeight,
-        );
-      });
-      if (duration > 0) {
-        const playheadX = (currentTime / duration) * width;
-        context.fillStyle = "#f6cc55";
-        context.fillRect(Math.max(0, playheadX - 1), 0, 2, height);
-      }
-    };
+  const waveformBars = useMemo(() => {
+    if (!waveform) return [];
+    const barCount = Math.min(180, waveform.peaks.length);
+    return Array.from({ length: barCount }, (_, index) => {
+      const start = Math.floor((index * waveform.peaks.length) / barCount);
+      const end = Math.max(
+        start + 1,
+        Math.floor(((index + 1) * waveform.peaks.length) / barCount),
+      );
+      return Math.max(0.04, Math.max(...waveform.peaks.slice(start, end)));
+    });
+  }, [waveform]);
 
-    draw();
-    const observer = typeof ResizeObserver === "undefined"
-      ? null
-      : new ResizeObserver(draw);
-    observer?.observe(canvas);
-    return () => observer?.disconnect();
-  }, [currentTime, duration, waveform]);
-
-  function seek(event: React.PointerEvent<HTMLCanvasElement>) {
+  function seek(event: React.PointerEvent<SVGSVGElement>) {
     if (duration <= 0 || !audioRef.current) return;
     const bounds = event.currentTarget.getBoundingClientRect();
     const nextTime = Math.min(
@@ -119,6 +103,7 @@ export default function AudioLightboxPlayer({
       <audio
         ref={audioRef}
         src={audioUrl}
+        autoPlay={autoPlay}
         preload="metadata"
         onLoadedMetadata={(event) => {
           if (Number.isFinite(event.currentTarget.duration)) {
@@ -140,18 +125,50 @@ export default function AudioLightboxPlayer({
           style={audioLightboxPlayButtonStyle}
           aria-label={playing ? "Pause audio" : "Play audio"}
         >
-          {playing ? "Ⅱ" : "▶"}
+          <span aria-hidden="true" style={audioLightboxPlayIconStyle}>
+            {playing ? "pause" : "play_arrow"}
+          </span>
         </button>
         <span style={audioLightboxTimeStyle}>
           {formatTime(currentTime)} / {formatTime(duration)}
         </span>
       </div>
-      <canvas
-        ref={canvasRef}
+      <svg
+        viewBox="0 0 180 100"
+        preserveAspectRatio="none"
+        role="img"
         aria-label="Audio waveform"
         onPointerDown={seek}
         style={audioLightboxWaveformStyle}
-      />
+      >
+        {waveformBars.map((peak, index) => {
+          const x = index + 0.5;
+          const height = Math.max(5, peak * 82);
+          return (
+            <rect
+              key={index}
+              x={x - 0.36}
+              y={(100 - height) / 2}
+              width={0.72}
+              height={height}
+              rx={0.36}
+              fill={activityColour}
+              opacity={0.88}
+            />
+          );
+        })}
+        {duration > 0 && (
+          <line
+            x1={(currentTime / duration) * 180}
+            x2={(currentTime / duration) * 180}
+            y1={4}
+            y2={96}
+            stroke="#ffffff"
+            strokeWidth={1.1}
+            vectorEffect="non-scaling-stroke"
+          />
+        )}
+      </svg>
       {!waveform && !waveformError && (
         <span style={audioLightboxMessageStyle}>Generating waveform…</span>
       )}
@@ -192,6 +209,13 @@ const audioLightboxPlayButtonStyle: CSSProperties = {
   fontSize: 16,
 };
 
+const audioLightboxPlayIconStyle: CSSProperties = {
+  fontFamily: "'Material Symbols Outlined'",
+  fontSize: 24,
+  lineHeight: 1,
+  fontVariationSettings: "'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24",
+};
+
 const audioLightboxTimeStyle: CSSProperties = {
   fontFamily: "monospace",
   fontSize: 12,
@@ -205,6 +229,7 @@ const audioLightboxWaveformStyle: CSSProperties = {
   borderRadius: 4,
   background: "rgba(255,255,255,0.06)",
   cursor: "pointer",
+  overflow: "hidden",
 };
 
 const audioLightboxMessageStyle: CSSProperties = {

@@ -25,6 +25,8 @@ const coreIconNames = [
   "warning",
   "child_hat",
   "close",
+  "play_arrow",
+  "pause",
 ];
 
 if (
