@@ -1078,6 +1078,7 @@ function orientHeadToCamera(head: THREE.Object3D, parent: THREE.Object3D, camera
 }
 
 function usePhotoTexture(url: string) {
+  const gl = useThree((state) => state.gl);
   const fallbackTexture = useMemo(() => {
     const texture = new THREE.DataTexture(
       new Uint8Array([34, 38, 48, 255]),
@@ -1101,8 +1102,10 @@ function usePhotoTexture(url: string) {
       (nextTexture) => {
         loadedTexture = nextTexture;
         nextTexture.colorSpace = THREE.SRGBColorSpace;
-        nextTexture.minFilter = THREE.LinearFilter;
+        nextTexture.minFilter = THREE.LinearMipmapLinearFilter;
         nextTexture.magFilter = THREE.LinearFilter;
+        nextTexture.generateMipmaps = true;
+        nextTexture.anisotropy = Math.min(4, gl.capabilities.getMaxAnisotropy());
         nextTexture.needsUpdate = true;
         if (active) setTexture(nextTexture);
         else nextTexture.dispose();
@@ -1120,7 +1123,7 @@ function usePhotoTexture(url: string) {
       active = false;
       loadedTexture?.dispose();
     };
-  }, [fallbackTexture, url]);
+  }, [fallbackTexture, gl, url]);
 
   useEffect(
     () => () => {
