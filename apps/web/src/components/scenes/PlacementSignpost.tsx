@@ -1,6 +1,6 @@
 import { Text } from "@react-three/drei";
 import { type ThreeEvent } from "@react-three/fiber";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 
 export type PlacementSignDirection = "left" | "right" | "down";
@@ -18,7 +18,7 @@ interface PlacementSignpostProps {
   position: [number, number, number];
   height: number;
   signs: PlacementSign[];
-  partnerLogoUrl?: string;
+  placementName?: string;
   partnerBrandColor?: string;
   partnerBrandColorTwo?: string;
   isSelected?: boolean;
@@ -31,11 +31,8 @@ const POST_RADIUS = 0.035;
 const SIGN_SPACING = 0.34;
 const SIGN_TOP_OFFSET = 0.18;
 const SIGNPOST_MIN_HEIGHT = 2.8;
-const SIGNPOST_LOGO_EXTENSION = 0.5;
-const LOGO_DISC_RADIUS = 0.22;
-const LOGO_DISC_SEGMENTS = 48;
-const LOGO_DISC_LOGO_SIZE = LOGO_DISC_RADIUS * 1.45;
-const LOGO_DISC_DEPTH = 0.012;
+const SIGNPOST_NAME_SIGN_GAP = 0.08;
+const NAME_SIGN_TEXT_DEPTH = 0.012;
 const POST_COLOR = "#687581";
 const POST_HIGHLIGHT_COLOR = "#aebbc4";
 const SIGN_COLOR = "#ffffff";
@@ -46,6 +43,7 @@ const SHARED_SIGN_MIN_WIDTH = 0.7;
 const SIGN_TIP_LENGTH = 0.085;
 const SIGN_INNER_EDGE = POST_RADIUS;
 const SIGN_SHARED_TANGENT_OFFSET = POST_RADIUS + 0.002;
+const NAME_SIGN_CORNER_RADIUS = 0.055;
 const SIGN_POINTER_RENDER_ORDER = 1;
 const SIGN_POLE_RENDER_ORDER = 3;
 const SIGN_SHARED_LOCATION_RENDER_ORDER = 5;
@@ -55,7 +53,7 @@ export default function PlacementSignpost({
   position,
   height,
   signs,
-  partnerLogoUrl,
+  placementName,
   partnerBrandColor,
   partnerBrandColorTwo,
   isSelected = false,
@@ -69,7 +67,10 @@ export default function PlacementSignpost({
     height,
     1.2 + signs.length * SIGN_SPACING,
   );
-  const postHeight = signStackHeight + SIGNPOST_LOGO_EXTENSION;
+  const nameSignLayout = getPlacementNameSignLayout(placementName);
+  const nameSignBottom = signStackHeight + SIGNPOST_NAME_SIGN_GAP;
+  const nameSignTop = nameSignBottom + nameSignLayout.height;
+  const postHeight = nameSignTop;
   const postGeometry = useMemo(
     () => new THREE.CylinderGeometry(POST_RADIUS, POST_RADIUS * 1.35, postHeight, 16),
     [postHeight],
@@ -82,29 +83,15 @@ export default function PlacementSignpost({
     () => new THREE.CylinderGeometry(POST_RADIUS * 1.45, POST_RADIUS * 1.45, 0.045, 16),
     [],
   );
-  const logoDiscGeometry = useMemo(
-    () => new THREE.CircleGeometry(LOGO_DISC_RADIUS, LOGO_DISC_SEGMENTS),
-    [],
-  );
-  const logoTexture = useLogoTexture(partnerLogoUrl);
-  const logoAspect = getLogoTextureAspect(logoTexture);
-  const logoWidth = logoAspect >= 1
-    ? LOGO_DISC_LOGO_SIZE
-    : LOGO_DISC_LOGO_SIZE * logoAspect;
-  const logoHeight = logoAspect >= 1
-    ? LOGO_DISC_LOGO_SIZE / logoAspect
-    : LOGO_DISC_LOGO_SIZE;
-  const logoDiscMaterial = useMemo(
-    () => createLogoDiscMaterial(partnerBrandColor, partnerBrandColorTwo),
+  const nameSignColor = useMemo(
+    () => getDarkerBrandColor(partnerBrandColor, partnerBrandColorTwo),
     [partnerBrandColor, partnerBrandColorTwo],
   );
   useEffect(() => () => postGeometry.dispose(), [postGeometry]);
   useEffect(() => () => {
     baseGeometry.dispose();
     collarGeometry.dispose();
-    logoDiscGeometry.dispose();
-    logoDiscMaterial.dispose();
-  }, [baseGeometry, collarGeometry, logoDiscGeometry, logoDiscMaterial]);
+  }, [baseGeometry, collarGeometry]);
   const pointerHandlers = useMemo(() => ({
     onClick: onClick
       ? (event: ThreeEvent<MouseEvent>) => {
@@ -170,135 +157,152 @@ export default function PlacementSignpost({
           depthWrite
         />
       </mesh>
-      <group
-        position={[0, 0, postHeight + LOGO_DISC_RADIUS]}
-        rotation={[Math.PI / 2, 0, 0]}
-      >
-        <mesh geometry={logoDiscGeometry} renderOrder={SIGN_SHARED_LOCATION_RENDER_ORDER}>
-          <primitive object={logoDiscMaterial} attach="material" />
-        </mesh>
-        {partnerLogoUrl && (
-          <mesh
-            position={[0, 0, LOGO_DISC_DEPTH]}
-            renderOrder={SIGN_SHARED_LOCATION_RENDER_ORDER + 1}
-          >
-            <planeGeometry args={[logoWidth, logoHeight]} />
-            <meshBasicMaterial
-              map={logoTexture}
-              color="#ffffff"
-              transparent
-              alphaTest={0.05}
-              side={THREE.DoubleSide}
-              toneMapped={false}
-              depthTest
-              depthWrite
-            />
-          </mesh>
-        )}
-      </group>
+      {placementName && (
+        <PlacementNameSign
+          layout={nameSignLayout}
+          color={nameSignColor}
+          positionZ={nameSignBottom + nameSignLayout.height / 2}
+        />
+      )}
       {signs.map((sign, index) => (
         <SignBoard
           key={sign.id}
           sign={sign}
           index={index}
-          postHeight={postHeight}
+          postHeight={signStackHeight}
         />
       ))}
     </group>
   );
 }
 
-function createLogoDiscMaterial(colorOne?: string, colorTwo?: string) {
-  return new THREE.ShaderMaterial({
-    uniforms: {
-      centerColor: { value: new THREE.Color(colorOne || POST_COLOR) },
-      edgeColor: { value: new THREE.Color(colorTwo || colorOne || POST_COLOR) },
-    },
-    vertexShader: `
-      varying vec2 vUv;
+function PlacementNameSign({
+  layout,
+  color,
+  positionZ,
+}: {
+  layout: PlacementNameSignLayout;
+  color: THREE.Color;
+  positionZ: number;
+}) {
+  const geometry = useMemo(
+    () => createRoundedRectangleGeometry(
+      layout.width,
+      layout.height,
+      Math.min(
+        NAME_SIGN_CORNER_RADIUS,
+        layout.width * 0.12,
+        layout.height * 0.25,
+      ),
+    ),
+    [layout.height, layout.width],
+  );
+  useEffect(() => () => geometry.dispose(), [geometry]);
 
-      void main() {
-        vUv = uv;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }
-    `,
-    fragmentShader: `
-      uniform vec3 centerColor;
-      uniform vec3 edgeColor;
-      varying vec2 vUv;
-
-      void main() {
-        float radialDistance = distance(vUv, vec2(0.5));
-        float gradient = smoothstep(0.05, 0.7, radialDistance);
-        gl_FragColor = vec4(mix(centerColor, edgeColor, gradient), 1.0);
-      }
-    `,
-    side: THREE.DoubleSide,
-    depthTest: true,
-    depthWrite: true,
-    toneMapped: false,
-  });
+  return (
+    <group
+      position={[0, -SIGN_SHARED_TANGENT_OFFSET, positionZ]}
+      rotation={[Math.PI / 2, 0, 0]}
+      renderOrder={SIGN_SHARED_LOCATION_RENDER_ORDER}
+    >
+      <mesh renderOrder={SIGN_SHARED_LOCATION_RENDER_ORDER}>
+        <primitive object={geometry} attach="geometry" />
+        <meshBasicMaterial
+          color={color}
+          side={THREE.DoubleSide}
+          depthTest
+          depthWrite
+        />
+      </mesh>
+      <Text
+        position={[0, 0, NAME_SIGN_TEXT_DEPTH]}
+        renderOrder={SIGN_SHARED_LOCATION_RENDER_ORDER + 1}
+        fontSize={layout.fontSize}
+        lineHeight={1.15}
+        maxWidth={layout.textWidth}
+        anchorX="center"
+        anchorY="middle"
+        textAlign="center"
+        color="#ffffff"
+        fillOpacity={1}
+        depthOffset={-3}
+        material-depthTest
+        material-depthWrite={false}
+        material-toneMapped={false}
+      >
+        {layout.text}
+      </Text>
+    </group>
+  );
 }
 
-function useLogoTexture(url?: string) {
-  const fallbackTexture = useMemo(() => {
-    const texture = new THREE.DataTexture(
-      new Uint8Array([255, 255, 255, 0]),
-      1,
-      1,
-      THREE.RGBAFormat,
-    );
-    texture.needsUpdate = true;
-    return texture;
-  }, []);
-  const [texture, setTexture] = useState<THREE.Texture>(fallbackTexture);
-
-  useEffect(() => {
-    let active = true;
-    let loadedTexture: THREE.Texture | null = null;
-    setTexture(fallbackTexture);
-    if (!url) return () => {
-      active = false;
-    };
-
-    new THREE.TextureLoader().load(
-      url,
-      (nextTexture) => {
-        loadedTexture = nextTexture;
-        nextTexture.colorSpace = THREE.SRGBColorSpace;
-        nextTexture.minFilter = THREE.LinearMipmapLinearFilter;
-        nextTexture.magFilter = THREE.LinearFilter;
-        nextTexture.generateMipmaps = true;
-        nextTexture.needsUpdate = true;
-        if (active) setTexture(nextTexture);
-        else nextTexture.dispose();
-      },
-      undefined,
-      () => {
-        if (active) console.warn(`[signpost-logo] unavailable: ${url}`);
-      },
-    );
-
-    return () => {
-      active = false;
-      loadedTexture?.dispose();
-    };
-  }, [fallbackTexture, url]);
-
-  useEffect(() => () => fallbackTexture.dispose(), [fallbackTexture]);
-  return texture;
+function createRoundedRectangleGeometry(width: number, height: number, radius: number) {
+  const halfWidth = width / 2;
+  const halfHeight = height / 2;
+  const shape = new THREE.Shape();
+  shape.moveTo(-halfWidth + radius, -halfHeight);
+  shape.lineTo(halfWidth - radius, -halfHeight);
+  shape.quadraticCurveTo(halfWidth, -halfHeight, halfWidth, -halfHeight + radius);
+  shape.lineTo(halfWidth, halfHeight - radius);
+  shape.quadraticCurveTo(halfWidth, halfHeight, halfWidth - radius, halfHeight);
+  shape.lineTo(-halfWidth + radius, halfHeight);
+  shape.quadraticCurveTo(-halfWidth, halfHeight, -halfWidth, halfHeight - radius);
+  shape.lineTo(-halfWidth, -halfHeight + radius);
+  shape.quadraticCurveTo(-halfWidth, -halfHeight, -halfWidth + radius, -halfHeight);
+  shape.closePath();
+  return new THREE.ShapeGeometry(shape);
 }
 
-function getLogoTextureAspect(texture: THREE.Texture) {
-  const image = texture.image as {
-    naturalWidth?: number;
-    naturalHeight?: number;
-    width?: number;
-    height?: number;
-  } | null;
-  const width = image?.naturalWidth ?? image?.width ?? 1;
-  const height = image?.naturalHeight ?? image?.height ?? 1;
-  return width > 0 && height > 0 ? width / height : 1;
+interface PlacementNameSignLayout {
+  text: string;
+  width: number;
+  height: number;
+  textWidth: number;
+  fontSize: number;
+}
+
+function getPlacementNameSignLayout(name?: string): PlacementNameSignLayout {
+  const normalizedName = name?.trim().replace(/\s+/g, " ") || "SITE";
+  const maxLineCharacters = 18;
+  const words = normalizedName.split(" ");
+  const lines: string[] = [];
+  let currentLine = "";
+  for (const word of words) {
+    const nextLine = currentLine ? `${currentLine} ${word}` : word;
+    if (currentLine && nextLine.length > maxLineCharacters) {
+      lines.push(currentLine);
+      currentLine = word;
+    } else {
+      currentLine = nextLine;
+    }
+  }
+  if (currentLine) lines.push(currentLine);
+
+  const longestLineCharacters = Math.max(...lines.map((line) => line.length));
+  const fontSize = THREE.MathUtils.clamp(
+    0.34 / Math.max(longestLineCharacters * 0.56, 1),
+    0.055,
+    0.095,
+  );
+  const textWidth = longestLineCharacters * fontSize * 0.56;
+  return {
+    text: lines.join("\n"),
+    width: Math.max(0.72, textWidth + 0.2),
+    height: lines.length * fontSize * 1.15 + 0.16,
+    textWidth,
+    fontSize,
+  };
+}
+
+function getDarkerBrandColor(colorOne?: string, colorTwo?: string) {
+  const first = new THREE.Color(colorOne || POST_COLOR);
+  if (!colorTwo?.trim()) return first;
+  const second = new THREE.Color(colorTwo);
+  return getColorLuminance(first) <= getColorLuminance(second) ? first : second;
+}
+
+function getColorLuminance(color: THREE.Color) {
+  return color.r * 0.2126 + color.g * 0.7152 + color.b * 0.0722;
 }
 
 function SignBoard({

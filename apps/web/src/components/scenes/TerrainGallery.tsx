@@ -1965,7 +1965,7 @@ export default function TerrainGallery({
             position={position}
             height={getPlacementSignpostHeight(position[2], terrainMaxZ, placementSigns.get(placement.placement_id)?.length ?? 0)}
             signs={placementSigns.get(placement.placement_id) ?? []}
-            partnerLogoUrl={placement.partner_white_logo?.url ?? placement.partner_logo?.url}
+            placementName={formatPlacementPlaqueName(placement)}
             partnerBrandColor={placement.partner_brand_color_one}
             partnerBrandColorTwo={placement.partner_brand_color_two}
             isSelected={
@@ -2897,6 +2897,12 @@ function formatPlacementDisplayName(placement: MapPlacement) {
   return section
     ? `${placement.placement_name} - ${section}`
     : placement.placement_name;
+}
+
+function formatPlacementPlaqueName(placement: MapPlacement) {
+  const acronym = placement.partner_acronym?.trim() ||
+    getPartnerAcronym(placement.partner_name || placement.placement_name);
+  return `${acronym} \u00b7 ${formatPlacementDisplayName(placement)}`;
 }
 
 function haversineMeters(a: [number, number], b: [number, number]) {
