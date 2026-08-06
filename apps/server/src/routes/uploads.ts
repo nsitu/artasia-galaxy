@@ -1996,14 +1996,7 @@ router.post("/assets/:assetId/flatten", async (req, res) => {
 
 router.get("/assets/:assetId/waveform", async (req, res) => {
   try {
-    const auth = await getAuthContext(req);
     const assetId = req.params.assetId.trim();
-    const isPublished = auth.authenticated
-      || (await getCachedPublishedAssetIds()).has(assetId);
-    if (!isPublished) {
-      res.status(401).json({ error: "Sign in to view audio waveforms." });
-      return;
-    }
     res.json(await getAudioWaveform(assetId));
   } catch (err) {
     const message = (err as Error).message;
