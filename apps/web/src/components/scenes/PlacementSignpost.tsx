@@ -36,6 +36,7 @@ const NAME_SIGN_TEXT_DEPTH = 0.012;
 const POST_COLOR = "#687581";
 const POST_HIGHLIGHT_COLOR = "#aebbc4";
 const SIGN_COLOR = "#ffffff";
+const SIGN_HOVER_COLOR = "#eee111";
 const SIGN_TEXT_COLOR = "#253746";
 const SIGN_TEXT_PADDING = 0.28;
 const SIGN_MIN_WIDTH = 0.9;
@@ -359,7 +360,7 @@ function SignBoard({
       <group rotation={[Math.PI / 2, 0, 0]}>
         <mesh geometry={geometry} renderOrder={renderOrder}>
           <meshBasicMaterial
-            color={SIGN_COLOR}
+            color={isHovered ? SIGN_HOVER_COLOR : SIGN_COLOR}
             side={THREE.DoubleSide}
             polygonOffset
             polygonOffsetFactor={-2}
