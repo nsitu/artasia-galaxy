@@ -431,7 +431,7 @@ class OrbitingActivityRingMaterial extends THREE.ShaderMaterial {
         ringOpacity: { value: 0.72 },
         innerRadius: { value: 1 },
         outerRadius: { value: 1.02 },
-        noiseCells: { value: 8 },
+        noiseCells: { value: 12 },
         noiseAmplitude: { value: 0.035 },
         time: { value: 0 },
       },
@@ -470,12 +470,28 @@ class OrbitingActivityRingMaterial extends THREE.ShaderMaterial {
           return mix(bottom, top, fadeY);
         }
 
+        float periodicNoise(vec2 point, float periodX) {
+          float value = 0.0;
+          float amplitude = 0.72;
+          float frequency = 1.0;
+          float amplitudeTotal = 0.0;
+
+          for (int octave = 0; octave < 3; octave++) {
+            value += periodicPerlin(point * frequency, periodX * frequency) * amplitude;
+            amplitudeTotal += amplitude;
+            amplitude *= 0.5;
+            frequency *= 2.0;
+          }
+
+          return value / amplitudeTotal;
+        }
+
         void main() {
           vec3 displaced = position;
           float radius = length(position.xy);
           float angle = atan(position.y, position.x);
           float angularCoordinate = (angle + 3.14159265) / 6.2831853 * noiseCells;
-          float noise = periodicPerlin(vec2(angularCoordinate, time * 0.35), noiseCells);
+          float noise = periodicNoise(vec2(angularCoordinate, time * 0.35), noiseCells);
           float edgeDirection = radius < (innerRadius + outerRadius) * 0.5 ? -1.0 : 1.0;
           displaced.xy += normalize(position.xy) * noise * noiseAmplitude * edgeDirection;
           vNoise = noise;
@@ -639,6 +655,10 @@ const ORBIT_HEIGHT = 0.72;
 const ORBIT_SPEED = 0.16;
 const ORBIT_SPEED_MIN = ORBIT_SPEED * 0.5;
 const ORBIT_SPEED_MAX = ORBIT_SPEED * 1.5;
+const ORBIT_RING_SEGMENTS = 256;
+const ORBIT_RING_HALF_WIDTH = 0.022;
+const ORBIT_RING_NOISE_CELLS = 12;
+const ORBIT_RING_NOISE_AMPLITUDE = 0.021;
 const CUTOUT_BORDER_COLORS = [
   "#8e1d58",
   "#eee111",
@@ -1033,8 +1053,8 @@ export function OrbitingActivityRing({
   const groupRef = useRef<THREE.Group>(null);
   const materialRef = useRef<OrbitingActivityRingMaterial>(null);
   const [cx, cy, cz] = center;
-  const innerRadius = radius - 0.012;
-  const outerRadius = radius + 0.012;
+  const innerRadius = radius - ORBIT_RING_HALF_WIDTH;
+  const outerRadius = radius + ORBIT_RING_HALF_WIDTH;
 
   useFrame((state) => {
     if (groupRef.current) groupRef.current.rotation.z = state.clock.elapsedTime * ORBIT_SPEED;
@@ -1047,15 +1067,15 @@ export function OrbitingActivityRing({
       position={[cx, cy, cz + ORBIT_HEIGHT]}
     >
       <mesh renderOrder={0}>
-        <ringGeometry args={[innerRadius, outerRadius, 128]} />
+        <ringGeometry args={[innerRadius, outerRadius, ORBIT_RING_SEGMENTS]} />
         <orbitingActivityRingMaterial
           ref={materialRef}
           ringColour={colour}
           ringOpacity={0.72}
           innerRadius={innerRadius}
           outerRadius={outerRadius}
-          noiseCells={8}
-          noiseAmplitude={0.012}
+          noiseCells={ORBIT_RING_NOISE_CELLS}
+          noiseAmplitude={ORBIT_RING_NOISE_AMPLITUDE}
           transparent
           side={THREE.DoubleSide}
           depthWrite={false}
