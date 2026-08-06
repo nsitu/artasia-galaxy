@@ -158,6 +158,7 @@ function artasia_get_expanded_placements(): WP_REST_Response
             $partner_lookup[$partner->ID] = [
                 'id'      => $partner->ID,
                 'name'    => $partner->post_title,
+                'acronym' => get_post_meta($partner->ID, 'artasia_partner_acronym', true) ?: '',
                 'type'    => get_post_meta($partner->ID, 'artasia_partner_type', true) ?: '',
                 'website' => get_post_meta($partner->ID, 'artasia_website', true) ?: '',
                 'brand_color_one' => get_post_meta($partner->ID, 'artasia_brand_color_one', true) ?: '',

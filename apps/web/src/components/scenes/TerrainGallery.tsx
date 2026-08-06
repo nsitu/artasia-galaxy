@@ -16,6 +16,7 @@ import {
   OrbitingPhotoBanner,
   TerrainPhotoFlower,
 } from "./TerrainPhotoMarker";
+import PlacementSignpost, { type PlacementSign } from "./PlacementSignpost";
 import PlaceMarker, { FlowerLayoutCoordinator } from "./PlaceMarker";
 import {
   createMaxDetailTerrainRequest,
@@ -36,6 +37,9 @@ const REGIONAL_DEM_ZOOM_OFFSET = 5;
 const LOCAL_DEM_ZOOM_OFFSET = 3;
 const ORBIT_TERRAIN_CLEARANCE = 0.12;
 const ORBIT_VISUAL_HALF_HEIGHT = 0.5;
+const SIGNPOST_TERRAIN_CLEARANCE = 0.35;
+const SIGNPOST_MIN_HEIGHT = 2.8;
+const SIGNPOST_MAX_DIRECTION_ANGLE = THREE.MathUtils.degToRad(30);
 const INTRO_CAMERA_DURATION_MS = 3000;
 const PLACEMENT_ORBIT_FIT_DURATION_MS = 100;
 
@@ -700,23 +704,26 @@ export default function TerrainGallery({
   const terrainDemZoomOffset = focusedPlacement
     ? LOCAL_DEM_ZOOM_OFFSET
     : REGIONAL_DEM_ZOOM_OFFSET;
+  const terrainMaxZ = useMemo(() => {
+    if (!terrain) return null;
+    terrain.updateMatrixWorld(true);
+    const terrainBounds = new THREE.Box3().setFromObject(terrain);
+    return Number.isFinite(terrainBounds.max.z) ? terrainBounds.max.z : null;
+  }, [terrain]);
   const orbitHeight = useMemo(() => {
-    if (!focusedPlacement || !projection || !terrain) return ORBIT_HEIGHT;
+    if (!focusedPlacement || !projection || !terrain || terrainMaxZ == null) return ORBIT_HEIGHT;
 
     const [placementX, placementY, placementZ = 0] = projection.proj([
       focusedPlacement.lat,
       focusedPlacement.lng,
     ]);
     const placementTerrainZ = sampleTerrainZ(terrain, placementX, placementY) ?? placementZ;
-    terrain.updateMatrixWorld(true);
-    const terrainBounds = new THREE.Box3().setFromObject(terrain);
-    if (!Number.isFinite(terrainBounds.max.z)) return ORBIT_HEIGHT;
 
     return Math.max(
       ORBIT_HEIGHT,
-      terrainBounds.max.z - placementTerrainZ + ORBIT_VISUAL_HALF_HEIGHT + ORBIT_TERRAIN_CLEARANCE,
+      terrainMaxZ - placementTerrainZ + ORBIT_VISUAL_HALF_HEIGHT + ORBIT_TERRAIN_CLEARANCE,
     );
-  }, [focusedPlacement, projection, terrain]);
+  }, [focusedPlacement, projection, terrain, terrainMaxZ]);
   const localPhotoLayout = useMemo<LocalPhotoLayoutItem[]>(() => {
     if (!focusedPlacement || !projection) return [];
     const [placementX, placementY, placementZ = 0] = projection.proj([
@@ -946,6 +953,74 @@ export default function TerrainGallery({
     });
   }, [focusedPlacement, projection, terrain, visiblePlacements]);
 
+  const placementSigns = useMemo(() => {
+    const signsByPlacementId = new Map<number, PlacementSign[]>();
+    const signTargets = focusedPlacement && projection
+      ? placements
+        .filter((placement) => Number.isFinite(placement.lat) && Number.isFinite(placement.lng))
+        .map((placement) => {
+          const [x, y, z = 0] = projection.proj([placement.lat, placement.lng]);
+          return {
+            placement,
+            position: [x, y, z] as [number, number, number],
+          };
+        })
+      : placementLayout;
+    const signposts = focusedPlacement ? placementLayout : signTargets;
+
+    for (const current of signposts) {
+      const currentAnchor = getPlacementAnchorKey(current.placement);
+      const samePlace = signTargets
+        .filter(
+          (candidate) =>
+            candidate.placement.placement_id !== current.placement.placement_id &&
+            getPlacementAnchorKey(candidate.placement) === currentAnchor,
+        )
+        .sort((a, b) => a.placement.placement_id - b.placement.placement_id);
+      const nearby = signTargets
+        .filter(
+          (candidate) =>
+            candidate.placement.placement_id !== current.placement.placement_id &&
+            getPlacementAnchorKey(candidate.placement) !== currentAnchor,
+        )
+        .sort(
+          (a, b) =>
+            haversineMeters(
+              [a.placement.lat, a.placement.lng],
+              [current.placement.lat, current.placement.lng],
+            ) -
+            haversineMeters(
+              [b.placement.lat, b.placement.lng],
+              [current.placement.lat, current.placement.lng],
+            ),
+        )
+        .slice(0, 3);
+
+      const signs = [
+        ...nearby.map<PlacementSign>((target) => ({
+          id: `nearby:${target.placement.placement_id}`,
+          label: getPlacementSignLabel(
+            target.placement,
+            haversineMeters(
+              [current.placement.lat, current.placement.lng],
+              [target.placement.lat, target.placement.lng],
+            ),
+          ),
+          direction: target.position[0] >= current.position[0] ? "right" : "left",
+          angle: getPlacementSignAngle(current, target),
+        })),
+        ...samePlace.map<PlacementSign>((target) => ({
+          id: `same-place:${target.placement.placement_id}`,
+          label: getPlacementSignLabel(target.placement),
+          direction: "down",
+          angle: 0,
+        })),
+      ];
+      signsByPlacementId.set(current.placement.placement_id, signs);
+    }
+    return signsByPlacementId;
+  }, [focusedPlacement, placementLayout, placements, projection]);
+
   useEffect(() => {
     const filterChanged = previousPartnerFilterRef.current !== selectedPartnerFilter;
     previousPartnerFilterRef.current = selectedPartnerFilter;
@@ -1075,6 +1150,30 @@ export default function TerrainGallery({
   }, []);
 
   useEffect(() => {
+    if (authenticated !== true) {
+      setPlacementsWithAssets(new Set());
+      return;
+    }
+
+    let cancelled = false;
+    fetchSiteActivityStats()
+      .then((result) => {
+        if (cancelled) return;
+        setPlacementsWithAssets(new Set(
+          Object.entries(result.sites)
+            .filter(([, stats]) => stats.totalPublished > 0)
+            .map(([placementId]) => Number(placementId)),
+        ));
+      })
+      .catch((statsError) => {
+        console.warn(`[viewer] failed to load placement asset stats: ${(statsError as Error).message}`);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [authenticated]);
+
+  useEffect(() => {
     if (!placementsResolved) return;
 
     if (!requestedSiteSlug) {
@@ -1123,30 +1222,6 @@ export default function TerrainGallery({
       cancelled = true;
     };
   }, []);
-
-  useEffect(() => {
-    if (authenticated !== true) {
-      setPlacementsWithAssets(new Set());
-      return;
-    }
-
-    let cancelled = false;
-    fetchSiteActivityStats()
-      .then((result) => {
-        if (cancelled) return;
-        setPlacementsWithAssets(new Set(
-          Object.entries(result.sites)
-            .filter(([, stats]) => stats.totalPublished > 0)
-            .map(([placementId]) => Number(placementId)),
-        ));
-      })
-      .catch((statsError) => {
-        console.warn(`[viewer] failed to load placement asset stats: ${(statsError as Error).message}`);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [authenticated]);
 
   useEffect(() => {
     if (!request) {
@@ -1524,16 +1599,29 @@ export default function TerrainGallery({
       placementOrbitFitPlacementRef.current === focusedPlacement.placement_id ||
       !sceneReadyForMarkers ||
       galleryLoading ||
-      activityOrbitRings.length === 0 ||
+      (activityOrbitRings.length === 0 && placementLayout.length === 0) ||
       !controls?.target
     ) return;
 
-    const center = new THREE.Vector3(...activityOrbitRings[0].center);
-    center.z += 0.72;
-    const outerRadius = Math.max(
-      ...activityOrbitRings.map((ring) => ring.radius),
+    const placementCenter = activityOrbitRings[0]?.center ?? placementLayout[0].position;
+    const center = new THREE.Vector3(...placementCenter);
+    const signpostHeight = getPlacementSignpostHeight(
+      center.z,
+      terrainMaxZ,
+      placementSigns.get(focusedPlacement.placement_id)?.length ?? 0,
     );
-    const contentRadius = Math.max(1, outerRadius + 0.75);
+    center.z += Math.max(ORBIT_HEIGHT, signpostHeight * 0.5);
+    const outerRadius = activityOrbitRings.length > 0
+      ? Math.max(...activityOrbitRings.map((ring) => ring.radius))
+      : 1;
+    const signpostBaseZ = placementCenter[2];
+    const signpostTopZ = signpostBaseZ + signpostHeight;
+    const verticalContentRadius = Math.max(
+      Math.abs(center.z - signpostBaseZ),
+      Math.abs(signpostTopZ - center.z),
+      Math.abs(signpostBaseZ + ORBIT_HEIGHT - center.z),
+    ) + 0.35;
+    const contentRadius = Math.max(1, outerRadius + 0.75, verticalContentRadius);
     const verticalFov = camera instanceof THREE.PerspectiveCamera
       ? THREE.MathUtils.degToRad(camera.fov)
       : THREE.MathUtils.degToRad(50);
@@ -1583,7 +1671,10 @@ export default function TerrainGallery({
     controls,
     focusedPlacement,
     galleryLoading,
+    placementSigns,
+    placementLayout,
     sceneReadyForMarkers,
+    terrainMaxZ,
   ]);
 
   useEffect(() => {
@@ -1784,7 +1875,7 @@ export default function TerrainGallery({
           : undefined
       }
     >
-      <FlowerLayoutCoordinator />
+      {!focusedPlacement && <FlowerLayoutCoordinator />}
       {terrain && terrainMatchesRequest && <primitive object={terrain} />}
       {sceneReadyForMarkers && focusedPlacement &&
         activityOrbitRings.map((ring) => (
@@ -1808,6 +1899,7 @@ export default function TerrainGallery({
               center={item.kind === "orbit" ? item.center : item.position}
               orbitRadius={item.kind === "orbit" ? item.orbitRadius : undefined}
               orbitHeight={orbitHeight}
+              activityColour={item.kind === "orbit" ? item.orbitColour : undefined}
               isDenseOrbit={item.kind === "orbit" && item.orbitAssetCount >= 5}
               isHighlighted={item.index === hoveredIndex}
               onClick={() => selectPhoto(item.index)}
@@ -1856,7 +1948,24 @@ export default function TerrainGallery({
           ),
         )}
 
-      {sceneReadyForMarkers &&
+      {sceneReadyForMarkers && focusedPlacement &&
+        placementLayout.map(({ placement, position }) => (
+          <PlacementSignpost
+            key={placement.placement_id}
+            markerId={String(placement.placement_id)}
+            position={position}
+            height={getPlacementSignpostHeight(position[2], terrainMaxZ, placementSigns.get(placement.placement_id)?.length ?? 0)}
+            signs={placementSigns.get(placement.placement_id) ?? []}
+            isSelected={
+              (
+                usesTouchPreview
+                  ? previewPlacement
+                  : hoveredPlacement
+              )?.placement_id === placement.placement_id
+            }
+          />
+        ))}
+      {sceneReadyForMarkers && !focusedPlacement &&
         placementLayout.map(({
           placement,
           position,
@@ -1882,30 +1991,26 @@ export default function TerrainGallery({
                   : hoveredPlacement
               )?.placement_id === placement.placement_id
             }
-            onClick={
-              focusedPlacement
-                ? undefined
-                : () => {
-                    if (usesTouchPreview) {
-                      setHoveredPlacement(null);
-                      setPreviewPlacement((current) =>
-                        current?.placement_id === placement.placement_id
-                          ? null
-                          : placement,
-                      );
-                      panToPlacement(position);
-                      return;
-                    }
-                    focusPlacement(placement);
-                  }
-            }
+            onClick={() => {
+              if (usesTouchPreview) {
+                setHoveredPlacement(null);
+                setPreviewPlacement((current) =>
+                  current?.placement_id === placement.placement_id
+                    ? null
+                    : placement,
+                );
+                panToPlacement(position);
+                return;
+              }
+              focusPlacement(placement);
+            }}
             onPointerEnter={
-              focusedPlacement || usesTouchPreview
+              usesTouchPreview
                 ? undefined
                 : () => setHoveredPlacement(placement)
             }
             onPointerLeave={
-              focusedPlacement || usesTouchPreview
+              usesTouchPreview
                 ? undefined
                 : () => setHoveredPlacement(null)
             }
@@ -2705,6 +2810,68 @@ function getPlacementAnchorKey(placement: MapPlacement) {
   if (placeName) return `place:${placeName}|${city}`;
   if (address) return `address:${address}|${city}`;
   return `coordinates:${placement.lat.toFixed(5)}:${placement.lng.toFixed(5)}`;
+}
+
+function getPlacementSignLabel(placement: MapPlacement, distanceMeters?: number) {
+  const label = placement.partner_acronym?.trim() ||
+    getPartnerAcronym(placement.partner_name || placement.placement_name);
+  if (distanceMeters == null || !Number.isFinite(distanceMeters)) return label;
+  const distanceKm = distanceMeters / 1000;
+  const distanceLabel = distanceKm < 1
+    ? `${Math.round(distanceMeters)} m`
+    : `${distanceKm.toFixed(distanceKm < 10 ? 1 : 0)} km`;
+  return `${label} · ${distanceLabel}`;
+}
+
+function getPlacementSignAngle(
+  current: { placement: MapPlacement; position: [number, number, number] },
+  target: { placement: MapPlacement; position: [number, number, number] },
+) {
+  const direction = target.position[0] >= current.position[0] ? 1 : -1;
+  const horizontalOffset = Math.abs(target.position[0] - current.position[0]);
+  const northSouthOffset = target.position[1] - current.position[1];
+  return THREE.MathUtils.clamp(
+    Math.atan2(northSouthOffset * direction, Math.max(horizontalOffset, 0.001)),
+    -SIGNPOST_MAX_DIRECTION_ANGLE,
+    SIGNPOST_MAX_DIRECTION_ANGLE,
+  );
+}
+
+function getPartnerAcronym(value?: string) {
+  const name = value?.trim().replace(/\s+/g, " ");
+  if (!name) return "SITE";
+  if (
+    /^[A-Z0-9]+$/.test(name) ||
+    (/^[A-Za-z0-9]+$/.test(name) && /[a-z][A-Z]/.test(name))
+  ) {
+    return name;
+  }
+
+  const words = name
+    .replace(/&/g, " and ")
+    .split(/[^A-Za-z0-9]+/)
+    .filter(Boolean)
+    .filter((word) => !/^(and|of|the|for|at|on|in)$/i.test(word));
+  const acronym = words
+    .map((word) => word[0]?.toUpperCase() ?? "")
+    .join("")
+    .slice(0, 8);
+  return acronym || "SITE";
+}
+
+function getPlacementSignpostHeight(
+  baseZ: number,
+  terrainMaxZ: number | null,
+  signCount: number,
+) {
+  const terrainClearanceHeight = terrainMaxZ == null
+    ? 0
+    : terrainMaxZ - baseZ + SIGNPOST_TERRAIN_CLEARANCE;
+  return Math.max(
+    SIGNPOST_MIN_HEIGHT,
+    1.2 + signCount * 0.34,
+    terrainClearanceHeight,
+  );
 }
 
 function formatPlacementDisplayName(placement: MapPlacement) {

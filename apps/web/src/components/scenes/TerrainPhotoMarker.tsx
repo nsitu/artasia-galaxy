@@ -628,6 +628,7 @@ interface OrbitAudioProps {
   center: [number, number, number];
   orbitRadius?: number;
   orbitHeight?: number;
+  activityColour?: string;
   isDenseOrbit?: boolean;
   isHighlighted: boolean;
   onClick: () => void;
@@ -665,7 +666,7 @@ const ORBIT_SPEED_MAX = ORBIT_SPEED * 1.5;
 const ORBIT_RING_SEGMENTS = 512;
 const ORBIT_RING_HALF_WIDTH = 0.1;
 const ORBIT_RING_NOISE_CELLS = 18;
-const ORBIT_RING_NOISE_AMPLITUDE = 0.07;
+const ORBIT_RING_NOISE_AMPLITUDE = 0.09;
 const ORBIT_RING_NOISE_TIME_SCALE = 0.5;
 const CUTOUT_BORDER_COLORS = [
   "#8e1d58",
@@ -683,6 +684,7 @@ const AUDIO_ICON_HIT_RADIUS = 0.45;
 const AUDIO_ICON_RING_INNER_RADIUS = 0.32;
 const AUDIO_ICON_RING_OUTER_RADIUS = 0.41;
 const AUDIO_ICON_SIZE = 0.82;
+const AUDIO_ICON_BACKGROUND_OPACITY = 0.46;
 
 const tempVector = new THREE.Vector3();
 const materialSymbolTexturePromises = new Map<
@@ -1105,6 +1107,7 @@ export function OrbitingAudioMarker({
   center,
   orbitRadius,
   orbitHeight,
+  activityColour,
   isDenseOrbit = false,
   isHighlighted,
   onClick,
@@ -1179,6 +1182,17 @@ export function OrbitingAudioMarker({
               opacity={0}
               depthWrite={false}
               color="#ffffff"
+            />
+          </mesh>
+          <mesh position={[0, 0, -0.0005]}>
+            <circleGeometry args={[AUDIO_ICON_RING_OUTER_RADIUS, 48]} />
+            <meshBasicMaterial
+              color={activityColour ?? "#8a9099"}
+              transparent
+              opacity={isHighlighted ? 1 : AUDIO_ICON_BACKGROUND_OPACITY}
+              depthWrite={false}
+              side={THREE.DoubleSide}
+              toneMapped={false}
             />
           </mesh>
           {assignedIconTexture ? (

@@ -12,6 +12,7 @@ export interface WpPlace {
 export interface WpPartner {
   id: number;
   name: string;
+  acronym?: string;
   type: string;
   website?: string;
   brand_color_one?: string;

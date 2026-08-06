@@ -123,6 +123,7 @@ export interface MapPlacement {
   placement_slug?: string;
   is_earlyon: boolean;
   partner_name?: string;
+  partner_acronym?: string;
   partner_logo?: {
     id: number;
     url: string;
