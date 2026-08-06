@@ -977,6 +977,7 @@ export default function TerrainGallery({
             getPlacementAnchorKey(candidate.placement) === currentAnchor,
         )
         .sort((a, b) => a.placement.placement_id - b.placement.placement_id);
+      const nearbyAnchors = new Set<string>();
       const nearby = signTargets
         .filter(
           (candidate) =>
@@ -992,8 +993,14 @@ export default function TerrainGallery({
             haversineMeters(
               [b.placement.lat, b.placement.lng],
               [current.placement.lat, current.placement.lng],
-            ),
+            ) || a.placement.placement_id - b.placement.placement_id,
         )
+        .filter((candidate) => {
+          const anchorKey = getPlacementAnchorKey(candidate.placement);
+          if (nearbyAnchors.has(anchorKey)) return false;
+          nearbyAnchors.add(anchorKey);
+          return true;
+        })
         .slice(0, 3);
 
       const signs = [
@@ -1008,12 +1015,14 @@ export default function TerrainGallery({
           ),
           direction: target.position[0] >= current.position[0] ? "right" : "left",
           angle: getPlacementSignAngle(current, target),
+          onClick: () => updatePlacementPath(target.placement),
         })),
         ...samePlace.map<PlacementSign>((target) => ({
           id: `same-place:${target.placement.placement_id}`,
-          label: getPlacementSignLabel(target.placement),
+          label: getSharedPlacementSignLabel(target.placement),
           direction: "down",
           angle: 0,
+          onClick: () => updatePlacementPath(target.placement),
         })),
       ];
       signsByPlacementId.set(current.placement.placement_id, signs);
@@ -2821,6 +2830,12 @@ function getPlacementSignLabel(placement: MapPlacement, distanceMeters?: number)
     ? `${Math.round(distanceMeters)} m`
     : `${distanceKm.toFixed(distanceKm < 10 ? 1 : 0)} km`;
   return `${label} · ${distanceLabel}`;
+}
+
+function getSharedPlacementSignLabel(placement: MapPlacement) {
+  const acronym = getPlacementSignLabel(placement);
+  const section = placement.section?.trim();
+  return section ? `${acronym} · ${section}` : acronym;
 }
 
 function getPlacementSignAngle(

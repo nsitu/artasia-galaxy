@@ -10,6 +10,7 @@ export interface PlacementSign {
   label: string;
   direction: PlacementSignDirection;
   angle?: number;
+  onClick?: () => void;
 }
 
 interface PlacementSignpostProps {
@@ -110,8 +111,8 @@ export default function PlacementSignpost({
       >
         <meshBasicMaterial
           color={isSelected ? POST_HIGHLIGHT_COLOR : POST_COLOR}
-          depthTest={false}
-          depthWrite={false}
+          depthTest
+          depthWrite
         />
       </mesh>
       <mesh
@@ -122,8 +123,8 @@ export default function PlacementSignpost({
       >
         <meshBasicMaterial
           color={isSelected ? POST_HIGHLIGHT_COLOR : POST_COLOR}
-          depthTest={false}
-          depthWrite={false}
+          depthTest
+          depthWrite
         />
       </mesh>
       <mesh
@@ -134,8 +135,8 @@ export default function PlacementSignpost({
       >
         <meshBasicMaterial
           color={isSelected ? POST_HIGHLIGHT_COLOR : POST_COLOR}
-          depthTest={false}
-          depthWrite={false}
+          depthTest
+          depthWrite
         />
       </mesh>
       {signs.map((sign, index) => (
@@ -171,17 +172,29 @@ function SignBoard({
     ? 0
     : directionMultiplier * (SIGN_INNER_EDGE + signWidth / 2);
   const geometry = useMemo(
-    () => new THREE.ShapeGeometry(createArrowShape(sign.direction, signWidth, sign.angle ?? 0)),
-    [sign.direction, sign.angle, signWidth],
+    () => new THREE.ShapeGeometry(createArrowShape(sign.direction, signWidth)),
+    [sign.direction, signWidth],
   );
   useEffect(() => () => geometry.dispose(), [geometry]);
 
   return (
     <group
       position={[0, 0, signZ]}
-      rotation={[Math.PI / 2, 0, 0]}
+      rotation={[0, 0, sign.angle ?? 0]}
+      onClick={sign.onClick ? (event) => {
+        event.stopPropagation();
+        sign.onClick?.();
+      } : undefined}
+      onPointerOver={sign.onClick ? (event) => {
+        event.stopPropagation();
+        document.body.style.cursor = "pointer";
+      } : undefined}
+      onPointerOut={sign.onClick ? (event) => {
+        event.stopPropagation();
+        document.body.style.cursor = "";
+      } : undefined}
     >
-      <group rotation={[0, 0, sign.angle ?? 0]}>
+      <group rotation={[Math.PI / 2, 0, 0]}>
         <mesh geometry={geometry} renderOrder={renderOrder}>
           <meshBasicMaterial
             color={SIGN_COLOR}
@@ -189,8 +202,8 @@ function SignBoard({
             polygonOffset
             polygonOffsetFactor={-2}
             polygonOffsetUnits={-2}
-            depthTest={isDown ? false : true}
-            depthWrite={false}
+            depthTest
+            depthWrite
           />
         </mesh>
         <Text
@@ -203,7 +216,8 @@ function SignBoard({
           textAlign="center"
           color={SIGN_TEXT_COLOR}
           depthOffset={-2}
-          material-depthTest={!isDown}
+          material-depthTest
+          material-depthWrite
         >
           {sign.label}
         </Text>
@@ -220,7 +234,7 @@ function getSignWidth(label: string, isDown: boolean, fontSize: number) {
   );
 }
 
-function createArrowShape(direction: PlacementSignDirection, width: number, angle: number) {
+function createArrowShape(direction: PlacementSignDirection, width: number) {
   const shape = new THREE.Shape();
   if (direction === "down") {
     const halfWidth = width / 2;
@@ -234,16 +248,12 @@ function createArrowShape(direction: PlacementSignDirection, width: number, angl
 
   const directionMultiplier = direction === "right" ? 1 : -1;
   const outerEdge = SIGN_INNER_EDGE + width;
-  const angleCosine = Math.cos(angle);
-  const angleSine = Math.sin(angle);
-  const innerEdgeX = (y: number) =>
-    (SIGN_INNER_EDGE + directionMultiplier * y * angleSine) / angleCosine;
   const points = [
-    [innerEdgeX(-SIGN_TIP_LENGTH), -SIGN_TIP_LENGTH],
+    [SIGN_INNER_EDGE, -SIGN_TIP_LENGTH],
     [outerEdge - SIGN_TIP_LENGTH, -SIGN_TIP_LENGTH],
     [outerEdge, 0],
     [outerEdge - SIGN_TIP_LENGTH, SIGN_TIP_LENGTH],
-    [innerEdgeX(SIGN_TIP_LENGTH), SIGN_TIP_LENGTH],
+    [SIGN_INNER_EDGE, SIGN_TIP_LENGTH],
   ];
   const [[firstX, firstY], ...rest] = points.map(([pointX, pointY]) => [
     pointX * directionMultiplier,

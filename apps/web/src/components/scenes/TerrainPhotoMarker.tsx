@@ -378,6 +378,7 @@ class OrbitingCutoutPhotoMaterial extends THREE.ShaderMaterial {
           color.rgb = mix(color.rgb, indicatorColor, indicatorMix);
           color.a = mix(color.a, 1.0, indicatorMix);
           color.rgb = mix(color.rgb, borderColor, borderMask);
+          if (cutoutAlpha < 0.05) discard;
           gl_FragColor = vec4(color.rgb, color.a * cutoutAlpha);
           #include <colorspace_fragment>
         }
@@ -1041,8 +1042,8 @@ export function OrbitingPhotoBanner({
             transparent
             side={THREE.DoubleSide}
             toneMapped={false}
-            depthWrite={false}
-            depthTest={false}
+            depthWrite
+            depthTest
             polygonOffset
             polygonOffsetFactor={-2}
             polygonOffsetUnits={-2}
@@ -1094,7 +1095,8 @@ export function OrbitingActivityRing({
           noiseTimeScale={ORBIT_RING_NOISE_TIME_SCALE}
           transparent
           side={THREE.DoubleSide}
-          depthWrite={false}
+          depthWrite
+          depthTest
         />
       </mesh>
     </group>
@@ -1190,7 +1192,8 @@ export function OrbitingAudioMarker({
               color={activityColour ?? "#8a9099"}
               transparent
               opacity={isHighlighted ? 1 : AUDIO_ICON_BACKGROUND_OPACITY}
-              depthWrite={false}
+              depthWrite
+              depthTest
               side={THREE.DoubleSide}
               toneMapped={false}
             />
@@ -1204,6 +1207,7 @@ export function OrbitingAudioMarker({
                 transparent
                 alphaTest={0.04}
                 depthWrite={false}
+                depthTest
                 side={THREE.DoubleSide}
                 toneMapped={false}
               />
