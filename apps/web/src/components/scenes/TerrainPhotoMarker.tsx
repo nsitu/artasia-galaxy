@@ -618,6 +618,7 @@ interface FlowerProps extends SharedPhotoProps {
 interface OrbitBannerProps extends SharedPhotoProps {
   center: [number, number, number];
   orbitRadius?: number;
+  orbitHeight?: number;
   isDenseOrbit?: boolean;
 }
 
@@ -626,6 +627,7 @@ interface OrbitAudioProps {
   iconName?: string;
   center: [number, number, number];
   orbitRadius?: number;
+  orbitHeight?: number;
   isDenseOrbit?: boolean;
   isHighlighted: boolean;
   onClick: () => void;
@@ -656,7 +658,7 @@ const CIRCLE_FRAME_SIZE = 0.72;
 const ORBIT_INDICATOR_SCALE = 0.34;
 const ORBIT_MIN_UNITS = 0.72;
 const ORBIT_MAX_UNITS = 2.15;
-const ORBIT_HEIGHT = 0.72;
+export const ORBIT_HEIGHT = 0.72;
 const ORBIT_SPEED = 0.16;
 const ORBIT_SPEED_MIN = ORBIT_SPEED * 0.5;
 const ORBIT_SPEED_MAX = ORBIT_SPEED * 1.5;
@@ -879,6 +881,7 @@ export function OrbitingPhotoBanner({
   height,
   center,
   orbitRadius,
+  orbitHeight,
   isSelected,
   isHighlighted,
   onClick,
@@ -919,6 +922,7 @@ export function OrbitingPhotoBanner({
     return CUTOUT_BORDER_COLORS[index];
   }, [id]);
   const [cx, cy, cz] = center;
+  const orbitZ = orbitHeight ?? ORBIT_HEIGHT;
   const aspect = getTextureAspect(texture, width, height);
   const brightness = adjustmentScalar(adjustments?.brightness);
   const contrast = adjustmentScalar(adjustments?.contrast);
@@ -938,7 +942,7 @@ export function OrbitingPhotoBanner({
     group.position.set(
       cx + Math.cos(angle) * orbit.radius,
       cy + Math.sin(angle) * orbit.radius,
-      cz + ORBIT_HEIGHT
+      cz + orbitZ
     );
     const isEngaged = isHighlighted || isSelected;
     let indicatorMix = 0;
@@ -965,7 +969,7 @@ export function OrbitingPhotoBanner({
   });
 
   return (
-    <group ref={groupRef} position={[cx + orbit.radius, cy, cz + ORBIT_HEIGHT]}>
+    <group ref={groupRef} position={[cx + orbit.radius, cy, cz + orbitZ]}>
       <Billboard>
         <mesh
           ref={imageRef}
@@ -1051,14 +1055,17 @@ export function OrbitingActivityRing({
   center,
   radius,
   colour,
+  orbitHeight,
 }: {
   center: [number, number, number];
   radius: number;
   colour: string;
+  orbitHeight?: number;
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const materialRef = useRef<OrbitingActivityRingMaterial>(null);
   const [cx, cy, cz] = center;
+  const orbitZ = orbitHeight ?? ORBIT_HEIGHT;
   const innerRadius = radius - ORBIT_RING_HALF_WIDTH;
   const outerRadius = radius + ORBIT_RING_HALF_WIDTH;
 
@@ -1070,7 +1077,7 @@ export function OrbitingActivityRing({
   return (
     <group
       ref={groupRef}
-      position={[cx, cy, cz + ORBIT_HEIGHT]}
+      position={[cx, cy, cz + orbitZ]}
     >
       <mesh renderOrder={0}>
         <ringGeometry args={[innerRadius, outerRadius, ORBIT_RING_SEGMENTS]} />
@@ -1097,6 +1104,7 @@ export function OrbitingAudioMarker({
   iconName,
   center,
   orbitRadius,
+  orbitHeight,
   isDenseOrbit = false,
   isHighlighted,
   onClick,
@@ -1124,6 +1132,7 @@ export function OrbitingAudioMarker({
     return shape;
   }, []);
   const [cx, cy, cz] = center;
+  const orbitZ = orbitHeight ?? ORBIT_HEIGHT;
   const color = "#ffffff";
 
   useFrame((state) => {
@@ -1134,7 +1143,7 @@ export function OrbitingAudioMarker({
     group.position.set(
       cx + Math.cos(angle) * orbit.radius,
       cy + Math.sin(angle) * orbit.radius,
-      cz + ORBIT_HEIGHT,
+      cz + orbitZ,
     );
     const pulseScale = isDenseOrbit
       ? 0.82 + (Math.sin(state.clock.elapsedTime * pulse.speed + pulse.phase) + 1) * 0.11
@@ -1144,7 +1153,7 @@ export function OrbitingAudioMarker({
   });
 
   return (
-    <group ref={groupRef} position={[cx + orbit.radius, cy, cz + ORBIT_HEIGHT]}>
+    <group ref={groupRef} position={[cx + orbit.radius, cy, cz + orbitZ]}>
       <Billboard>
         <group
           ref={iconRef}

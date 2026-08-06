@@ -10,6 +10,7 @@ import {
 } from "../../api/client";
 import { useGalleryStore } from "../../stores/galleryStore";
 import {
+  ORBIT_HEIGHT,
   OrbitingActivityRing,
   OrbitingAudioMarker,
   OrbitingPhotoBanner,
@@ -33,6 +34,8 @@ const REGIONAL_CAMERA_FIT_SCALE = 0.5;
 const LOCAL_CAMERA_FIT_SCALE = 0.55;
 const REGIONAL_DEM_ZOOM_OFFSET = 5;
 const LOCAL_DEM_ZOOM_OFFSET = 3;
+const ORBIT_TERRAIN_CLEARANCE = 0.12;
+const ORBIT_VISUAL_HALF_HEIGHT = 0.5;
 const INTRO_CAMERA_DURATION_MS = 3000;
 const PLACEMENT_ORBIT_FIT_DURATION_MS = 100;
 
@@ -697,6 +700,23 @@ export default function TerrainGallery({
   const terrainDemZoomOffset = focusedPlacement
     ? LOCAL_DEM_ZOOM_OFFSET
     : REGIONAL_DEM_ZOOM_OFFSET;
+  const orbitHeight = useMemo(() => {
+    if (!focusedPlacement || !projection || !terrain) return ORBIT_HEIGHT;
+
+    const [placementX, placementY, placementZ = 0] = projection.proj([
+      focusedPlacement.lat,
+      focusedPlacement.lng,
+    ]);
+    const placementTerrainZ = sampleTerrainZ(terrain, placementX, placementY) ?? placementZ;
+    terrain.updateMatrixWorld(true);
+    const terrainBounds = new THREE.Box3().setFromObject(terrain);
+    if (!Number.isFinite(terrainBounds.max.z)) return ORBIT_HEIGHT;
+
+    return Math.max(
+      ORBIT_HEIGHT,
+      terrainBounds.max.z - placementTerrainZ + ORBIT_VISUAL_HALF_HEIGHT + ORBIT_TERRAIN_CLEARANCE,
+    );
+  }, [focusedPlacement, projection, terrain]);
   const localPhotoLayout = useMemo<LocalPhotoLayoutItem[]>(() => {
     if (!focusedPlacement || !projection) return [];
     const [placementX, placementY, placementZ = 0] = projection.proj([
@@ -1773,6 +1793,7 @@ export default function TerrainGallery({
             center={ring.center}
             radius={ring.radius}
             colour={ring.colour}
+            orbitHeight={orbitHeight}
           />
         ))}
 
@@ -1786,6 +1807,7 @@ export default function TerrainGallery({
               iconName={item.photo.iconName}
               center={item.kind === "orbit" ? item.center : item.position}
               orbitRadius={item.kind === "orbit" ? item.orbitRadius : undefined}
+              orbitHeight={orbitHeight}
               isDenseOrbit={item.kind === "orbit" && item.orbitAssetCount >= 5}
               isHighlighted={item.index === hoveredIndex}
               onClick={() => selectPhoto(item.index)}
@@ -1821,6 +1843,7 @@ export default function TerrainGallery({
               borderColour={selectedActivityColour ?? item.orbitColour}
               center={item.center}
               orbitRadius={item.orbitRadius}
+              orbitHeight={orbitHeight}
               isDenseOrbit={item.orbitAssetCount >= 5}
               isSelected={item.index === selectedIndex}
               isHighlighted={item.index === hoveredIndex}
