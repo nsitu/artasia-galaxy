@@ -41,6 +41,7 @@ const SIGN_TEXT_COLOR = "#253746";
 const SIGN_TEXT_PADDING = 0.28;
 const SIGN_MIN_WIDTH = 0.9;
 const SHARED_SIGN_MIN_WIDTH = 0.7;
+const SHARED_SIGN_FONT_SIZE = 0.075;
 const SIGN_TIP_LENGTH = 0.085;
 const SIGN_INNER_EDGE = POST_RADIUS;
 // Keep centered shared-location signs just in front of the pole so the pole
@@ -284,11 +285,7 @@ function getPlacementNameSignLayout(name?: string): PlacementNameSignLayout {
   if (currentLine) lines.push(currentLine);
 
   const longestLineCharacters = Math.max(...lines.map((line) => line.length));
-  const fontSize = THREE.MathUtils.clamp(
-    0.34 / Math.max(longestLineCharacters * 0.56, 1),
-    0.055,
-    0.095,
-  );
+  const fontSize = SHARED_SIGN_FONT_SIZE;
   const textWidth = longestLineCharacters * fontSize * 0.56;
   return {
     text: lines.join("\n"),
@@ -325,7 +322,7 @@ function SignBoard({
     ? SIGN_SHARED_LOCATION_RENDER_ORDER
     : SIGN_POINTER_RENDER_ORDER;
   const signZ = postHeight - SIGN_TOP_OFFSET - index * SIGN_SPACING;
-  const fontSize = isDown ? 0.075 : 0.085;
+  const fontSize = isDown ? SHARED_SIGN_FONT_SIZE : 0.085;
   const signWidth = getSignWidth(sign.label, isDown, fontSize);
   const directionMultiplier = sign.direction === "left" ? -1 : 1;
   const textOffsetX = isDown
