@@ -27,7 +27,7 @@ const TERRAIN_MAP_MOUSE_BUTTONS = {
 };
 const TERRAIN_GROUND_PLANE_NORMAL = new THREE.Vector3(0, 0, 1);
 const TERRAIN_GL_OPTIONS = {
-  antialias: false,
+  antialias: true,
   alpha: true,
   powerPreference: "default" as WebGLPowerPreference,
   failIfMajorPerformanceCaveat: false,

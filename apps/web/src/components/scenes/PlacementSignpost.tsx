@@ -1,6 +1,6 @@
 import { Text } from "@react-three/drei";
 import { type ThreeEvent } from "@react-three/fiber";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as THREE from "three";
 
 export type PlacementSignDirection = "left" | "right" | "down";
@@ -42,8 +42,12 @@ const SIGN_MIN_WIDTH = 0.9;
 const SHARED_SIGN_MIN_WIDTH = 0.7;
 const SIGN_TIP_LENGTH = 0.085;
 const SIGN_INNER_EDGE = POST_RADIUS;
-const SIGN_SHARED_TANGENT_OFFSET = POST_RADIUS + 0.002;
+// Keep centered shared-location signs just in front of the pole so the pole
+// does not visually cut through their labels.
+const SIGN_SHARED_TANGENT_OFFSET = POST_RADIUS + 0.04;
+const NAME_SIGN_TANGENT_OFFSET = POST_RADIUS + 0.002;
 const NAME_SIGN_CORNER_RADIUS = 0.055;
+const SIGN_HOVER_SCALE = 1.06;
 const SIGN_POINTER_RENDER_ORDER = 1;
 const SIGN_POLE_RENDER_ORDER = 3;
 const SIGN_SHARED_LOCATION_RENDER_ORDER = 5;
@@ -201,7 +205,7 @@ function PlacementNameSign({
 
   return (
     <group
-      position={[0, -SIGN_SHARED_TANGENT_OFFSET, positionZ]}
+      position={[0, -NAME_SIGN_TANGENT_OFFSET, positionZ]}
       rotation={[Math.PI / 2, 0, 0]}
       renderOrder={SIGN_SHARED_LOCATION_RENDER_ORDER}
     >
@@ -314,6 +318,7 @@ function SignBoard({
   index: number;
   postHeight: number;
 }) {
+  const [isHovered, setIsHovered] = useState(false);
   const isDown = sign.direction === "down";
   const renderOrder = isDown
     ? SIGN_SHARED_LOCATION_RENDER_ORDER
@@ -335,18 +340,21 @@ function SignBoard({
     <group
       position={[0, isDown ? -SIGN_SHARED_TANGENT_OFFSET : 0, signZ]}
       rotation={[0, 0, sign.angle ?? 0]}
+      scale={isHovered ? SIGN_HOVER_SCALE : 1}
       onClick={sign.onClick ? (event) => {
         event.stopPropagation();
         sign.onClick?.();
       } : undefined}
-      onPointerOver={sign.onClick ? (event) => {
+      onPointerEnter={(event) => {
         event.stopPropagation();
-        document.body.style.cursor = "pointer";
-      } : undefined}
-      onPointerOut={sign.onClick ? (event) => {
+        setIsHovered(true);
+        document.body.style.cursor = sign.onClick ? "pointer" : "";
+      }}
+      onPointerLeave={(event) => {
         event.stopPropagation();
+        setIsHovered(false);
         document.body.style.cursor = "";
-      } : undefined}
+      }}
     >
       <group rotation={[Math.PI / 2, 0, 0]}>
         <mesh geometry={geometry} renderOrder={renderOrder}>
