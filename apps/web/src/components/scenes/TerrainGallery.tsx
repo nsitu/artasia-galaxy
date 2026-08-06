@@ -1965,6 +1965,9 @@ export default function TerrainGallery({
             position={position}
             height={getPlacementSignpostHeight(position[2], terrainMaxZ, placementSigns.get(placement.placement_id)?.length ?? 0)}
             signs={placementSigns.get(placement.placement_id) ?? []}
+            partnerLogoUrl={placement.partner_white_logo?.url ?? placement.partner_logo?.url}
+            partnerBrandColor={placement.partner_brand_color_one}
+            partnerBrandColorTwo={placement.partner_brand_color_two}
             isSelected={
               (
                 usesTouchPreview
