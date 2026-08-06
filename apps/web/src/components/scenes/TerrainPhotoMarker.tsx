@@ -433,6 +433,7 @@ class OrbitingActivityRingMaterial extends THREE.ShaderMaterial {
         outerRadius: { value: 1.02 },
         noiseCells: { value: 12 },
         noiseAmplitude: { value: 0.035 },
+        noiseTimeScale: { value: 0.5 },
         time: { value: 0 },
       },
       vertexShader: `
@@ -440,6 +441,7 @@ class OrbitingActivityRingMaterial extends THREE.ShaderMaterial {
         uniform float outerRadius;
         uniform float noiseCells;
         uniform float noiseAmplitude;
+        uniform float noiseTimeScale;
         uniform float time;
         varying float vNoise;
 
@@ -491,7 +493,7 @@ class OrbitingActivityRingMaterial extends THREE.ShaderMaterial {
           float radius = length(position.xy);
           float angle = atan(position.y, position.x);
           float angularCoordinate = (angle + 3.14159265) / 6.2831853 * noiseCells;
-          float noise = periodicNoise(vec2(angularCoordinate, time * 0.35), noiseCells);
+          float noise = periodicNoise(vec2(angularCoordinate, time * noiseTimeScale), noiseCells);
           float edgeDirection = radius < (innerRadius + outerRadius) * 0.5 ? -1.0 : 1.0;
           displaced.xy += normalize(position.xy) * noise * noiseAmplitude * edgeDirection;
           vNoise = noise;
@@ -525,6 +527,8 @@ class OrbitingActivityRingMaterial extends THREE.ShaderMaterial {
   set noiseCells(value: number) { this.uniforms.noiseCells.value = value; }
   get noiseAmplitude() { return this.uniforms.noiseAmplitude.value as number; }
   set noiseAmplitude(value: number) { this.uniforms.noiseAmplitude.value = value; }
+  get noiseTimeScale() { return this.uniforms.noiseTimeScale.value as number; }
+  set noiseTimeScale(value: number) { this.uniforms.noiseTimeScale.value = value; }
   get time() { return this.uniforms.time.value as number; }
   set time(value: number) { this.uniforms.time.value = value; }
 }
@@ -581,6 +585,7 @@ declare module "@react-three/fiber" {
       outerRadius?: number;
       noiseCells?: number;
       noiseAmplitude?: number;
+      noiseTimeScale?: number;
       time?: number;
     };
   }
@@ -655,10 +660,11 @@ const ORBIT_HEIGHT = 0.72;
 const ORBIT_SPEED = 0.16;
 const ORBIT_SPEED_MIN = ORBIT_SPEED * 0.5;
 const ORBIT_SPEED_MAX = ORBIT_SPEED * 1.5;
-const ORBIT_RING_SEGMENTS = 256;
-const ORBIT_RING_HALF_WIDTH = 0.022;
-const ORBIT_RING_NOISE_CELLS = 12;
-const ORBIT_RING_NOISE_AMPLITUDE = 0.021;
+const ORBIT_RING_SEGMENTS = 512;
+const ORBIT_RING_HALF_WIDTH = 0.1;
+const ORBIT_RING_NOISE_CELLS = 18;
+const ORBIT_RING_NOISE_AMPLITUDE = 0.07;
+const ORBIT_RING_NOISE_TIME_SCALE = 0.5;
 const CUTOUT_BORDER_COLORS = [
   "#8e1d58",
   "#eee111",
@@ -1076,6 +1082,7 @@ export function OrbitingActivityRing({
           outerRadius={outerRadius}
           noiseCells={ORBIT_RING_NOISE_CELLS}
           noiseAmplitude={ORBIT_RING_NOISE_AMPLITUDE}
+          noiseTimeScale={ORBIT_RING_NOISE_TIME_SCALE}
           transparent
           side={THREE.DoubleSide}
           depthWrite={false}
