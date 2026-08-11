@@ -4,10 +4,12 @@ import {
   assignAssetPlacement,
   assignAssetUploader,
   createAudioTrim,
+  createVideoRotation,
   cropUploadAsset,
   deleteUploadAsset,
   fetchAssetEdits,
   fetchAudioTrimJob,
+  fetchVideoRotationJob,
   fetchAuthUser,
   fetchDriveFiles,
   fetchDriveFolder,
@@ -49,6 +51,7 @@ import {
   type UploadOptions,
   type PlacementAsset,
   type SiteActivityStats,
+  type VideoRotationJob,
 } from "../../api/client";
 import AudioTrimEditor from "./AudioTrimEditor";
 import MaterialIconPicker from "./MaterialIconPicker";
@@ -232,6 +235,8 @@ export default function UploadPanel({
   const [audioTrimEnd, setAudioTrimEnd] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
   const [audioTrimStatus, setAudioTrimStatus] = useState<string | null>(null);
+  const [videoRotationStatus, setVideoRotationStatus] = useState<string | null>(null);
+  const [videoPreviewPlaying, setVideoPreviewPlaying] = useState(false);
   const [deletingAsset, setDeletingAsset] = useState(false);
   const [driveAssetAction, setDriveAssetAction] = useState<"lookup" | "reimport" | null>(null);
   const [driveBulkLookupRunning, setDriveBulkLookupRunning] = useState(false);
@@ -275,6 +280,7 @@ export default function UploadPanel({
   const [menuOpen, setMenuOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const cropImageRef = useRef<HTMLImageElement | null>(null);
+  const videoPreviewRef = useRef<HTMLVideoElement | null>(null);
   const cropStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const appPath = adminPath ?? window.location.pathname;
@@ -1819,6 +1825,8 @@ export default function UploadPanel({
     setAudioTrimStart(0);
     setAudioTrimEnd(duration);
     setAudioTrimStatus(null);
+    setVideoRotationStatus(null);
+    setVideoPreviewPlaying(false);
     setDriveAssetAction(null);
     setCropRefreshKey((current) => current + 1);
     setMediaRefreshAssetId(null);
@@ -1862,6 +1870,9 @@ export default function UploadPanel({
     setAudioTrimStart(0);
     setAudioTrimEnd(0);
     setAudioTrimStatus(null);
+    videoPreviewRef.current?.pause();
+    setVideoRotationStatus(null);
+    setVideoPreviewPlaying(false);
     setDriveAssetAction(null);
     setMediaRefreshAssetId(null);
     setMediaRefreshAttempt(0);
@@ -2132,6 +2143,8 @@ export default function UploadPanel({
       manageContrast !== selectedAdjustments.contrast ||
       manageSaturation !== selectedAdjustments.saturation;
     const pixelEditsChanged = hasPendingPixelEdits(selectedAsset);
+    const videoRotationChanged =
+      selectedAsset.mediaKind === "video" && rotationDegrees !== 0;
     const audioTrimChanged =
       selectedAsset.mediaKind === "audio" &&
       audioDuration > 0 &&
@@ -2151,6 +2164,7 @@ export default function UploadPanel({
       !gpsUsageChanged &&
       !adjustmentChanged &&
       !pixelEditsChanged &&
+      !videoRotationChanged &&
       !audioTrimChanged
     ) {
       setError("There are no changes to save.");
@@ -2158,6 +2172,10 @@ export default function UploadPanel({
     }
     if (pixelEditsChanged && !cropRect) {
       setError("Choose a crop area before saving.");
+      return;
+    }
+    if (videoRotationChanged && manageArchived) {
+      setError("Restore this video before rotating it.");
       return;
     }
     const latitude = Number(manageLatitude);
@@ -2262,6 +2280,29 @@ export default function UploadPanel({
         });
         message = `Upload changes saved. Created ${result.width}×${result.height} edited copy and archived the original.`;
       }
+      if (videoRotationChanged) {
+        setVideoRotationStatus("Preparing video rotation...");
+        let rotationJob: VideoRotationJob = await createVideoRotation({
+          assetId,
+          rotationDegrees: rotationDegrees as 90 | 180 | 270,
+        });
+        for (;;) {
+          setVideoRotationStatus(
+            `${rotationJob.message}${rotationJob.state === "rendering" ? ` (${Math.round(rotationJob.progress)}%)` : "..."}`,
+          );
+          if (rotationJob.state === "complete") break;
+          if (rotationJob.state === "failed") {
+            throw new Error(
+              `Metadata was saved, but the video rotation failed. The original video remains active. ${rotationJob.error ?? ""}`.trim(),
+            );
+          }
+          await new Promise((resolve) => window.setTimeout(resolve, 1_000));
+          rotationJob = await fetchVideoRotationJob(rotationJob.id);
+        }
+        message = rotationJob.width && rotationJob.height
+          ? `Upload changes saved. Created ${rotationJob.width}x${rotationJob.height} rotated video and archived the original.`
+          : "Upload changes saved. Created a rotated video and archived the original.";
+      }
       if (audioTrimChanged) {
         setAudioTrimStatus("Preparing audio trim…");
         let trimJob: AudioTrimJob = await createAudioTrim({
@@ -2300,6 +2341,7 @@ export default function UploadPanel({
     } finally {
       setSavingAsset(false);
       setAudioTrimStatus(null);
+      setVideoRotationStatus(null);
     }
   }
 
@@ -2408,6 +2450,22 @@ export default function UploadPanel({
     }
   }
 
+  function toggleVideoPreview() {
+    const video = videoPreviewRef.current;
+    if (!video) return;
+    if (video.paused) {
+      void video.play()
+        .then(() => setVideoPreviewPlaying(true))
+        .catch((playError) => {
+          setError(`Could not play video preview: ${(playError as Error).message}`);
+          setVideoPreviewPlaying(false);
+        });
+    } else {
+      video.pause();
+      setVideoPreviewPlaying(false);
+    }
+  }
+
   async function lookupMissingDriveSources() {
     if (!authUser?.authenticated) {
       setError("Sign in with Google to look up Drive files.");
@@ -2504,7 +2562,10 @@ export default function UploadPanel({
   }
 
   function sourceImageDimensions(asset: PlacementAsset) {
-    if (cropEditing && cropSourceDimensions) return cropSourceDimensions;
+    if (
+      cropSourceDimensions &&
+      (cropEditing || asset.mediaKind === "video")
+    ) return cropSourceDimensions;
     const width = asset.width ?? cropImageRef.current?.naturalWidth ?? 0;
     const height = asset.height ?? cropImageRef.current?.naturalHeight ?? 0;
     return { width, height };
@@ -2782,6 +2843,7 @@ export default function UploadPanel({
   }
 
   function hasPendingPixelEdits(asset: PlacementAsset) {
+    if (asset.type !== "IMAGE") return false;
     if (rotationDegrees !== 0 || Math.abs(straightenDegrees) > 0.0001) {
       return true;
     }
@@ -2849,6 +2911,10 @@ export default function UploadPanel({
   function changeRotationDegrees(delta: 90 | -90) {
     if (!selectedAsset) return;
     const nextRotation = ((rotationDegrees + delta + 360) % 360) as RotationDegrees;
+    if (selectedAsset.mediaKind === "video") {
+      setRotationDegrees(nextRotation);
+      return;
+    }
     const previousDegrees = effectiveRotationDegrees();
     const nextDegrees = effectiveRotationDegrees(straightenDegrees, nextRotation);
     setCropRect((current) =>
@@ -4115,6 +4181,8 @@ export default function UploadPanel({
     const gpsUsageChanged =
       manageUseGpsLocation !== (selectedAsset.useGpsLocation !== false);
     const pixelEditsChanged = hasPendingPixelEdits(selectedAsset);
+    const videoRotationChanged =
+      selectedAsset.mediaKind === "video" && rotationDegrees !== 0;
     const audioTrimChanged =
       selectedAsset.mediaKind === "audio" &&
       audioDuration > 0 &&
@@ -4133,6 +4201,7 @@ export default function UploadPanel({
       locationChanged ||
       gpsUsageChanged ||
       pixelEditsChanged ||
+      videoRotationChanged ||
       audioTrimChanged;
     const displayPreviewUrl = mediaUrl(
       selectedAsset.previewUrl,
@@ -4143,6 +4212,10 @@ export default function UploadPanel({
     )}`;
     const cropCanvasDimensions = rotatedImageDimensions(selectedAsset);
     const cropSourceSize = sourceImageDimensions(selectedAsset);
+    const videoPreviewDimensions = rotatedImageDimensions(
+      selectedAsset,
+      rotationDegrees,
+    );
 
     return (
       <div className="atlas-manage-panel" style={managePanelStyle}>
@@ -4169,12 +4242,82 @@ export default function UploadPanel({
               }}
             />
           ) : selectedAsset.type === "VIDEO" ? (
-            <video
-              src={selectedAsset.originalUrl}
-              controls
-              preload="metadata"
-              style={manageMediaStyle}
-            />
+            <div style={videoRotationEditorStyle}>
+              <div
+                style={{
+                  ...videoRotationPreviewStyle,
+                  width: `min(100%, ${Math.round((560 * videoPreviewDimensions.width) / videoPreviewDimensions.height)}px)`,
+                  aspectRatio: `${videoPreviewDimensions.width} / ${videoPreviewDimensions.height}`,
+                }}
+              >
+                <video
+                  ref={videoPreviewRef}
+                  src={selectedAsset.originalUrl}
+                  controls={rotationDegrees === 0}
+                  preload="metadata"
+                  onClick={rotationDegrees === 0 ? undefined : toggleVideoPreview}
+                  onPlay={() => setVideoPreviewPlaying(true)}
+                  onPause={() => setVideoPreviewPlaying(false)}
+                  onEnded={() => setVideoPreviewPlaying(false)}
+                  onLoadedMetadata={(event) => {
+                    const video = event.currentTarget;
+                    if (!video.videoWidth || !video.videoHeight) return;
+                    setCropSourceDimensions({
+                      width: video.videoWidth,
+                      height: video.videoHeight,
+                    });
+                  }}
+                  style={{
+                    ...rotatedVideoPreviewStyle,
+                    width: `${(cropSourceSize.width / videoPreviewDimensions.width) * 100}%`,
+                    height: `${(cropSourceSize.height / videoPreviewDimensions.height) * 100}%`,
+                    transform: `translate(-50%, -50%) rotate(${rotationDegrees}deg)`,
+                    cursor: rotationDegrees === 0 ? "default" : "pointer",
+                  }}
+                />
+              </div>
+              <div style={rotationControlStyle}>
+                <span>Rotate video</span>
+                <button
+                  type="button"
+                  onClick={() => changeRotationDegrees(-90)}
+                  disabled={savingAsset || manageArchived}
+                  style={secondaryButtonStyle}
+                >
+                  Left 90Â°
+                </button>
+                <button
+                  type="button"
+                  onClick={() => changeRotationDegrees(90)}
+                  disabled={savingAsset || manageArchived}
+                  style={secondaryButtonStyle}
+                >
+                  Right 90Â°
+                </button>
+                <span style={rotationValueStyle}>
+                  {rotationDegrees === 270 ? "-90Â°" : `${rotationDegrees}Â°`}
+                </span>
+                {rotationDegrees !== 0 && (
+                  <button
+                    type="button"
+                    onClick={toggleVideoPreview}
+                    disabled={savingAsset}
+                    style={secondaryButtonStyle}
+                  >
+                    {videoPreviewPlaying ? "Pause preview" : "Play preview"}
+                  </button>
+                )}
+              </div>
+              <div style={cropHintStyle}>
+                Rotation creates a new MP4 and archives the original after the
+                replacement has been verified.
+              </div>
+              {manageArchived && (
+                <div style={fieldHelpStyle}>
+                  Restore this video before rotating it.
+                </div>
+              )}
+            </div>
           ) : cropEditing ? (
             <div style={cropEditorStyle}>
               <div
@@ -4682,9 +4825,9 @@ export default function UploadPanel({
             </span>
           )}
           <div style={manageActionsStyle}>
-            {savingAsset && audioTrimStatus && (
+            {savingAsset && (audioTrimStatus || videoRotationStatus) && (
               <div style={audioTrimStatusStyle}>
-                <span>{audioTrimStatus}</span>
+                <span>{audioTrimStatus ?? videoRotationStatus}</span>
               </div>
             )}
             <button
@@ -4703,6 +4846,8 @@ export default function UploadPanel({
               {savingAsset
                 ? audioTrimChanged
                   ? "Saving & Trimming Audio..."
+                  : videoRotationChanged
+                    ? "Saving & Rotating Video..."
                   : pixelEditsChanged
                   ? "Saving & Creating Edited Copy..."
                   : "Saving..."
@@ -6320,6 +6465,29 @@ const manageMediaStyle: React.CSSProperties = {
   objectFit: "contain",
   borderRadius: 4,
   background: "#0c0e13",
+};
+
+const videoRotationEditorStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 10,
+};
+
+const videoRotationPreviewStyle: React.CSSProperties = {
+  position: "relative",
+  width: "100%",
+  maxWidth: "100%",
+  maxHeight: 560,
+  overflow: "hidden",
+  background: "#0c0e13",
+  borderRadius: 4,
+};
+
+const rotatedVideoPreviewStyle: React.CSSProperties = {
+  position: "absolute",
+  left: "50%",
+  top: "50%",
+  objectFit: "contain",
+  transformOrigin: "center",
 };
 
 const cropStageStyle: React.CSSProperties = {

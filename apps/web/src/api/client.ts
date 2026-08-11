@@ -659,6 +659,56 @@ export async function fetchAudioTrimJob(jobId: string): Promise<AudioTrimJob> {
   return body.job;
 }
 
+export interface VideoRotationJob {
+  id: string;
+  sourceAssetId: string;
+  targetAssetId?: string;
+  rotationDegrees: 90 | 180 | 270;
+  durationSeconds: number;
+  width?: number;
+  height?: number;
+  state:
+    | "prepared"
+    | "downloading"
+    | "rendering"
+    | "uploaded"
+    | "relationships_copied"
+    | "verified"
+    | "source_archived"
+    | "complete"
+    | "failed";
+  progress: number;
+  message: string;
+  error?: string;
+}
+
+export async function createVideoRotation(params: {
+  assetId: string;
+  rotationDegrees: 90 | 180 | 270;
+}): Promise<VideoRotationJob> {
+  const res = await fetch(`/api/v1/uploads/assets/${params.assetId}/rotate-video`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ rotationDegrees: params.rotationDegrees }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  const body = await res.json() as { job: VideoRotationJob };
+  return body.job;
+}
+
+export async function fetchVideoRotationJob(jobId: string): Promise<VideoRotationJob> {
+  const res = await fetch(`/api/v1/uploads/video-rotation-jobs/${encodeURIComponent(jobId)}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  const body = await res.json() as { job: VideoRotationJob };
+  return body.job;
+}
+
 export async function resetUploadAssetEdits(assetId: string): Promise<void> {
   const res = await fetch(`/api/v1/uploads/assets/${assetId}/edits`, {
     method: "DELETE",

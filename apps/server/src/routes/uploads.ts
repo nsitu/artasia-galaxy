@@ -45,6 +45,10 @@ import {
   getAudioTrimJob,
 } from "../services/trimAudioAsset.service.js";
 import {
+  createVideoRotationJob,
+  getVideoRotationJob,
+} from "../services/rotateVideoAsset.service.js";
+import {
   findConfiguredPlacement,
   findConfiguredUploader,
   getPlacementTagNames,
@@ -2085,6 +2089,48 @@ router.get("/audio-trim-jobs/:jobId", async (req, res) => {
     const job = await getAudioTrimJob(req.params.jobId);
     if (!job) {
       res.status(404).json({ error: "Audio trim job was not found." });
+      return;
+    }
+    res.json({ job });
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
+});
+
+router.post("/assets/:assetId/rotate-video", async (req, res) => {
+  try {
+    const auth = await getAuthContext(req);
+    if (!auth.authenticated) {
+      res.status(401).json({ error: "Sign in to rotate videos." });
+      return;
+    }
+    const job = await createVideoRotationJob(
+      req.params.assetId.trim(),
+      req.body?.rotationDegrees,
+      invalidateSiteActivityStats,
+    );
+    res.status(202).json({ job });
+  } catch (err) {
+    const message = (err as Error).message;
+    const status = /already running/i.test(message)
+      ? 409
+      : /only video|duration|rotation|degrees|archived/i.test(message)
+        ? 400
+        : 502;
+    res.status(status).json({ error: message });
+  }
+});
+
+router.get("/video-rotation-jobs/:jobId", async (req, res) => {
+  try {
+    const auth = await getAuthContext(req);
+    if (!auth.authenticated) {
+      res.status(401).json({ error: "Sign in to view video rotation jobs." });
+      return;
+    }
+    const job = await getVideoRotationJob(req.params.jobId);
+    if (!job) {
+      res.status(404).json({ error: "Video rotation job was not found." });
       return;
     }
     res.json({ job });
