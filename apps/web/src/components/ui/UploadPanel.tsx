@@ -30,6 +30,7 @@ import {
   setAssetIcon,
   setAssetLinkedAudio,
   setAssetPublished,
+  setAssetsPublished,
   syncDriveFiles,
   updateAssetCaption,
   updateAssetGpsUsage,
@@ -73,6 +74,9 @@ interface UploadItem {
   captionStatus?: "idle" | "saving" | "saved" | "failed";
   captionError?: string;
   openingEditor?: boolean;
+  published?: boolean;
+  publishStatus?: "idle" | "publishing" | "published" | "failed";
+  publishError?: string;
 }
 
 type NoticeTone = "success" | "warning";
@@ -216,6 +220,14 @@ export default function UploadPanel({
   >("idle");
   const [captionSaveError, setCaptionSaveError] = useState<string | null>(null);
   const [savingAsset, setSavingAsset] = useState(false);
+  const [selectedBrowseAssetIds, setSelectedBrowseAssetIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [publishingBrowseAssets, setPublishingBrowseAssets] = useState(false);
+  const [publishingItemIds, setPublishingItemIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [publishingAllItems, setPublishingAllItems] = useState(false);
   const [audioTrimStart, setAudioTrimStart] = useState(0);
   const [audioTrimEnd, setAudioTrimEnd] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
@@ -1048,6 +1060,26 @@ export default function UploadPanel({
     [placementAssets, showArchivedAssets, workspaceMode],
   );
 
+  useEffect(() => {
+    const selectableIds = new Set(
+      displayedPlacementAssets
+        .filter((asset) => !asset.published && !asset.archived)
+        .map((asset) => asset.id),
+    );
+    setSelectedBrowseAssetIds((current) => {
+      const next = new Set(
+        Array.from(current).filter((assetId) => selectableIds.has(assetId)),
+      );
+      if (
+        next.size === current.size &&
+        Array.from(next).every((assetId) => current.has(assetId))
+      ) {
+        return current;
+      }
+      return next;
+    });
+  }, [displayedPlacementAssets]);
+
   const browseBreadcrumbParents = useMemo(() => {
     return [
       browsePartnerKey.trim() || null,
@@ -1425,6 +1457,151 @@ export default function UploadPanel({
           entry.id === item.id ? { ...entry, openingEditor: false } : entry,
         ),
       );
+    }
+  }
+
+  function markAssetsPublished(assetIds: string[]) {
+    const publishedIds = new Set(assetIds);
+    setItems((current) =>
+      current.map((item) =>
+        item.assetId && publishedIds.has(item.assetId)
+          ? {
+              ...item,
+              published: true,
+              publishStatus: "published",
+              publishError: undefined,
+            }
+          : item,
+      ),
+    );
+    setPlacementAssets((current) =>
+      current.map((asset) =>
+        publishedIds.has(asset.id) ? { ...asset, published: true } : asset,
+      ),
+    );
+    setSelectedAsset((current) =>
+      current && publishedIds.has(current.id)
+        ? { ...current, published: true }
+        : current,
+    );
+    if (selectedAsset && publishedIds.has(selectedAsset.id)) {
+      setManagePublished(true);
+    }
+  }
+
+  async function publishUploadedItem(item: UploadItem) {
+    if (!item.assetId || item.published || publishingItemIds.has(item.assetId)) return;
+    const assetId = item.assetId;
+    setPublishingItemIds((current) => new Set(current).add(assetId));
+    setItems((current) =>
+      current.map((entry) =>
+        entry.id === item.id
+          ? { ...entry, publishStatus: "publishing", publishError: undefined }
+          : entry,
+      ),
+    );
+    setError(null);
+    try {
+      await setAssetsPublished([assetId]);
+      markAssetsPublished([assetId]);
+      setNotice({ tone: "success", message: `Published ${item.fileName}.` });
+    } catch (err) {
+      const message = (err as Error).message;
+      setItems((current) =>
+        current.map((entry) =>
+          entry.id === item.id
+            ? { ...entry, publishStatus: "failed", publishError: message }
+            : entry,
+        ),
+      );
+      setError(message);
+    } finally {
+      setPublishingItemIds((current) => {
+        const next = new Set(current);
+        next.delete(assetId);
+        return next;
+      });
+    }
+  }
+
+  async function publishAllCurrentItems() {
+    const assetIds = Array.from(
+      new Set(
+        items
+          .filter((item) => item.status === "completed" && item.assetId && !item.published)
+          .map((item) => item.assetId as string),
+      ),
+    );
+    if (assetIds.length === 0 || publishingAllItems) return;
+
+    const ids = new Set(assetIds);
+    setPublishingAllItems(true);
+    setPublishingItemIds((current) => new Set([...current, ...assetIds]));
+    setItems((current) =>
+      current.map((item) =>
+        item.assetId && ids.has(item.assetId)
+          ? { ...item, publishStatus: "publishing", publishError: undefined }
+          : item,
+      ),
+    );
+    setError(null);
+    try {
+      const publishedIds = await setAssetsPublished(assetIds);
+      markAssetsPublished(publishedIds);
+      setNotice({
+        tone: "success",
+        message: `Published ${publishedIds.length} asset${publishedIds.length === 1 ? "" : "s"}.`,
+      });
+    } catch (err) {
+      const message = (err as Error).message;
+      setItems((current) =>
+        current.map((item) =>
+          item.assetId && ids.has(item.assetId)
+            ? { ...item, publishStatus: "failed", publishError: message }
+            : item,
+        ),
+      );
+      setError(message);
+    } finally {
+      setPublishingAllItems(false);
+      setPublishingItemIds((current) => {
+        const next = new Set(current);
+        assetIds.forEach((assetId) => next.delete(assetId));
+        return next;
+      });
+    }
+  }
+
+  function toggleBrowseAssetSelection(assetId: string) {
+    setSelectedBrowseAssetIds((current) => {
+      const next = new Set(current);
+      if (next.has(assetId)) next.delete(assetId);
+      else next.add(assetId);
+      return next;
+    });
+  }
+
+  async function publishBrowseAssets(assetIds: string[]) {
+    const uniqueAssetIds = Array.from(new Set(assetIds));
+    if (uniqueAssetIds.length === 0 || publishingBrowseAssets) return;
+    setPublishingBrowseAssets(true);
+    setError(null);
+    try {
+      const publishedIds = await setAssetsPublished(uniqueAssetIds);
+      markAssetsPublished(publishedIds);
+      setSelectedBrowseAssetIds((current) => {
+        const next = new Set(current);
+        publishedIds.forEach((assetId) => next.delete(assetId));
+        return next;
+      });
+      setNotice({
+        tone: "success",
+        message: `Published ${publishedIds.length} asset${publishedIds.length === 1 ? "" : "s"}.`,
+      });
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setPublishingBrowseAssets(false);
     }
   }
 
@@ -3070,85 +3247,114 @@ export default function UploadPanel({
     );
     const activityLabel = asset.activity_label?.trim() || activity?.label;
     const activityColour = activity?.colour?.trim();
+    const isDraft = !asset.published && !asset.archived;
+    const isSelected = selectedBrowseAssetIds.has(asset.id);
     return (
-      <a
+      <div
         key={asset.id}
-        href={`/admin/edit/${asset.id}`}
-        onClick={(event) => {
-          if (
-            event.defaultPrevented ||
-            event.button !== 0 ||
-            event.metaKey ||
-            event.ctrlKey ||
-            event.shiftKey ||
-            event.altKey
-          ) return;
-          event.preventDefault();
-          openAssetManager(asset);
+        style={{
+          ...assetCardStyle,
+          ...(isSelected ? selectedAssetCardStyle : {}),
         }}
-        style={assetCardStyle}
       >
-        <img
-          src={mediaUrl(asset.thumbnailUrl, asset.id)}
-          alt=""
-          style={{
-            ...assetImageStyle,
-            ...adjustmentFilterStyle(asset.adjustments),
+        <a
+          href={`/admin/edit/${asset.id}`}
+          onClick={(event) => {
+            if (
+              event.defaultPrevented ||
+              event.button !== 0 ||
+              event.metaKey ||
+              event.ctrlKey ||
+              event.shiftKey ||
+              event.altKey
+            ) return;
+            event.preventDefault();
+            openAssetManager(asset);
           }}
-        />
-        <span style={assetBadgeRowStyle}>
-          {asset.archived ? (
-            <span style={archivedAssetBadgeStyle}>Archived</span>
-          ) : asset.published ? (
-            <span style={publishedAssetBadgeStyle}>Published</span>
-          ) : (
-            <span style={draftAssetBadgeStyle}>Draft</span>
-          )}
-          <span style={mediaKindBadgeStyle}>
-            {asset.mediaKind === "audio"
-              ? "Audio"
-              : asset.mediaKind === "video"
-                ? "Video"
-                : "Image"}
-          </span>
-          {asset.driveFileId && (
-            <span
-              style={driveAssetBadgeStyle}
-              title="Linked to Google Drive"
-              aria-label="Linked to Google Drive"
-            >
-              <span style={driveAssetBadgeIconStyle} aria-hidden="true">
-                add_to_drive
+          style={assetCardLinkStyle}
+        >
+          <img
+            src={mediaUrl(asset.thumbnailUrl, asset.id)}
+            alt=""
+            style={{
+              ...assetImageStyle,
+              ...adjustmentFilterStyle(asset.adjustments),
+            }}
+          />
+          <span style={assetBadgeRowStyle}>
+            {asset.archived ? (
+              <span style={archivedAssetBadgeStyle}>Archived</span>
+            ) : asset.published ? (
+              <span style={publishedAssetBadgeStyle}>Published</span>
+            ) : (
+              <span style={draftAssetBadgeStyle}>Draft</span>
+            )}
+            <span style={mediaKindBadgeStyle}>
+              {asset.mediaKind === "audio"
+                ? "Audio"
+                : asset.mediaKind === "video"
+                  ? "Video"
+                  : "Image"}
+            </span>
+            {asset.driveFileId && (
+              <span
+                style={driveAssetBadgeStyle}
+                title="Linked to Google Drive"
+                aria-label="Linked to Google Drive"
+              >
+                <span style={driveAssetBadgeIconStyle} aria-hidden="true">
+                  add_to_drive
+                </span>
               </span>
-            </span>
-          )}
-          {activityLabel && (
-            <span
-              style={{
-                ...activityAssetBadgeStyle,
-                ...(activityColour
-                  ? {
-                      background: activityColour,
-                      borderColor: activityColour,
-                      color: readableBadgeTextColour(activityColour),
-                    }
-                  : {}),
-              }}
-            >
-              {activityLabel}
-            </span>
-          )}
-        </span>
-        <span style={assetNameStyle}>{asset.fileName}</span>
-        {asset.mediaKind === "audio" && (
-          <span style={assetDurationStyle}>
-            Duration: {formatAssetDuration(asset.durationSeconds)}
+            )}
+            {activityLabel && (
+              <span
+                style={{
+                  ...activityAssetBadgeStyle,
+                  ...(activityColour
+                    ? {
+                        background: activityColour,
+                        borderColor: activityColour,
+                        color: readableBadgeTextColour(activityColour),
+                      }
+                    : {}),
+                }}
+              >
+                {activityLabel}
+              </span>
+            )}
           </span>
+          <span style={assetNameStyle}>{asset.fileName}</span>
+          {asset.mediaKind === "audio" && (
+            <span style={assetDurationStyle}>
+              Duration: {formatAssetDuration(asset.durationSeconds)}
+            </span>
+          )}
+          <span style={assetDateStyle}>
+            {new Date(asset.createdAt).toLocaleDateString()}
+          </span>
+        </a>
+        {isDraft && authUser?.authenticated && (
+          <div style={assetCardActionsStyle}>
+            <label style={assetSelectionLabelStyle}>
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={() => toggleBrowseAssetSelection(asset.id)}
+              />
+              Select
+            </label>
+            <button
+              type="button"
+              onClick={() => void publishBrowseAssets([asset.id])}
+              disabled={publishingBrowseAssets}
+              style={inlinePublishButtonStyle}
+            >
+              {publishingBrowseAssets ? "Publishing..." : "Publish"}
+            </button>
+          </div>
         )}
-        <span style={assetDateStyle}>
-          {new Date(asset.createdAt).toLocaleDateString()}
-        </span>
-      </a>
+      </div>
     );
   }
 
@@ -3186,6 +3392,21 @@ export default function UploadPanel({
 
     return (
       <div style={assetGroupsStyle}>
+        {selectedBrowseAssetIds.size > 0 && (
+          <div style={browseSelectionBarStyle}>
+            <span>
+              {selectedBrowseAssetIds.size} asset{selectedBrowseAssetIds.size === 1 ? "" : "s"} selected
+            </span>
+            <button
+              type="button"
+              onClick={() => void publishBrowseAssets(Array.from(selectedBrowseAssetIds))}
+              disabled={publishingBrowseAssets}
+              style={primaryActionButtonStyle}
+            >
+              {publishingBrowseAssets ? "Publishing..." : "Publish selection"}
+            </button>
+          </div>
+        )}
         {groups.map((group) => (
           <section key={group.label} style={assetGroupStyle}>
             <h3 style={assetGroupHeadingStyle}>
@@ -3203,9 +3424,27 @@ export default function UploadPanel({
 
   function renderUploadItems() {
     if (items.length === 0) return null;
+    const publishableItemCount = items.filter(
+      (item) => item.status === "completed" && item.assetId && !item.published,
+    ).length;
 
     return (
       <div style={listStyle}>
+        {publishableItemCount > 0 && (
+          <div style={uploadPublishAllStyle}>
+            <span>
+              {publishableItemCount} completed asset{publishableItemCount === 1 ? "" : "s"} ready to publish
+            </span>
+            <button
+              type="button"
+              onClick={() => void publishAllCurrentItems()}
+              disabled={publishingAllItems || !authUser?.authenticated}
+              style={primaryActionButtonStyle}
+            >
+              {publishingAllItems ? "Publishing..." : "Publish all"}
+            </button>
+          </div>
+        )}
         {items.map((item) => (
           <div key={item.id} style={itemStyle}>
             <div style={thumbStyle}>
@@ -3305,7 +3544,9 @@ export default function UploadPanel({
                       type="button"
                       onClick={() => void saveItemCaption(item)}
                       disabled={
-                        item.captionStatus === "saving" || item.openingEditor
+                        item.captionStatus === "saving" ||
+                        item.openingEditor ||
+                        (item.assetId ? publishingItemIds.has(item.assetId) : false)
                       }
                       style={captionSaveButtonStyle}
                     >
@@ -3315,12 +3556,32 @@ export default function UploadPanel({
                       type="button"
                       onClick={() => void editUploadedItem(item)}
                       disabled={
-                        item.captionStatus === "saving" || item.openingEditor
+                        item.captionStatus === "saving" ||
+                        item.openingEditor ||
+                        (item.assetId ? publishingItemIds.has(item.assetId) : false)
                       }
                       style={captionSaveButtonStyle}
                     >
                       {item.openingEditor ? "Opening..." : "Edit"}
                     </button>
+                    {!item.published && (
+                      <button
+                        type="button"
+                        onClick={() => void publishUploadedItem(item)}
+                        disabled={
+                          !authUser?.authenticated ||
+                          item.captionStatus === "saving" ||
+                          item.openingEditor ||
+                          (item.assetId ? publishingItemIds.has(item.assetId) : false)
+                        }
+                        style={primaryActionButtonStyle}
+                      >
+                        {item.publishStatus === "publishing" ? "Publishing..." : "Publish"}
+                      </button>
+                    )}
+                    {item.published && (
+                      <span style={publishedAssetBadgeStyle}>Published</span>
+                    )}
                   </div>
                   {item.captionStatus === "saved" && (
                     <span style={captionStatusStyle}>Saved</span>
@@ -3328,6 +3589,11 @@ export default function UploadPanel({
                   {item.captionStatus === "failed" && (
                     <span style={captionErrorStyle}>
                       {item.captionError ?? "Caption failed"}
+                    </span>
+                  )}
+                  {item.publishStatus === "failed" && (
+                    <span style={captionErrorStyle}>
+                      {item.publishError ?? "Publishing failed"}
                     </span>
                   )}
                 </label>
@@ -6010,6 +6276,18 @@ const listStyle: React.CSSProperties = {
   marginTop: 14,
 };
 
+const uploadPublishAllStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+  padding: "10px 12px",
+  color: "#dce7ff",
+  background: "rgba(85, 126, 214, 0.12)",
+  border: "1px solid rgba(117, 151, 224, 0.35)",
+  borderRadius: 6,
+};
+
 const assetGridHeaderStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
@@ -6346,9 +6624,62 @@ const assetCardStyle: React.CSSProperties = {
   borderRadius: 6,
   padding: 8,
   minWidth: 0,
-  cursor: "pointer",
+  cursor: "default",
   textAlign: "left",
   font: "inherit",
+};
+
+const assetCardLinkStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 6,
+  minWidth: 0,
+  color: "inherit",
+  textDecoration: "none",
+  cursor: "pointer",
+};
+
+const selectedAssetCardStyle: React.CSSProperties = {
+  borderColor: "rgba(158, 190, 255, 0.9)",
+  boxShadow: "0 0 0 1px rgba(158, 190, 255, 0.45)",
+};
+
+const assetCardActionsStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 8,
+  paddingTop: 4,
+  borderTop: "1px solid rgba(255,255,255,0.08)",
+};
+
+const assetSelectionLabelStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 5,
+  color: "#c8cede",
+  fontSize: 12,
+  cursor: "pointer",
+};
+
+const inlinePublishButtonStyle: React.CSSProperties = {
+  ...primaryActionButtonStyle,
+  padding: "5px 8px",
+  fontSize: 12,
+};
+
+const browseSelectionBarStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+  position: "sticky",
+  top: 8,
+  zIndex: 2,
+  padding: "10px 12px",
+  color: "#eef3ff",
+  background: "rgba(23, 31, 48, 0.96)",
+  border: "1px solid rgba(158, 190, 255, 0.45)",
+  borderRadius: 6,
 };
 
 const assetImageStyle: React.CSSProperties = {

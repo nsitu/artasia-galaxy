@@ -1713,6 +1713,52 @@ router.post("/assets/:assetId/published", async (req, res) => {
   }
 });
 
+router.post("/assets/published", async (req, res) => {
+  try {
+    const auth = await getAuthContext(req);
+    if (!auth.authenticated) {
+      res.status(401).json({ error: "Sign in to publish uploads." });
+      return;
+    }
+
+    const requestedAssetIds: unknown[] = Array.isArray(req.body?.asset_ids)
+      ? req.body.asset_ids
+      : [];
+    const assetIds = Array.from(
+      new Set(
+        requestedAssetIds
+          .map((value) => String(value).trim())
+          .filter((assetId) => assetId.length > 0),
+      ),
+    );
+    if (assetIds.length === 0) {
+      res.status(400).json({ error: "Select at least one asset to publish." });
+      return;
+    }
+    const assets = await Promise.all(assetIds.map((assetId) => getAsset(assetId)));
+    const archivedAssets = assets.filter((asset) => asset.isArchived);
+    if (archivedAssets.length > 0) {
+      res.status(409).json({
+        error: `${archivedAssets.length} selected asset${archivedAssets.length === 1 ? " is" : "s are"} archived and cannot be published. Restore ${archivedAssets.length === 1 ? "it" : "them"} first.`,
+      });
+      return;
+    }
+
+    const album = await getPublishedAlbum();
+    await addAssetsToAlbum(album.id, assetIds);
+    invalidateSiteActivityStats();
+
+    res.json({
+      ok: true,
+      asset_ids: assetIds,
+      published: true,
+      published_album_id: album.id,
+    });
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
+});
+
 router.post("/assets/:assetId/archived", async (req, res) => {
   try {
     const auth = await getAuthContext(req);
