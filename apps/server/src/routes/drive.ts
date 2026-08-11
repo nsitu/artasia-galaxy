@@ -696,7 +696,7 @@ async function importDriveFile(params: {
     let replacement: ImmichAsset | null = null;
     if (fileInfo.isAudio) {
       console.log(`[Drive] converting audio file ${params.fileId} to MP4`);
-      const prepared = await prepareAudioAsVideo({ stream, originalName: fileInfo.name });
+      const prepared = await prepareAudioAsVideo({ stream, originalName: uploadFileName });
       try {
         replacement = await findDriveImportReplacement({
           fileId: params.fileId,

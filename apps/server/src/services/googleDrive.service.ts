@@ -39,6 +39,23 @@ const MIME_TYPE_EXTENSIONS: Readonly<Record<string, string>> = {
   "audio/m4a": ".m4a",
   "audio/x-m4a": ".m4a",
 };
+const MIME_TYPE_COMPATIBLE_EXTENSIONS: Readonly<Record<string, ReadonlySet<string>>> = {
+  "image/jpeg": new Set([".jpg", ".jpeg", ".jpe"]),
+  "image/png": new Set([".png"]),
+  "image/gif": new Set([".gif"]),
+  "image/webp": new Set([".webp"]),
+  "image/bmp": new Set([".bmp"]),
+  "image/heic": new Set([".heic"]),
+  "image/heif": new Set([".heif"]),
+  "video/mp4": new Set([".mp4", ".m4v"]),
+  "video/quicktime": new Set([".mov", ".qt"]),
+  "video/x-msvideo": new Set([".avi"]),
+  "audio/mpeg": new Set([".mp3", ".mp2", ".mpa"]),
+  "audio/mp3": new Set([".mp3"]),
+  "audio/mp4": new Set([".m4a", ".mp4"]),
+  "audio/m4a": new Set([".m4a"]),
+  "audio/x-m4a": new Set([".m4a"]),
+};
 const COMPARABLE_MEDIA_EXTENSIONS = new Set([
   ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".heic", ".heif",
   ".mp4", ".mov", ".m4v", ".webm", ".avi", ".mkv",
@@ -58,9 +75,16 @@ function comparableMediaFilename(name: string) {
  * the multipart filename when choosing an upload decoder.
  */
 export function ensureDriveFileExtension(name: string, mimeType: string): string {
-  if (extname(name)) return name;
-  const extension = MIME_TYPE_EXTENSIONS[mimeType.toLowerCase()];
-  return extension ? `${name}${extension}` : name;
+  const normalizedMimeType = mimeType.trim().toLowerCase();
+  const extension = MIME_TYPE_EXTENSIONS[normalizedMimeType];
+  if (!extension) return name;
+
+  const filenameExtension = extname(name).toLowerCase();
+  if (MIME_TYPE_COMPATIBLE_EXTENSIONS[normalizedMimeType]?.has(filenameExtension)) {
+    return name;
+  }
+
+  return `${name}${extension}`;
 }
 
 interface DriveFile {
