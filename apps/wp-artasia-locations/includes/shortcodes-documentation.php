@@ -164,6 +164,9 @@ function artasia_render_documentation_article(WP_Post $document, string $partner
         'artasia_people'
     );
     $people_names = array_values(array_filter(array_map('get_the_title', $people_ids)));
+    $edit_url = is_user_logged_in() && current_user_can('edit_post', $document->ID)
+        ? get_edit_post_link($document->ID, '')
+        : '';
     $gallery_url = !empty($context['placement_id'])
         ? artasia_get_placement_gallery_url(
             intval($context['placement_id']),
@@ -181,7 +184,12 @@ function artasia_render_documentation_article(WP_Post $document, string $partner
             <?php if ($partner_name && $partner_name !== 'Other documentation') : ?>
                 <p class="artasia-documentation__partner"><?php echo esc_html($partner_name); ?></p>
             <?php endif; ?>
-            <h2 class="artasia-documentation__title" tabindex="-1"><?php echo esc_html($document->post_title); ?></h2>
+            <div class="artasia-documentation__title-row">
+                <h2 class="artasia-documentation__title" tabindex="-1"><?php echo esc_html($document->post_title); ?></h2>
+                <?php if ($edit_url) : ?>
+                    <a class="artasia-documentation__edit-button" href="<?php echo esc_url($edit_url); ?>">Edit documentation</a>
+                <?php endif; ?>
+            </div>
             <?php if ($people_names) : ?>
                 <p class="artasia-documentation__people">
                     <span>Documentation by</span>

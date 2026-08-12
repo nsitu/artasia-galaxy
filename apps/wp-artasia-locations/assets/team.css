@@ -85,6 +85,39 @@
     margin: 0;
 }
 
+.artasia-team__heading {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1rem;
+}
+
+.artasia-team .artasia-team__edit-button,
+.artasia-team .artasia-team__edit-button:visited {
+    background: #ec008c;
+    border: 0;
+    border-radius: 4px;
+    color: #fff;
+    display: inline-block;
+    font-size: 0.875rem;
+    font-weight: 900;
+    line-height: 1.2;
+    padding: 0.65rem 1rem;
+    text-decoration: none;
+    transition: background-color 150ms ease;
+}
+
+.artasia-team .artasia-team__edit-button:hover,
+.artasia-team .artasia-team__edit-button:focus-visible {
+    background: #8e1d58;
+    color: #fff;
+}
+
+.artasia-team .artasia-team__edit-button:focus-visible {
+    outline: 3px solid #f28b20;
+    outline-offset: 3px;
+}
+
 .artasia-team__pronouns {
     color: var(--artasia-team-colour);
     margin: 0.5rem 0 0;
@@ -135,11 +168,6 @@
 .artasia-team .artasia-team__portfolio-link::after {
     content: none !important;
     display: none !important;
-}
-
-.artasia-team__edit {
-    font-size: 0.875em;
-    font-weight: 900;
 }
 
 .artasia-team a,

@@ -199,9 +199,14 @@ function artasia_render_team(int $project_id): string
                         </div>
                     <?php endif; ?>
                     <div class="artasia-team__content">
-                        <h3 class="artasia-team__name">
-                            <?php echo esc_html($person->post_title); ?>
-                        </h3>
+                        <div class="artasia-team__heading">
+                            <h3 class="artasia-team__name">
+                                <?php echo esc_html($person->post_title); ?>
+                            </h3>
+                            <?php if ($edit_url) : ?>
+                                <a class="artasia-team__edit-button" href="<?php echo esc_url($edit_url); ?>">Edit profile</a>
+                            <?php endif; ?>
+                        </div>
                         <?php if ($pronouns) : ?>
                             <p class="artasia-team__pronouns"><?php echo esc_html($pronouns); ?></p>
                         <?php endif; ?>
@@ -233,11 +238,6 @@ function artasia_render_team(int $project_id): string
                                         <a class="artasia-team__portfolio-link" href="<?php echo esc_url($portfolio_url); ?>" rel="noopener noreferrer" target="_blank"><?php echo esc_html($portfolio_label); ?></a>
                                     </span>
                                 <?php endif; ?>
-                            </p>
-                        <?php endif; ?>
-                        <?php if ($edit_url) : ?>
-                            <p class="artasia-team__edit">
-                                <a href="<?php echo esc_url($edit_url); ?>">Edit profile</a>
                             </p>
                         <?php endif; ?>
                     </div>

@@ -97,6 +97,40 @@
   font-weight: 900;
 }
 
+.artasia-documentation__title-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.artasia-documentation .artasia-documentation__edit-button,
+.artasia-documentation .artasia-documentation__edit-button:visited {
+  background: #ec008c;
+  border: 0;
+  border-radius: 4px;
+  color: #fff;
+  display: inline-block;
+  font-size: 0.875rem;
+  font-weight: 900;
+  line-height: 1.2;
+  padding: 0.65rem 1rem;
+  text-decoration: none;
+  transition: background-color 150ms ease;
+}
+
+.artasia-documentation .artasia-documentation__edit-button:hover,
+.artasia-documentation .artasia-documentation__edit-button:focus-visible {
+  background: #8e1d58;
+  color: #fff;
+}
+
+.artasia-documentation .artasia-documentation__edit-button:focus-visible {
+  outline: 3px solid #f28b20;
+  outline-offset: 3px;
+}
+
 .artasia-documentation__people {
   display: flex;
   flex-wrap: wrap;
@@ -148,7 +182,8 @@
 }
 
 .artasia-documentation__title {
-  margin-top: 0;
+  flex: 1 1 18rem;
+  margin: 0;
   color: inherit;
   font-weight: 900;
   scroll-margin-top: 14rem;
