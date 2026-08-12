@@ -21,7 +21,7 @@ import {
 
 const DATA_DIR = process.env.DATA_DIR ?? join(process.cwd(), "data");
 const FLATTEN_DIR = join(DATA_DIR, "flatten-jobs");
-const MAX_STRAIGHTEN_DEGREES = 35;
+const MAX_STRAIGHTEN_DEGREES = 45;
 const RIGHT_ANGLE_ROTATIONS = [0, 90, 180, 270] as const;
 const execFile = promisify(execFileCallback);
 

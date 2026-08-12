@@ -152,6 +152,7 @@ export interface MapPlacement {
 export interface ActivityOption {
   id: number;
   label: string;
+  week?: number;
   colour?: string;
   count?: number;
 }

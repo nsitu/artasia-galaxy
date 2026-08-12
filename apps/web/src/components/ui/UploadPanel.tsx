@@ -41,6 +41,7 @@ import {
   updateUploadAssetAdjustments,
   uploadFiles,
   type AssetAdjustments,
+  type ActivityOption,
   type AudioTrimJob,
   type AuthUser,
   type CropParameters,
@@ -152,6 +153,59 @@ const UPLOAD_ACCEPT_TYPES = "image/*,video/*,.heic,.heif,image/heic,image/heif";
 const DEFAULT_SHARED_DRIVE_NAME = "artasia 2026";
 const DEFAULT_SHARED_DRIVE_FOLDER = "documentation";
 const GLOBAL_AUDIO_PLACEMENT_ID = 21639;
+
+function integersIn(value: string) {
+  return (value.match(/\d+/g) ?? [])
+    .map(Number)
+    .filter((number) => Number.isSafeInteger(number));
+}
+
+function activityWeekNumbers(activity: ActivityOption) {
+  if (Number.isSafeInteger(activity.week) && (activity.week ?? 0) > 0) {
+    return [activity.week as number];
+  }
+  return integersIn(activity.label);
+}
+
+function folderActivityMatchScore(folderName: string, activity: ActivityOption) {
+  const folderNumbers = new Set(integersIn(folderName));
+  let score = 0;
+
+  for (const week of activityWeekNumbers(activity)) {
+    if (!folderNumbers.has(week)) continue;
+    const explicitWeekPattern = new RegExp(`\\bweek\\s*0*${week}\\b`, "i");
+    score = Math.max(score, explicitWeekPattern.test(folderName) ? 2 : 1);
+  }
+
+  return score;
+}
+
+function uniqueBestMatch<T>(candidates: T[], score: (candidate: T) => number) {
+  let bestScore = 0;
+  let bestMatches: T[] = [];
+  for (const candidate of candidates) {
+    const candidateScore = score(candidate);
+    if (candidateScore > bestScore) {
+      bestScore = candidateScore;
+      bestMatches = [candidate];
+    } else if (candidateScore > 0 && candidateScore === bestScore) {
+      bestMatches.push(candidate);
+    }
+  }
+  return bestMatches.length === 1 ? bestMatches[0] : null;
+}
+
+function activityFolderMatch(activity: ActivityOption, folders: DriveFolder[]) {
+  return uniqueBestMatch(folders, (folder) =>
+    folderActivityMatchScore(folder.name, activity),
+  );
+}
+
+function folderActivityMatch(folderName: string, activities: ActivityOption[]) {
+  return uniqueBestMatch(activities, (activity) =>
+    folderActivityMatchScore(folderName, activity),
+  );
+}
 const BROWSE_ASSET_STATUSES: Array<{
   value: BrowseAssetStatus;
   label: string;
@@ -740,7 +794,7 @@ export default function UploadPanel({
     fetchDriveFolders(driveType, selectedDriveFolder, currentDriveId)
       .then((response) => {
         if (driveType === "myDrive") {
-          setDriveFolders(response.subfolders ?? []);
+          setDriveFolders(response.subfolders ?? response.folders ?? []);
         } else {
           // Shared Drives
           setDriveFolders(response.folders ?? []);
@@ -1068,16 +1122,63 @@ export default function UploadPanel({
     );
   }, [options, placementKey]);
 
+  const selectedActivity = useMemo(() => {
+    if (!options || !activityTagFilter) return null;
+    return (
+      options.activities.find(
+        (activity) => String(activity.id) === activityTagFilter,
+      ) ?? null
+    );
+  }, [activityTagFilter, options]);
+
   useLayoutEffect(() => {
     if (workspaceMode !== "import" || !routeSelectionResolved) return;
     void openDriveImportDefault(
       selectedPlacement?.google_drive_folder_id,
       selectedPlacement?.placement_id ?? null,
+      selectedActivity,
     );
   }, [
     routeSelectionResolved,
+    selectedActivity?.id,
+    selectedActivity?.week,
     selectedPlacement?.google_drive_folder_id,
     selectedPlacement?.placement_id,
+    workspaceMode,
+  ]);
+
+  useEffect(() => {
+    if (workspaceMode !== "import" || !options || !selectedPlacement) return;
+    const placementFolderId = selectedPlacement.google_drive_folder_id?.trim();
+    if (!placementFolderId) return;
+
+    const placementFolderIndex = folderPath.findIndex(
+      (folder) => folder.id === placementFolderId,
+    );
+    if (
+      placementFolderIndex < 0 ||
+      folderPath.length !== placementFolderIndex + 2
+    ) {
+      return;
+    }
+
+    const currentFolder = folderPath[folderPath.length - 1];
+    const matchedActivity = folderActivityMatch(
+      currentFolder.name,
+      options.activities,
+    );
+    if (
+      matchedActivity &&
+      String(matchedActivity.id) !== activityTagFilter
+    ) {
+      setActivityTagFilter(String(matchedActivity.id));
+      setSelectedAsset(null);
+    }
+  }, [
+    activityTagFilter,
+    folderPath,
+    options,
+    selectedPlacement,
     workspaceMode,
   ]);
 
@@ -1110,14 +1211,7 @@ export default function UploadPanel({
     );
   }, [filteredPlacements, selectedPlacement]);
 
-  const selectedActivityLabel = useMemo(() => {
-    if (!options || !activityTagFilter) return null;
-    return (
-      options.activities.find(
-        (activity) => String(activity.id) === activityTagFilter,
-      )?.label ?? null
-    );
-  }, [activityTagFilter, options]);
+  const selectedActivityLabel = selectedActivity?.label ?? null;
 
   const browseAssetStatusCounts = useMemo(
     () => ({
@@ -3361,6 +3455,7 @@ export default function UploadPanel({
   async function openDriveImportDefault(
     configuredFolderId = selectedPlacement?.google_drive_folder_id,
     placementId = selectedPlacement?.placement_id ?? null,
+    activity = selectedActivity,
   ) {
     const requestId = ++driveDefaultRequestRef.current;
     const placementChanged = drivePlacementIdRef.current !== placementId;
@@ -3384,19 +3479,40 @@ export default function UploadPanel({
       if (configuredFolderId) {
         const { folder, path } = await fetchDriveFolder(configuredFolderId);
         if (requestId !== driveDefaultRequestRef.current) return;
+        const driveType = folder.driveId ? "sharedDrives" : "myDrive";
+        let destinationFolder = folder;
+        let destinationPath = path;
+
+        if (activity) {
+          const response = await fetchDriveFolders(
+            driveType,
+            folder.id,
+            folder.driveId,
+          );
+          if (requestId !== driveDefaultRequestRef.current) return;
+          const matchingFolder = activityFolderMatch(
+            activity,
+            response.folders ?? response.subfolders ?? [],
+          );
+          if (matchingFolder) {
+            destinationFolder = matchingFolder;
+            destinationPath = [...path, matchingFolder];
+          }
+        }
+
         if (folder.driveId) {
           setDriveType("sharedDrives");
           setCurrentDriveId(folder.driveId);
           setFolderPath([
             { id: "__shared_drives__", name: "Shared Drives" },
-            ...path,
+            ...destinationPath,
           ]);
         } else {
           setDriveType("myDrive");
           setCurrentDriveId(undefined);
-          setFolderPath(path);
+          setFolderPath(destinationPath);
         }
-        setSelectedDriveFolder(folder.id);
+        setSelectedDriveFolder(destinationFolder.id);
         return;
       }
 
@@ -4646,8 +4762,8 @@ export default function UploadPanel({
                 <span>Straighten {straightenDegrees.toFixed(1)}°</span>
                 <input
                   type="range"
-                  min={-35}
-                  max={35}
+                  min={-45}
+                  max={45}
                   step={0.1}
                   value={straightenDegrees}
                   disabled={cropSaving}

@@ -148,6 +148,7 @@ interface WpActivity {
 export interface WpActivityInfo {
   id: number;
   label: string;
+  week?: number;
   colour?: string;
 }
 
@@ -193,6 +194,7 @@ export async function getUploadActivities({
       result.push({
         id: activity.id,
         label,
+        ...(activity.week && activity.week > 0 ? { week: activity.week } : {}),
         ...(/^#[0-9a-f]{6}$/i.test(activity.colour ?? "")
           ? { colour: activity.colour }
           : {}),

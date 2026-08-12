@@ -14,6 +14,7 @@ export { activityAnchorTag, isActivityAnchorTagName };
 export interface ActivityConfig {
   id: number;
   label: string;
+  week?: number;
   colour?: string;
 }
 
@@ -210,6 +211,7 @@ export async function getUploadConfig(): Promise<UploadConfig> {
     .map((a) => ({
       id: a.id,
       label: a.label,
+      ...(a.week ? { week: a.week } : {}),
       ...(a.colour ? { colour: a.colour } : {}),
     }));
   const uploaders = wpUploaders
