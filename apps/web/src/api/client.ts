@@ -860,6 +860,14 @@ export interface DriveFoldersResponse {
   folders?: DriveFolder[];
 }
 
+export interface DriveFolderStats {
+  folderId: string;
+  directFileCount: number;
+  subfolderCount: number;
+  nestedFileCount: number;
+  totalFileCount: number;
+}
+
 export async function fetchDriveFolder(folderId: string): Promise<{
   folder: DriveFolder;
   path: DriveFolder[];
@@ -896,6 +904,26 @@ export async function fetchDriveFolders(
     throw new Error(body.error ?? `HTTP ${res.status}`);
   }
   return res.json();
+}
+
+export async function fetchDriveFolderStats(
+  folderIds: string[],
+  driveId?: string,
+): Promise<DriveFolderStats[]> {
+  const res = await fetch("/api/v1/drive/folders/stats", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ folderIds, ...(driveId ? { driveId } : {}) }),
+  });
+  if (!res.ok) {
+    if (res.status === 401) {
+      throw new Error("Please sign in with Google to access Drive");
+    }
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  const body = (await res.json()) as { stats: DriveFolderStats[] };
+  return body.stats;
 }
 
 export async function fetchDriveFiles(

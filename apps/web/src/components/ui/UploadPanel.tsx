@@ -13,6 +13,7 @@ import {
   fetchAuthUser,
   fetchDriveFiles,
   fetchDriveFolder,
+  fetchDriveFolderStats,
   fetchDriveFolders,
   flattenUploadAsset,
   fetchLinkedAudioOptions,
@@ -47,6 +48,7 @@ import {
   type CropParameters,
   type DriveFile,
   type DriveFolder,
+  type DriveFolderStats,
   type DriveSyncResult,
   type LinkedAudioOption,
   type RotationDegrees,
@@ -412,6 +414,11 @@ export default function UploadPanel({
   const [currentDriveId, setCurrentDriveId] = useState<string | undefined>();
   const [driveFolders, setDriveFolders] = useState<DriveFolder[]>([]);
   const [driveFiles, setDriveFiles] = useState<DriveFile[]>([]);
+  const [driveFolderStats, setDriveFolderStats] = useState<
+    Record<string, DriveFolderStats>
+  >({});
+  const [driveFolderStatsLoading, setDriveFolderStatsLoading] = useState(false);
+  const [driveFolderStatsFailed, setDriveFolderStatsFailed] = useState(false);
   const [selectedDriveFolder, setSelectedDriveFolder] = useState("root");
   const [folderPath, setFolderPath] = useState<
     Array<{ id: string; name: string }>
@@ -809,6 +816,65 @@ export default function UploadPanel({
     selectedDriveFolder,
     currentDriveId,
     driveDefaultOpening,
+  ]);
+
+  const activityDriveFolders = useMemo(() => {
+    if (!options) return [];
+    const matchingPlacements = options.placements.filter(
+      (placement) =>
+        placement.google_drive_folder_id?.trim() === selectedDriveFolder,
+    );
+    if (matchingPlacements.length !== 1) return [];
+    return driveFolders.filter((folder) =>
+      Boolean(folderActivityMatch(folder.name, options.activities)),
+    );
+  }, [driveFolders, options, selectedDriveFolder]);
+
+  useEffect(() => {
+    if (
+      workspaceMode !== "import" ||
+      driveDefaultOpening ||
+      activityDriveFolders.length === 0 ||
+      (driveType === "sharedDrives" && !currentDriveId)
+    ) {
+      setDriveFolderStats({});
+      setDriveFolderStatsLoading(false);
+      setDriveFolderStatsFailed(false);
+      return;
+    }
+
+    let cancelled = false;
+    setDriveFolderStats({});
+    setDriveFolderStatsLoading(true);
+    setDriveFolderStatsFailed(false);
+    fetchDriveFolderStats(
+      activityDriveFolders.map((folder) => folder.id),
+      currentDriveId,
+    )
+      .then((stats) => {
+        if (cancelled) return;
+        setDriveFolderStats(
+          Object.fromEntries(stats.map((item) => [item.folderId, item])),
+        );
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.warn("[drive] Failed to load folder counts", err);
+        setDriveFolderStatsFailed(true);
+      })
+      .finally(() => {
+        if (!cancelled) setDriveFolderStatsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activityDriveFolders,
+    currentDriveId,
+    driveDefaultOpening,
+    driveType,
+    workspaceMode,
   ]);
 
   // Load files for current Drive folder
@@ -4193,7 +4259,25 @@ export default function UploadPanel({
                 onClick={() => navigateToDriveFolder(folder)}
               >
                 <span style={{ fontSize: 16 }}>📁</span>
-                <span style={{ flex: 1 }}>{folder.name}</span>
+                <span style={driveFolderNameAndStatsStyle}>
+                  <span>{folder.name}</span>
+                  {activityDriveFolders.some(
+                    (activityFolder) => activityFolder.id === folder.id,
+                  ) && (
+                    <span style={driveFolderStatsStyle}>
+                      {driveFolderStats[folder.id]
+                        ? driveFolderStats[folder.id].totalFileCount === 0 &&
+                          driveFolderStats[folder.id].subfolderCount === 0
+                          ? "Empty"
+                          : `${driveFolderStats[folder.id].directFileCount} direct file${driveFolderStats[folder.id].directFileCount === 1 ? "" : "s"} · ${driveFolderStats[folder.id].subfolderCount} subfolder${driveFolderStats[folder.id].subfolderCount === 1 ? "" : "s"} · ${driveFolderStats[folder.id].nestedFileCount} nested file${driveFolderStats[folder.id].nestedFileCount === 1 ? "" : "s"}`
+                        : driveFolderStatsFailed
+                          ? "Counts unavailable"
+                          : driveFolderStatsLoading
+                            ? "Counting contents..."
+                            : "No contents counted"}
+                    </span>
+                  )}
+                </span>
                 <span style={{ color: "#666", fontSize: 12 }}>→</span>
               </div>
             ))}
@@ -7848,6 +7932,20 @@ const driveFileMetaStyle: React.CSSProperties = {
   justifyContent: "space-between",
   gap: 8,
   minWidth: 0,
+};
+
+const driveFolderNameAndStatsStyle: React.CSSProperties = {
+  display: "flex",
+  flex: 1,
+  flexDirection: "column",
+  gap: 3,
+  minWidth: 0,
+};
+
+const driveFolderStatsStyle: React.CSSProperties = {
+  color: "#9aa3b3",
+  fontSize: 12,
+  fontWeight: 400,
 };
 
 const driveFileThumbImageStyle: React.CSSProperties = {

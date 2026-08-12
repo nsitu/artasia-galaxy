@@ -106,6 +106,34 @@ interface DriveFolder {
   driveId?: string;
 }
 
+export interface DriveFolderStats {
+  folderId: string;
+  directFileCount: number;
+  subfolderCount: number;
+  nestedFileCount: number;
+  totalFileCount: number;
+}
+
+async function mapWithConcurrency<T, R>(
+  values: T[],
+  concurrency: number,
+  mapper: (value: T) => Promise<R>,
+) {
+  const results = new Array<R>(values.length);
+  let nextIndex = 0;
+  async function worker() {
+    while (nextIndex < values.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await mapper(values[index]);
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, values.length) }, worker),
+  );
+  return results;
+}
+
 export class GoogleDriveClient {
   private drive: drive_v3.Drive;
 
@@ -208,6 +236,76 @@ export class GoogleDriveClient {
     const res = await this.drive.files.list(listParams);
 
     return (res.data.files ?? []) as DriveFolder[];
+  }
+
+  private async getAllFolderChildren(folderId: string, driveId?: string) {
+    const children: Array<{ id: string; mimeType: string }> = [];
+    let pageToken: string | undefined;
+    do {
+      const listParams: drive_v3.Params$Resource$Files$List = {
+        q: `'${folderId}' in parents and trashed = false`,
+        pageSize: 1000,
+        pageToken,
+        fields: "nextPageToken,files(id,mimeType)",
+      };
+      if (driveId) {
+        listParams.corpora = "drive";
+        listParams.driveId = driveId;
+        listParams.includeItemsFromAllDrives = true;
+        listParams.supportsAllDrives = true;
+      } else {
+        listParams.spaces = "drive";
+      }
+      const response = await this.drive.files.list(listParams);
+      for (const child of response.data.files ?? []) {
+        if (child.id && child.mimeType) {
+          children.push({ id: child.id, mimeType: child.mimeType });
+        }
+      }
+      pageToken = response.data.nextPageToken ?? undefined;
+    } while (pageToken);
+    return children;
+  }
+
+  async getFolderStatsOneLevel(
+    folderId: string,
+    driveId?: string,
+  ): Promise<DriveFolderStats> {
+    const directChildren = await this.getAllFolderChildren(folderId, driveId);
+    const subfolders = directChildren.filter(
+      (child) => child.mimeType === GOOGLE_MIME_TYPE_FOLDER,
+    );
+    const directFileCount = directChildren.length - subfolders.length;
+    const nestedFileCounts = await mapWithConcurrency(
+      subfolders,
+      4,
+      async (subfolder) => {
+        const children = await this.getAllFolderChildren(subfolder.id, driveId);
+        return children.filter(
+          (child) => child.mimeType !== GOOGLE_MIME_TYPE_FOLDER,
+        ).length;
+      },
+    );
+    const nestedFileCount = nestedFileCounts.reduce(
+      (total, count) => total + count,
+      0,
+    );
+    return {
+      folderId,
+      directFileCount,
+      subfolderCount: subfolders.length,
+      nestedFileCount,
+      totalFileCount: directFileCount + nestedFileCount,
+    };
+  }
+
+  async getFolderStats(
+    folderIds: string[],
+    driveId?: string,
+  ): Promise<DriveFolderStats[]> {
+    return mapWithConcurrency(folderIds, 3, (folderId) =>
+      this.getFolderStatsOneLevel(folderId, driveId),
+    );
   }
 
   /**

@@ -491,6 +491,49 @@ router.get("/folders", async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * POST /api/v1/drive/folders/stats
+ * Count direct files, immediate subfolders, and files one level below several
+ * folders. Deeper descendants are intentionally excluded.
+ */
+router.post("/folders/stats", async (req: Request, res: Response) => {
+  const requestedFolderIds: unknown[] | null = Array.isArray(req.body?.folderIds)
+    ? req.body.folderIds as unknown[]
+    : null;
+  if (!requestedFolderIds) {
+    res.status(400).json({ error: "folderIds must be an array." });
+    return;
+  }
+  const folderIds = Array.from(
+    new Set(
+      requestedFolderIds
+        .filter((value): value is string => typeof value === "string")
+        .map((value) => value.trim())
+        .filter(Boolean),
+    ),
+  );
+  if (folderIds.length === 0 || folderIds.length > 50) {
+    res.status(400).json({
+      error: "Request stats for between 1 and 50 unique folders.",
+    });
+    return;
+  }
+  const driveId =
+    typeof req.body?.driveId === "string" && req.body.driveId.trim()
+      ? req.body.driveId.trim()
+      : undefined;
+
+  try {
+    const client = getDriveClient(req);
+    const stats = await client.getFolderStats(folderIds, driveId);
+    res.json({ stats });
+  } catch (err) {
+    res
+      .status(err instanceof Error && err.message.includes("Not authenticated") ? 401 : 500)
+      .json({ error: (err as Error).message });
+  }
+});
+
 interface DriveFileInfo {
   id: string;
   name: string;
