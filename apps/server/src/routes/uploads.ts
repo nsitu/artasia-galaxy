@@ -1763,6 +1763,50 @@ router.post("/assets/published", async (req, res) => {
   }
 });
 
+router.post("/assets/archived", async (req, res) => {
+  try {
+    const auth = await getAuthContext(req);
+    if (!auth.authenticated) {
+      res.status(401).json({ error: "Sign in to archive uploads." });
+      return;
+    }
+
+    const requestedAssetIds: unknown[] = Array.isArray(req.body?.asset_ids)
+      ? req.body.asset_ids
+      : [];
+    const assetIds = Array.from(
+      new Set(
+        requestedAssetIds
+          .map((value) => String(value).trim())
+          .filter((assetId) => assetId.length > 0),
+      ),
+    );
+    if (assetIds.length === 0) {
+      res.status(400).json({ error: "Select at least one asset to archive." });
+      return;
+    }
+
+    await Promise.all(assetIds.map((assetId) => getAsset(assetId)));
+    const album = await getPublishedAlbum();
+    await Promise.all([
+      ...assetIds.map((assetId) =>
+        updateAsset(assetId, { visibility: "archive" }),
+      ),
+      removeAssetsFromAlbum(album.id, assetIds),
+    ]);
+    invalidateSiteActivityStats();
+
+    res.json({
+      ok: true,
+      asset_ids: assetIds,
+      archived: true,
+      published: false,
+    });
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
+});
+
 router.post("/assets/:assetId/archived", async (req, res) => {
   try {
     const auth = await getAuthContext(req);

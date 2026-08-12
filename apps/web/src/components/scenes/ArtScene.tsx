@@ -173,6 +173,7 @@ export default function ArtScene() {
   const [lightboxSwipeOffset, setLightboxSwipeOffset] = useState(0);
   const [lightboxSwipeSettling, setLightboxSwipeSettling] = useState(false);
   const [lightboxZoom, setLightboxZoom] = useState(1);
+  const [lightboxMetadataExpanded, setLightboxMetadataExpanded] = useState(true);
   const lightboxZoomRef = useRef(1);
   const lightboxTouchPointsRef = useRef(new Map<number, { x: number; y: number }>());
   const lightboxPinchRef = useRef<{ distance: number; zoom: number } | null>(null);
@@ -739,63 +740,124 @@ export default function ArtScene() {
                 : ""}
             </div>
           )}
-          <div
-            className="atlas-photo-lightbox-track"
-            style={{
-              ...photoLightboxTrackStyle,
-              transform: `translate3d(calc(-33.333333% + ${lightboxSwipeOffset}px), 0, 0)`,
-              transition: lightboxSwipeSettling ? "transform 180ms ease-out" : "none",
-            }}
-          >
-            <div className="atlas-photo-lightbox-slide" style={photoLightboxSlideStyle}>
-              {lightboxPreviousPhoto && (
+          <div className="atlas-photo-lightbox-stage" style={photoLightboxStageStyle}>
+            <div
+              className="atlas-photo-lightbox-track"
+              style={{
+                ...photoLightboxTrackStyle,
+                transform: `translate3d(calc(-33.333333% + ${lightboxSwipeOffset}px), 0, 0)`,
+                transition: lightboxSwipeSettling ? "transform 180ms ease-out" : "none",
+              }}
+            >
+              <div className="atlas-photo-lightbox-slide" style={photoLightboxSlideStyle}>
+                {lightboxPreviousPhoto && (
+                  <LightboxMedia
+                    key={`${lightboxPreviousPhoto.id}-adjacent`}
+                    photo={lightboxPreviousPhoto}
+                    active={false}
+                    style={{
+                      ...photoLightboxImageStyle,
+                      ...photoAdjustmentFilterStyle(lightboxPreviousPhoto.adjustments),
+                    }}
+                    onClick={(event) => event.stopPropagation()}
+                  />
+                )}
+              </div>
+              <div className="atlas-photo-lightbox-slide" style={photoLightboxSlideStyle}>
                 <LightboxMedia
-                  key={`${lightboxPreviousPhoto.id}-adjacent`}
-                  photo={lightboxPreviousPhoto}
-                  active={false}
+                  key={`${selectedPhoto.id}-active`}
+                  photo={selectedPhoto}
+                  active
+                  zoom={lightboxZoom}
+                  activityColour={selectedAudioActivityColour}
                   style={{
                     ...photoLightboxImageStyle,
-                    ...photoAdjustmentFilterStyle(lightboxPreviousPhoto.adjustments),
+                    ...photoAdjustmentFilterStyle(selectedPhoto.adjustments),
                   }}
                   onClick={(event) => event.stopPropagation()}
                 />
-              )}
+              </div>
+              <div className="atlas-photo-lightbox-slide" style={photoLightboxSlideStyle}>
+                {lightboxNextPhoto && (
+                  <LightboxMedia
+                    key={`${lightboxNextPhoto.id}-adjacent`}
+                    photo={lightboxNextPhoto}
+                    active={false}
+                    style={{
+                      ...photoLightboxImageStyle,
+                      ...photoAdjustmentFilterStyle(lightboxNextPhoto.adjustments),
+                    }}
+                    onClick={(event) => event.stopPropagation()}
+                  />
+                )}
+              </div>
             </div>
-            <div className="atlas-photo-lightbox-slide" style={photoLightboxSlideStyle}>
-              <LightboxMedia
-                key={`${selectedPhoto.id}-active`}
-                photo={selectedPhoto}
-                active
-                zoom={lightboxZoom}
-                activityColour={selectedAudioActivityColour}
-                style={{
-                  ...photoLightboxImageStyle,
-                  ...photoAdjustmentFilterStyle(selectedPhoto.adjustments),
-                }}
-                onClick={(event) => event.stopPropagation()}
-              />
-            </div>
-            <div className="atlas-photo-lightbox-slide" style={photoLightboxSlideStyle}>
-              {lightboxNextPhoto && (
-                <LightboxMedia
-                  key={`${lightboxNextPhoto.id}-adjacent`}
-                  photo={lightboxNextPhoto}
-                  active={false}
-                  style={{
-                    ...photoLightboxImageStyle,
-                    ...photoAdjustmentFilterStyle(lightboxNextPhoto.adjustments),
+            {photos.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  className="atlas-lightbox-nav-button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    selectAdjacentPhoto(-1);
                   }}
-                  onClick={(event) => event.stopPropagation()}
-                />
-              )}
-            </div>
+                  aria-label="Previous artwork"
+                  style={{ ...photoLightboxNavStyle, left: 0 }}
+                >
+                  <svg viewBox="0 0 16 16" aria-hidden="true" style={photoLightboxNavIconStyle}>
+                    <path d="m10.5 2.5-5.5 5.5 5.5 5.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  className="atlas-lightbox-nav-button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    selectAdjacentPhoto(1);
+                  }}
+                  aria-label="Next artwork"
+                  style={{ ...photoLightboxNavStyle, right: 0 }}
+                >
+                  <svg viewBox="0 0 16 16" aria-hidden="true" style={photoLightboxNavIconStyle}>
+                    <path d="m5.5 2.5 5.5 5.5-5.5 5.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </>
+            )}
           </div>
           <div
             className="atlas-photo-lightbox-metadata"
             style={photoLightboxMetadataStyle}
             onClick={(event) => event.stopPropagation()}
+            onPointerDown={(event) => event.stopPropagation()}
+            onPointerMove={(event) => event.stopPropagation()}
+            onPointerUp={(event) => event.stopPropagation()}
+            onWheel={(event) => event.stopPropagation()}
           >
-            <div style={photoLightboxTitleStyle}>{selectedPhoto.fileName}</div>
+            <div style={photoLightboxMetadataHeaderStyle}>
+              <div style={photoLightboxTitleStyle}>{selectedPhoto.fileName}</div>
+              <button
+                type="button"
+                aria-expanded={lightboxMetadataExpanded}
+                aria-controls="atlas-lightbox-caption-details"
+                aria-label={lightboxMetadataExpanded ? "Collapse asset details" : "Expand asset details"}
+                onClick={() => setLightboxMetadataExpanded((current) => !current)}
+                style={photoLightboxMetadataToggleStyle}
+              >
+                <svg viewBox="0 0 16 16" aria-hidden="true" style={photoLightboxMetadataChevronStyle}>
+                  <path
+                    d={lightboxMetadataExpanded ? "m3 6 5 5 5-5" : "m3 10 5-5 5 5"}
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            </div>
+            {lightboxMetadataExpanded && (
+              <div id="atlas-lightbox-caption-details" style={photoLightboxMetadataBodyStyle}>
             {selectedPhotoActivities.length > 0 && (
               <div style={photoLightboxActivityListStyle}>
                 {selectedPhotoActivities.map((activity) => (
@@ -852,39 +914,9 @@ export default function ArtScene() {
                 Edit
               </a>
             )}
+              </div>
+            )}
           </div>
-          {photos.length > 1 && (
-            <>
-              <button
-                type="button"
-                className="atlas-lightbox-nav-button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  selectAdjacentPhoto(-1);
-                }}
-                aria-label="Previous artwork"
-                style={{ ...photoLightboxNavStyle, left: 0 }}
-              >
-                <svg viewBox="0 0 16 16" aria-hidden="true" style={photoLightboxNavIconStyle}>
-                  <path d="m10.5 2.5-5.5 5.5 5.5 5.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                className="atlas-lightbox-nav-button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  selectAdjacentPhoto(1);
-                }}
-                aria-label="Next artwork"
-                style={{ ...photoLightboxNavStyle, right: 0 }}
-              >
-                <svg viewBox="0 0 16 16" aria-hidden="true" style={photoLightboxNavIconStyle}>
-                  <path d="m5.5 2.5 5.5 5.5-5.5 5.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            </>
-          )}
           <button
             type="button"
             onClick={() => selectPhoto(null)}
@@ -1360,9 +1392,8 @@ const responsiveTopNavStyles = `
       height: 100dvh;
       min-height: 100svh;
       box-sizing: border-box;
-      flex-direction: column;
-      gap: 12px;
-      padding: max(72px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)) !important;
+      gap: 0;
+      padding: 0 !important;
       overflow: hidden;
     }
     .atlas-photo-lightbox-media {
@@ -1383,11 +1414,9 @@ const responsiveTopNavStyles = `
       padding: 0 !important;
     }
     .atlas-photo-lightbox-metadata {
-      position: static !important;
-      flex: 0 0 auto;
       width: 100% !important;
-      max-height: 32dvh !important;
-      overflow-y: auto;
+      max-height: min(42dvh, 360px) !important;
+      overflow: hidden;
     }
 
     .atlas-top-nav {
@@ -1727,21 +1756,32 @@ const buildStampStyle: React.CSSProperties = {
 };
 
 const photoLightboxStyle: React.CSSProperties = {
-  position: "absolute",
+  position: "fixed",
   inset: 0,
   zIndex: 30,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: 24,
+  display: "grid",
+  gridTemplateRows: "minmax(0, 1fr) auto",
+  width: "100vw",
+  height: "100dvh",
+  padding: 0,
+  boxSizing: "border-box",
+  overflow: "hidden",
   background: "rgba(3,3,8,0.88)",
   cursor: "zoom-out",
 };
 
+const photoLightboxStageStyle: React.CSSProperties = {
+  position: "relative",
+  width: "100%",
+  height: "100%",
+  minWidth: 0,
+  minHeight: 0,
+  overflow: "hidden",
+};
+
 const photoLightboxImageStyle: React.CSSProperties = {
   maxWidth: "calc(100vw - 48px)",
-  // Reserve room for the caption panel, especially on short mobile screens.
-  maxHeight: "calc(100dvh - 220px)",
+  maxHeight: "100%",
   objectFit: "contain",
   boxShadow: "0 18px 60px rgba(0,0,0,0.5)",
   cursor: "default",
@@ -1772,30 +1812,66 @@ const photoLightboxSlideStyle: React.CSSProperties = {
 };
 
 const photoLightboxMetadataStyle: React.CSSProperties = {
-  position: "absolute",
-  left: 24,
-  bottom: "max(12px, env(safe-area-inset-bottom))",
-  width: "min(520px, calc(100vw - 48px))",
-  maxHeight: "min(36vh, calc(100dvh - 120px))",
+  position: "relative",
+  zIndex: 3,
+  width: "100%",
+  maxHeight: "min(42dvh, 360px)",
   boxSizing: "border-box",
-  overflowY: "auto",
-  background: "rgba(10,10,20,0.86)",
-  border: "1px solid rgba(255,255,255,0.18)",
-  borderRadius: 6,
-  padding: "12px 14px",
+  display: "flex",
+  flexDirection: "column",
+  overflow: "hidden",
+  background: "rgba(10,10,20,0.96)",
+  borderTop: "1px solid rgba(255,255,255,0.18)",
+  padding: "12px 16px max(12px, env(safe-area-inset-bottom))",
   color: "#ddd",
   fontFamily: "monospace",
   fontSize: 13,
   lineHeight: 1.45,
   cursor: "default",
+  touchAction: "pan-y",
+  boxShadow: "0 -12px 34px rgba(0,0,0,0.26)",
+};
+
+const photoLightboxMetadataHeaderStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 12,
+  minHeight: 30,
 };
 
 const photoLightboxTitleStyle: React.CSSProperties = {
+  flex: "1 1 auto",
+  minWidth: 0,
   color: "#fff",
   fontSize: 12,
   fontWeight: 700,
-  marginBottom: 6,
   overflowWrap: "anywhere",
+};
+
+const photoLightboxMetadataToggleStyle: React.CSSProperties = {
+  flex: "0 0 auto",
+  width: 30,
+  height: 30,
+  display: "grid",
+  placeItems: "center",
+  padding: 0,
+  borderRadius: 999,
+  background: "rgba(255,255,255,0.08)",
+  color: "#eef2f8",
+  border: "1px solid rgba(255,255,255,0.14)",
+  cursor: "pointer",
+};
+
+const photoLightboxMetadataChevronStyle: React.CSSProperties = {
+  width: 16,
+  height: 16,
+};
+
+const photoLightboxMetadataBodyStyle: React.CSSProperties = {
+  minHeight: 0,
+  overflowY: "auto",
+  marginTop: 10,
+  paddingRight: 4,
 };
 
 const photoLightboxDescriptionStyle: React.CSSProperties = {

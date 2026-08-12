@@ -29,6 +29,7 @@ import {
   reimportUploadAssetFromDrive,
   resetUploadAssetEdits,
   setAssetArchived,
+  setAssetsArchived,
   setAssetIcon,
   setAssetLinkedAudio,
   setAssetPublished,
@@ -227,6 +228,7 @@ export default function UploadPanel({
     new Set(),
   );
   const [publishingBrowseAssets, setPublishingBrowseAssets] = useState(false);
+  const [archivingBrowseAssets, setArchivingBrowseAssets] = useState(false);
   const [publishingItemIds, setPublishingItemIds] = useState<Set<string>>(
     new Set(),
   );
@@ -1069,7 +1071,7 @@ export default function UploadPanel({
   useEffect(() => {
     const selectableIds = new Set(
       displayedPlacementAssets
-        .filter((asset) => !asset.published && !asset.archived)
+        .filter((asset) => !asset.archived)
         .map((asset) => asset.id),
     );
     setSelectedBrowseAssetIds((current) => {
@@ -1589,7 +1591,11 @@ export default function UploadPanel({
 
   async function publishBrowseAssets(assetIds: string[]) {
     const uniqueAssetIds = Array.from(new Set(assetIds));
-    if (uniqueAssetIds.length === 0 || publishingBrowseAssets) return;
+    if (
+      uniqueAssetIds.length === 0 ||
+      publishingBrowseAssets ||
+      archivingBrowseAssets
+    ) return;
     setPublishingBrowseAssets(true);
     setError(null);
     try {
@@ -1608,6 +1614,54 @@ export default function UploadPanel({
       setError((err as Error).message);
     } finally {
       setPublishingBrowseAssets(false);
+    }
+  }
+
+  function markAssetsArchived(assetIds: string[]) {
+    const archivedIds = new Set(assetIds);
+    setPlacementAssets((current) =>
+      current.map((asset) =>
+        archivedIds.has(asset.id)
+          ? { ...asset, archived: true, published: false }
+          : asset,
+      ),
+    );
+    setSelectedAsset((current) =>
+      current && archivedIds.has(current.id)
+        ? { ...current, archived: true, published: false }
+        : current,
+    );
+    if (selectedAsset && archivedIds.has(selectedAsset.id)) {
+      setManageArchived(true);
+      setManagePublished(false);
+    }
+  }
+
+  async function archiveBrowseAssets(assetIds: string[]) {
+    const uniqueAssetIds = Array.from(new Set(assetIds));
+    if (
+      uniqueAssetIds.length === 0 ||
+      archivingBrowseAssets ||
+      publishingBrowseAssets
+    ) return;
+    setArchivingBrowseAssets(true);
+    setError(null);
+    try {
+      const archivedIds = await setAssetsArchived(uniqueAssetIds);
+      markAssetsArchived(archivedIds);
+      setSelectedBrowseAssetIds((current) => {
+        const next = new Set(current);
+        archivedIds.forEach((assetId) => next.delete(assetId));
+        return next;
+      });
+      setNotice({
+        tone: "success",
+        message: `Archived ${archivedIds.length} asset${archivedIds.length === 1 ? "" : "s"}.`,
+      });
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setArchivingBrowseAssets(false);
     }
   }
 
@@ -3400,7 +3454,7 @@ export default function UploadPanel({
             {new Date(asset.createdAt).toLocaleDateString()}
           </span>
         </a>
-        {isDraft && authUser?.authenticated && (
+        {!asset.archived && authUser?.authenticated && (
           <div style={assetCardActionsStyle}>
             <label style={assetSelectionLabelStyle}>
               <input
@@ -3410,14 +3464,16 @@ export default function UploadPanel({
               />
               Select
             </label>
-            <button
-              type="button"
-              onClick={() => void publishBrowseAssets([asset.id])}
-              disabled={publishingBrowseAssets}
-              style={inlinePublishButtonStyle}
-            >
-              {publishingBrowseAssets ? "Publishing..." : "Publish"}
-            </button>
+            {isDraft && (
+              <button
+                type="button"
+                onClick={() => void publishBrowseAssets([asset.id])}
+                disabled={publishingBrowseAssets || archivingBrowseAssets}
+                style={inlinePublishButtonStyle}
+              >
+                {publishingBrowseAssets ? "Publishing..." : "Publish"}
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -3455,6 +3511,14 @@ export default function UploadPanel({
         ),
       },
     ].filter((group) => group.assets.length > 0);
+    const selectedDraftAssetIds = displayedPlacementAssets
+      .filter(
+        (asset) =>
+          selectedBrowseAssetIds.has(asset.id) &&
+          !asset.published &&
+          !asset.archived,
+      )
+      .map((asset) => asset.id);
 
     return (
       <div style={assetGroupsStyle}>
@@ -3463,14 +3527,28 @@ export default function UploadPanel({
             <span>
               {selectedBrowseAssetIds.size} asset{selectedBrowseAssetIds.size === 1 ? "" : "s"} selected
             </span>
-            <button
-              type="button"
-              onClick={() => void publishBrowseAssets(Array.from(selectedBrowseAssetIds))}
-              disabled={publishingBrowseAssets}
-              style={primaryActionButtonStyle}
-            >
-              {publishingBrowseAssets ? "Publishing..." : "Publish selection"}
-            </button>
+            <div style={detailHeaderActionsStyle}>
+              <button
+                type="button"
+                onClick={() => void publishBrowseAssets(selectedDraftAssetIds)}
+                disabled={
+                  selectedDraftAssetIds.length === 0 ||
+                  publishingBrowseAssets ||
+                  archivingBrowseAssets
+                }
+                style={primaryActionButtonStyle}
+              >
+                {publishingBrowseAssets ? "Publishing..." : "Publish selection"}
+              </button>
+              <button
+                type="button"
+                onClick={() => void archiveBrowseAssets(Array.from(selectedBrowseAssetIds))}
+                disabled={archivingBrowseAssets || publishingBrowseAssets}
+                style={secondaryButtonStyle}
+              >
+                {archivingBrowseAssets ? "Archiving..." : "Archive selection"}
+              </button>
+            </div>
           </div>
         )}
         {groups.map((group) => (
