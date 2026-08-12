@@ -193,6 +193,28 @@ function artasia_get_expanded_placements(): WP_REST_Response
         }
     }
 
+    $documentation_lookup = [];
+    $documentation_posts = get_posts([
+        'post_type'      => 'artasia_document',
+        'posts_per_page' => -1,
+        'post_status'    => 'publish',
+        'orderby'        => [
+            'date'  => 'ASC',
+            'title' => 'ASC',
+        ],
+        'no_found_rows'  => true,
+    ]);
+    foreach ($documentation_posts as $documentation) {
+        $documentation_placement_ids = artasia_sanitize_integer_array_meta(
+            get_post_meta($documentation->ID, 'artasia_documentation_placement_ids', true)
+        );
+        foreach ($documentation_placement_ids as $documentation_placement_id) {
+            if (!isset($documentation_lookup[$documentation_placement_id])) {
+                $documentation_lookup[$documentation_placement_id] = $documentation;
+            }
+        }
+    }
+
     $results = [];
 
     foreach ($placement_posts as $placement) {
@@ -201,11 +223,19 @@ function artasia_get_expanded_placements(): WP_REST_Response
         $partner_id = intval(get_post_meta($placement->ID, 'artasia_partner_id', true));
         $team_member_id = intval(get_post_meta($placement->ID, 'artasia_team_member_id', true));
         $secondary_team_member_id = intval(get_post_meta($placement->ID, 'artasia_secondary_team_member_id', true));
+        $documentation = $documentation_lookup[$placement->ID] ?? null;
+        $documentation_page_id = $project_id
+            ? intval(get_post_meta($project_id, 'artasia_documentation_page_id', true))
+            : 0;
+        $documentation_url = $documentation && $documentation_page_id && get_post_status($documentation_page_id) === 'publish'
+            ? add_query_arg('documentation', $documentation->post_name, get_permalink($documentation_page_id))
+            : '';
 
         $results[] = [
             'placement_id' => $placement->ID,
             'placement_name' => $placement->post_title,
             'placement_slug' => $placement->post_name,
+            'documentation_url' => $documentation_url,
             'project' => $project_lookup[$project_id] ?? null,
             'description' => get_post_meta($placement->ID, 'artasia_placement_description', true) ?: '',
             'program_context' => get_post_meta($placement->ID, 'artasia_program_context', true) ?: '',

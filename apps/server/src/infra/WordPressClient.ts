@@ -55,6 +55,7 @@ export interface WpArtasiaPlacement {
   placement_id: number;
   placement_name: string;
   placement_slug?: string;
+  documentation_url?: string;
   project: WpProject | null;
   program_context: string;
   is_earlyon: boolean;

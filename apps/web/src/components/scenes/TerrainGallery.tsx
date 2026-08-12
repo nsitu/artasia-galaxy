@@ -2095,11 +2095,23 @@ export function FocusedPlacementOverlay({
               <SiteDetail label="Age range" value={participantDetails} />
             )}
           </div>
-          {adminHref && (
-            <div style={siteDetailsAdminActionStyle}>
-              <a href={adminHref} style={siteDetailsAdminLinkStyle}>
-                Admin
-              </a>
+          {(placement.documentation_url || adminHref) && (
+            <div style={siteDetailsActionsStyle}>
+              {placement.documentation_url && (
+                <a
+                  href={placement.documentation_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={siteDetailsActionLinkStyle}
+                >
+                  Documentation
+                </a>
+              )}
+              {adminHref && (
+                <a href={adminHref} style={siteDetailsActionLinkStyle}>
+                  Admin
+                </a>
+              )}
             </div>
           )}
         </>
@@ -2638,14 +2650,15 @@ const siteDetailsGridStyle: React.CSSProperties = {
   paddingTop: 10,
 };
 
-const siteDetailsAdminActionStyle: React.CSSProperties = {
+const siteDetailsActionsStyle: React.CSSProperties = {
   display: "flex",
+  gap: 8,
   justifyContent: "flex-end",
   marginTop: 10,
   pointerEvents: "auto",
 };
 
-const siteDetailsAdminLinkStyle: React.CSSProperties = {
+const siteDetailsActionLinkStyle: React.CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   minHeight: 30,
