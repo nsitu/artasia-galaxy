@@ -82,6 +82,24 @@ function artasia_get_gallery_availability(): ?array
     return is_array($stale) ? $stale : null;
 }
 
+function artasia_get_placement_gallery_url(int $placement_id, ?array $gallery_availability): string
+{
+    if (get_post_type($placement_id) !== 'artasia_placement' || get_post_status($placement_id) !== 'publish') {
+        return '';
+    }
+
+    if (is_array($gallery_availability) && empty($gallery_availability[(string) $placement_id])) {
+        return '';
+    }
+
+    $placement_slug = get_post_field('post_name', $placement_id);
+    if (!is_string($placement_slug) || $placement_slug === '') {
+        return '';
+    }
+
+    return artasia_atlas_base_url() . '/sites/' . rawurlencode($placement_slug);
+}
+
 function artasia_render_sites(int $project_id): string
 {
     if (get_post_type($project_id) !== 'artasia_project' || get_post_status($project_id) !== 'publish') {
@@ -263,12 +281,10 @@ function artasia_render_sites(int $project_id): string
                                 $section = trim((string) get_post_meta($placement->ID, 'artasia_section', true));
                                 $placement_label = $placement->post_title
                                     . ($section !== '' ? ' — ' . $section : '');
-                                $atlas_url = artasia_atlas_base_url() . '/sites/' . rawurlencode($placement->post_name);
                                 $place_id = intval(get_post_meta($placement->ID, 'artasia_place_id', true));
                                 $place = $place_lookup[$place_id] ?? null;
                                 $documentation = $documentation_lookup[$placement->ID] ?? null;
-                                $show_gallery = $gallery_availability === null
-                                    || !empty($gallery_availability[(string) $placement->ID]);
+                                $gallery_url = artasia_get_placement_gallery_url($placement->ID, $gallery_availability);
                                 ?>
                                 <li>
                                     <span class="artasia-sites__placement-name"><?php echo esc_html($placement_label); ?></span>
@@ -278,10 +294,10 @@ function artasia_render_sites(int $project_id): string
                                             <span class="artasia-sites__place-address"><?php echo esc_html($place['address']); ?></span>
                                         <?php endif; ?>
                                     <?php endif; ?>
-                                    <?php if ($show_gallery || ($documentation && $documentation_base_url)) : ?>
+                                    <?php if ($gallery_url || ($documentation && $documentation_base_url)) : ?>
                                         <div class="artasia-sites__actions">
-                                            <?php if ($show_gallery) : ?>
-                                                <a class="artasia-sites__action" href="<?php echo esc_url($atlas_url); ?>" target="_blank" rel="noopener noreferrer">Gallery</a>
+                                            <?php if ($gallery_url) : ?>
+                                                <a class="artasia-sites__action" href="<?php echo esc_url($gallery_url); ?>" target="_blank" rel="noopener noreferrer">Gallery</a>
                                             <?php endif; ?>
                                             <?php if ($documentation && $documentation_base_url) : ?>
                                                 <a class="artasia-sites__action" href="<?php echo esc_url(add_query_arg('documentation', $documentation->post_name, $documentation_base_url)); ?>">Documentation</a>

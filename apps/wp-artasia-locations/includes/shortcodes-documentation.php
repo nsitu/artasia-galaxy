@@ -164,6 +164,12 @@ function artasia_render_documentation_article(WP_Post $document, string $partner
         'artasia_people'
     );
     $people_names = array_values(array_filter(array_map('get_the_title', $people_ids)));
+    $gallery_url = !empty($context['placement_id'])
+        ? artasia_get_placement_gallery_url(
+            intval($context['placement_id']),
+            artasia_get_gallery_availability()
+        )
+        : '';
     remove_filter('the_content', 'artasia_append_documentation_gallery', 20);
     $content = apply_filters('the_content', $document->post_content);
     add_filter('the_content', 'artasia_append_documentation_gallery', 20);
@@ -193,6 +199,11 @@ function artasia_render_documentation_article(WP_Post $document, string $partner
                     <?php if (!empty($context['place_address'])) : ?>
                         <span><?php echo esc_html($context['place_address']); ?></span>
                     <?php endif; ?>
+                </p>
+            <?php endif; ?>
+            <?php if ($gallery_url) : ?>
+                <p class="artasia-documentation__actions">
+                    <a class="artasia-documentation__action" href="<?php echo esc_url($gallery_url); ?>" target="_blank" rel="noopener noreferrer">Gallery</a>
                 </p>
             <?php endif; ?>
             <?php if ($pull_quote) : ?>

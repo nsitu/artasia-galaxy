@@ -123,6 +123,30 @@
   display: block;
 }
 
+.artasia-documentation__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 1.5rem;
+}
+
+.artasia-documentation__action {
+  display: inline-block;
+  padding: 0.4rem 0.85rem;
+  border: 2px solid currentColor;
+  border-radius: 999px;
+  color: inherit;
+  font-weight: 700;
+  line-height: 1.2;
+  text-decoration: none;
+}
+
+.artasia-documentation__action:hover,
+.artasia-documentation__action:focus-visible {
+  background: #8e1d58;
+  color: #fff;
+}
+
 .artasia-documentation__title {
   margin-top: 0;
   color: inherit;
