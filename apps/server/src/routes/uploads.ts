@@ -2205,6 +2205,42 @@ router.delete("/assets/:assetId/edits", async (req, res) => {
   }
 });
 
+router.post("/assets/delete", async (req, res) => {
+  try {
+    const auth = await getAuthContext(req);
+    if (!auth.authenticated) {
+      res.status(401).json({ error: "Sign in to delete uploads." });
+      return;
+    }
+
+    const requestedAssetIds: unknown[] = Array.isArray(req.body?.asset_ids)
+      ? req.body.asset_ids
+      : [];
+    const assetIds = Array.from(
+      new Set(
+        requestedAssetIds
+          .map((value) => String(value).trim())
+          .filter(Boolean),
+      ),
+    );
+    if (assetIds.length === 0) {
+      res.status(400).json({ error: "Select at least one asset to delete." });
+      return;
+    }
+    if (assetIds.length > 100) {
+      res.status(400).json({ error: "Delete no more than 100 assets at once." });
+      return;
+    }
+
+    await Promise.all(assetIds.map((assetId) => getAsset(assetId)));
+    await deleteAssets(assetIds);
+    invalidateSiteActivityStats();
+    res.json({ ok: true, asset_ids: assetIds });
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
+});
+
 router.delete("/assets/:assetId", async (req, res) => {
   try {
     const auth = await getAuthContext(req);

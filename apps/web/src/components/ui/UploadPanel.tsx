@@ -7,6 +7,7 @@ import {
   createVideoRotation,
   cropUploadAsset,
   deleteUploadAsset,
+  deleteUploadAssets,
   fetchAssetEdits,
   fetchAudioTrimJob,
   fetchVideoRotationJob,
@@ -321,6 +322,7 @@ export default function UploadPanel({
   );
   const [publishingBrowseAssets, setPublishingBrowseAssets] = useState(false);
   const [archivingBrowseAssets, setArchivingBrowseAssets] = useState(false);
+  const [deletingBrowseAssets, setDeletingBrowseAssets] = useState(false);
   const [publishingItemIds, setPublishingItemIds] = useState<Set<string>>(
     new Set(),
   );
@@ -1883,7 +1885,8 @@ export default function UploadPanel({
     if (
       uniqueAssetIds.length === 0 ||
       publishingBrowseAssets ||
-      archivingBrowseAssets
+      archivingBrowseAssets ||
+      deletingBrowseAssets
     ) return;
     setPublishingBrowseAssets(true);
     setError(null);
@@ -1931,7 +1934,8 @@ export default function UploadPanel({
     if (
       uniqueAssetIds.length === 0 ||
       archivingBrowseAssets ||
-      publishingBrowseAssets
+      publishingBrowseAssets ||
+      deletingBrowseAssets
     ) return;
     setArchivingBrowseAssets(true);
     setError(null);
@@ -1951,6 +1955,48 @@ export default function UploadPanel({
       setError((err as Error).message);
     } finally {
       setArchivingBrowseAssets(false);
+    }
+  }
+
+  async function deleteBrowseAssets(assetIds: string[]) {
+    const uniqueAssetIds = Array.from(new Set(assetIds));
+    if (
+      uniqueAssetIds.length === 0 ||
+      deletingBrowseAssets ||
+      publishingBrowseAssets ||
+      archivingBrowseAssets
+    ) return;
+    const assetLabel = `${uniqueAssetIds.length} selected asset${uniqueAssetIds.length === 1 ? "" : "s"}`;
+    if (
+      !window.confirm(
+        `Permanently delete ${assetLabel}? This cannot be undone.`,
+      )
+    ) return;
+
+    setDeletingBrowseAssets(true);
+    setError(null);
+    try {
+      const deletedIds = await deleteUploadAssets(uniqueAssetIds);
+      const deletedIdSet = new Set(deletedIds);
+      setPlacementAssets((current) =>
+        current.filter((asset) => !deletedIdSet.has(asset.id)),
+      );
+      setSelectedBrowseAssetIds((current) => {
+        const next = new Set(current);
+        deletedIds.forEach((assetId) => next.delete(assetId));
+        return next;
+      });
+      setSelectedAsset((current) =>
+        current && deletedIdSet.has(current.id) ? null : current,
+      );
+      setNotice({
+        tone: "success",
+        message: `Deleted ${deletedIds.length} asset${deletedIds.length === 1 ? "" : "s"}.`,
+      });
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setDeletingBrowseAssets(false);
     }
   }
 
@@ -3726,22 +3772,16 @@ export default function UploadPanel({
           ...(isSelected ? selectedAssetCardStyle : {}),
         }}
       >
-        <a
-          href={`/admin/edit/${asset.id}`}
-          onClick={(event) => {
-            if (
-              event.defaultPrevented ||
-              event.button !== 0 ||
-              event.metaKey ||
-              event.ctrlKey ||
-              event.shiftKey ||
-              event.altKey
-            ) return;
-            event.preventDefault();
-            openAssetManager(asset);
-          }}
-          style={assetCardLinkStyle}
-        >
+        <div style={assetPreviewStyle}>
+          {authUser?.authenticated && (
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={() => toggleBrowseAssetSelection(asset.id)}
+              aria-label={`Select ${asset.fileName}`}
+              style={driveFileCheckboxStyle}
+            />
+          )}
           <img
             src={mediaUrl(asset.thumbnailUrl, asset.id)}
             alt=""
@@ -3793,6 +3833,8 @@ export default function UploadPanel({
               </span>
             )}
           </span>
+        </div>
+        <div style={assetCardMetaStyle}>
           <span style={assetNameStyle}>{asset.fileName}</span>
           {asset.mediaKind === "audio" && (
             <span style={assetDurationStyle}>
@@ -3802,29 +3844,35 @@ export default function UploadPanel({
           <span style={assetDateStyle}>
             {new Date(asset.createdAt).toLocaleDateString()}
           </span>
-        </a>
-        {!asset.archived && authUser?.authenticated && (
-          <div style={assetCardActionsStyle}>
-            <label style={assetSelectionLabelStyle}>
-              <input
-                type="checkbox"
-                checked={isSelected}
-                onChange={() => toggleBrowseAssetSelection(asset.id)}
-              />
-              Select
-            </label>
+        </div>
+        <div style={assetCardActionsStyle}>
+          <button
+            type="button"
+            onClick={() => openAssetManager(asset)}
+            style={browseEditButtonStyle}
+          >
+            <span style={materialSymbolStyle} aria-hidden="true">edit</span>
+            Edit
+          </button>
+          {authUser?.authenticated && (
+            <>
             {isDraft && (
               <button
                 type="button"
                 onClick={() => void publishBrowseAssets([asset.id])}
-                disabled={publishingBrowseAssets || archivingBrowseAssets}
+                disabled={
+                  publishingBrowseAssets ||
+                  archivingBrowseAssets ||
+                  deletingBrowseAssets
+                }
                 style={inlinePublishButtonStyle}
               >
                 {publishingBrowseAssets ? "Publishing..." : "Publish"}
               </button>
             )}
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
     );
   }
@@ -3906,27 +3954,46 @@ export default function UploadPanel({
               {selectedBrowseAssetIds.size} asset{selectedBrowseAssetIds.size === 1 ? "" : "s"} selected
             </span>
             <div style={detailHeaderActionsStyle}>
-              {browseAssetStatus === "draft" && (
-                <button
-                  type="button"
-                  onClick={() => void publishBrowseAssets(selectedDraftAssetIds)}
-                  disabled={
-                    selectedDraftAssetIds.length === 0 ||
-                    publishingBrowseAssets ||
-                    archivingBrowseAssets
-                  }
-                  style={primaryActionButtonStyle}
-                >
-                  {publishingBrowseAssets ? "Publishing..." : "Publish selection"}
-                </button>
-              )}
+              <span style={withSelectedLabelStyle}>With selected</span>
+              <button
+                type="button"
+                onClick={() => void publishBrowseAssets(selectedDraftAssetIds)}
+                disabled={
+                  selectedDraftAssetIds.length === 0 ||
+                  publishingBrowseAssets ||
+                  archivingBrowseAssets ||
+                  deletingBrowseAssets
+                }
+                style={primaryActionButtonStyle}
+              >
+                {publishingBrowseAssets ? "Publishing..." : "Publish"}
+              </button>
               <button
                 type="button"
                 onClick={() => void archiveBrowseAssets(Array.from(selectedBrowseAssetIds))}
-                disabled={archivingBrowseAssets || publishingBrowseAssets}
+                disabled={
+                  browseAssetStatus === "archived" ||
+                  archivingBrowseAssets ||
+                  publishingBrowseAssets ||
+                  deletingBrowseAssets
+                }
                 style={secondaryButtonStyle}
               >
-                {archivingBrowseAssets ? "Archiving..." : "Archive selection"}
+                {archivingBrowseAssets ? "Archiving..." : "Archive"}
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  void deleteBrowseAssets(Array.from(selectedBrowseAssetIds))
+                }
+                disabled={
+                  deletingBrowseAssets ||
+                  archivingBrowseAssets ||
+                  publishingBrowseAssets
+                }
+                style={dangerButtonStyle}
+              >
+                {deletingBrowseAssets ? "Deleting..." : "Delete"}
               </button>
             </div>
           </div>
@@ -4802,22 +4869,32 @@ export default function UploadPanel({
                 <span>Rotate video</span>
                 <button
                   type="button"
+                  aria-label="Rotate video left 90 degrees"
+                  title="Rotate left 90 degrees"
                   onClick={() => changeRotationDegrees(-90)}
                   disabled={savingAsset || manageArchived}
                   style={secondaryButtonStyle}
                 >
-                  Left 90Â°
+                  <span style={materialSymbolStyle} aria-hidden="true">
+                    rotate_left
+                  </span>
+                  <span aria-hidden="true">90&deg;</span>
                 </button>
                 <button
                   type="button"
+                  aria-label="Rotate video right 90 degrees"
+                  title="Rotate right 90 degrees"
                   onClick={() => changeRotationDegrees(90)}
                   disabled={savingAsset || manageArchived}
                   style={secondaryButtonStyle}
                 >
-                  Right 90Â°
+                  <span style={materialSymbolStyle} aria-hidden="true">
+                    rotate_right
+                  </span>
+                  <span aria-hidden="true">90&deg;</span>
                 </button>
                 <span style={rotationValueStyle}>
-                  {rotationDegrees === 270 ? "-90Â°" : `${rotationDegrees}Â°`}
+                  {rotationDegrees === 270 ? -90 : rotationDegrees}&deg;
                 </span>
                 {rotationDegrees !== 0 && (
                   <button
@@ -4910,26 +4987,38 @@ export default function UploadPanel({
                 <span>Rotate</span>
                 <button
                   type="button"
+                  aria-label="Rotate image left 90 degrees"
+                  title="Rotate left 90 degrees"
                   onClick={() => changeRotationDegrees(-90)}
                   disabled={cropSaving}
                   style={secondaryButtonStyle}
                 >
-                  Left 90°
+                  <span style={materialSymbolStyle} aria-hidden="true">
+                    rotate_left
+                  </span>
+                  <span aria-hidden="true">90&deg;</span>
                 </button>
                 <button
                   type="button"
+                  aria-label="Rotate image right 90 degrees"
+                  title="Rotate right 90 degrees"
                   onClick={() => changeRotationDegrees(90)}
                   disabled={cropSaving}
                   style={secondaryButtonStyle}
                 >
-                  Right 90°
+                  <span style={materialSymbolStyle} aria-hidden="true">
+                    rotate_right
+                  </span>
+                  <span aria-hidden="true">90&deg;</span>
                 </button>
                 <span style={rotationValueStyle}>
-                  {rotationDegrees === 270 ? "-90°" : `${rotationDegrees}°`}
+                  {rotationDegrees === 270 ? -90 : rotationDegrees}&deg;
                 </span>
               </div>
               <label style={adjustmentLabelStyle}>
-                <span>Straighten {straightenDegrees.toFixed(1)}°</span>
+                <span>
+                  Straighten {straightenDegrees.toFixed(1)}&deg;
+                </span>
                 <input
                   type="range"
                   min={-45}
@@ -7234,8 +7323,8 @@ const rangeInputStyle: React.CSSProperties = {
 
 const assetGridStyle: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fill, minmax(132px, 1fr))",
-  gap: 10,
+  gridTemplateColumns: "repeat(auto-fill, minmax(236px, 1fr))",
+  gap: 8,
 };
 
 const browseStatusTabsStyle: React.CSSProperties = {
@@ -7281,31 +7370,45 @@ const browseStatusCountStyle: React.CSSProperties = {
 
 const assetCardStyle: React.CSSProperties = {
   display: "grid",
-  gap: 6,
-  color: "#ddd",
+  gridTemplateRows: "220px auto auto",
+  gap: 8,
+  color: "#d8e7ff",
   textDecoration: "none",
-  background: "#171a22",
-  border: "1px solid rgba(255,255,255,0.1)",
-  borderRadius: 6,
+  background: "rgba(255,255,255,0.05)",
+  borderWidth: 1,
+  borderStyle: "solid",
+  borderColor: "rgba(255,255,255,0.12)",
+  borderRadius: 4,
+  boxShadow: "none",
   padding: 8,
   minWidth: 0,
   cursor: "default",
   textAlign: "left",
   font: "inherit",
+  fontSize: 13,
+  transition: "background 120ms ease, border-color 120ms ease, box-shadow 120ms ease",
 };
 
-const assetCardLinkStyle: React.CSSProperties = {
+const assetPreviewStyle: React.CSSProperties = {
+  position: "relative",
+  width: "100%",
+  height: 220,
+  overflow: "hidden",
+  borderRadius: 4,
+  background: "rgba(255,255,255,0.08)",
+  border: "1px solid rgba(255,255,255,0.12)",
+};
+
+const assetCardMetaStyle: React.CSSProperties = {
   display: "grid",
-  gap: 6,
+  gap: 4,
   minWidth: 0,
-  color: "inherit",
-  textDecoration: "none",
-  cursor: "pointer",
 };
 
 const selectedAssetCardStyle: React.CSSProperties = {
-  borderColor: "rgba(158, 190, 255, 0.9)",
-  boxShadow: "0 0 0 1px rgba(158, 190, 255, 0.45)",
+  background: "rgba(120, 170, 255, 0.18)",
+  borderColor: "rgba(216, 231, 255, 0.9)",
+  boxShadow: "0 0 0 2px rgba(120, 170, 255, 0.24)",
 };
 
 const assetCardActionsStyle: React.CSSProperties = {
@@ -7317,13 +7420,14 @@ const assetCardActionsStyle: React.CSSProperties = {
   borderTop: "1px solid rgba(255,255,255,0.08)",
 };
 
-const assetSelectionLabelStyle: React.CSSProperties = {
+const browseEditButtonStyle: React.CSSProperties = {
+  ...secondaryButtonStyle,
   display: "inline-flex",
   alignItems: "center",
-  gap: 5,
-  color: "#c8cede",
+  justifyContent: "center",
+  gap: 6,
+  padding: "5px 8px",
   fontSize: 12,
-  cursor: "pointer",
 };
 
 const inlinePublishButtonStyle: React.CSSProperties = {
@@ -7347,11 +7451,17 @@ const browseSelectionBarStyle: React.CSSProperties = {
   borderRadius: 6,
 };
 
+const withSelectedLabelStyle: React.CSSProperties = {
+  color: "#aeb8ca",
+  fontSize: 12,
+  whiteSpace: "nowrap",
+};
+
 const assetImageStyle: React.CSSProperties = {
   width: "100%",
-  aspectRatio: "1 / 1",
+  height: "100%",
   objectFit: "cover",
-  borderRadius: 4,
+  display: "block",
   background: "#0c0e13",
 };
 
@@ -7369,11 +7479,16 @@ const archivedAssetBadgeStyle: React.CSSProperties = {
 };
 
 const assetBadgeRowStyle: React.CSSProperties = {
+  position: "absolute",
+  top: 8,
+  right: 8,
   display: "flex",
   alignItems: "center",
   gap: 5,
   flexWrap: "wrap",
-  justifySelf: "start",
+  justifyContent: "flex-end",
+  maxWidth: "calc(100% - 48px)",
+  zIndex: 1,
 };
 
 const publishedAssetBadgeStyle: React.CSSProperties = {
