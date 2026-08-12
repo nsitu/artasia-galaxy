@@ -833,6 +833,25 @@ export default function ArtScene() {
           >
             <div style={photoLightboxMetadataHeaderStyle}>
               <div style={photoLightboxTitleStyle}>{selectedPhoto.fileName}</div>
+              <a
+                href={`/api/v1/assets/${selectedPhoto.id}/original`}
+                download={selectedPhoto.fileName}
+                aria-label={`Download original asset: ${selectedPhoto.fileName}`}
+                title="Download original asset"
+                style={photoLightboxDownloadLinkStyle}
+              >
+                <svg viewBox="0 0 16 16" aria-hidden="true" style={photoLightboxDownloadIconStyle}>
+                  <path
+                    d="M8 2.5v7m-3-3 3 3 3-3M3 12.5h10"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <span>Download</span>
+              </a>
               <button
                 type="button"
                 aria-expanded={lightboxMetadataExpanded}
@@ -1858,6 +1877,30 @@ const photoLightboxTitleStyle: React.CSSProperties = {
   fontSize: 12,
   fontWeight: 700,
   overflowWrap: "anywhere",
+};
+
+const photoLightboxDownloadLinkStyle: React.CSSProperties = {
+  flex: "0 0 auto",
+  minHeight: 30,
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  padding: "0 10px",
+  borderRadius: 999,
+  background: "rgba(255,255,255,0.08)",
+  color: "#eef2f8",
+  border: "1px solid rgba(255,255,255,0.14)",
+  fontSize: 11,
+  fontWeight: 700,
+  lineHeight: 1,
+  textDecoration: "none",
+  whiteSpace: "nowrap",
+  cursor: "pointer",
+};
+
+const photoLightboxDownloadIconStyle: React.CSSProperties = {
+  width: 15,
+  height: 15,
 };
 
 const photoLightboxMetadataToggleStyle: React.CSSProperties = {

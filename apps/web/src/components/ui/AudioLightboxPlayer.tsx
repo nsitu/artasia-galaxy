@@ -227,18 +227,26 @@ const audioLightboxPlayButtonStyle: CSSProperties = {
   gridArea: "play",
   width: 42,
   height: 42,
-  border: "1px solid rgba(255,255,255,0.3)",
+  display: "grid",
+  placeItems: "center",
+  padding: 0,
+  border: "none",
   borderRadius: "50%",
   background: "rgba(255,255,255,0.12)",
   color: "#fff",
   cursor: "pointer",
-  fontSize: 16,
+  lineHeight: 0,
+  appearance: "none",
 };
 
 const audioLightboxPlayIconStyle: CSSProperties = {
+  display: "block",
+  width: 24,
+  height: 24,
   fontFamily: "'Material Symbols Outlined'",
   fontSize: 24,
-  lineHeight: 1,
+  lineHeight: "24px",
+  textAlign: "center",
   fontVariationSettings: "'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24",
 };
 
