@@ -4,7 +4,7 @@ import { fetchSlideshow } from "../api/client";
 
 type GalleryPhotoScope =
   | { mode: "regional" }
-  | { mode: "placement"; placementId: number; activityId?: number };
+  | { mode: "placement"; placementId: number };
 
 interface GalleryState {
   photos: Photo[];
@@ -19,7 +19,6 @@ interface GalleryState {
     lat: number;
     lng: number;
     radiusKm: number;
-    activityId?: number;
   }) => Promise<void>;
   selectPhoto: (index: number | null) => void;
 }
@@ -27,11 +26,6 @@ interface GalleryState {
 let galleryRequestId = 0;
 const placementPhotoCache = new Map<number, Photo[]>();
 const placementPhotoRequests = new Map<number, Promise<Photo[]>>();
-
-function photosForActivity(photos: Photo[], activityId?: number) {
-  if (activityId == null) return photos;
-  return photos.filter((photo) => photo.activityIds?.includes(activityId));
-}
 
 function requestPlacementPhotos(params: {
   placementId: number;
@@ -93,13 +87,10 @@ export const useGalleryStore = create<GalleryState>((set) => ({
     const scope: GalleryPhotoScope = {
       mode: "placement",
       placementId: params.placementId,
-      ...(params.activityId != null ? { activityId: params.activityId } : {}),
     };
     const cached = placementPhotoCache.get(params.placementId);
     set({
-      photos: cached
-        ? photosForActivity(cached, params.activityId)
-        : [],
+      photos: cached ?? [],
       photoScope: scope,
       loading: !cached,
       error: null,
@@ -110,7 +101,7 @@ export const useGalleryStore = create<GalleryState>((set) => ({
       const photos = await requestPlacementPhotos(params);
       if (requestId === galleryRequestId) {
         set({
-          photos: photosForActivity(photos, params.activityId),
+          photos,
           photoScope: scope,
           loading: false,
         });

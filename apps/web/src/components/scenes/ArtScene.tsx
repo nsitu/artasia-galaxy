@@ -143,6 +143,7 @@ export default function ArtScene() {
   );
   const fetchPhotos = useGalleryStore((s) => s.fetchPhotos);
   const photos = useGalleryStore((s) => s.photos);
+  const photoScope = useGalleryStore((s) => s.photoScope);
   const selectedPhotoIndex = useGalleryStore((s) => s.selectedPhotoIndex);
   const selectPhoto = useGalleryStore((s) => s.selectPhoto);
   const error = useGalleryStore((s) => s.error);
@@ -447,6 +448,10 @@ export default function ArtScene() {
     setPreviewPlacementDetails(placement);
     setPreviewPlacementAction(action ? () => action : null);
   }, []);
+  const handleFocusedPlacementChange = useCallback((placement: MapPlacement | null) => {
+    setSelectedActivityFilter("");
+    setFocusedPlacementDetails(placement);
+  }, []);
 
   useEffect(() => {
     if (!selectedPartnerFilter) return;
@@ -487,24 +492,16 @@ export default function ArtScene() {
     }
   }, [activityFilterOptions, selectedActivityFilter]);
 
-  const placementTotalPhotosRef = useRef<Photo[]>([]);
-
   useEffect(() => {
-    if (!focusedPlacementDetails) {
-      placementTotalPhotosRef.current = [];
-      return;
-    }
-    if (!photos.length) return;
-
-    if (photos.length > placementTotalPhotosRef.current.length) {
-      placementTotalPhotosRef.current = photos;
-    }
-
+    if (!focusedPlacementDetails) return;
+    if (
+      photoScope.mode !== "placement" ||
+      photoScope.placementId !== focusedPlacementDetails.placement_id
+    ) return;
     if (!activityFilterOptions.length) return;
 
-    const allPhotos = placementTotalPhotosRef.current;
     const counts = new Map<number, number>();
-    for (const photo of allPhotos) {
+    for (const photo of photos) {
       for (const activityId of photo.activityIds ?? []) {
         counts.set(activityId, (counts.get(activityId) ?? 0) + 1);
       }
@@ -516,7 +513,7 @@ export default function ArtScene() {
         count: counts.get(option.id) ?? 0,
       })),
     );
-  }, [focusedPlacementDetails, photos, activityFilterOptions.length]);
+  }, [focusedPlacementDetails, photoScope, photos, activityFilterOptions.length]);
 
   useEffect(() => {
     if (!focusedPlacementDetails) setSelectedActivityFilter("");
@@ -970,7 +967,7 @@ export default function ArtScene() {
               introPanOffsetRef={introPanOffsetRef}
               onNoticeChange={setTerrainNotice}
               onBackActionChange={handleBackActionChange}
-              onFocusedPlacementChange={setFocusedPlacementDetails}
+              onFocusedPlacementChange={handleFocusedPlacementChange}
               onHoveredPlacementChange={setHoveredPlacementDetails}
               onPreviewPlacementChange={handlePreviewPlacementChange}
               onPartnerFilterOptionsChange={setPartnerFilterOptions}

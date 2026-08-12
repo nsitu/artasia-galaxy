@@ -636,13 +636,11 @@ export default function TerrainGallery({
   }, [selectedActivityFilter]);
   const photosForCurrentView = useMemo(() => {
     if (focusedPlacement) {
-      return isMatchingPlacementPhotoScope(
-        photoScope,
-        focusedPlacement.placement_id,
-        selectedActivityId,
-      )
-        ? photos
-        : [];
+      if (!isMatchingPlacementPhotoScope(photoScope, focusedPlacement.placement_id)) {
+        return [];
+      }
+      if (selectedActivityId == null) return photos;
+      return photos.filter((photo) => photo.activityIds?.includes(selectedActivityId));
     }
     return photoScope.mode === "regional" ? photos : [];
   }, [focusedPlacement, photoScope, photos, selectedActivityId]);
@@ -1794,9 +1792,8 @@ export default function TerrainGallery({
       lat: focusedPlacement.lat,
       lng: focusedPlacement.lng,
       radiusKm: LOCAL_PLACEMENT_RADIUS_KM,
-      activityId: selectedActivityId,
     });
-  }, [fetchPlacementFocus, focusedPlacement, selectedActivityId]);
+  }, [fetchPlacementFocus, focusedPlacement]);
 
   useEffect(() => {
     return () => onNoticeChange?.(null);
@@ -2411,14 +2408,12 @@ function updateViewerPath(path: string, replace = false) {
 function isMatchingPlacementPhotoScope(
   scope:
     | { mode: "regional" }
-    | { mode: "placement"; placementId: number; activityId?: number },
+    | { mode: "placement"; placementId: number },
   placementId: number,
-  activityId?: number,
 ) {
   return (
     scope.mode === "placement" &&
-    scope.placementId === placementId &&
-    (scope.activityId ?? null) === (activityId ?? null)
+    scope.placementId === placementId
   );
 }
 
