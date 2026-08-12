@@ -1081,11 +1081,12 @@ export async function lookupMissingUploadAssetDriveSources(): Promise<BulkDriveL
 export async function reimportUploadAssetFromDrive(
   assetId: string,
   placementId?: number,
+  asAudio = false,
 ): Promise<DriveSyncResult> {
   const res = await fetch(`/api/v1/drive/assets/${encodeURIComponent(assetId)}/reimport`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ placementId }),
+    body: JSON.stringify({ placementId, asAudio }),
   });
   if (!res.ok) {
     if (res.status === 401) throw new Error("Please sign in with Google to access Drive");

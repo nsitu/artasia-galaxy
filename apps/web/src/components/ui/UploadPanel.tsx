@@ -334,7 +334,9 @@ export default function UploadPanel({
   const [videoRotationStatus, setVideoRotationStatus] = useState<string | null>(null);
   const [videoPreviewPlaying, setVideoPreviewPlaying] = useState(false);
   const [deletingAsset, setDeletingAsset] = useState(false);
-  const [driveAssetAction, setDriveAssetAction] = useState<"lookup" | "reimport" | null>(null);
+  const [driveAssetAction, setDriveAssetAction] = useState<
+    "lookup" | "reimport" | "reimport-audio" | null
+  >(null);
   const [driveBulkLookupRunning, setDriveBulkLookupRunning] = useState(false);
   const [cropEditing, setCropEditing] = useState(false);
   const [cropRect, setCropRect] = useState<CropRect | null>(null);
@@ -2946,14 +2948,18 @@ export default function UploadPanel({
     );
   }
 
-  async function reimportSelectedAssetFromDrive() {
+  async function reimportSelectedAssetFromDrive(asAudio = false) {
     if (!selectedAsset) return;
     if (!authUser?.authenticated) {
       setError("Sign in with Google to reimport Drive files.");
       return;
     }
 
-    setDriveAssetAction("reimport");
+    if (asAudio && !window.confirm(
+      "Replace this video with an audio-only version using the standard Artasia audio artwork?",
+    )) return;
+
+    setDriveAssetAction(asAudio ? "reimport-audio" : "reimport");
     setError(null);
     setNotice(null);
     try {
@@ -2963,6 +2969,7 @@ export default function UploadPanel({
         Number.isSafeInteger(selectedPlacementId) && selectedPlacementId > 0
           ? selectedPlacementId
           : undefined,
+        asAudio,
       );
       if (!result.assetId) throw new Error("Google Drive reimport did not create an asset.");
       const replacement = await fetchUploadAsset(result.assetId);
@@ -2973,7 +2980,9 @@ export default function UploadPanel({
       refreshVisibleAssets();
       setNotice({
         tone: "success",
-        message: `Reimported ${result.fileName} and replaced the previous asset.`,
+        message: asAudio
+          ? `Reimported ${result.fileName} as audio and replaced the previous video.`
+          : `Reimported ${result.fileName} and replaced the previous asset.`,
       });
     } catch (err) {
       setError((err as Error).message);
@@ -5150,7 +5159,7 @@ export default function UploadPanel({
                   type="button"
                   onClick={
                     selectedAsset.driveFileId
-                      ? reimportSelectedAssetFromDrive
+                      ? () => void reimportSelectedAssetFromDrive()
                       : lookupSelectedAssetDriveSource
                   }
                   disabled={
@@ -5175,6 +5184,31 @@ export default function UploadPanel({
                         : "Lookup Drive"}
                 </button>
               )}
+              {authUser?.authenticated &&
+                selectedAsset.driveFileId &&
+                selectedAsset.mediaKind === "video" && (
+                  <button
+                    type="button"
+                    onClick={() => void reimportSelectedAssetFromDrive(true)}
+                    disabled={
+                      Boolean(driveAssetAction) ||
+                      savingAsset ||
+                      deletingAsset ||
+                      cropSaving ||
+                      adjustmentsSaving ||
+                      captionSaving
+                    }
+                    title="Discard the video picture and replace it with the standard audio artwork"
+                    style={siteActionButtonStyle}
+                  >
+                    <span style={siteActionIconStyle} aria-hidden="true">
+                      audio_file
+                    </span>
+                    {driveAssetAction === "reimport-audio"
+                      ? "Converting to audio..."
+                      : "Reimport as audio"}
+                  </button>
+                )}
             </div>
           </div>
 

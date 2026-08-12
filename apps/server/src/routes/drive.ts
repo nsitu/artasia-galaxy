@@ -24,7 +24,7 @@ import {
 } from "../infra/ImmichClient.js";
 import { getUploadConfig } from "../services/uploadConfig.service.js";
 import { prepareAudioAsVideo } from "../services/audioToVideo.service.js";
-import { parseImmichDuration } from "../services/audioAsset.service.js";
+import { isAudioAsset, parseImmichDuration } from "../services/audioAsset.service.js";
 import { UPLOAD_LIMITS } from "../services/uploadLimits.js";
 
 const router = Router();
@@ -953,6 +953,7 @@ async function importDriveFile(params: {
   placementId?: number | null;
   placement: DrivePlacement | null;
   activityTags: string[];
+  forceAudio?: boolean;
 }): Promise<DriveSyncResult> {
   let fileName = "Unknown";
   try {
@@ -962,7 +963,16 @@ async function importDriveFile(params: {
     if (!fileInfo.isSupported) {
       return { fileId: params.fileId, fileName, status: "failed", error: `Unsupported file type: ${fileInfo.mimeType}` };
     }
-    if (fileInfo.isAudio && fileInfo.size && fileInfo.size > UPLOAD_LIMITS.maxFileBytes) {
+    if (params.forceAudio && !fileInfo.isVideo) {
+      return {
+        fileId: params.fileId,
+        fileName,
+        status: "failed",
+        error: `The linked Drive file is not a video (${fileInfo.mimeType}).`,
+      };
+    }
+    const importAsAudio = fileInfo.isAudio || params.forceAudio === true;
+    if (importAsAudio && fileInfo.size && fileInfo.size > UPLOAD_LIMITS.maxFileBytes) {
       return { fileId: params.fileId, fileName, status: "failed", error: `Audio file exceeds the ${Math.round(UPLOAD_LIMITS.maxFileBytes / (1024 * 1024))}MB limit` };
     }
     if (fileInfo.size && fileInfo.size > 10 * 1024 * 1024 * 1024) {
@@ -974,8 +984,8 @@ async function importDriveFile(params: {
     const fileDate = fileInfo.modifiedTime ? new Date(fileInfo.modifiedTime) : undefined;
     let uploadResult;
     let replacement: ImmichAsset | null = null;
-    if (fileInfo.isAudio) {
-      console.log(`[Drive] converting audio file ${params.fileId} to MP4`);
+    if (importAsAudio) {
+      console.log(`[Drive] converting ${params.forceAudio ? "video's audio track" : "audio file"} ${params.fileId} to audio artwork MP4`);
       const prepared = await prepareAudioAsVideo({ stream, originalName: uploadFileName });
       try {
         replacement = await findDriveImportReplacement({
@@ -1020,11 +1030,11 @@ async function importDriveFile(params: {
       ...(params.placement ? drivePlacementTags(params.placement) : []),
       ...params.activityTags,
       driveSourceTag(params.fileId),
-      ...(fileInfo.isAudio ? ["media:audio"] : []),
+      ...(importAsAudio ? ["media:audio"] : []),
     ];
     await tagAsset(uploadResult.id, allTags);
     await waitForAssetTags(uploadResult.id, allTags, {
-      requireAudioDuration: fileInfo.isAudio,
+      requireAudioDuration: importAsAudio,
     });
     if (replacement) {
       await replaceImportedAsset(replacement, uploadResult.id, {
@@ -1106,6 +1116,15 @@ router.post("/assets/:assetId/reimport", async (req: Request, res: Response) => 
     const client = getDriveClient(req);
     const assetId = Array.isArray(req.params.assetId) ? req.params.assetId[0] : req.params.assetId;
     const asset = await getAsset(assetId.trim());
+    const forceAudio = req.body?.asAudio === true;
+    if (forceAudio && asset.type !== "VIDEO") {
+      res.status(400).json({ error: "Only video assets can be reimported as audio." });
+      return;
+    }
+    if (forceAudio && isAudioAsset(asset)) {
+      res.status(400).json({ error: "This asset is already classified as audio." });
+      return;
+    }
     const requestedPlacementId = Number(req.body?.placementId);
     const placementId = Number.isSafeInteger(requestedPlacementId) && requestedPlacementId > 0
       ? requestedPlacementId
@@ -1154,6 +1173,7 @@ router.post("/assets/:assetId/reimport", async (req: Request, res: Response) => 
       placementId,
       placement,
       activityTags: activity ? [`activity:${activity.id}`, activity.label] : [],
+      forceAudio,
     });
     if (result.status === "failed") {
       res.status(502).json({ error: result.error ?? "Google Drive reimport failed." });

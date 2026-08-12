@@ -370,6 +370,7 @@ export class GoogleDriveClient {
     modifiedTime?: string;
     isSupported: boolean;
     isAudio: boolean;
+    isVideo: boolean;
   }> {
     const file = await this.getFile(fileId);
     const isSupported = SUPPORTED_MIME_TYPES.includes(file.mimeType);
@@ -380,6 +381,7 @@ export class GoogleDriveClient {
       modifiedTime: file.modifiedTime,
       isSupported,
       isAudio: GoogleDriveClient.isAudio(file.mimeType),
+      isVideo: GoogleDriveClient.isVideo(file.mimeType),
     };
   }
 
