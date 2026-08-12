@@ -208,6 +208,21 @@ function folderActivityMatch(folderName: string, activities: ActivityOption[]) {
     folderActivityMatchScore(folderName, activity),
   );
 }
+
+function driveFolderStatsLabel(stats: DriveFolderStats) {
+  const parts: string[] = [];
+  if (stats.totalFileCount > 0) {
+    parts.push(
+      `${stats.totalFileCount} file${stats.totalFileCount === 1 ? "" : "s"}`,
+    );
+  }
+  if (stats.subfolderCount > 0) {
+    parts.push(
+      `${stats.subfolderCount} subfolder${stats.subfolderCount === 1 ? "" : "s"}`,
+    );
+  }
+  return parts.length > 0 ? parts.join(" · ") : "Empty";
+}
 const BROWSE_ASSET_STATUSES: Array<{
   value: BrowseAssetStatus;
   label: string;
@@ -417,7 +432,6 @@ export default function UploadPanel({
   const [driveFolderStats, setDriveFolderStats] = useState<
     Record<string, DriveFolderStats>
   >({});
-  const [driveFolderStatsLoading, setDriveFolderStatsLoading] = useState(false);
   const [driveFolderStatsFailed, setDriveFolderStatsFailed] = useState(false);
   const [selectedDriveFolder, setSelectedDriveFolder] = useState("root");
   const [folderPath, setFolderPath] = useState<
@@ -838,14 +852,12 @@ export default function UploadPanel({
       (driveType === "sharedDrives" && !currentDriveId)
     ) {
       setDriveFolderStats({});
-      setDriveFolderStatsLoading(false);
       setDriveFolderStatsFailed(false);
       return;
     }
 
     let cancelled = false;
     setDriveFolderStats({});
-    setDriveFolderStatsLoading(true);
     setDriveFolderStatsFailed(false);
     fetchDriveFolderStats(
       activityDriveFolders.map((folder) => folder.id),
@@ -861,9 +873,6 @@ export default function UploadPanel({
         if (cancelled) return;
         console.warn("[drive] Failed to load folder counts", err);
         setDriveFolderStatsFailed(true);
-      })
-      .finally(() => {
-        if (!cancelled) setDriveFolderStatsLoading(false);
       });
 
     return () => {
@@ -4259,22 +4268,22 @@ export default function UploadPanel({
                 onClick={() => navigateToDriveFolder(folder)}
               >
                 <span style={{ fontSize: 16 }}>📁</span>
-                <span style={driveFolderNameAndStatsStyle}>
+                <span
+                  className="atlas-drive-folder-label"
+                  style={driveFolderNameAndStatsStyle}
+                >
                   <span>{folder.name}</span>
                   {activityDriveFolders.some(
                     (activityFolder) => activityFolder.id === folder.id,
-                  ) && (
-                    <span style={driveFolderStatsStyle}>
+                  ) &&
+                    (driveFolderStats[folder.id] || driveFolderStatsFailed) && (
+                    <span
+                      className="atlas-drive-folder-stats"
+                      style={driveFolderStatsStyle}
+                    >
                       {driveFolderStats[folder.id]
-                        ? driveFolderStats[folder.id].totalFileCount === 0 &&
-                          driveFolderStats[folder.id].subfolderCount === 0
-                          ? "Empty"
-                          : `${driveFolderStats[folder.id].directFileCount} direct file${driveFolderStats[folder.id].directFileCount === 1 ? "" : "s"} · ${driveFolderStats[folder.id].subfolderCount} subfolder${driveFolderStats[folder.id].subfolderCount === 1 ? "" : "s"} · ${driveFolderStats[folder.id].nestedFileCount} nested file${driveFolderStats[folder.id].nestedFileCount === 1 ? "" : "s"}`
-                        : driveFolderStatsFailed
-                          ? "Counts unavailable"
-                          : driveFolderStatsLoading
-                            ? "Counting contents..."
-                            : "No contents counted"}
+                        ? driveFolderStatsLabel(driveFolderStats[folder.id])
+                        : "Counts unavailable"}
                     </span>
                   )}
                 </span>
@@ -5466,7 +5475,23 @@ export default function UploadPanel({
             }
           }
 
+          .atlas-drive-folder-stats::before {
+            content: "·";
+            color: #666;
+            margin-right: 8px;
+          }
+
           @media (max-width: 760px) {
+            .atlas-drive-folder-label {
+              align-items: flex-start !important;
+              flex-direction: column !important;
+              gap: 3px !important;
+            }
+
+            .atlas-drive-folder-stats::before {
+              content: none;
+            }
+
             .atlas-admin-layout {
               display: grid !important;
               grid-template-columns: 1fr !important;
@@ -7937,8 +7962,9 @@ const driveFileMetaStyle: React.CSSProperties = {
 const driveFolderNameAndStatsStyle: React.CSSProperties = {
   display: "flex",
   flex: 1,
-  flexDirection: "column",
-  gap: 3,
+  alignItems: "baseline",
+  flexDirection: "row",
+  gap: 8,
   minWidth: 0,
 };
 
