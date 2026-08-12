@@ -1407,11 +1407,11 @@ const responsiveTopNavStyles = `
       max-width: 100% !important;
     }
     .atlas-photo-lightbox-track {
-      padding: max(72px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)) !important;
+      padding: 0 !important;
       box-sizing: border-box;
     }
     .atlas-photo-lightbox-slide {
-      padding: 0 !important;
+      padding: max(72px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)) !important;
     }
     .atlas-photo-lightbox-metadata {
       width: 100% !important;
@@ -1809,6 +1809,7 @@ const photoLightboxSlideStyle: React.CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   padding: 24,
+  overflow: "hidden",
 };
 
 const photoLightboxMetadataStyle: React.CSSProperties = {
