@@ -1131,6 +1131,44 @@ export default function UploadPanel({
     );
   }, [activityTagFilter, options]);
 
+  const driveFolderPlacement = useMemo(() => {
+    if (!options || selectedDriveFolder === "root") return null;
+    const matches = options.placements.filter(
+      (placement) =>
+        placement.google_drive_folder_id?.trim() === selectedDriveFolder,
+    );
+    return matches.length === 1 ? matches[0] : null;
+  }, [options, selectedDriveFolder]);
+
+  useEffect(() => {
+    if (
+      workspaceMode !== "import" ||
+      !routeSelectionResolved ||
+      !driveFolderPlacement ||
+      driveFolderPlacement.placement_id === selectedPlacement?.placement_id
+    ) {
+      return;
+    }
+
+    const placementId = String(driveFolderPlacement.placement_id);
+    setPlacementKey(placementId);
+    setSiteScope("placement");
+    setAssetMode("placements");
+    setActivityTagFilter("");
+    setSelectedAsset(null);
+    setItems([]);
+    setNotice(null);
+    setError(null);
+    setApplicationPath(
+      `/admin/import?site=${encodeURIComponent(placementId)}`,
+    );
+  }, [
+    driveFolderPlacement,
+    routeSelectionResolved,
+    selectedPlacement?.placement_id,
+    workspaceMode,
+  ]);
+
   useLayoutEffect(() => {
     if (workspaceMode !== "import" || !routeSelectionResolved) return;
     void openDriveImportDefault(
@@ -1149,6 +1187,12 @@ export default function UploadPanel({
 
   useEffect(() => {
     if (workspaceMode !== "import" || !options || !selectedPlacement) return;
+    if (
+      driveFolderPlacement &&
+      driveFolderPlacement.placement_id !== selectedPlacement.placement_id
+    ) {
+      return;
+    }
     const placementFolderId = selectedPlacement.google_drive_folder_id?.trim();
     if (!placementFolderId) return;
 
@@ -1176,6 +1220,7 @@ export default function UploadPanel({
     }
   }, [
     activityTagFilter,
+    driveFolderPlacement,
     folderPath,
     options,
     selectedPlacement,
