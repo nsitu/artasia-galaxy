@@ -1406,6 +1406,20 @@ const responsiveTopNavStyles = `
       width: 100% !important;
       max-width: 100% !important;
     }
+    .atlas-audio-lightbox-controls {
+      grid-template-columns: minmax(0, 1fr) auto !important;
+      grid-template-areas:
+        "waveform waveform"
+        "play time" !important;
+      column-gap: 12px !important;
+      row-gap: 8px !important;
+    }
+    .atlas-audio-lightbox-play {
+      justify-self: start;
+    }
+    .atlas-audio-lightbox-time {
+      justify-self: end;
+    }
     .atlas-photo-lightbox-track {
       padding: 0 !important;
       box-sizing: border-box;

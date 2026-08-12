@@ -129,9 +129,13 @@ export default function AudioLightboxPlayer({
           setCurrentTime(0);
         }}
       />
-      <div style={audioLightboxControlsStyle}>
+      <span aria-hidden="true" style={audioLightboxAssetIconStyle}>
+        {displayedIconName}
+      </span>
+      <div className="atlas-audio-lightbox-controls" style={audioLightboxControlsStyle}>
         <button
           type="button"
+          className="atlas-audio-lightbox-play"
           onClick={() => void togglePlayback()}
           style={audioLightboxPlayButtonStyle}
           aria-label={playing ? "Pause audio" : "Play audio"}
@@ -140,10 +144,7 @@ export default function AudioLightboxPlayer({
             {playing ? "pause" : "play_arrow"}
           </span>
         </button>
-        <div style={audioLightboxWaveformColumnStyle}>
-          <span aria-hidden="true" style={audioLightboxAssetIconStyle}>
-            {displayedIconName}
-          </span>
+        <div className="atlas-audio-lightbox-waveform" style={audioLightboxWaveformColumnStyle}>
           <svg
             viewBox="0 0 180 100"
             preserveAspectRatio="none"
@@ -172,7 +173,7 @@ export default function AudioLightboxPlayer({
             })}
           </svg>
         </div>
-        <span style={audioLightboxTimeStyle}>
+        <span className="atlas-audio-lightbox-time" style={audioLightboxTimeStyle}>
           {formatTime(currentTime)} / {formatTime(duration)}
         </span>
       </div>
@@ -196,12 +197,14 @@ const audioLightboxPlayerStyle: CSSProperties = {
 const audioLightboxControlsStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "42px minmax(0, 1fr) auto",
+  gridTemplateAreas: '"play waveform time"',
   alignItems: "center",
   gap: 14,
   width: "100%",
 };
 
 const audioLightboxWaveformColumnStyle: CSSProperties = {
+  gridArea: "waveform",
   minWidth: 0,
   width: "100%",
 };
@@ -221,6 +224,7 @@ const audioLightboxAssetIconStyle: CSSProperties = {
 };
 
 const audioLightboxPlayButtonStyle: CSSProperties = {
+  gridArea: "play",
   width: 42,
   height: 42,
   border: "1px solid rgba(255,255,255,0.3)",
@@ -239,9 +243,11 @@ const audioLightboxPlayIconStyle: CSSProperties = {
 };
 
 const audioLightboxTimeStyle: CSSProperties = {
+  gridArea: "time",
   fontFamily: "monospace",
   fontSize: 12,
   color: "#c7ccd6",
+  whiteSpace: "nowrap",
 };
 
 const audioLightboxWaveformStyle: CSSProperties = {
