@@ -201,20 +201,45 @@ async function processWithConcurrency<T, R>(
 function findExistingPlacementTagIds(
   placement: { placement_id: number; placement_name: string } | null | undefined,
   tags: Awaited<ReturnType<typeof listTags>>,
+  configuredPlacements: Array<{
+    placement_id: number;
+    placement_name: string;
+  }>,
 ) {
   if (!placement) return [];
 
-  const placementTagNames = new Set([
-    placementAnchorTag(placement.placement_id).trim().toLowerCase(),
-    placement.placement_name.trim().toLowerCase(),
-  ]);
-
-  return tags
-    .filter((tag) =>
-      placementTagNames.has(tag.name.trim().toLowerCase()) ||
-      placementTagNames.has(tag.value.trim().toLowerCase())
+  const anchorTagName = placementAnchorTag(placement.placement_id)
+    .trim()
+    .toLowerCase();
+  const anchorTagIds = tags
+    .filter(
+      (tag) =>
+        tag.name.trim().toLowerCase() === anchorTagName ||
+        tag.value.trim().toLowerCase() === anchorTagName,
     )
     .map((tag) => tag.id);
+
+  const normalizedPlacementName = placement.placement_name
+    .trim()
+    .toLowerCase();
+  const placementNameIsUnique =
+    configuredPlacements.filter(
+      (candidate) =>
+        candidate.placement_name.trim().toLowerCase() ===
+        normalizedPlacementName,
+    ).length === 1;
+
+  if (!placementNameIsUnique) return anchorTagIds;
+
+  const legacyNameTagIds = tags
+    .filter(
+      (tag) =>
+        tag.name.trim().toLowerCase() === normalizedPlacementName ||
+        tag.value.trim().toLowerCase() === normalizedPlacementName,
+    )
+    .map((tag) => tag.id);
+
+  return Array.from(new Set([...anchorTagIds, ...legacyNameTagIds]));
 }
 
 function isPlacementAnchorTagName(value: string) {
@@ -1065,7 +1090,20 @@ function mapEmbeddedAssetMetadata(
       placementAnchorTag(placement.placement_id).toLowerCase(),
       value,
     );
-    placementsByTag.set(placement.placement_name.trim().toLowerCase(), value);
+  }
+  for (const placement of config.placements) {
+    const normalizedName = placement.placement_name.trim().toLowerCase();
+    const nameIsUnique =
+      config.placements.filter(
+        (candidate) =>
+          candidate.placement_name.trim().toLowerCase() === normalizedName,
+      ).length === 1;
+    if (nameIsUnique) {
+      placementsByTag.set(normalizedName, {
+        id: placement.placement_id,
+        name: placement.placement_name,
+      });
+    }
   }
   for (const activity of config.activities) {
     const value = { id: activity.id, label: activity.label };
@@ -1251,7 +1289,11 @@ router.get("/audio-options", async (req, res) => {
     const placementTagIds = Array.from(
       new Set(
         placementIds.flatMap((placementId) =>
-          findExistingPlacementTagIds(placementsById.get(placementId), tags),
+          findExistingPlacementTagIds(
+            placementsById.get(placementId),
+            tags,
+            config.placements,
+          ),
         ),
       ),
     );
@@ -1298,7 +1340,11 @@ router.get("/assets", async (req, res) => {
     );
     const tagIds = Array.from(new Set(
       placementIds.flatMap((placementId) =>
-        findExistingPlacementTagIds(placementsById.get(placementId), tags)
+        findExistingPlacementTagIds(
+          placementsById.get(placementId),
+          tags,
+          config.placements,
+        )
       ),
     ));
     const resolvedAt = Date.now();
@@ -2276,14 +2322,21 @@ router.get("/placements/:id/assets", async (req, res) => {
       return;
     }
 
-    const placement = await findConfiguredPlacement(placementId);
+    const config = await getUploadConfig();
+    const placement = config.placements.find(
+      (candidate) => candidate.placement_id === placementId,
+    );
     if (!placement) {
       res.status(404).json({ error: "Placement was not found." });
       return;
     }
 
     const tags = await listTags();
-    const tagIds = findExistingPlacementTagIds(placement, tags);
+    const tagIds = findExistingPlacementTagIds(
+      placement,
+      tags,
+      config.placements,
+    );
     if (tagIds.length === 0) {
       res.json({ placement_id: placementId, assets: [] });
       return;

@@ -1304,18 +1304,18 @@ export default function UploadPanel({
     workspaceMode,
   ]);
 
-  const existingPlacementFileKeys = useMemo(() => {
+  const existingPlacementDriveFileIds = useMemo(() => {
     if (!selectedPlacement) return new Set<string>();
     return new Set(
       placementAssets
         .filter((asset) => asset.placement_id === selectedPlacement.placement_id)
-        .map((asset) => normalizedMediaFileKey(asset.fileName))
-        .filter(Boolean),
+        .map((asset) => asset.driveFileId?.trim())
+        .filter((driveFileId): driveFileId is string => Boolean(driveFileId)),
     );
   }, [placementAssets, selectedPlacement]);
 
   function driveFileIsImported(file: DriveFile) {
-    return existingPlacementFileKeys.has(normalizedMediaFileKey(file.name));
+    return existingPlacementDriveFileIds.has(file.id);
   }
 
   const browsePlacementOptions = useMemo(() => {
@@ -2163,15 +2163,20 @@ export default function UploadPanel({
     setCropRefreshKey((current) => current + 1);
   }
 
-  function setApplicationPath(path: string, replace = false) {
+  function setApplicationPath(
+    path: string,
+    replace = false,
+    retainSelectedSite = true,
+  ) {
     const nextUrl = new URL(path, window.location.origin);
-    const retainsSelectedSite = [
+    const pathCanRetainSelectedSite = [
       "/admin/browse",
       "/admin/upload",
       "/admin/import",
     ].includes(nextUrl.pathname);
     if (
-      retainsSelectedSite &&
+      retainSelectedSite &&
+      pathCanRetainSelectedSite &&
       placementKey &&
       !nextUrl.searchParams.has("site")
     ) {
@@ -5877,6 +5882,13 @@ export default function UploadPanel({
                     }
                     onChange={(e) => {
                       const nextPlacementKey = e.target.value;
+                      const nextParams = new URLSearchParams();
+                      if (nextPlacementKey) {
+                        nextParams.set("site", nextPlacementKey);
+                      }
+                      if (activityTagFilter) {
+                        nextParams.set("activity", activityTagFilter);
+                      }
                       if (!nextPlacementKey) {
                         setPlacementKey("");
                         setSiteScope("all");
@@ -5886,6 +5898,12 @@ export default function UploadPanel({
                         setSiteScope("placement");
                         setAssetMode("placements");
                       }
+                      const nextQuery = nextParams.toString();
+                      setApplicationPath(
+                        `/admin/browse${nextQuery ? `?${nextQuery}` : ""}`,
+                        true,
+                        false,
+                      );
                       setSelectedAsset(null);
                       setItems([]);
                       setNotice(null);
@@ -7892,14 +7910,6 @@ const copyDriveFolderLinkStyle: React.CSSProperties = {
   fontFamily: "inherit",
   cursor: "pointer",
 };
-
-function normalizedMediaFileKey(fileName: string) {
-  return fileName
-    .normalize("NFKC")
-    .trim()
-    .toLocaleLowerCase()
-    .replace(/\.(?:jpe?g|png|gif|webp|heic|heif|avif|tiff?|bmp|mp4|mov|m4v|webm|avi|mkv|mp3|m4a|wav|aac|ogg|flac)$/i, "");
-}
 
 function formatAssetDuration(seconds: number) {
   const safeSeconds = Number.isFinite(seconds) ? Math.max(0, Math.round(seconds)) : 0;
