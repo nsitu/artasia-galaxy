@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ensureDriveFileExtension } from "./googleDrive.service.js";
+import {
+  comparableMediaFilename,
+  ensureDriveFileExtension,
+} from "./googleDrive.service.js";
 
 test("adds a MIME-derived extension to a Drive filename without one", () => {
   assert.equal(ensureDriveFileExtension("Documentation", "image/jpeg"), "Documentation.jpg");
@@ -28,4 +31,15 @@ test("uses the MIME type when a recognizable extension conflicts with it", () =>
 
 test("leaves the filename alone when the MIME type is unknown", () => {
   assert.equal(ensureDriveFileExtension("Archive.custom", "application/octet-stream"), "Archive.custom");
+});
+
+test("maps Atlas edit and trim derivatives back to their Drive source stem", () => {
+  assert.equal(
+    comparableMediaFilename("Photo-artasia-edit-artasia-edit.jpg"),
+    "photo",
+  );
+  assert.equal(
+    comparableMediaFilename("Recording -artasia-trim.mp4"),
+    "recording",
+  );
 });

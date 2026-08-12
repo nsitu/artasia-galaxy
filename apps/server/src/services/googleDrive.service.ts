@@ -62,12 +62,15 @@ const COMPARABLE_MEDIA_EXTENSIONS = new Set([
   ".mp3", ".m4a", ".wav", ".aac", ".ogg", ".flac",
 ]);
 
-function comparableMediaFilename(name: string) {
+export function comparableMediaFilename(name: string) {
   const normalized = name.trim().toLocaleLowerCase();
   const extension = extname(normalized);
-  return COMPARABLE_MEDIA_EXTENSIONS.has(extension)
+  const stem = COMPARABLE_MEDIA_EXTENSIONS.has(extension)
     ? normalized.slice(0, -extension.length)
     : normalized;
+  return stem
+    .replace(/(?:\s*-\s*artasia-(?:edit|trim))+$/g, "")
+    .trim();
 }
 
 /**

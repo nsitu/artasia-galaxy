@@ -38,6 +38,10 @@ function normalizeFilename(value: string) {
   return value.trim().toLocaleLowerCase();
 }
 
+function reportedDriveMatches(matches: DriveFile[]) {
+  return matches.map(({ id, name }) => ({ id, name }));
+}
+
 function immichChecksumAsHex(checksum: string) {
   try {
     const bytes = Buffer.from(checksum, "base64");
@@ -45,6 +49,40 @@ function immichChecksumAsHex(checksum: string) {
   } catch {
     return null;
   }
+}
+
+function driveModifiedTimeDistanceMs(assetTime: string, driveTime?: string) {
+  if (!driveTime) return Number.POSITIVE_INFINITY;
+  const assetMs = Date.parse(assetTime);
+  const driveMs = Date.parse(driveTime);
+  if (!Number.isFinite(assetMs) || !Number.isFinite(driveMs)) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  const localParts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: process.env.MEDIA_TIME_ZONE ?? "America/Toronto",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(driveMs));
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(localParts.find((candidate) => candidate.type === type)?.value);
+  const driveLocalWallTimeMs = Date.UTC(
+    part("year"),
+    part("month") - 1,
+    part("day"),
+    part("hour"),
+    part("minute"),
+    part("second"),
+  );
+  return Math.min(
+    Math.abs(assetMs - driveMs),
+    Math.abs(assetMs - driveLocalWallTimeMs),
+  );
 }
 
 function selectDriveFilenameMatch(
@@ -58,7 +96,17 @@ function selectDriveFilenameMatch(
   const checksumMatches = lookup.matches.filter(
     (file) => file.sha1Checksum?.trim().toLocaleLowerCase() === checksum,
   );
-  if (checksumMatches.length === 0) return { file: null, detail: null };
+  if (checksumMatches.length === 0) {
+    const timestampMatches = lookup.matches.filter(
+      (file) => driveModifiedTimeDistanceMs(asset.fileCreatedAt, file.modifiedTime) <= 2_000,
+    );
+    return timestampMatches.length === 1
+      ? {
+          file: timestampMatches[0],
+          detail: `resolved ${lookup.matchCount} source-name matches by capture timestamp`,
+        }
+      : { file: null, detail: null };
+  }
 
   const orderedMatches = [...checksumMatches].sort((a, b) => {
     const aCreated = a.createdTime ?? a.modifiedTime ?? "9999";
@@ -153,24 +201,40 @@ async function canonicalizeDriveManagedTags(params: {
       .flatMap(drivePlacementTags)
       .map((value) => value.toLocaleLowerCase()),
   );
-  const managedTagIds = (asset.tags ?? [])
+  const canonicalTags = [
+    driveSourceTag(params.fileId),
+    ...(params.placement ? drivePlacementTags(params.placement) : []),
+  ];
+  const canonicalValues = new Set(
+    canonicalTags.map((value) => value.toLocaleLowerCase()),
+  );
+  const staleManagedTagIds = (asset.tags ?? [])
     .filter((tag) => [tag.name, tag.value].some((rawValue) => {
       const value = rawValue.trim().toLocaleLowerCase();
       return value.startsWith(DRIVE_SOURCE_TAG_PREFIX) ||
         /^placement:\d+$/.test(value) ||
         configuredPlacementValues.has(value);
     }))
+    .filter((tag) => ![tag.name, tag.value].some((rawValue) =>
+      canonicalValues.has(rawValue.trim().toLocaleLowerCase())))
     .map((tag) => tag.id);
 
-  if (managedTagIds.length > 0) {
-    await untagAssets([params.assetId], Array.from(new Set(managedTagIds)));
+  let verified = false;
+  let verificationError: unknown;
+  for (let attempt = 0; attempt < 2 && !verified; attempt += 1) {
+    await tagAsset(params.assetId, canonicalTags);
+    try {
+      await waitForAssetTags(params.assetId, canonicalTags);
+      verified = true;
+    } catch (error) {
+      verificationError = error;
+    }
   }
-  const canonicalTags = [
-    driveSourceTag(params.fileId),
-    ...(params.placement ? drivePlacementTags(params.placement) : []),
-  ];
-  await tagAsset(params.assetId, canonicalTags);
-  await waitForAssetTags(params.assetId, canonicalTags);
+  if (!verified) throw verificationError;
+
+  if (staleManagedTagIds.length > 0) {
+    await untagAssets([params.assetId], Array.from(new Set(staleManagedTagIds)));
+  }
 }
 
 function assetActivityId(asset: ImmichAsset) {
@@ -470,7 +534,7 @@ async function runBulkDriveLookup(client: GoogleDriveClient): Promise<DriveBulkL
             folderId,
             folderName: lookup.folderName,
             searchedFileName: lookup.filename,
-            matches: lookup.matches,
+            matches: reportedDriveMatches(lookup.matches),
             error: `Found ${lookup.matchCount} matching files in the site's Google Drive folder.`,
           });
           continue;
@@ -491,7 +555,7 @@ async function runBulkDriveLookup(client: GoogleDriveClient): Promise<DriveBulkL
             folderId,
             folderName: lookup.folderName,
             searchedFileName: lookup.filename,
-            matches: lookup.matches,
+            matches: reportedDriveMatches(lookup.matches),
             fileId: selection.file.id,
             driveFileName: assetDriveSourceIds(asset).length > 1
               ? `${selection.file.name} (replaced ${assetDriveSourceIds(asset).length} conflicting Drive IDs${selection.detail ? `; ${selection.detail}` : ""})`
@@ -509,7 +573,7 @@ async function runBulkDriveLookup(client: GoogleDriveClient): Promise<DriveBulkL
             folderId,
             folderName: lookup.folderName,
             searchedFileName: lookup.filename,
-            matches: lookup.matches,
+            matches: reportedDriveMatches(lookup.matches),
             error: (err as Error).message,
           });
         }
