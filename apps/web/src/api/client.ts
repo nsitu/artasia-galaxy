@@ -998,6 +998,11 @@ export interface DriveLookupResult {
   status: "linked" | "already-linked" | "not-found";
   fileId?: string;
   fileName?: string;
+  scope?: "site" | "project-documentation";
+  placementId?: number;
+  placementName?: string;
+  activityId?: number;
+  activityLabel?: string;
 }
 
 export async function lookupUploadAssetDriveSource(assetId: string): Promise<DriveLookupResult> {

@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   comparableMediaFilename,
   ensureDriveFileExtension,
+  inferActivityFromDriveFolders,
 } from "./googleDrive.service.js";
 
 test("adds a MIME-derived extension to a Drive filename without one", () => {
@@ -42,4 +43,25 @@ test("maps Atlas edit and trim derivatives back to their Drive source stem", () 
     comparableMediaFilename("Recording -artasia-trim.mp4"),
     "recording",
   );
+});
+
+test("infers an activity from a week subfolder using Import tab semantics", () => {
+  const activities = [
+    { id: 1, label: "Collage", week: 1 },
+    { id: 2, label: "Printmaking", week: 2 },
+  ];
+
+  assert.deepEqual(
+    inferActivityFromDriveFolders(["Participant uploads", "Week 02 - Prints"], activities),
+    activities[1],
+  );
+});
+
+test("does not infer an activity when the best folder match is ambiguous", () => {
+  const activities = [
+    { id: 1, label: "First activity", week: 3 },
+    { id: 2, label: "Second activity", week: 3 },
+  ];
+
+  assert.equal(inferActivityFromDriveFolders(["Week 3"], activities), null);
 });

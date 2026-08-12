@@ -104,12 +104,70 @@ export interface DriveFile {
   thumbnailLink?: string;
 }
 
-interface DriveFolder {
+export interface DriveFolder {
   id: string;
   name: string;
   mimeType: string;
   parents?: string[];
   driveId?: string;
+}
+
+export interface DriveActivityCandidate {
+  id: number;
+  label: string;
+  week?: number;
+}
+
+function integersIn(value: string) {
+  return (value.match(/\d+/g) ?? [])
+    .map(Number)
+    .filter((number) => Number.isSafeInteger(number));
+}
+
+function activityWeekNumbers(activity: DriveActivityCandidate) {
+  if (Number.isSafeInteger(activity.week) && (activity.week ?? 0) > 0) {
+    return [activity.week as number];
+  }
+  return integersIn(activity.label);
+}
+
+function folderActivityMatchScore(
+  folderName: string,
+  activity: DriveActivityCandidate,
+) {
+  const folderNumbers = new Set(integersIn(folderName));
+  let score = 0;
+  for (const week of activityWeekNumbers(activity)) {
+    if (!folderNumbers.has(week)) continue;
+    const explicitWeekPattern = new RegExp(`\\bweek\\s*0*${week}\\b`, "i");
+    score = Math.max(score, explicitWeekPattern.test(folderName) ? 2 : 1);
+  }
+  return score;
+}
+
+/** Mirror the Import tab's conservative activity-folder matching semantics. */
+export function inferActivityFromDriveFolders<T extends DriveActivityCandidate>(
+  folderNames: string[],
+  activities: T[],
+): T | null {
+  let bestScore = 0;
+  let bestMatches: T[] = [];
+  for (const activity of activities) {
+    const score = folderNames.reduce(
+      (highest, folderName) => Math.max(
+        highest,
+        folderActivityMatchScore(folderName, activity),
+      ),
+      0,
+    );
+    if (score > bestScore) {
+      bestScore = score;
+      bestMatches = [activity];
+    } else if (score > 0 && score === bestScore) {
+      bestMatches.push(activity);
+    }
+  }
+  return bestMatches.length === 1 ? bestMatches[0] : null;
 }
 
 export interface DriveFolderStats {
@@ -119,6 +177,11 @@ export interface DriveFolderStats {
   nestedFileCount: number;
   totalFileCount: number;
 }
+
+const PROJECT_SHARED_DRIVE_NAME =
+  process.env.GOOGLE_DRIVE_PROJECT_NAME?.trim() || "artasia 2026";
+const PROJECT_DOCUMENTATION_FOLDER_NAME =
+  process.env.GOOGLE_DRIVE_DOCUMENTATION_FOLDER_NAME?.trim() || "documentation";
 
 async function mapWithConcurrency<T, R>(
   values: T[],
@@ -397,6 +460,40 @@ export class GoogleDriveClient {
    */
   static isVideo(mimeType: string): boolean {
     return VIDEO_MIME_TYPES.includes(mimeType);
+  }
+
+  async getProjectDocumentationFolder(): Promise<DriveFolder> {
+    const normalizedProjectName = PROJECT_SHARED_DRIVE_NAME.toLocaleLowerCase();
+    const sharedDrives = await this.getSharedDrives();
+    const matchingDrives = sharedDrives.filter((drive) =>
+      drive.name.trim().toLocaleLowerCase().includes(normalizedProjectName),
+    );
+    if (matchingDrives.length !== 1) {
+      throw new Error(
+        matchingDrives.length === 0
+          ? `Google Drive project "${PROJECT_SHARED_DRIVE_NAME}" was not found.`
+          : `Multiple shared drives match project "${PROJECT_SHARED_DRIVE_NAME}".`,
+      );
+    }
+
+    const projectDrive = matchingDrives[0];
+    const rootFolders = await this.getFoldersInFolder(
+      projectDrive.id,
+      projectDrive.id,
+    );
+    const normalizedFolderName =
+      PROJECT_DOCUMENTATION_FOLDER_NAME.toLocaleLowerCase();
+    const matchingFolders = rootFolders.filter(
+      (folder) => folder.name.trim().toLocaleLowerCase() === normalizedFolderName,
+    );
+    if (matchingFolders.length !== 1) {
+      throw new Error(
+        matchingFolders.length === 0
+          ? `Project documentation folder "${PROJECT_DOCUMENTATION_FOLDER_NAME}" was not found.`
+          : `Multiple project folders are named "${PROJECT_DOCUMENTATION_FOLDER_NAME}".`,
+      );
+    }
+    return matchingFolders[0];
   }
 
   /**

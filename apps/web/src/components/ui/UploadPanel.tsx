@@ -592,7 +592,9 @@ export default function UploadPanel({
     if (mode !== "browse" && mode !== "upload" && mode !== "import") return;
 
     const params = new URLSearchParams(appSearch);
-    const requestedSiteId = Number(params.get("site"));
+    const requestedSite = params.get("site");
+    const requestedSiteId = Number(requestedSite);
+    const requestedUntagged = mode === "browse" && requestedSite === "untagged";
     const requestedActivityId = Number(params.get("activity"));
     const requestedStatus = params.get("status");
     const site = options.placements.find(
@@ -609,9 +611,9 @@ export default function UploadPanel({
     );
 
     setPlacementKey(site ? String(site.placement_id) : "");
-    setSiteScope(site ? "placement" : mode === "browse" ? "all" : "select");
-    setAssetMode("placements");
-    setActivityTagFilter(activity ? String(activity.id) : "");
+    setSiteScope(site ? "placement" : mode === "browse" && !requestedUntagged ? "all" : "select");
+    setAssetMode(requestedUntagged ? "untagged" : "placements");
+    setActivityTagFilter(!requestedUntagged && activity ? String(activity.id) : "");
     if (mode === "browse") {
       setBrowseAssetStatus(
         BROWSE_ASSET_STATUSES.some(
@@ -2843,21 +2845,51 @@ export default function UploadPanel({
       if (result.status === "not-found") {
         setNotice({
           tone: "warning",
-          message: `No matching file was found in this site's Google Drive folder for ${selectedAsset.fileName}.`,
+          message: selectedAsset.placement_id
+            ? `No matching file was found in this site's Google Drive folder for ${selectedAsset.fileName}.`
+            : `No matching file was found in the project Documentation folder for ${selectedAsset.fileName}.`,
         });
         return;
       }
       const driveFileId = result.fileId ?? selectedAsset.driveFileId ?? null;
+      const inferredPlacementId = result.placementId ?? selectedAsset.placement_id ?? null;
+      const inferredPlacementName = result.placementName ?? selectedAsset.placement_name ?? null;
+      const inferredActivityId = result.activityId ?? selectedAsset.activity_id ?? null;
+      const inferredActivityLabel = result.activityLabel ?? selectedAsset.activity_label ?? null;
       setSelectedAsset((current) =>
-        current?.id === selectedAsset.id ? { ...current, driveFileId } : current,
+        current?.id === selectedAsset.id
+          ? {
+              ...current,
+              driveFileId,
+              placement_id: inferredPlacementId,
+              placement_name: inferredPlacementName,
+              activity_id: inferredActivityId,
+              activity_label: inferredActivityLabel,
+            }
+          : current,
       );
       setPlacementAssets((current) => current.map((asset) =>
-        asset.id === selectedAsset.id ? { ...asset, driveFileId } : asset,
+        asset.id === selectedAsset.id
+          ? {
+              ...asset,
+              driveFileId,
+              placement_id: inferredPlacementId,
+              placement_name: inferredPlacementName,
+              activity_id: inferredActivityId,
+              activity_label: inferredActivityLabel,
+            }
+          : asset,
       ));
+      if (result.placementId) {
+        setManagePlacementKey(String(result.placementId));
+      }
+      if (result.activityId) {
+        setManageActivityTag(String(result.activityId));
+      }
       setNotice({
         tone: "success",
         message: result.status === "linked"
-          ? `Linked this asset to ${result.fileName ?? "its Google Drive source"}.`
+          ? `Linked this asset to ${result.fileName ?? "its Google Drive source"}${result.scope === "project-documentation" ? " from the project Documentation folder" : ""}${result.placementName ? ` and assigned it to ${result.placementName}` : ""}${result.activityLabel ? ` (${result.activityLabel})` : ""}.`
           : "This asset is already linked to its Google Drive source.",
       });
     } catch (err) {
@@ -5918,20 +5950,35 @@ export default function UploadPanel({
                   Artasia Site
                   <select
                     value={
-                      assetMode === "untagged" || !selectedPlacement
-                        ? ""
-                        : String(selectedPlacement.placement_id)
+                      assetMode === "untagged"
+                        ? "untagged"
+                        : selectedPlacement
+                          ? String(selectedPlacement.placement_id)
+                          : ""
                     }
                     onChange={(e) => {
                       const nextPlacementKey = e.target.value;
                       const nextParams = new URLSearchParams();
-                      if (nextPlacementKey) {
+                      if (nextPlacementKey === "untagged") {
+                        nextParams.set("site", "untagged");
+                      } else if (nextPlacementKey) {
                         nextParams.set("site", nextPlacementKey);
                       }
-                      if (activityTagFilter) {
+                      if (activityTagFilter && nextPlacementKey !== "untagged") {
                         nextParams.set("activity", activityTagFilter);
                       }
-                      if (!nextPlacementKey) {
+                      if (nextPlacementKey === "untagged") {
+                        setPlacementKey("");
+                        setSiteScope("select");
+                        setAssetMode("untagged");
+                        setUploaderKey("");
+                        setActivityTagFilter("");
+                        setBrowseContextFilter("all");
+                        setDeliveryDayFilter("");
+                        setTimeOfDayFilter("");
+                        setAgeRangeFilter("");
+                        setBrowsePartnerKey("");
+                      } else if (!nextPlacementKey) {
                         setPlacementKey("");
                         setSiteScope("all");
                         setAssetMode("placements");
@@ -5953,6 +6000,7 @@ export default function UploadPanel({
                     style={inputStyle}
                   >
                     <option value="">All Sites</option>
+                    <option value="untagged">No Site (Untagged)</option>
                     {browsePlacementOptions.map((placement) => (
                       <option
                         key={placement.placement_id}
@@ -6229,37 +6277,6 @@ export default function UploadPanel({
                 </div>
               )}
 
-              {workspaceMode === "browse" && (
-                <label style={labelStyle}>
-                  Assets
-                  <select
-                    value={assetMode}
-                    onChange={(e) => {
-                      const nextAssetMode = e.target.value as
-                        | "placements"
-                        | "untagged";
-                      setAssetMode(nextAssetMode);
-                      if (nextAssetMode === "untagged") {
-                        setUploaderKey("");
-                        setActivityTagFilter("");
-                        setBrowseContextFilter("all");
-                        setTimeOfDayFilter("");
-                        setAgeRangeFilter("");
-                        setBrowsePartnerKey("");
-                      }
-                      setPlacementKey("");
-                      setSiteScope("select");
-                      setSelectedAsset(null);
-                      setItems([]);
-                    }}
-                    style={inputStyle}
-                  >
-                    <option value="placements">Tagged assets</option>
-                    <option value="untagged">Untagged assets</option>
-                  </select>
-                </label>
-              )}
-
             </aside>
           )}
 
@@ -6405,7 +6422,7 @@ export default function UploadPanel({
                   {assetMode === "placements" ? (
                     renderSiteBreadcrumb("All Sites", browseBreadcrumbParents)
                   ) : (
-                    <h2 style={detailTitleStyle}>Assets</h2>
+                    <h2 style={detailTitleStyle}>No Site (Untagged)</h2>
                   )}
                   <div style={detailHeaderActionsStyle}>
                     <div style={countBadgeStyle}>

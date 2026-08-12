@@ -5,7 +5,9 @@ import {
   createDriveClient,
   ensureDriveFileExtension,
   GoogleDriveClient,
+  inferActivityFromDriveFolders,
   type DriveFile,
+  type DriveFolder,
 } from "../services/googleDrive.service.js";
 import {
   copyAssetRelationships,
@@ -22,7 +24,10 @@ import {
   updateAsset,
   type ImmichAsset,
 } from "../infra/ImmichClient.js";
-import { getUploadConfig } from "../services/uploadConfig.service.js";
+import {
+  getUploadConfig,
+  type ActivityConfig,
+} from "../services/uploadConfig.service.js";
 import { prepareAudioAsVideo } from "../services/audioToVideo.service.js";
 import { isAudioAsset, parseImmichDuration } from "../services/audioAsset.service.js";
 import { UPLOAD_LIMITS } from "../services/uploadLimits.js";
@@ -187,10 +192,46 @@ function drivePlacementTags(placement: DrivePlacement) {
   ].map((value) => value.trim()).filter(Boolean);
 }
 
+function inferPlacementFromDriveFilePath(params: {
+  path: DriveFolder[];
+  placements: DrivePlacement[];
+}) {
+  const pathFolderIds = new Set(params.path.map((folder) => folder.id));
+  const matches = params.placements.filter((placement) => {
+    const folderId = placement.google_drive_folder_id?.trim();
+    return Boolean(folderId && pathFolderIds.has(folderId));
+  });
+  if (matches.length === 0) return null;
+  if (matches.length > 1) {
+    throw new Error(
+      `The matched Drive file path contains folders assigned to multiple Artasia sites (${matches.map((placement) => placement.placement_name).join(", ")}).`,
+    );
+  }
+  return matches[0];
+}
+
+function inferActivityFromDriveFilePath(params: {
+  path: DriveFolder[];
+  placement: DrivePlacement | null;
+  activities: ActivityConfig[];
+}) {
+  const placementFolderId = params.placement?.google_drive_folder_id?.trim();
+  if (!placementFolderId) return null;
+  const placementFolderIndex = params.path.findIndex(
+    (folder) => folder.id === placementFolderId,
+  );
+  if (placementFolderIndex < 0) return null;
+  return inferActivityFromDriveFolders(
+    params.path.slice(placementFolderIndex + 1).map((folder) => folder.name),
+    params.activities,
+  );
+}
+
 async function canonicalizeDriveManagedTags(params: {
   assetId: string;
   fileId: string;
   placement: DrivePlacement | null;
+  activity?: ActivityConfig;
 }) {
   const [asset, config] = await Promise.all([
     getAsset(params.assetId),
@@ -204,16 +245,26 @@ async function canonicalizeDriveManagedTags(params: {
   const canonicalTags = [
     driveSourceTag(params.fileId),
     ...(params.placement ? drivePlacementTags(params.placement) : []),
+    ...(params.activity ? [`activity:${params.activity.id}`, params.activity.label] : []),
   ];
   const canonicalValues = new Set(
     canonicalTags.map((value) => value.toLocaleLowerCase()),
   );
+  const configuredActivityValues = params.activity
+    ? new Set(config.activities.flatMap((activity) => [
+        `activity:${activity.id}`,
+        activity.label,
+      ]).map((value) => value.trim().toLocaleLowerCase()))
+    : null;
   const staleManagedTagIds = (asset.tags ?? [])
     .filter((tag) => [tag.name, tag.value].some((rawValue) => {
       const value = rawValue.trim().toLocaleLowerCase();
       return value.startsWith(DRIVE_SOURCE_TAG_PREFIX) ||
         /^placement:\d+$/.test(value) ||
-        configuredPlacementValues.has(value);
+        configuredPlacementValues.has(value) ||
+        Boolean(configuredActivityValues && (
+          /^activity:\d+$/.test(value) || configuredActivityValues.has(value)
+        ));
     }))
     .filter((tag) => ![tag.name, tag.value].some((rawValue) =>
       canonicalValues.has(rawValue.trim().toLocaleLowerCase())))
@@ -1067,13 +1118,14 @@ router.post("/assets/:assetId/lookup", async (req: Request, res: Response) => {
     }
 
     const placementId = assetPlacementId(asset);
-    if (placementId == null) {
-      res.status(400).json({ error: "Assign this asset to one Artasia site before looking it up in Google Drive." });
-      return;
-    }
     const config = await getUploadConfig();
-    const placement = config.placements.find((candidate) => candidate.placement_id === placementId);
-    const folderId = placement?.google_drive_folder_id?.trim();
+    const placement = placementId == null
+      ? null
+      : config.placements.find((candidate) => candidate.placement_id === placementId) ?? null;
+    const globalFolder = placementId == null
+      ? await client.getProjectDocumentationFolder()
+      : null;
+    const folderId = placement?.google_drive_folder_id?.trim() ?? globalFolder?.id;
     if (!folderId) {
       res.status(400).json({ error: "This Artasia site does not have a Google Drive folder configured." });
       return;
@@ -1087,21 +1139,38 @@ router.post("/assets/:assetId/lookup", async (req: Request, res: Response) => {
     const selection = selectDriveFilenameMatch(asset, lookup);
     if (!selection.file) {
       res.status(409).json({
-        error: `Found ${lookup.matchCount} matching files in this site's Google Drive folder. The asset was not linked.`,
+        error: `Found ${lookup.matchCount} matching files in the ${placement ? "site's" : "project Documentation"} Google Drive folder. The asset was not linked.`,
       });
       return;
     }
 
+    const parentId = selection.file.parents?.[0];
+    const drivePath = parentId ? await client.getFolderPath(parentId) : [];
+    const resolvedPlacement = placement ?? inferPlacementFromDriveFilePath({
+      path: drivePath,
+      placements: config.placements,
+    });
+    const inferredActivity = inferActivityFromDriveFilePath({
+      path: drivePath,
+      placement: resolvedPlacement,
+      activities: config.activities,
+    });
     await canonicalizeDriveManagedTags({
       assetId: asset.id,
       fileId: selection.file.id,
-      placement: placement ?? null,
+      placement: resolvedPlacement,
+      ...(inferredActivity ? { activity: inferredActivity } : {}),
     });
     res.json({
       status: "linked",
       fileId: selection.file.id,
       fileName: selection.file.name,
       resolution: selection.detail,
+      scope: placement ? "site" : "project-documentation",
+      placementId: resolvedPlacement?.placement_id,
+      placementName: resolvedPlacement?.placement_name,
+      activityId: inferredActivity?.id,
+      activityLabel: inferredActivity?.label,
     });
   } catch (err) {
     res
