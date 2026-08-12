@@ -3442,6 +3442,23 @@ export default function UploadPanel({
     setSelectedDriveFiles(newSelection);
   }
 
+  function toggleAllDriveFiles() {
+    const visibleFileIds = driveFiles.map((file) => file.id);
+    if (visibleFileIds.length === 0) return;
+
+    setSelectedDriveFiles((current) => {
+      const next = new Set(current);
+      const allVisibleFilesSelected = visibleFileIds.every((fileId) =>
+        current.has(fileId),
+      );
+      for (const fileId of visibleFileIds) {
+        if (allVisibleFilesSelected) next.delete(fileId);
+        else next.add(fileId);
+      }
+      return next;
+    });
+  }
+
   function navigateToDriveFolder(folder: DriveFolder) {
     if (folder.id === "__my_drive__") {
       setDriveType("myDrive");
@@ -4044,6 +4061,9 @@ export default function UploadPanel({
   }
 
   function renderDriveBrowser() {
+    const allDriveFilesSelected =
+      driveFiles.length > 0 &&
+      driveFiles.every((file) => selectedDriveFiles.has(file.id));
     const googleDriveFolderUrl =
       selectedDriveFolder !== "root" &&
       selectedDriveFolder !== "__shared_drives__"
@@ -4260,23 +4280,35 @@ export default function UploadPanel({
             </button>
           )}
           {(driveFiles.length > 0 || selectedDriveFiles.size > 0) && (
-            <button
-              type="button"
-              onClick={syncSelectedDriveFiles}
-              disabled={
-                selectedDriveFiles.size === 0 ||
-                driveSyncing ||
-                !authUser?.authenticated
-              }
-              style={primaryActionButtonStyle}
-            >
-              {driveSyncing && <span aria-hidden="true" style={loadingSpinnerStyle} />}
-              {driveSyncing && driveSyncProgress
-                ? `Importing ${driveSyncProgress.current}/${driveSyncProgress.total} files`
-                : driveSyncing
-                  ? "Importing files"
-                  : `Import ${selectedDriveFiles.size} file${selectedDriveFiles.size === 1 ? "" : "s"}`}
-            </button>
+            <>
+              {driveFiles.length > 0 && (
+                <button
+                  type="button"
+                  onClick={toggleAllDriveFiles}
+                  disabled={driveLoading || driveSyncing}
+                  style={secondaryButtonStyle}
+                >
+                  {allDriveFilesSelected ? "Clear Selection" : "Select All"}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={syncSelectedDriveFiles}
+                disabled={
+                  selectedDriveFiles.size === 0 ||
+                  driveSyncing ||
+                  !authUser?.authenticated
+                }
+                style={primaryActionButtonStyle}
+              >
+                {driveSyncing && <span aria-hidden="true" style={loadingSpinnerStyle} />}
+                {driveSyncing && driveSyncProgress
+                  ? `Importing ${driveSyncProgress.current}/${driveSyncProgress.total} files`
+                  : driveSyncing
+                    ? "Importing files"
+                    : `Import ${selectedDriveFiles.size} file${selectedDriveFiles.size === 1 ? "" : "s"}`}
+              </button>
+            </>
           )}
         </div>
       </div>
