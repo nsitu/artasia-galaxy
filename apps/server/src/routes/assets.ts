@@ -1,8 +1,52 @@
 import { Router } from "express";
-import { getAssetOriginal, getAssetThumbnail } from "../infra/ImmichClient.js";
+import {
+  getAssetOriginal,
+  getAssetThumbnail,
+  regenerateAssetThumbnail,
+} from "../infra/ImmichClient.js";
 import { getWordPressConfig } from "../infra/WordPressClient.js";
 
 const router = Router();
+const THUMBNAIL_REGEN_COOLDOWN_MS = 5 * 60_000;
+const thumbnailRegenRequestedAt = new Map<string, number>();
+
+async function isMissingAssetMedia(response: Response) {
+  if (response.status !== 404) return false;
+
+  const body = await response.clone().text().catch(() => "");
+  try {
+    const parsed = JSON.parse(body) as { message?: unknown };
+    return parsed.message === "Asset media not found";
+  } catch {
+    return body.includes("Asset media not found");
+  }
+}
+
+async function requestThumbnailRegeneration(assetId: string, response: Response) {
+  if (!(await isMissingAssetMedia(response))) return;
+
+  const now = Date.now();
+  const lastRequestedAt = thumbnailRegenRequestedAt.get(assetId) ?? 0;
+  if (now - lastRequestedAt < THUMBNAIL_REGEN_COOLDOWN_MS) return;
+
+  thumbnailRegenRequestedAt.set(assetId, now);
+  if (thumbnailRegenRequestedAt.size > 5_000) {
+    for (const [cachedAssetId, requestedAt] of thumbnailRegenRequestedAt) {
+      if (now - requestedAt >= THUMBNAIL_REGEN_COOLDOWN_MS) {
+        thumbnailRegenRequestedAt.delete(cachedAssetId);
+      }
+    }
+  }
+
+  try {
+    await regenerateAssetThumbnail(assetId);
+    console.warn(`[thumbnail] ${assetId}: missing media; regeneration queued`);
+  } catch (error) {
+    console.error(
+      `[thumbnail] ${assetId}: failed to queue regeneration: ${(error as Error).message}`,
+    );
+  }
+}
 
 async function getAssetThumbnailWithFallback(
   assetId: string,
@@ -10,7 +54,10 @@ async function getAssetThumbnailWithFallback(
   edited: boolean,
 ) {
   const response = await getAssetThumbnail(assetId, size, { edited });
-  if (!edited || response.ok) return response;
+  if (!edited || response.ok) {
+    if (!response.ok) await requestThumbnailRegeneration(assetId, response);
+    return response;
+  }
 
   await response.body?.cancel().catch(() => undefined);
   const fallback = await getAssetThumbnail(assetId, size);
@@ -18,6 +65,8 @@ async function getAssetThumbnailWithFallback(
     console.warn(
       `[${size}] ${assetId}: edited rendition unavailable; using original thumbnail`,
     );
+  } else {
+    await requestThumbnailRegeneration(assetId, fallback);
   }
   return fallback;
 }

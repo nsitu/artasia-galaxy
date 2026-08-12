@@ -143,6 +143,21 @@ export async function getAssetThumbnail(
   );
 }
 
+export async function regenerateAssetThumbnail(assetId: string): Promise<void> {
+  if (!isValidUUID(assetId)) {
+    throw new Error(`Cannot regenerate thumbnail for invalid asset ID: ${assetId}`);
+  }
+
+  await immichRequest("/assets/jobs", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      assetIds: [assetId],
+      name: "regenerate-thumbnail",
+    }),
+  });
+}
+
 export async function getAssetOriginal(
   assetId: string,
   options?: { range?: string; allowErrorStatus?: boolean },

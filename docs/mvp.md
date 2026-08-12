@@ -167,6 +167,7 @@ The Artasia server-side Immich API key must have these Immich permissions:
 | `asset.read` | Query assets from the `Published` album for the public gallery. |
 | `asset.view` | Proxy thumbnails and previews. |
 | `asset.download` | Proxy original assets if needed. |
+| `job.create` | Regenerate a missing asset thumbnail when Atlas receives an Immich `Asset media not found` response. |
 | `tag.read` | Find existing activity, partner, and site tags. |
 | `tag.create` | Create missing activity, partner, and site tags. |
 | `tag.asset` | Attach tags to uploaded assets. |

@@ -3798,13 +3798,14 @@ export default function UploadPanel({
               style={driveFileCheckboxStyle}
             />
           )}
-          <img
+          <RetryableUploadThumbnail
+            assetId={asset.id}
             src={mediaUrl(asset.thumbnailUrl, asset.id)}
-            alt=""
-            style={{
+            imageStyle={{
               ...assetImageStyle,
               ...adjustmentFilterStyle(asset.adjustments),
             }}
+            placeholderStyle={assetThumbnailPlaceholderStyle}
           />
           <span style={assetBadgeRowStyle}>
             {asset.archived ? (
@@ -7492,6 +7493,15 @@ const assetImageStyle: React.CSSProperties = {
   objectFit: "cover",
   display: "block",
   background: "#0c0e13",
+};
+
+const assetThumbnailPlaceholderStyle: React.CSSProperties = {
+  ...assetImageStyle,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  color: "#9aa4b5",
+  fontSize: 12,
 };
 
 const archivedAssetBadgeStyle: React.CSSProperties = {

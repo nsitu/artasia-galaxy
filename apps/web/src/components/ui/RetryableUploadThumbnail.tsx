@@ -4,12 +4,14 @@ const THUMBNAIL_RETRY_DELAYS_MS = [1500, 3000, 6000, 10000, 15000];
 
 interface RetryableUploadThumbnailProps {
   assetId: string;
+  src?: string;
   imageStyle: CSSProperties;
   placeholderStyle: CSSProperties;
 }
 
 export default function RetryableUploadThumbnail({
   assetId,
+  src,
   imageStyle,
   placeholderStyle,
 }: RetryableUploadThumbnailProps) {
@@ -35,7 +37,8 @@ export default function RetryableUploadThumbnail({
     return () => window.clearTimeout(timeoutId);
   }, [attempt, waiting]);
 
-  const src = `/api/v1/assets/${assetId}/thumbnail?v=${encodeURIComponent(assetId)}&thumbnailAttempt=${attempt}`;
+  const baseSrc = src ?? `/api/v1/assets/${assetId}/thumbnail?v=${encodeURIComponent(assetId)}`;
+  const retrySrc = `${baseSrc}${baseSrc.includes("?") ? "&" : "?"}thumbnailAttempt=${attempt}`;
 
   return (
     <>
@@ -47,7 +50,7 @@ export default function RetryableUploadThumbnail({
       {!waiting && (
         <img
           key={`${assetId}-${attempt}`}
-          src={src}
+          src={retrySrc}
           alt=""
           style={{
             ...imageStyle,
