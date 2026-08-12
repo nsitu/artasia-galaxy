@@ -131,6 +131,19 @@ function activityWeekNumbers(activity: DriveActivityCandidate) {
   return integersIn(activity.label);
 }
 
+function escapeDriveQueryValue(value: string) {
+  return value.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
+function driveFilenameSearchStem(filename: string) {
+  const trimmed = filename.trim();
+  const extension = extname(trimmed);
+  const stem = COMPARABLE_MEDIA_EXTENSIONS.has(extension.toLocaleLowerCase())
+    ? trimmed.slice(0, -extension.length)
+    : trimmed;
+  return stem.replace(/(?:\s*-\s*artasia-(?:edit|trim))+$/gi, "").trim();
+}
+
 function folderActivityMatchScore(
   folderName: string,
   activity: DriveActivityCandidate,
@@ -205,6 +218,7 @@ async function mapWithConcurrency<T, R>(
 
 export class GoogleDriveClient {
   private drive: drive_v3.Drive;
+  private folderCache = new Map<string, Promise<DriveFolder>>();
 
   constructor(refreshToken: string, clientId: string, clientSecret: string) {
     const auth = new OAuth2Client({
@@ -506,9 +520,52 @@ export class GoogleDriveClient {
     matches: DriveFile[];
     matchCount: number;
   }> {
-    return (await this.findUniqueFilesInFolderTree(folderId, [filename]))[0] ?? {
-      matches: [],
-      matchCount: 0,
+    const rootFolder = await this.getFolder(folderId);
+    const driveId = rootFolder.driveId;
+    const searchStem = driveFilenameSearchStem(filename);
+    if (!searchStem) return { matches: [], matchCount: 0 };
+
+    const supportedTypesQuery = `(${SUPPORTED_MIME_TYPES.map(
+      (mime) => `mimeType = '${mime}'`,
+    ).join(" or ")})`;
+    const listParams: drive_v3.Params$Resource$Files$List = {
+      q: `(name contains '${escapeDriveQueryValue(searchStem)}' or fullText contains '${escapeDriveQueryValue(searchStem)}') and trashed = false and ${supportedTypesQuery}`,
+      pageSize: 1000,
+      fields: "nextPageToken,files(id,name,mimeType,size,createdTime,modifiedTime,md5Checksum,sha1Checksum,parents,webViewLink,thumbnailLink)",
+    };
+    if (driveId) {
+      listParams.corpora = "drive";
+      listParams.driveId = driveId;
+      listParams.includeItemsFromAllDrives = true;
+      listParams.supportsAllDrives = true;
+    } else {
+      listParams.spaces = "drive";
+    }
+
+    const candidates: DriveFile[] = [];
+    do {
+      const response = await this.drive.files.list(listParams);
+      for (const rawFile of response.data.files ?? []) {
+        const file = rawFile as DriveFile;
+        const comparableName = ensureDriveFileExtension(file.name, file.mimeType);
+        if (comparableMediaFilename(comparableName) === comparableMediaFilename(filename)) {
+          candidates.push(file);
+        }
+      }
+      listParams.pageToken = response.data.nextPageToken ?? undefined;
+    } while (listParams.pageToken);
+
+    const candidatePaths = await mapWithConcurrency(candidates, 6, async (file) => {
+      const parentId = file.parents?.[0];
+      return parentId ? this.getFolderPath(parentId) : [];
+    });
+    const matches = candidates.filter((_, index) =>
+      candidatePaths[index].some((folder) => folder.id === folderId),
+    );
+    return {
+      ...(matches.length === 1 ? { file: matches[0] } : {}),
+      matches,
+      matchCount: matches.length,
     };
   }
 
@@ -600,17 +657,27 @@ export class GoogleDriveClient {
   }
 
   async getFolder(folderId: string): Promise<DriveFolder> {
-    const res = await this.drive.files.get({
-      fileId: folderId,
-      fields: "id,name,mimeType,parents,driveId",
-      supportsAllDrives: true,
-    });
+    const cached = this.folderCache.get(folderId);
+    if (cached) return cached;
 
-    if (!res.data.id || res.data.mimeType !== GOOGLE_MIME_TYPE_FOLDER) {
-      throw new Error(`Google Drive folder ${folderId} not found`);
+    const request = (async () => {
+      const res = await this.drive.files.get({
+        fileId: folderId,
+        fields: "id,name,mimeType,parents,driveId",
+        supportsAllDrives: true,
+      });
+      if (!res.data.id || res.data.mimeType !== GOOGLE_MIME_TYPE_FOLDER) {
+        throw new Error(`Google Drive folder ${folderId} not found`);
+      }
+      return res.data as DriveFolder;
+    })();
+    this.folderCache.set(folderId, request);
+    try {
+      return await request;
+    } catch (error) {
+      this.folderCache.delete(folderId);
+      throw error;
     }
-
-    return res.data as DriveFolder;
   }
 
   async getFolderPath(folderId: string): Promise<DriveFolder[]> {
