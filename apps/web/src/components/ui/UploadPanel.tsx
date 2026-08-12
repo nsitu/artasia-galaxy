@@ -95,6 +95,7 @@ type DeliveryDayFilter =
 type SiteScope = "select" | "all" | "placement";
 type SiteSort = "alphabetical" | "published-assets";
 type WorkspaceMode = "sites" | "browse" | "edit" | "upload" | "import";
+type BrowseAssetStatus = "draft" | "published" | "archived";
 type PlacementMetaLine = {
   text: string;
   icon?: string;
@@ -151,6 +152,14 @@ const UPLOAD_ACCEPT_TYPES = "image/*,video/*,.heic,.heif,image/heic,image/heif";
 const DEFAULT_SHARED_DRIVE_NAME = "artasia 2026";
 const DEFAULT_SHARED_DRIVE_FOLDER = "documentation";
 const GLOBAL_AUDIO_PLACEMENT_ID = 21639;
+const BROWSE_ASSET_STATUSES: Array<{
+  value: BrowseAssetStatus;
+  label: string;
+}> = [
+  { value: "draft", label: "Draft" },
+  { value: "published", label: "Published" },
+  { value: "archived", label: "Archived" },
+];
 const coordinateInputValue = (value?: number | null) =>
   Number.isFinite(value) ? String(value) : "";
 const DELIVERY_DAY_OPTIONS: Array<{ value: DeliveryDayFilter; label: string }> =
@@ -188,7 +197,18 @@ export default function UploadPanel({
   const [assetMode, setAssetMode] = useState<"placements" | "untagged">(
     "placements",
   );
-  const [showArchivedAssets, setShowArchivedAssets] = useState(true);
+  const [browseAssetStatus, setBrowseAssetStatus] = useState<BrowseAssetStatus>(
+    () => {
+      const requestedStatus = new URLSearchParams(
+        adminSearch ?? window.location.search,
+      ).get("status");
+      return BROWSE_ASSET_STATUSES.some(
+        (status) => status.value === requestedStatus,
+      )
+        ? requestedStatus as BrowseAssetStatus
+        : "draft";
+    },
+  );
   const [siteScope, setSiteScope] = useState<SiteScope>("select");
   const [siteSort, setSiteSort] = useState<SiteSort>("published-assets");
   const [siteActivityStats, setSiteActivityStats] = useState<
@@ -200,6 +220,7 @@ export default function UploadPanel({
   const [selectedAsset, setSelectedAsset] = useState<PlacementAsset | null>(
     null,
   );
+  const [editNavigationAssets, setEditNavigationAssets] = useState<PlacementAsset[]>([]);
   const [managePlacementKey, setManagePlacementKey] = useState("");
   const [manageUploaderKey, setManageUploaderKey] = useState("");
   const [manageActivityTag, setManageActivityTag] = useState("");
@@ -494,6 +515,7 @@ export default function UploadPanel({
     const params = new URLSearchParams(appSearch);
     const requestedSiteId = Number(params.get("site"));
     const requestedActivityId = Number(params.get("activity"));
+    const requestedStatus = params.get("status");
     const site = options.placements.find(
       (placement) =>
         params.has("site") &&
@@ -511,7 +533,17 @@ export default function UploadPanel({
     setSiteScope(site ? "placement" : mode === "browse" ? "all" : "select");
     setAssetMode("placements");
     setActivityTagFilter(activity ? String(activity.id) : "");
+    if (mode === "browse") {
+      setBrowseAssetStatus(
+        BROWSE_ASSET_STATUSES.some(
+          (status) => status.value === requestedStatus,
+        )
+          ? requestedStatus as BrowseAssetStatus
+          : "draft",
+      );
+    }
     setSelectedAsset(null);
+    setSelectedBrowseAssetIds(new Set());
     setItems([]);
     setNotice(null);
     setError(null);
@@ -596,6 +628,33 @@ export default function UploadPanel({
       cancelled = true;
     };
   }, [initialAssetId, authUser?.authenticated, selectedAsset?.id]);
+
+  useEffect(() => {
+    if (
+      workspaceMode !== "edit" ||
+      selectedAsset?.type !== "IMAGE" ||
+      !selectedAsset.placement_id
+    ) {
+      setEditNavigationAssets([]);
+      return;
+    }
+
+    let cancelled = false;
+    setEditNavigationAssets([]);
+    fetchPlacementAssets(selectedAsset.placement_id)
+      .then((assets) => {
+        if (!cancelled) setEditNavigationAssets(assets);
+      })
+      .catch((navigationError) => {
+        console.warn(
+          `[asset-navigation] ${(navigationError as Error).message}`,
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedAsset?.placement_id, selectedAsset?.type, workspaceMode]);
 
   function formatBytes(bytes: number) {
     if (bytes < 1024) return `${bytes} B`;
@@ -1060,12 +1119,28 @@ export default function UploadPanel({
     );
   }, [activityTagFilter, options]);
 
+  const browseAssetStatusCounts = useMemo(
+    () => ({
+      draft: placementAssets.filter(
+        (asset) => !asset.published && !asset.archived,
+      ).length,
+      published: placementAssets.filter(
+        (asset) => Boolean(asset.published) && !asset.archived,
+      ).length,
+      archived: placementAssets.filter((asset) => Boolean(asset.archived)).length,
+    }),
+    [placementAssets],
+  );
+
   const displayedPlacementAssets = useMemo(
-    () =>
-      workspaceMode === "browse" && !showArchivedAssets
-        ? placementAssets.filter((asset) => !asset.archived)
-        : placementAssets,
-    [placementAssets, showArchivedAssets, workspaceMode],
+    () => placementAssets.filter((asset) => {
+      if (browseAssetStatus === "archived") return Boolean(asset.archived);
+      if (browseAssetStatus === "published") {
+        return Boolean(asset.published) && !asset.archived;
+      }
+      return !asset.published && !asset.archived;
+    }),
+    [browseAssetStatus, placementAssets],
   );
 
   useEffect(() => {
@@ -1842,12 +1917,33 @@ export default function UploadPanel({
     ) {
       nextUrl.searchParams.set("site", placementKey);
     }
+    if (
+      nextUrl.pathname === "/admin/browse" &&
+      browseAssetStatus !== "draft" &&
+      !nextUrl.searchParams.has("status")
+    ) {
+      nextUrl.searchParams.set("status", browseAssetStatus);
+    }
     const nextPath = `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`;
     const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
     if (currentPath === nextPath) return;
     if (replace) window.history.replaceState(null, "", nextPath);
     else window.history.pushState(null, "", nextPath);
     window.dispatchEvent(new PopStateEvent("popstate"));
+  }
+
+  function selectBrowseAssetStatus(status: BrowseAssetStatus) {
+    setBrowseAssetStatus(status);
+    setSelectedBrowseAssetIds(new Set());
+
+    const nextUrl = new URL(window.location.href);
+    if (status === "draft") nextUrl.searchParams.delete("status");
+    else nextUrl.searchParams.set("status", status);
+    window.history.replaceState(
+      null,
+      "",
+      `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`,
+    );
   }
 
   function openAssetManager(asset: PlacementAsset, updateUrl = true) {
@@ -3488,29 +3584,6 @@ export default function UploadPanel({
           <span>Loading uploads...</span>
         </div>
       );
-    if (displayedPlacementAssets.length === 0)
-      return <div style={emptyStateStyle}>{emptyMessage}</div>;
-
-    const groups = [
-      {
-        label: "Draft",
-        assets: displayedPlacementAssets.filter(
-          (asset) => !asset.published && !asset.archived,
-        ),
-      },
-      {
-        label: "Published",
-        assets: displayedPlacementAssets.filter(
-          (asset) => Boolean(asset.published) && !asset.archived,
-        ),
-      },
-      {
-        label: "Archived",
-        assets: displayedPlacementAssets.filter(
-          (asset) => Boolean(asset.archived),
-        ),
-      },
-    ].filter((group) => group.assets.length > 0);
     const selectedDraftAssetIds = displayedPlacementAssets
       .filter(
         (asset) =>
@@ -3519,27 +3592,81 @@ export default function UploadPanel({
           !asset.archived,
       )
       .map((asset) => asset.id);
+    const activeStatusLabel = BROWSE_ASSET_STATUSES.find(
+      (status) => status.value === browseAssetStatus,
+    )?.label ?? "Draft";
+
+    function handleStatusTabKeyDown(
+      event: React.KeyboardEvent<HTMLButtonElement>,
+      statusIndex: number,
+    ) {
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      event.preventDefault();
+      const offset = event.key === "ArrowLeft" ? -1 : 1;
+      const nextIndex =
+        (statusIndex + offset + BROWSE_ASSET_STATUSES.length) %
+        BROWSE_ASSET_STATUSES.length;
+      const nextStatus = BROWSE_ASSET_STATUSES[nextIndex].value;
+      selectBrowseAssetStatus(nextStatus);
+      window.requestAnimationFrame(() => {
+        document.getElementById(`atlas-browse-status-${nextStatus}`)?.focus();
+      });
+    }
 
     return (
-      <div style={assetGroupsStyle}>
+      <div>
+        <div
+          className="atlas-browse-status-tabs"
+          role="tablist"
+          aria-label="Asset status"
+          style={browseStatusTabsStyle}
+        >
+          {BROWSE_ASSET_STATUSES.map((status, statusIndex) => {
+            const active = browseAssetStatus === status.value;
+            return (
+              <button
+                key={status.value}
+                id={`atlas-browse-status-${status.value}`}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                aria-controls="atlas-browse-status-panel"
+                tabIndex={active ? 0 : -1}
+                onClick={() => selectBrowseAssetStatus(status.value)}
+                onKeyDown={(event) => handleStatusTabKeyDown(event, statusIndex)}
+                style={{
+                  ...browseStatusTabStyle,
+                  ...(active ? browseStatusTabActiveStyle : {}),
+                }}
+              >
+                <span>{status.label}</span>
+                <span style={browseStatusCountStyle}>
+                  {browseAssetStatusCounts[status.value]}
+                </span>
+              </button>
+            );
+          })}
+        </div>
         {selectedBrowseAssetIds.size > 0 && (
           <div style={browseSelectionBarStyle}>
             <span>
               {selectedBrowseAssetIds.size} asset{selectedBrowseAssetIds.size === 1 ? "" : "s"} selected
             </span>
             <div style={detailHeaderActionsStyle}>
-              <button
-                type="button"
-                onClick={() => void publishBrowseAssets(selectedDraftAssetIds)}
-                disabled={
-                  selectedDraftAssetIds.length === 0 ||
-                  publishingBrowseAssets ||
-                  archivingBrowseAssets
-                }
-                style={primaryActionButtonStyle}
-              >
-                {publishingBrowseAssets ? "Publishing..." : "Publish selection"}
-              </button>
+              {browseAssetStatus === "draft" && (
+                <button
+                  type="button"
+                  onClick={() => void publishBrowseAssets(selectedDraftAssetIds)}
+                  disabled={
+                    selectedDraftAssetIds.length === 0 ||
+                    publishingBrowseAssets ||
+                    archivingBrowseAssets
+                  }
+                  style={primaryActionButtonStyle}
+                >
+                  {publishingBrowseAssets ? "Publishing..." : "Publish selection"}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => void archiveBrowseAssets(Array.from(selectedBrowseAssetIds))}
@@ -3551,17 +3678,23 @@ export default function UploadPanel({
             </div>
           </div>
         )}
-        {groups.map((group) => (
-          <section key={group.label} style={assetGroupStyle}>
-            <h3 style={assetGroupHeadingStyle}>
-              <span>{group.label}</span>
-              <span style={assetGroupCountStyle}>{group.assets.length}</span>
-            </h3>
+        <div
+          id="atlas-browse-status-panel"
+          role="tabpanel"
+          aria-labelledby={`atlas-browse-status-${browseAssetStatus}`}
+        >
+          {displayedPlacementAssets.length > 0 ? (
             <div style={assetGridStyle}>
-              {group.assets.map(renderAssetCard)}
+              {displayedPlacementAssets.map(renderAssetCard)}
             </div>
-          </section>
-        ))}
+          ) : (
+            <div style={emptyStateStyle}>
+              {placementAssets.length === 0
+                ? emptyMessage
+                : `No ${activeStatusLabel.toLowerCase()} uploads match the current filters.`}
+            </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -4227,6 +4360,31 @@ export default function UploadPanel({
     const assignedPlacement = options?.placements.find(
       (placement) => placement.placement_id === selectedAsset.placement_id,
     );
+    const navigationSource = editNavigationAssets.length > 0
+      ? editNavigationAssets
+      : placementAssets;
+    const editableImages = navigationSource.filter(
+      (asset) =>
+        asset.type === "IMAGE" &&
+        asset.placement_id === selectedAsset.placement_id,
+    );
+    const selectedImageIndex = editableImages.findIndex(
+      (asset) => asset.id === selectedAsset.id,
+    );
+    const previousImage = selectedImageIndex > 0
+      ? editableImages[selectedImageIndex - 1]
+      : null;
+    const nextImage =
+      selectedImageIndex >= 0 && selectedImageIndex < editableImages.length - 1
+        ? editableImages[selectedImageIndex + 1]
+        : null;
+    const assetNavigationBusy =
+      savingAsset ||
+      deletingAsset ||
+      cropSaving ||
+      adjustmentsSaving ||
+      captionSaving ||
+      Boolean(driveAssetAction);
     const placementChanged =
       Boolean(managePlacementKey) &&
       managePlacementKey !==
@@ -4524,6 +4682,44 @@ export default function UploadPanel({
           <div style={manageHeaderStyle}>
             <h2 style={assetHeadingStyle}>{selectedAsset.fileName}</h2>
             <div style={detailHeaderActionsStyle}>
+              {selectedAsset.type === "IMAGE" && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => previousImage && openAssetManager(previousImage)}
+                    disabled={!previousImage || assetNavigationBusy}
+                    aria-label="Edit previous image"
+                    title="Previous image"
+                    style={{
+                      ...assetNavigationButtonStyle,
+                      ...(!previousImage || assetNavigationBusy
+                        ? assetNavigationButtonDisabledStyle
+                        : {}),
+                    }}
+                  >
+                    <span style={assetNavigationIconStyle} aria-hidden="true">
+                      arrow_back
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => nextImage && openAssetManager(nextImage)}
+                    disabled={!nextImage || assetNavigationBusy}
+                    aria-label="Edit next image"
+                    title="Next image"
+                    style={{
+                      ...assetNavigationButtonStyle,
+                      ...(!nextImage || assetNavigationBusy
+                        ? assetNavigationButtonDisabledStyle
+                        : {}),
+                    }}
+                  >
+                    <span style={assetNavigationIconStyle} aria-hidden="true">
+                      arrow_forward
+                    </span>
+                  </button>
+                </>
+              )}
               {assignedPlacement && (
                 <a
                   href={placementViewerUrl(assignedPlacement)}
@@ -5020,6 +5216,12 @@ export default function UploadPanel({
             }
 
             .atlas-workspace-tabs {
+              overflow-x: auto !important;
+              overflow-y: hidden !important;
+              -webkit-overflow-scrolling: touch;
+            }
+
+            .atlas-browse-status-tabs {
               overflow-x: auto !important;
               overflow-y: hidden !important;
               -webkit-overflow-scrolling: touch;
@@ -5630,36 +5832,6 @@ export default function UploadPanel({
                 </label>
               )}
 
-              {workspaceMode === "browse" && (
-                <div style={gpsToggleRowStyle}>
-                  <span style={gpsToggleLabelStyle}>Show archived assets</span>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={showArchivedAssets}
-                    aria-label="Show archived assets"
-                    onClick={() =>
-                      setShowArchivedAssets((current) => !current)
-                    }
-                    style={{
-                      ...gpsToggleTrackStyle,
-                      ...(showArchivedAssets
-                        ? gpsToggleTrackEnabledStyle
-                        : {}),
-                    }}
-                  >
-                    <span
-                      aria-hidden="true"
-                      style={{
-                        ...gpsToggleThumbStyle,
-                        ...(showArchivedAssets
-                          ? gpsToggleThumbEnabledStyle
-                          : {}),
-                      }}
-                    />
-                  </button>
-                </div>
-              )}
             </aside>
           )}
 
@@ -5783,8 +5955,8 @@ export default function UploadPanel({
                       View
                     </a>
                     <div style={countBadgeStyle}>
-                      {assetsLoading ? "..." : displayedPlacementAssets.length} upload
-                      {displayedPlacementAssets.length === 1 ? "" : "s"}
+                      {assetsLoading ? "..." : placementAssets.length} upload
+                      {placementAssets.length === 1 ? "" : "s"}
                     </div>
                     {renderDriveMaintenanceButton()}
                     <button
@@ -5809,8 +5981,8 @@ export default function UploadPanel({
                   )}
                   <div style={detailHeaderActionsStyle}>
                     <div style={countBadgeStyle}>
-                      {assetsLoading ? "..." : displayedPlacementAssets.length} upload
-                      {displayedPlacementAssets.length === 1 ? "" : "s"}
+                      {assetsLoading ? "..." : placementAssets.length} upload
+                      {placementAssets.length === 1 ? "" : "s"}
                     </div>
                     {renderDriveMaintenanceButton()}
                     <button
@@ -6193,6 +6365,28 @@ const siteActionButtonStyle: React.CSSProperties = {
 const siteActionLinkStyle: React.CSSProperties = {
   ...siteActionButtonStyle,
   textDecoration: "none",
+};
+
+const assetNavigationButtonStyle: React.CSSProperties = {
+  ...siteActionButtonStyle,
+  flex: "0 0 32px",
+  width: 32,
+  minWidth: 32,
+  padding: 0,
+};
+
+const assetNavigationIconStyle: React.CSSProperties = {
+  fontFamily: "'Material Symbols Outlined'",
+  fontSize: 20,
+  fontWeight: 400,
+  lineHeight: 1,
+  fontStyle: "normal",
+  fontVariationSettings: "'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 20",
+};
+
+const assetNavigationButtonDisabledStyle: React.CSSProperties = {
+  opacity: 0.35,
+  cursor: "default",
 };
 
 const clearFiltersButtonStyle: React.CSSProperties = {
@@ -6828,27 +7022,36 @@ const assetGridStyle: React.CSSProperties = {
   gap: 10,
 };
 
-const assetGroupsStyle: React.CSSProperties = {
-  display: "grid",
-  gap: 26,
-};
-
-const assetGroupStyle: React.CSSProperties = {
-  display: "grid",
-  gap: 10,
-};
-
-const assetGroupHeadingStyle: React.CSSProperties = {
+const browseStatusTabsStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
-  gap: 8,
-  margin: 0,
-  color: "#e5e7eb",
-  fontSize: 14,
-  fontWeight: 700,
+  gap: 4,
+  marginBottom: 16,
+  borderBottom: "1px solid rgba(255,255,255,0.14)",
 };
 
-const assetGroupCountStyle: React.CSSProperties = {
+const browseStatusTabStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 7,
+  flex: "0 0 auto",
+  padding: "9px 12px",
+  background: "transparent",
+  color: "#9aa3b3",
+  border: 0,
+  borderBottom: "2px solid transparent",
+  cursor: "pointer",
+  font: "inherit",
+  fontSize: 13,
+  fontWeight: 600,
+};
+
+const browseStatusTabActiveStyle: React.CSSProperties = {
+  color: "#d8e7ff",
+  borderBottomColor: "#d8e7ff",
+};
+
+const browseStatusCountStyle: React.CSSProperties = {
   display: "inline-grid",
   placeItems: "center",
   minWidth: 20,

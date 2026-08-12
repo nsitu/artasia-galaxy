@@ -833,44 +833,6 @@ export default function ArtScene() {
           >
             <div style={photoLightboxMetadataHeaderStyle}>
               <div style={photoLightboxTitleStyle}>{selectedPhoto.fileName}</div>
-              <a
-                href={`/api/v1/assets/${selectedPhoto.id}/original`}
-                download={selectedPhoto.fileName}
-                aria-label={`Download original asset: ${selectedPhoto.fileName}`}
-                title="Download original asset"
-                style={photoLightboxDownloadLinkStyle}
-              >
-                <svg viewBox="0 0 16 16" aria-hidden="true" style={photoLightboxDownloadIconStyle}>
-                  <path
-                    d="M8 2.5v7m-3-3 3 3 3-3M3 12.5h10"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                <span>Download</span>
-              </a>
-              <button
-                type="button"
-                aria-expanded={lightboxMetadataExpanded}
-                aria-controls="atlas-lightbox-caption-details"
-                aria-label={lightboxMetadataExpanded ? "Collapse asset details" : "Expand asset details"}
-                onClick={() => setLightboxMetadataExpanded((current) => !current)}
-                style={photoLightboxMetadataToggleStyle}
-              >
-                <svg viewBox="0 0 16 16" aria-hidden="true" style={photoLightboxMetadataChevronStyle}>
-                  <path
-                    d={lightboxMetadataExpanded ? "m3 6 5 5 5-5" : "m3 10 5-5 5 5"}
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
             </div>
             {lightboxMetadataExpanded && (
               <div id="atlas-lightbox-caption-details" style={photoLightboxMetadataBodyStyle}>
@@ -921,17 +883,67 @@ export default function ArtScene() {
                 </button>
               </div>
             )}
-            {authUser?.authenticated && (
-              <a
-                href={`/edit/${selectedPhoto.id}`}
-                style={photoLightboxEditLinkStyle}
-                onClick={(event) => event.stopPropagation()}
-              >
-                Edit
-              </a>
-            )}
               </div>
             )}
+            <div style={photoLightboxActionRowStyle}>
+              <a
+                href={`/api/v1/assets/${selectedPhoto.id}/original`}
+                download={selectedPhoto.fileName}
+                aria-label={`Download original asset: ${selectedPhoto.fileName}`}
+                title="Download original asset"
+                style={photoLightboxActionLinkStyle}
+              >
+                <svg viewBox="0 0 16 16" aria-hidden="true" style={photoLightboxActionIconStyle}>
+                  <path
+                    d="M8 2.5v7m-3-3 3 3 3-3M3 12.5h10"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <span>Download</span>
+              </a>
+              {authUser?.authenticated && (
+                <a
+                  href={`/edit/${selectedPhoto.id}`}
+                  aria-label={`Edit asset: ${selectedPhoto.fileName}`}
+                  style={photoLightboxActionLinkStyle}
+                >
+                  <svg viewBox="0 0 16 16" aria-hidden="true" style={photoLightboxActionIconStyle}>
+                    <path
+                      d="m3 11.5-.5 2 2-.5 7.6-7.6-1.5-1.5L3 11.5Zm6.6-6.6 1.5 1.5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  <span>Edit</span>
+                </a>
+              )}
+              <button
+                type="button"
+                aria-expanded={lightboxMetadataExpanded}
+                aria-controls="atlas-lightbox-caption-details"
+                aria-label={lightboxMetadataExpanded ? "Collapse asset details" : "Expand asset details"}
+                onClick={() => setLightboxMetadataExpanded((current) => !current)}
+                style={photoLightboxMetadataToggleStyle}
+              >
+                <svg viewBox="0 0 16 16" aria-hidden="true" style={photoLightboxMetadataChevronStyle}>
+                  <path
+                    d={lightboxMetadataExpanded ? "m3 6 5 5 5-5" : "m3 10 5-5 5 5"}
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            </div>
           </div>
           <button
             type="button"
@@ -1879,7 +1891,16 @@ const photoLightboxTitleStyle: React.CSSProperties = {
   overflowWrap: "anywhere",
 };
 
-const photoLightboxDownloadLinkStyle: React.CSSProperties = {
+const photoLightboxActionRowStyle: React.CSSProperties = {
+  flex: "0 0 auto",
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  width: "100%",
+  marginTop: 10,
+};
+
+const photoLightboxActionLinkStyle: React.CSSProperties = {
   flex: "0 0 auto",
   minHeight: 30,
   display: "inline-flex",
@@ -1898,13 +1919,14 @@ const photoLightboxDownloadLinkStyle: React.CSSProperties = {
   cursor: "pointer",
 };
 
-const photoLightboxDownloadIconStyle: React.CSSProperties = {
+const photoLightboxActionIconStyle: React.CSSProperties = {
   width: 15,
   height: 15,
 };
 
 const photoLightboxMetadataToggleStyle: React.CSSProperties = {
   flex: "0 0 auto",
+  marginLeft: "auto",
   width: 30,
   height: 30,
   display: "grid",
@@ -1969,15 +1991,6 @@ const photoLightboxAudioButtonStyle: React.CSSProperties = {
   font: "inherit",
   fontWeight: 700,
   cursor: "pointer",
-};
-
-const photoLightboxEditLinkStyle: React.CSSProperties = {
-  display: "inline-block",
-  marginTop: 9,
-  color: "#fff",
-  fontWeight: 700,
-  textDecoration: "underline",
-  textUnderlineOffset: 3,
 };
 
 const photoLightboxCloseStyle: React.CSSProperties = {
