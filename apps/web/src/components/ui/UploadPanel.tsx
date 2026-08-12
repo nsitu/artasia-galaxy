@@ -5225,40 +5225,6 @@ export default function UploadPanel({
                   />
                 </label>
               </div>
-              <div style={gpsToggleRowStyle}>
-                <span>
-                  <span style={gpsToggleLabelStyle}>Use GPS location</span>
-                  <span style={gpsToggleHelpStyle}>
-                    {manageUseGpsLocation
-                      ? "Plants this artwork at its coordinates."
-                      : "Shows this artwork orbiting its Artasia site."}
-                  </span>
-                </span>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={manageUseGpsLocation}
-                  aria-label="Use GPS location in the Atlas viewer"
-                  onClick={() =>
-                    setManageUseGpsLocation((current) => !current)
-                  }
-                  disabled={!authUser?.authenticated || savingAsset}
-                  style={{
-                    ...gpsToggleTrackStyle,
-                    ...(manageUseGpsLocation ? gpsToggleTrackEnabledStyle : {}),
-                  }}
-                >
-                  <span
-                    aria-hidden="true"
-                    style={{
-                      ...gpsToggleThumbStyle,
-                      ...(manageUseGpsLocation
-                        ? gpsToggleThumbEnabledStyle
-                        : {}),
-                    }}
-                  />
-                </button>
-              </div>
             </div>
           )}
           {authUser?.authenticated && selectedAsset.type === "IMAGE" && (
@@ -7207,58 +7173,6 @@ const locationPanelStyle: React.CSSProperties = {
   borderRadius: 6,
 };
 
-const gpsToggleRowStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 16,
-};
-
-const gpsToggleLabelStyle: React.CSSProperties = {
-  display: "block",
-  color: "#d8e7ff",
-  fontSize: 13,
-};
-
-const gpsToggleHelpStyle: React.CSSProperties = {
-  display: "block",
-  marginTop: 3,
-  color: "#8490a3",
-  fontSize: 11,
-  lineHeight: 1.35,
-};
-
-const gpsToggleTrackStyle: React.CSSProperties = {
-  position: "relative",
-  flex: "0 0 auto",
-  width: 44,
-  height: 24,
-  padding: 2,
-  border: "1px solid rgba(255,255,255,0.24)",
-  borderRadius: 999,
-  background: "#343946",
-  cursor: "pointer",
-};
-
-const gpsToggleTrackEnabledStyle: React.CSSProperties = {
-  background: "#8fc85c",
-  borderColor: "#a9dc79",
-};
-
-const gpsToggleThumbStyle: React.CSSProperties = {
-  display: "block",
-  width: 18,
-  height: 18,
-  borderRadius: "50%",
-  background: "#f5f7fb",
-  transform: "translateX(0)",
-  transition: "transform 120ms ease-out",
-};
-
-const gpsToggleThumbEnabledStyle: React.CSSProperties = {
-  transform: "translateX(18px)",
-};
-
 const manageHeaderStyle: React.CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
@@ -7886,8 +7800,11 @@ const driveFileItemStyle: React.CSSProperties = {
   gap: 8,
   padding: 8,
   background: "rgba(255,255,255,0.05)",
-  border: "1px solid rgba(255,255,255,0.12)",
+  borderWidth: 1,
+  borderStyle: "solid",
+  borderColor: "rgba(255,255,255,0.12)",
   borderRadius: 4,
+  boxShadow: "none",
   cursor: "pointer",
   fontSize: 13,
   color: "#d8e7ff",

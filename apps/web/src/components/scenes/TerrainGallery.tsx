@@ -14,7 +14,6 @@ import {
   OrbitingActivityRing,
   OrbitingAudioMarker,
   OrbitingPhotoBanner,
-  TerrainPhotoFlower,
 } from "./TerrainPhotoMarker";
 import PlacementSignpost, { type PlacementSign } from "./PlacementSignpost";
 import PlaceMarker, { FlowerLayoutCoordinator } from "./PlaceMarker";
@@ -30,7 +29,6 @@ const REGIONAL_TERRAIN_ELEVATION_SCALE = 8;
 const LOCAL_TERRAIN_ELEVATION_SCALE = 1.25;
 const DEFAULT_TERRAIN_CAMERA_POSITION = new THREE.Vector3(0, -12, 10);
 const LOCAL_PLACEMENT_RADIUS_KM = 0.5;
-const SAME_LOCATION_THRESHOLD_METERS = 15;
 const REGIONAL_CAMERA_FIT_SCALE = 0.5;
 const LOCAL_CAMERA_FIT_SCALE = 0.55;
 const REGIONAL_DEM_ZOOM_OFFSET = 5;
@@ -470,23 +468,16 @@ type TerrainPhase =
   | "ready"
   | "flat"
   | "error";
-type LocalPhotoLayoutItem =
-  | {
-      kind: "flower";
-      photo: Photo;
-      index: number;
-      position: [number, number, number];
-    }
-  | {
-      kind: "orbit";
-      photo: Photo;
-      index: number;
-      center: [number, number, number];
-      orbitRadius: number;
-      orbitAssetCount: number;
-      orbitColour?: string;
-      activityId: number;
-    };
+type LocalPhotoLayoutItem = {
+  kind: "orbit";
+  photo: Photo;
+  index: number;
+  center: [number, number, number];
+  orbitRadius: number;
+  orbitAssetCount: number;
+  orbitColour?: string;
+  activityId: number;
+};
 type TerrainOrbitControls = {
   target?: THREE.Vector3;
   update?: () => void;
@@ -758,67 +749,23 @@ export default function TerrainGallery({
       };
     };
 
-    const orbitItems = photosForCurrentView.map<LocalPhotoLayoutItem>((photo, index) => {
-      if (photo.mediaKind === "audio") {
-        return {
-          kind: "orbit",
-          photo,
-          index,
-          center: placementCenter,
-          ...orbitForPhoto(photo),
-        };
-      }
-      const lat = photo.exifInfo?.latitude;
-      const lng = photo.exifInfo?.longitude;
-      if (
-        photo.useGpsLocation !== false &&
-        Number.isFinite(lat) &&
-        Number.isFinite(lng)
-      ) {
-        const photoLatLng = [lat as number, lng as number] as [number, number];
-        const placementLatLng = [
-          focusedPlacement.lat,
-          focusedPlacement.lng,
-        ] as [number, number];
-        const distanceFromPlacementMeters = haversineMeters(
-          placementLatLng,
-          photoLatLng,
-        );
-        const isPlantableOnLocalTerrain =
-          distanceFromPlacementMeters > SAME_LOCATION_THRESHOLD_METERS &&
-          distanceFromPlacementMeters <= LOCAL_PLACEMENT_RADIUS_KM * 1000;
-
-        if (isPlantableOnLocalTerrain) {
-          const [x, y, z = 0] = projection.proj(photoLatLng);
-          return {
-            kind: "flower",
-            photo,
-            index,
-            position: [
-              x,
-              y,
-              terrain ? (sampleTerrainZ(terrain, x, y) ?? z) : z,
-            ] as [number, number, number],
-          };
-        }
-      }
-
-      return {
+    const orbitItems = photosForCurrentView.map<LocalPhotoLayoutItem>(
+      (photo, index) => ({
         kind: "orbit",
         photo,
         index,
         center: placementCenter,
         ...orbitForPhoto(photo),
-      };
-    });
+      }),
+    );
     const orbitCounts = new Map<number, number>();
     for (const item of orbitItems) {
-      if (item.kind !== "orbit") continue;
       orbitCounts.set(item.activityId, (orbitCounts.get(item.activityId) ?? 0) + 1);
     }
-    return orbitItems.map((item) => item.kind === "orbit"
-      ? { ...item, orbitAssetCount: orbitCounts.get(item.activityId) ?? 1 }
-      : item);
+    return orbitItems.map((item) => ({
+      ...item,
+      orbitAssetCount: orbitCounts.get(item.activityId) ?? 1,
+    }));
   }, [activityOptions, focusedPlacement, photosForCurrentView, projection, terrain]);
   const activityOrbitRings = useMemo(() => {
     const rings = new Map<number, {
@@ -827,7 +774,6 @@ export default function TerrainGallery({
       center: [number, number, number];
     }>();
     for (const item of localPhotoLayout) {
-      if (item.kind !== "orbit" || item.activityId == null) continue;
       rings.set(item.activityId, {
         radius: item.orbitRadius,
         colour: item.orbitColour ?? "#ffffff",
@@ -1902,31 +1848,13 @@ export default function TerrainGallery({
               key={item.photo.id}
               id={item.photo.id}
               iconName={item.photo.iconName}
-              center={item.kind === "orbit" ? item.center : item.position}
-              orbitRadius={item.kind === "orbit" ? item.orbitRadius : undefined}
+              center={item.center}
+              orbitRadius={item.orbitRadius}
               orbitHeight={orbitHeight}
-              activityColour={item.kind === "orbit" ? item.orbitColour : undefined}
-              isDenseOrbit={item.kind === "orbit" && item.orbitAssetCount >= 5}
+              activityColour={item.orbitColour}
+              isDenseOrbit={item.orbitAssetCount >= 5}
               isHighlighted={item.index === hoveredIndex}
               onClick={() => selectPhoto(item.index)}
-              onPointerEnter={() => setHoveredIndex(item.index)}
-              onPointerLeave={() => setHoveredIndex(null)}
-            />
-          ) : item.kind === "flower" ? (
-            <TerrainPhotoFlower
-              key={item.photo.id}
-              id={item.photo.id}
-              url={item.photo.thumbnailUrl}
-              width={item.photo.width}
-              height={item.photo.height}
-              adjustments={item.photo.adjustments}
-              borderColour={selectedActivityColour}
-              position={item.position}
-              isSelected={item.index === selectedIndex}
-              isHighlighted={item.index === hoveredIndex}
-              onClick={() =>
-                selectPhoto(item.index === selectedIndex ? null : item.index)
-              }
               onPointerEnter={() => setHoveredIndex(item.index)}
               onPointerLeave={() => setHoveredIndex(null)}
             />
