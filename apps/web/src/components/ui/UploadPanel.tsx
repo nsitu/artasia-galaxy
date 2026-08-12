@@ -3772,12 +3772,23 @@ export default function UploadPanel({
           ...(isSelected ? selectedAssetCardStyle : {}),
         }}
       >
-        <div style={assetPreviewStyle}>
+        <div
+          style={{
+            ...assetPreviewStyle,
+            cursor: authUser?.authenticated ? "pointer" : "default",
+          }}
+          onClick={
+            authUser?.authenticated
+              ? () => toggleBrowseAssetSelection(asset.id)
+              : undefined
+          }
+        >
           {authUser?.authenticated && (
             <input
               type="checkbox"
               checked={isSelected}
               onChange={() => toggleBrowseAssetSelection(asset.id)}
+              onClick={(event) => event.stopPropagation()}
               aria-label={`Select ${asset.fileName}`}
               style={driveFileCheckboxStyle}
             />
@@ -7468,14 +7479,15 @@ const assetImageStyle: React.CSSProperties = {
 const archivedAssetBadgeStyle: React.CSSProperties = {
   padding: "2px 6px",
   borderRadius: 999,
-  background: "rgba(245, 158, 11, 0.18)",
-  border: "1px solid rgba(245, 158, 11, 0.5)",
-  color: "#fbbf24",
+  background: "rgba(120, 53, 15, 0.94)",
+  border: "1px solid rgba(251, 191, 36, 0.72)",
+  color: "#fde68a",
   fontSize: 10,
   fontWeight: 700,
   lineHeight: 1.4,
   textTransform: "uppercase",
   letterSpacing: "0.04em",
+  boxShadow: "0 2px 7px rgba(0,0,0,0.45)",
 };
 
 const assetBadgeRowStyle: React.CSSProperties = {
@@ -7493,23 +7505,23 @@ const assetBadgeRowStyle: React.CSSProperties = {
 
 const publishedAssetBadgeStyle: React.CSSProperties = {
   ...archivedAssetBadgeStyle,
-  background: "rgba(34, 197, 94, 0.18)",
-  border: "1px solid rgba(34, 197, 94, 0.5)",
-  color: "#4ade80",
+  background: "rgba(20, 83, 45, 0.94)",
+  border: "1px solid rgba(74, 222, 128, 0.72)",
+  color: "#dcfce7",
 };
 
 const draftAssetBadgeStyle: React.CSSProperties = {
   ...archivedAssetBadgeStyle,
-  background: "rgba(148, 163, 184, 0.14)",
-  border: "1px solid rgba(148, 163, 184, 0.4)",
-  color: "#aeb8c7",
+  background: "rgba(51, 65, 85, 0.94)",
+  border: "1px solid rgba(203, 213, 225, 0.68)",
+  color: "#f1f5f9",
 };
 
 const mediaKindBadgeStyle: React.CSSProperties = {
   ...archivedAssetBadgeStyle,
-  background: "rgba(96, 165, 250, 0.12)",
-  border: "1px solid rgba(96, 165, 250, 0.35)",
-  color: "#93c5fd",
+  background: "rgba(30, 64, 175, 0.94)",
+  border: "1px solid rgba(147, 197, 253, 0.72)",
+  color: "#dbeafe",
 };
 
 const driveAssetBadgeStyle: React.CSSProperties = {
@@ -7518,9 +7530,9 @@ const driveAssetBadgeStyle: React.CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   padding: "2px 5px",
-  background: "rgba(52, 168, 83, 0.16)",
-  border: "1px solid rgba(52, 168, 83, 0.48)",
-  color: "#8be29c",
+  background: "rgba(20, 83, 45, 0.94)",
+  border: "1px solid rgba(134, 239, 172, 0.72)",
+  color: "#dcfce7",
 };
 
 const driveAssetBadgeIconStyle: React.CSSProperties = {
@@ -7830,9 +7842,9 @@ const driveBrowserHeaderStyle: React.CSSProperties = {
 
 const activityAssetBadgeStyle: React.CSSProperties = {
   ...archivedAssetBadgeStyle,
-  background: "rgba(148, 163, 184, 0.18)",
-  border: "1px solid rgba(148, 163, 184, 0.45)",
-  color: "#e2e8f0",
+  background: "rgba(51, 65, 85, 0.94)",
+  border: "1px solid rgba(203, 213, 225, 0.68)",
+  color: "#f1f5f9",
 };
 
 function readableBadgeTextColour(background: string) {
