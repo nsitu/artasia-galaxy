@@ -87,12 +87,15 @@ export function ensureDriveFileExtension(name: string, mimeType: string): string
   return `${name}${extension}`;
 }
 
-interface DriveFile {
+export interface DriveFile {
   id: string;
   name: string;
   mimeType: string;
   size?: number;
+  createdTime?: string;
   modifiedTime?: string;
+  md5Checksum?: string;
+  sha1Checksum?: string;
   parents?: string[];
   webViewLink?: string;
   thumbnailLink?: string;
@@ -170,7 +173,7 @@ export class GoogleDriveClient {
       q: `'${parentId}' in parents and trashed = false and ${supportedTypesQuery}`,
       pageSize: 100,
       pageToken,
-      fields: "files(id,name,mimeType,size,modifiedTime,parents,webViewLink,thumbnailLink)",
+      fields: "files(id,name,mimeType,size,createdTime,modifiedTime,md5Checksum,sha1Checksum,parents,webViewLink,thumbnailLink)",
       orderBy: "name",
     };
 
@@ -198,7 +201,7 @@ export class GoogleDriveClient {
   async getFile(fileId: string): Promise<DriveFile> {
     const res = await this.drive.files.get({
       fileId,
-      fields: "id,name,mimeType,size,modifiedTime,parents,webViewLink,thumbnailLink",
+      fields: "id,name,mimeType,size,createdTime,modifiedTime,md5Checksum,sha1Checksum,parents,webViewLink,thumbnailLink",
       supportsAllDrives: true,
     });
 
@@ -398,9 +401,11 @@ export class GoogleDriveClient {
    */
   async findUniqueFileInFolderTree(folderId: string, filename: string): Promise<{
     file?: DriveFile;
+    matches: DriveFile[];
     matchCount: number;
   }> {
     return (await this.findUniqueFilesInFolderTree(folderId, [filename]))[0] ?? {
+      matches: [],
       matchCount: 0,
     };
   }
@@ -417,7 +422,7 @@ export class GoogleDriveClient {
     filename: string;
     folderName: string;
     file?: DriveFile;
-    matches: Array<{ id: string; name: string }>;
+    matches: DriveFile[];
     matchCount: number;
   }>> {
     const uniqueFilenames = Array.from(
@@ -486,10 +491,7 @@ export class GoogleDriveClient {
         ...(targetMatches.size === 1
           ? { file: targetMatches.values().next().value as DriveFile }
           : {}),
-        matches: Array.from(targetMatches.values()).map((file) => ({
-          id: file.id,
-          name: file.name,
-        })),
+        matches: Array.from(targetMatches.values()),
         matchCount: targetMatches.size,
       };
     });

@@ -16,6 +16,7 @@ const MAX_DURATION_SECONDS = parseInt(
   10,
 );
 const DURATION_TOLERANCE_SECONDS = 1.25;
+export const AUDIO_VIDEO_FRAME_RATE = 12;
 
 export interface PreparedAudioVideo {
   filePath: string;
@@ -92,6 +93,29 @@ async function probeDuration(inputPath: string) {
   return duration;
 }
 
+async function probeInitialVideoPacketCount(inputPath: string) {
+  const { stdout } = await runProcess(
+    "ffprobe",
+    [
+      "-v",
+      "error",
+      "-select_streams",
+      "v:0",
+      "-read_intervals",
+      "0%+#2",
+      "-count_packets",
+      "-show_entries",
+      "stream=nb_read_packets",
+      "-of",
+      "default=noprint_wrappers=1:nokey=1",
+      inputPath,
+    ],
+    30_000,
+  );
+  const packetCount = Number.parseInt(stdout.trim(), 10);
+  return Number.isFinite(packetCount) ? packetCount : 0;
+}
+
 export async function prepareAudioAsVideo(params: {
   stream: NodeJS.ReadableStream;
   originalName: string;
@@ -122,7 +146,7 @@ export async function prepareAudioAsVideo(params: {
         "-loop",
         "1",
         "-framerate",
-        "1",
+        `${AUDIO_VIDEO_FRAME_RATE}`,
         "-i",
         framePath,
         "-i",
@@ -138,7 +162,7 @@ export async function prepareAudioAsVideo(params: {
         "-tune",
         "stillimage",
         "-r",
-        "1",
+        `${AUDIO_VIDEO_FRAME_RATE}`,
         "-pix_fmt",
         "yuv420p",
         "-c:a",
@@ -147,7 +171,6 @@ export async function prepareAudioAsVideo(params: {
         "192k",
         "-t",
         durationSeconds.toFixed(3),
-        "-shortest",
         "-movflags",
         "+faststart",
         outputPath,
@@ -158,6 +181,13 @@ export async function prepareAudioAsVideo(params: {
     const outputStats = await stat(outputPath);
     if (outputStats.size === 0) {
       throw new Error("Audio conversion produced an empty video");
+    }
+
+    const initialVideoPacketCount = await probeInitialVideoPacketCount(outputPath);
+    if (initialVideoPacketCount < 2) {
+      throw new Error(
+        `Audio conversion produced too few video frames (${initialVideoPacketCount})`,
+      );
     }
 
     const outputDurationSeconds = await probeDuration(outputPath);

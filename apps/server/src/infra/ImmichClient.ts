@@ -52,6 +52,7 @@ export interface ImmichAsset {
     state?: string;
     country?: string;
     orientation?: string | null;
+    fileSizeInByte?: number;
   };
   people?: Array<{
     id: string;

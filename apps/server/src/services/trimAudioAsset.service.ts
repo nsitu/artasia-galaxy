@@ -13,6 +13,7 @@ import {
   uploadAsset,
 } from "../infra/ImmichClient.js";
 import { isAudioAsset, parseImmichDuration } from "./audioAsset.service.js";
+import { AUDIO_VIDEO_FRAME_RATE } from "./audioToVideo.service.js";
 
 const DATA_DIR = process.env.DATA_DIR ?? join(process.cwd(), "data");
 const JOB_DIR = join(DATA_DIR, "audio-trim-jobs");
@@ -105,7 +106,7 @@ function runFfmpeg(
     "-tune",
     "stillimage",
     "-r",
-    "1",
+    `${AUDIO_VIDEO_FRAME_RATE}`,
     "-pix_fmt",
     "yuv420p",
     "-c:a",

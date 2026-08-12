@@ -2957,7 +2957,13 @@ export default function UploadPanel({
     setError(null);
     setNotice(null);
     try {
-      const result = await reimportUploadAssetFromDrive(selectedAsset.id);
+      const selectedPlacementId = Number(managePlacementKey);
+      const result = await reimportUploadAssetFromDrive(
+        selectedAsset.id,
+        Number.isSafeInteger(selectedPlacementId) && selectedPlacementId > 0
+          ? selectedPlacementId
+          : undefined,
+      );
       if (!result.assetId) throw new Error("Google Drive reimport did not create an asset.");
       const replacement = await fetchUploadAsset(result.assetId);
       setPlacementAssets((current) => current.map((asset) =>
@@ -3806,6 +3812,7 @@ export default function UploadPanel({
               ...adjustmentFilterStyle(asset.adjustments),
             }}
             placeholderStyle={assetThumbnailPlaceholderStyle}
+            exhaustedLabel="unavailable"
           />
           <span style={assetBadgeRowStyle}>
             {asset.archived ? (

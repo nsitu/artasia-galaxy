@@ -5,6 +5,7 @@ import {
   createDriveClient,
   ensureDriveFileExtension,
   GoogleDriveClient,
+  type DriveFile,
 } from "../services/googleDrive.service.js";
 import {
   copyAssetRelationships,
@@ -17,6 +18,7 @@ import {
   uploadAssetStream,
   tagAsset,
   tagAssets,
+  untagAssets,
   updateAsset,
   type ImmichAsset,
 } from "../infra/ImmichClient.js";
@@ -36,11 +38,48 @@ function normalizeFilename(value: string) {
   return value.trim().toLocaleLowerCase();
 }
 
+function immichChecksumAsHex(checksum: string) {
+  try {
+    const bytes = Buffer.from(checksum, "base64");
+    return bytes.length === 20 ? bytes.toString("hex").toLocaleLowerCase() : null;
+  } catch {
+    return null;
+  }
+}
+
+function selectDriveFilenameMatch(
+  asset: ImmichAsset,
+  lookup: { file?: DriveFile; matches: DriveFile[]; matchCount: number },
+) {
+  if (lookup.file) return { file: lookup.file, detail: null };
+
+  const checksum = immichChecksumAsHex(asset.checksum);
+  if (!checksum) return { file: null, detail: null };
+  const checksumMatches = lookup.matches.filter(
+    (file) => file.sha1Checksum?.trim().toLocaleLowerCase() === checksum,
+  );
+  if (checksumMatches.length === 0) return { file: null, detail: null };
+
+  const orderedMatches = [...checksumMatches].sort((a, b) => {
+    const aCreated = a.createdTime ?? a.modifiedTime ?? "9999";
+    const bCreated = b.createdTime ?? b.modifiedTime ?? "9999";
+    return aCreated.localeCompare(bCreated) || a.id.localeCompare(b.id);
+  });
+  return {
+    file: orderedMatches[0],
+    detail: checksumMatches.length === 1
+      ? `resolved ${lookup.matchCount} filename matches by SHA-1 checksum`
+      : `selected the oldest of ${checksumMatches.length} byte-identical Drive copies`,
+  };
+}
+
 function tagValues(asset: ImmichAsset) {
-  return (asset.tags ?? [])
-    .flatMap((tag) => [tag.name, tag.value])
-    .map((value) => value.trim())
-    .filter(Boolean);
+  return Array.from(new Set(
+    (asset.tags ?? [])
+      .flatMap((tag) => [tag.name, tag.value])
+      .map((value) => value.trim())
+      .filter(Boolean),
+  ));
 }
 
 function assetHasTagNames(asset: ImmichAsset, requiredTagNames: string[]) {
@@ -68,27 +107,70 @@ async function waitForAssetTags(
   );
 }
 
-function assetDriveSourceId(asset: ImmichAsset) {
-  const sourceTags = tagValues(asset).filter((value) =>
+function assetDriveSourceIds(asset: ImmichAsset) {
+  return Array.from(new Set(tagValues(asset).filter((value) =>
     value.toLocaleLowerCase().startsWith(DRIVE_SOURCE_TAG_PREFIX),
-  );
-  const ids = Array.from(new Set(sourceTags.map((value) => value.slice(DRIVE_SOURCE_TAG_PREFIX.length))));
-  if (ids.length > 1) {
-    throw new Error("This asset has multiple Google Drive source tags and cannot be safely reimported.");
-  }
-  return ids[0] || null;
+  ).map((value) => value.slice(DRIVE_SOURCE_TAG_PREFIX.length))));
 }
 
-function assetPlacementId(asset: ImmichAsset) {
-  const placementIds = Array.from(new Set(
+function assetPlacementIds(asset: ImmichAsset) {
+  return Array.from(new Set(
     tagValues(asset)
       .map((value) => value.match(/^placement:(\d+)$/i)?.[1])
       .filter((value): value is string => Boolean(value)),
-  ));
+  )).map(Number);
+}
+
+function assetPlacementId(asset: ImmichAsset) {
+  const placementIds = assetPlacementIds(asset);
   if (placementIds.length > 1) {
     throw new Error("This asset has multiple placement tags and cannot be safely matched to Google Drive.");
   }
-  return placementIds[0] ? Number(placementIds[0]) : null;
+  return placementIds[0] ?? null;
+}
+
+type DrivePlacement = Awaited<ReturnType<typeof getUploadConfig>>["placements"][number];
+
+function drivePlacementTags(placement: DrivePlacement) {
+  return [
+    `placement:${placement.placement_id}`,
+    placement.partner_name,
+    placement.placement_name,
+  ].map((value) => value.trim()).filter(Boolean);
+}
+
+async function canonicalizeDriveManagedTags(params: {
+  assetId: string;
+  fileId: string;
+  placement: DrivePlacement | null;
+}) {
+  const [asset, config] = await Promise.all([
+    getAsset(params.assetId),
+    getUploadConfig(),
+  ]);
+  const configuredPlacementValues = new Set(
+    config.placements
+      .flatMap(drivePlacementTags)
+      .map((value) => value.toLocaleLowerCase()),
+  );
+  const managedTagIds = (asset.tags ?? [])
+    .filter((tag) => [tag.name, tag.value].some((rawValue) => {
+      const value = rawValue.trim().toLocaleLowerCase();
+      return value.startsWith(DRIVE_SOURCE_TAG_PREFIX) ||
+        /^placement:\d+$/.test(value) ||
+        configuredPlacementValues.has(value);
+    }))
+    .map((tag) => tag.id);
+
+  if (managedTagIds.length > 0) {
+    await untagAssets([params.assetId], Array.from(new Set(managedTagIds)));
+  }
+  const canonicalTags = [
+    driveSourceTag(params.fileId),
+    ...(params.placement ? drivePlacementTags(params.placement) : []),
+  ];
+  await tagAsset(params.assetId, canonicalTags);
+  await waitForAssetTags(params.assetId, canonicalTags);
 }
 
 function assetActivityId(asset: ImmichAsset) {
@@ -173,6 +255,42 @@ async function searchAllAssetsForDriveLookup() {
   return Array.from(byId.values());
 }
 
+async function resolveAmbiguousPlacementFromDrive(params: {
+  client: GoogleDriveClient;
+  asset: ImmichAsset;
+  placements: DrivePlacement[];
+}) {
+  const candidates = params.placements.filter(
+    (placement) => Boolean(placement.google_drive_folder_id?.trim()),
+  );
+  const lookups = await Promise.all(candidates.map(async (placement) => ({
+    placement,
+    lookup: await params.client.findUniqueFileInFolderTree(
+      placement.google_drive_folder_id!.trim(),
+      params.asset.originalFileName,
+    ),
+  })));
+  const evaluated = lookups.map(({ placement, lookup }) => ({
+    placement,
+    lookup,
+    selection: selectDriveFilenameMatch(params.asset, lookup),
+  }));
+  const unresolvedAmbiguities = evaluated.filter(
+    ({ lookup, selection }) => lookup.matchCount > 0 && !selection.file,
+  );
+  const uniqueMatches = evaluated.filter(({ selection }) => Boolean(selection.file));
+  if (unresolvedAmbiguities.length > 0 || uniqueMatches.length !== 1) {
+    return {
+      resolved: null,
+      matchCount: lookups.reduce((total, { lookup }) => total + lookup.matchCount, 0),
+    };
+  }
+  return {
+    resolved: uniqueMatches[0],
+    matchCount: 1,
+  };
+}
+
 /** Link every unlinked admin asset to a unique matching file in its site's Drive tree. */
 async function runBulkDriveLookup(client: GoogleDriveClient): Promise<DriveBulkLookupSummary> {
     const [assets, config] = await Promise.all([
@@ -200,30 +318,62 @@ async function runBulkDriveLookup(client: GoogleDriveClient): Promise<DriveBulkL
         asset = await getAsset(asset.id);
       }
 
-      try {
-        if (assetDriveSourceId(asset)) continue;
-      } catch (err) {
-        results.push({
-          assetId: asset.id,
-          fileName: asset.originalFileName,
-          status: "skipped",
-          placementTags: tagValues(asset).filter((value) => /^placement:/i.test(value)),
-          error: (err as Error).message,
-        });
-        continue;
-      }
+      const existingSourceIds = assetDriveSourceIds(asset);
+      if (existingSourceIds.length === 1) continue;
 
       let placementId: number | null;
       try {
         placementId = assetPlacementId(asset);
       } catch (err) {
-        results.push({
-          assetId: asset.id,
-          fileName: asset.originalFileName,
-          status: "skipped",
-          placementTags: tagValues(asset).filter((value) => /^placement:/i.test(value)),
-          error: (err as Error).message,
-        });
+        const ambiguousPlacements = assetPlacementIds(asset)
+          .map((id) => placementsById.get(id))
+          .filter((placement): placement is DrivePlacement => Boolean(placement));
+        try {
+          const resolution = await resolveAmbiguousPlacementFromDrive({
+            client,
+            asset,
+            placements: ambiguousPlacements,
+          });
+          if (resolution.resolved?.selection.file) {
+            const { placement, selection } = resolution.resolved;
+            const file = selection.file;
+            candidates += 1;
+            await canonicalizeDriveManagedTags({
+              assetId: asset.id,
+              fileId: file.id,
+              placement,
+            });
+            results.push({
+              assetId: asset.id,
+              fileName: asset.originalFileName,
+              status: "linked",
+              placementId: placement.placement_id,
+              placementName: placement.placement_name,
+              folderId: placement.google_drive_folder_id?.trim(),
+              searchedFileName: asset.originalFileName.trim(),
+              fileId: file.id,
+              driveFileName: `${file.name} (${selection.detail ?? "resolved conflicting placement and Drive tags"})`,
+            });
+            continue;
+          }
+          results.push({
+            assetId: asset.id,
+            fileName: asset.originalFileName,
+            status: resolution.matchCount > 0 ? "ambiguous" : "skipped",
+            placementTags: tagValues(asset).filter((value) => /^placement:/i.test(value)),
+            error: resolution.matchCount > 0
+              ? `Multiple tagged sites contain a possible match for this filename (${resolution.matchCount} matches).`
+              : "None of the asset's tagged sites contains a unique matching Drive file.",
+          });
+        } catch (resolutionError) {
+          results.push({
+            assetId: asset.id,
+            fileName: asset.originalFileName,
+            status: "failed",
+            placementTags: tagValues(asset).filter((value) => /^placement:/i.test(value)),
+            error: (resolutionError as Error).message,
+          });
+        }
         continue;
       }
       if (placementId == null) {
@@ -261,8 +411,8 @@ async function runBulkDriveLookup(client: GoogleDriveClient): Promise<DriveBulkL
       let lookups: Array<{
         filename: string;
         folderName: string;
-        file?: { id: string; name: string };
-        matches: Array<{ id: string; name: string }>;
+        file?: DriveFile;
+        matches: DriveFile[];
         matchCount: number;
       }>;
       try {
@@ -309,7 +459,8 @@ async function runBulkDriveLookup(client: GoogleDriveClient): Promise<DriveBulkL
           });
           continue;
         }
-        if (!lookup.file) {
+        const selection = selectDriveFilenameMatch(asset, lookup);
+        if (!selection.file) {
           results.push({
             assetId: asset.id,
             fileName: asset.originalFileName,
@@ -326,9 +477,11 @@ async function runBulkDriveLookup(client: GoogleDriveClient): Promise<DriveBulkL
         }
 
         try {
-          const sourceTag = driveSourceTag(lookup.file.id);
-          await tagAsset(asset.id, [sourceTag]);
-          await waitForAssetTags(asset.id, [sourceTag]);
+          await canonicalizeDriveManagedTags({
+            assetId: asset.id,
+            fileId: selection.file.id,
+            placement: placementsById.get(placementId) ?? null,
+          });
           results.push({
             assetId: asset.id,
             fileName: asset.originalFileName,
@@ -339,8 +492,12 @@ async function runBulkDriveLookup(client: GoogleDriveClient): Promise<DriveBulkL
             folderName: lookup.folderName,
             searchedFileName: lookup.filename,
             matches: lookup.matches,
-            fileId: lookup.file.id,
-            driveFileName: lookup.file.name,
+            fileId: selection.file.id,
+            driveFileName: assetDriveSourceIds(asset).length > 1
+              ? `${selection.file.name} (replaced ${assetDriveSourceIds(asset).length} conflicting Drive IDs${selection.detail ? `; ${selection.detail}` : ""})`
+              : selection.detail
+                ? `${selection.file.name} (${selection.detail})`
+                : selection.file.name,
           });
         } catch (err) {
           results.push({
@@ -689,8 +846,19 @@ async function findDriveImportReplacement(params: {
   return null;
 }
 
-async function replaceImportedAsset(source: ImmichAsset, targetAssetId: string) {
-  if (source.id === targetAssetId) return;
+async function replaceImportedAsset(
+  source: ImmichAsset,
+  targetAssetId: string,
+  canonical: { fileId: string; placement: DrivePlacement | null },
+) {
+  if (source.id === targetAssetId) {
+    await canonicalizeDriveManagedTags({
+      assetId: targetAssetId,
+      fileId: canonical.fileId,
+      placement: canonical.placement,
+    });
+    return;
+  }
 
   await copyAssetRelationships(source.id, targetAssetId);
   const sourceTagIds = (source.tags ?? []).map((tag) => tag.id);
@@ -707,6 +875,11 @@ async function replaceImportedAsset(source: ImmichAsset, targetAssetId: string) 
     dateTimeOriginal: source.fileCreatedAt,
     visibility: "timeline",
   });
+  await canonicalizeDriveManagedTags({
+    assetId: targetAssetId,
+    fileId: canonical.fileId,
+    placement: canonical.placement,
+  });
   await deleteAssets([source.id]);
 }
 
@@ -714,7 +887,7 @@ async function importDriveFile(params: {
   client: GoogleDriveClient;
   fileId: string;
   placementId?: number | null;
-  placementTags: string[];
+  placement: DrivePlacement | null;
   activityTags: string[];
 }): Promise<DriveSyncResult> {
   let fileName = "Unknown";
@@ -780,7 +953,7 @@ async function importDriveFile(params: {
       return { fileId: params.fileId, fileName, status: "failed", error: "Failed to upload to Immich" };
     }
     const allTags = [
-      ...params.placementTags,
+      ...(params.placement ? drivePlacementTags(params.placement) : []),
       ...params.activityTags,
       driveSourceTag(params.fileId),
       ...(fileInfo.isAudio ? ["media:audio"] : []),
@@ -789,7 +962,12 @@ async function importDriveFile(params: {
     await waitForAssetTags(uploadResult.id, allTags, {
       requireAudioDuration: fileInfo.isAudio,
     });
-    if (replacement) await replaceImportedAsset(replacement, uploadResult.id);
+    if (replacement) {
+      await replaceImportedAsset(replacement, uploadResult.id, {
+        fileId: params.fileId,
+        placement: params.placement,
+      });
+    }
     return {
       fileId: params.fileId,
       fileName,
@@ -808,9 +986,9 @@ router.post("/assets/:assetId/lookup", async (req: Request, res: Response) => {
     const client = getDriveClient(req);
     const assetId = Array.isArray(req.params.assetId) ? req.params.assetId[0] : req.params.assetId;
     const asset = await getAsset(assetId.trim());
-    const existingSourceId = assetDriveSourceId(asset);
-    if (existingSourceId) {
-      res.json({ status: "already-linked", fileId: existingSourceId });
+    const existingSourceIds = assetDriveSourceIds(asset);
+    if (existingSourceIds.length === 1) {
+      res.json({ status: "already-linked", fileId: existingSourceIds[0] });
       return;
     }
 
@@ -832,17 +1010,25 @@ router.post("/assets/:assetId/lookup", async (req: Request, res: Response) => {
       res.json({ status: "not-found" });
       return;
     }
-    if (!lookup.file) {
+    const selection = selectDriveFilenameMatch(asset, lookup);
+    if (!selection.file) {
       res.status(409).json({
         error: `Found ${lookup.matchCount} matching files in this site's Google Drive folder. The asset was not linked.`,
       });
       return;
     }
 
-    const sourceTag = driveSourceTag(lookup.file.id);
-    await tagAsset(asset.id, [sourceTag]);
-    await waitForAssetTags(asset.id, [sourceTag]);
-    res.json({ status: "linked", fileId: lookup.file.id, fileName: lookup.file.name });
+    await canonicalizeDriveManagedTags({
+      assetId: asset.id,
+      fileId: selection.file.id,
+      placement: placement ?? null,
+    });
+    res.json({
+      status: "linked",
+      fileId: selection.file.id,
+      fileName: selection.file.name,
+      resolution: selection.detail,
+    });
   } catch (err) {
     res
       .status(err instanceof Error && err.message.includes("Not authenticated") ? 401 : 500)
@@ -856,14 +1042,14 @@ router.post("/assets/:assetId/reimport", async (req: Request, res: Response) => 
     const client = getDriveClient(req);
     const assetId = Array.isArray(req.params.assetId) ? req.params.assetId[0] : req.params.assetId;
     const asset = await getAsset(assetId.trim());
-    const fileId = assetDriveSourceId(asset);
-    if (!fileId) {
-      res.status(400).json({ error: "This asset is not linked to a Google Drive file yet." });
-      return;
-    }
-    const placementId = assetPlacementId(asset);
+    const requestedPlacementId = Number(req.body?.placementId);
+    const placementId = Number.isSafeInteger(requestedPlacementId) && requestedPlacementId > 0
+      ? requestedPlacementId
+      : assetPlacementId(asset);
     if (placementId == null) {
-      res.status(400).json({ error: "Assign this asset to one Artasia site before reimporting it." });
+      res.status(400).json({
+        error: "Select one Artasia site in the asset editor before reimporting this ambiguous asset.",
+      });
       return;
     }
     const config = await getUploadConfig();
@@ -871,6 +1057,28 @@ router.post("/assets/:assetId/reimport", async (req: Request, res: Response) => 
     if (!placement) {
       res.status(400).json({ error: "This asset's Artasia site is no longer configured." });
       return;
+    }
+    const sourceIds = assetDriveSourceIds(asset);
+    let fileId = sourceIds.length === 1 ? sourceIds[0] : null;
+    if (!fileId) {
+      const folderId = placement.google_drive_folder_id?.trim();
+      if (!folderId) {
+        res.status(400).json({
+          error: "The selected Artasia site does not have a Google Drive folder configured.",
+        });
+        return;
+      }
+      const lookup = await client.findUniqueFileInFolderTree(folderId, asset.originalFileName);
+      const selection = selectDriveFilenameMatch(asset, lookup);
+      if (!selection.file) {
+        res.status(409).json({
+          error: lookup.matchCount === 0
+            ? "No matching file was found in the selected site's Google Drive folder."
+            : `Found ${lookup.matchCount} matching files in the selected site's Google Drive folder.`,
+        });
+        return;
+      }
+      fileId = selection.file.id;
     }
     const activityId = assetActivityId(asset);
     const activity = activityId == null
@@ -880,7 +1088,7 @@ router.post("/assets/:assetId/reimport", async (req: Request, res: Response) => 
       client,
       fileId,
       placementId,
-      placementTags: [`placement:${placementId}`, placement.placement_name],
+      placement,
       activityTags: activity ? [`activity:${activity.id}`, activity.label] : [],
     });
     if (result.status === "failed") {
@@ -924,22 +1132,17 @@ router.post("/sync", async (req: Request, res: Response) => {
     }
 
     // Validate placement and activity if specified
-    let placementTags: string[] = [];
     let activityTags: string[] = [];
-    let placementConfig: (typeof config.placements)[number] | undefined;
+    let placementConfig: (typeof config.placements)[number] | null = null;
 
     if (placementId !== null && placementId !== undefined) {
       placementConfig = config.placements.find(
         (p) => p.placement_id === placementId
-      );
+      ) ?? null;
       if (!placementConfig) {
         res.status(400).json({ error: "Invalid placement ID" });
         return;
       }
-      placementTags = [
-        `placement:${placementId}`,
-        placementConfig.placement_name,
-      ];
     }
 
     if (activityId !== null && activityId !== undefined) {
@@ -957,7 +1160,7 @@ router.post("/sync", async (req: Request, res: Response) => {
         client,
         fileId,
         placementId,
-        placementTags,
+        placement: placementConfig,
         activityTags,
       }));
     }

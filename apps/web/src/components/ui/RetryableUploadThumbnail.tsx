@@ -7,6 +7,7 @@ interface RetryableUploadThumbnailProps {
   src?: string;
   imageStyle: CSSProperties;
   placeholderStyle: CSSProperties;
+  exhaustedLabel?: string;
 }
 
 export default function RetryableUploadThumbnail({
@@ -14,56 +15,61 @@ export default function RetryableUploadThumbnail({
   src,
   imageStyle,
   placeholderStyle,
+  exhaustedLabel = "pending",
 }: RetryableUploadThumbnailProps) {
   const [attempt, setAttempt] = useState(0);
-  const [loaded, setLoaded] = useState(false);
-  const [waiting, setWaiting] = useState(false);
+  const [objectUrl, setObjectUrl] = useState<string | null>(null);
 
   useEffect(() => {
     setAttempt(0);
-    setLoaded(false);
-    setWaiting(false);
-  }, [assetId]);
-
-  useEffect(() => {
-    if (!waiting) return;
-    if (attempt >= THUMBNAIL_RETRY_DELAYS_MS.length) return;
-
-    const timeoutId = window.setTimeout(() => {
-      setWaiting(false);
-      setAttempt((current) => current + 1);
-    }, THUMBNAIL_RETRY_DELAYS_MS[attempt]);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [attempt, waiting]);
+  }, [assetId, src]);
 
   const baseSrc = src ?? `/api/v1/assets/${assetId}/thumbnail?v=${encodeURIComponent(assetId)}`;
   const retrySrc = `${baseSrc}${baseSrc.includes("?") ? "&" : "?"}thumbnailAttempt=${attempt}`;
 
+  useEffect(() => {
+    const controller = new AbortController();
+    let retryTimeoutId: number | undefined;
+    let fetchedObjectUrl: string | undefined;
+
+    setObjectUrl(null);
+    void fetch(retrySrc, { cache: "no-store", signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error(`Thumbnail unavailable (${response.status})`);
+        return response.blob();
+      })
+      .then((blob) => {
+        if (controller.signal.aborted) return;
+        fetchedObjectUrl = URL.createObjectURL(blob);
+        setObjectUrl(fetchedObjectUrl);
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        if (attempt >= THUMBNAIL_RETRY_DELAYS_MS.length) return;
+        retryTimeoutId = window.setTimeout(() => {
+          setAttempt((current) => current + 1);
+        }, THUMBNAIL_RETRY_DELAYS_MS[attempt]);
+      });
+
+    return () => {
+      controller.abort();
+      if (retryTimeoutId !== undefined) window.clearTimeout(retryTimeoutId);
+      if (fetchedObjectUrl) URL.revokeObjectURL(fetchedObjectUrl);
+    };
+  }, [attempt, retrySrc]);
+
   return (
     <>
-      {!loaded && (
+      {!objectUrl && (
         <span style={placeholderStyle}>
-          {attempt >= THUMBNAIL_RETRY_DELAYS_MS.length ? "pending" : "processing"}
+          {attempt >= THUMBNAIL_RETRY_DELAYS_MS.length ? exhaustedLabel : "processing"}
         </span>
       )}
-      {!waiting && (
+      {objectUrl && (
         <img
-          key={`${assetId}-${attempt}`}
-          src={retrySrc}
+          src={objectUrl}
           alt=""
-          style={{
-            ...imageStyle,
-            display: loaded ? "block" : "none",
-          }}
-          onLoad={() => {
-            setLoaded(true);
-            setWaiting(false);
-          }}
-          onError={() => {
-            setLoaded(false);
-            setWaiting(attempt < THUMBNAIL_RETRY_DELAYS_MS.length);
-          }}
+          style={imageStyle}
         />
       )}
     </>
