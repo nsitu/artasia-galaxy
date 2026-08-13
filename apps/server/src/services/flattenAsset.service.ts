@@ -10,6 +10,8 @@ import {
   copyAssetRelationships,
   getAsset,
   getAssetOriginal,
+  getPublishedAlbum,
+  removeAssetsFromAlbum,
   tagAssets,
   updateAsset,
   uploadAsset,
@@ -311,7 +313,11 @@ export async function flattenAsset(sourceAssetId: string, requestedRecipe: unkno
     job.state = "verified";
     await persistJob(job);
 
-    await updateAsset(sourceAssetId, { visibility: "archive" });
+    const publishedAlbum = await getPublishedAlbum();
+    await Promise.all([
+      updateAsset(sourceAssetId, { visibility: "archive" }),
+      removeAssetsFromAlbum(publishedAlbum.id, [sourceAssetId]),
+    ]);
     job.state = "source_archived";
     await persistJob(job);
     job.state = "complete";

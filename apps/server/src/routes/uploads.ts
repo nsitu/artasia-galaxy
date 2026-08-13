@@ -2126,6 +2126,7 @@ router.post("/assets/:assetId/flatten", async (req, res) => {
     }
 
     const result = await flattenAsset(assetId, req.body);
+    invalidateSiteActivityStats();
     res.json({ ok: true, ...result, asset_id: result.assetId, source_asset_id: result.sourceAssetId });
   } catch (err) {
     const message = (err as Error).message;
