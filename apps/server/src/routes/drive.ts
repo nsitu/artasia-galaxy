@@ -40,10 +40,6 @@ function driveSourceTag(fileId: string) {
   return `${DRIVE_SOURCE_TAG_PREFIX}${fileId}`;
 }
 
-function normalizeFilename(value: string) {
-  return value.trim().toLocaleLowerCase();
-}
-
 function reportedDriveMatches(matches: DriveFile[]) {
   return matches.map(({ id, name }) => ({ id, name }));
 }
@@ -934,8 +930,6 @@ async function getAssetsForTag(tagId: string) {
 
 async function findDriveImportReplacement(params: {
   fileId: string;
-  filename: string;
-  placementId?: number | null;
 }): Promise<ImmichAsset | null> {
   const tags = await listTags();
   const sourceTagName = driveSourceTag(params.fileId).toLocaleLowerCase();
@@ -956,28 +950,6 @@ async function findDriveImportReplacement(params: {
     }
   }
 
-  if (params.placementId == null) return null;
-  const placementTagName = `placement:${params.placementId}`;
-  const placementTag = tags.find(
-    (tag) =>
-      tag.name.trim().toLocaleLowerCase() === placementTagName ||
-      tag.value.trim().toLocaleLowerCase() === placementTagName,
-  );
-  if (!placementTag) return null;
-
-  const filename = normalizeFilename(params.filename);
-  const matches = (await getAssetsForTag(placementTag.id)).filter(
-    (asset) =>
-      !asset.isArchived &&
-      !asset.isTrashed &&
-      normalizeFilename(asset.originalFileName) === filename,
-  );
-  if (matches.length === 1) return matches[0];
-  if (matches.length > 1) {
-    throw new Error(
-      `Cannot safely replace "${params.filename}" because multiple assets with that name exist at this placement.`,
-    );
-  }
   return null;
 }
 
@@ -1025,6 +997,7 @@ async function importDriveFile(params: {
   placement: DrivePlacement | null;
   activityTags: string[];
   forceAudio?: boolean;
+  replacementAsset?: ImmichAsset;
 }): Promise<DriveSyncResult> {
   let fileName = "Unknown";
   try {
@@ -1054,16 +1027,13 @@ async function importDriveFile(params: {
     const deviceAssetId = `artasia-galaxy:drive:${params.fileId}`;
     const fileDate = fileInfo.modifiedTime ? new Date(fileInfo.modifiedTime) : undefined;
     let uploadResult;
-    let replacement: ImmichAsset | null = null;
+    const replacement = params.replacementAsset ?? await findDriveImportReplacement({
+      fileId: params.fileId,
+    });
     if (importAsAudio) {
       console.log(`[Drive] converting ${params.forceAudio ? "video's audio track" : "audio file"} ${params.fileId} to audio artwork MP4`);
       const prepared = await prepareAudioAsVideo({ stream, originalName: uploadFileName });
       try {
-        replacement = await findDriveImportReplacement({
-          fileId: params.fileId,
-          filename: prepared.filename,
-          placementId: params.placementId,
-        });
         console.log(`[Drive] converted audio file ${params.fileId}: ${Math.round(prepared.durationSeconds)}s, ${prepared.outputBytes} bytes`);
         uploadResult = await uploadAsset({
           filePath: prepared.filePath,
@@ -1079,11 +1049,6 @@ async function importDriveFile(params: {
         });
       }
     } else {
-      replacement = await findDriveImportReplacement({
-        fileId: params.fileId,
-        filename: uploadFileName,
-        placementId: params.placementId,
-      });
       uploadResult = await uploadAssetStream({
         stream,
         filename: uploadFileName,
@@ -1263,6 +1228,7 @@ router.post("/assets/:assetId/reimport", async (req: Request, res: Response) => 
       placement,
       activityTags: activity ? [`activity:${activity.id}`, activity.label] : [],
       forceAudio,
+      replacementAsset: asset,
     });
     if (result.status === "failed") {
       res.status(502).json({ error: result.error ?? "Google Drive reimport failed." });
