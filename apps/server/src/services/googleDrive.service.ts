@@ -563,32 +563,43 @@ export class GoogleDriveClient {
       return { matches: [], matchCount: 0, driveMatches: [], driveMatchCount: 0 };
     }
 
-    const listParams: drive_v3.Params$Resource$Files$List = {
-      q: `(name contains '${escapeDriveQueryValue(searchStem)}' or fullText contains '${escapeDriveQueryValue(searchStem)}') and trashed = false and mimeType != '${GOOGLE_MIME_TYPE_FOLDER}'`,
-      pageSize: 1000,
-      fields: "nextPageToken,files(id,name,mimeType,size,createdTime,modifiedTime,md5Checksum,sha1Checksum,parents,webViewLink,thumbnailLink)",
-    };
-    if (driveId) {
-      listParams.corpora = "drive";
-      listParams.driveId = driveId;
-      listParams.includeItemsFromAllDrives = true;
-      listParams.supportsAllDrives = true;
-    } else {
-      listParams.spaces = "drive";
-    }
-
-    const candidates: DriveFile[] = [];
-    do {
-      const response = await this.drive.files.list(listParams);
-      for (const rawFile of response.data.files ?? []) {
-        const file = rawFile as DriveFile;
-        const comparableName = ensureDriveFileExtension(file.name, file.mimeType);
-        if (comparableMediaFilename(comparableName) === comparableMediaFilename(filename)) {
-          candidates.push(file);
-        }
+    const queryCandidates = async (scopeDriveId?: string) => {
+      const listParams: drive_v3.Params$Resource$Files$List = {
+        q: `(name contains '${escapeDriveQueryValue(searchStem)}' or fullText contains '${escapeDriveQueryValue(searchStem)}') and trashed = false and mimeType != '${GOOGLE_MIME_TYPE_FOLDER}'`,
+        pageSize: 1000,
+        fields: "nextPageToken,files(id,name,mimeType,size,createdTime,modifiedTime,md5Checksum,sha1Checksum,parents,webViewLink,thumbnailLink)",
+        includeItemsFromAllDrives: true,
+        supportsAllDrives: true,
+      };
+      if (scopeDriveId) {
+        listParams.corpora = "drive";
+        listParams.driveId = scopeDriveId;
+      } else {
+        // The user corpus includes My Drive plus every Shared Drive visible to
+        // the signed-in user. It is used only for ambiguity diagnostics.
+        listParams.corpora = "user";
+        listParams.spaces = "drive";
       }
-      listParams.pageToken = response.data.nextPageToken ?? undefined;
-    } while (listParams.pageToken);
+
+      const found = new Map<string, DriveFile>();
+      do {
+        const response = await this.drive.files.list(listParams);
+        for (const rawFile of response.data.files ?? []) {
+          const file = rawFile as DriveFile;
+          const comparableName = ensureDriveFileExtension(file.name, file.mimeType);
+          if (comparableMediaFilename(comparableName) === comparableMediaFilename(filename)) {
+            found.set(file.id, file);
+          }
+        }
+        listParams.pageToken = response.data.nextPageToken ?? undefined;
+      } while (listParams.pageToken);
+      return Array.from(found.values());
+    };
+
+    const candidates = await queryCandidates(driveId);
+    const driveMatches = driveId
+      ? await queryCandidates()
+      : candidates;
 
     const candidatePaths = await mapWithConcurrency(candidates, 6, async (file) => {
       const parentId = file.parents?.[0];
@@ -601,8 +612,8 @@ export class GoogleDriveClient {
       ...(matches.length === 1 ? { file: matches[0] } : {}),
       matches,
       matchCount: matches.length,
-      driveMatches: candidates,
-      driveMatchCount: candidates.length,
+      driveMatches,
+      driveMatchCount: driveMatches.length,
     };
   }
 
