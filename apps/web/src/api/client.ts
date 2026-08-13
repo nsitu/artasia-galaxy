@@ -995,7 +995,7 @@ export async function syncDriveFiles(params: {
 }
 
 export interface DriveLookupResult {
-  status: "linked" | "already-linked" | "not-found";
+  status: "linked" | "already-linked" | "not-found" | "ambiguous";
   fileId?: string;
   fileName?: string;
   scope?: "site" | "project-documentation";
@@ -1003,6 +1003,9 @@ export interface DriveLookupResult {
   placementName?: string;
   activityId?: number;
   activityLabel?: string;
+  matchCount?: number;
+  matches?: Array<{ id: string; name: string }>;
+  detail?: string;
 }
 
 export async function lookupUploadAssetDriveSource(assetId: string): Promise<DriveLookupResult> {

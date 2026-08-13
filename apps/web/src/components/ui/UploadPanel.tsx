@@ -2842,6 +2842,13 @@ export default function UploadPanel({
     setNotice(null);
     try {
       const result = await lookupUploadAssetDriveSource(selectedAsset.id);
+      if (result.status === "ambiguous") {
+        setNotice({
+          tone: "warning",
+          message: result.detail ?? `Found ${result.matchCount ?? "multiple"} matching Google Drive files. Compare them manually, assign this asset to the matching Artasia site, and run the lookup again.`,
+        });
+        return;
+      }
       if (result.status === "not-found") {
         setNotice({
           tone: "warning",

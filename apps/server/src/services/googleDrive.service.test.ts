@@ -4,6 +4,7 @@ import {
   comparableMediaFilename,
   driveSourceSearchFilename,
   ensureDriveFileExtension,
+  GoogleDriveClient,
   inferActivityFromDriveFolders,
 } from "./googleDrive.service.js";
 
@@ -25,6 +26,21 @@ test("does not mistake user metadata after a dot for a file extension", () => {
 test("preserves an extension compatible with the Drive MIME type", () => {
   assert.equal(ensureDriveFileExtension("Photo.JPEG", "image/jpeg"), "Photo.JPEG");
   assert.equal(ensureDriveFileExtension("Clip.m4v", "video/mp4"), "Clip.m4v");
+});
+
+test("recognizes all registered HEIC and HEIF MIME variants", () => {
+  assert.equal(GoogleDriveClient.isImage("image/heic-sequence", "Burst.HEIC"), true);
+  assert.equal(GoogleDriveClient.isImage("image/heif-sequence", "Burst.HEIF"), true);
+  assert.equal(
+    ensureDriveFileExtension("Burst", "image/heic-sequence"),
+    "Burst.heic",
+  );
+});
+
+test("recognizes generic Drive MIME metadata only when the filename is HEIC or HEIF", () => {
+  assert.equal(GoogleDriveClient.isSupported("application/octet-stream", "Photo.HEIC"), true);
+  assert.equal(GoogleDriveClient.isSupported("binary/octet-stream", "Photo.heif"), true);
+  assert.equal(GoogleDriveClient.isSupported("application/octet-stream", "Archive.bin"), false);
 });
 
 test("uses the MIME type when a recognizable extension conflicts with it", () => {

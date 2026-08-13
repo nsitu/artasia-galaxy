@@ -17,6 +17,8 @@ export const ALLOWED_UPLOAD_MIME_TYPES = new Set([
   "image/gif",
   "image/heic",
   "image/heif",
+  "image/heic-sequence",
+  "image/heif-sequence",
   "video/mp4",
   "video/quicktime",
   "video/webm",

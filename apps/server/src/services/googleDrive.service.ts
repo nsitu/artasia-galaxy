@@ -11,7 +11,11 @@ const IMAGE_MIME_TYPES = [
   "image/bmp",
   "image/heic",
   "image/heif",
+  "image/heic-sequence",
+  "image/heif-sequence",
 ];
+const GENERIC_DRIVE_MIME_TYPES = ["application/octet-stream", "binary/octet-stream"];
+const HEIC_EXTENSIONS = new Set([".heic", ".heif"]);
 const VIDEO_MIME_TYPES = ["video/mp4", "video/quicktime", "video/x-msvideo"];
 const AUDIO_MIME_TYPES = [
   "audio/mpeg",
@@ -30,6 +34,8 @@ const MIME_TYPE_EXTENSIONS: Readonly<Record<string, string>> = {
   "image/bmp": ".bmp",
   "image/heic": ".heic",
   "image/heif": ".heif",
+  "image/heic-sequence": ".heic",
+  "image/heif-sequence": ".heif",
   "video/mp4": ".mp4",
   "video/quicktime": ".mov",
   "video/x-msvideo": ".avi",
@@ -47,6 +53,8 @@ const MIME_TYPE_COMPATIBLE_EXTENSIONS: Readonly<Record<string, ReadonlySet<strin
   "image/bmp": new Set([".bmp"]),
   "image/heic": new Set([".heic"]),
   "image/heif": new Set([".heif"]),
+  "image/heic-sequence": new Set([".heic"]),
+  "image/heif-sequence": new Set([".heif"]),
   "video/mp4": new Set([".mp4", ".m4v"]),
   "video/quicktime": new Set([".mov", ".qt"]),
   "video/x-msvideo": new Set([".avi"]),
@@ -88,7 +96,7 @@ export function comparableMediaFilename(name: string) {
  * the multipart filename when choosing an upload decoder.
  */
 export function ensureDriveFileExtension(name: string, mimeType: string): string {
-  const normalizedMimeType = mimeType.trim().toLowerCase();
+  const normalizedMimeType = mimeType.split(";", 1)[0].trim().toLowerCase();
   const extension = MIME_TYPE_EXTENSIONS[normalizedMimeType];
   if (!extension) return name;
 
@@ -255,7 +263,7 @@ export class GoogleDriveClient {
     nextPageToken?: string;
   }> {
     const parentId = folderId === "root" ? driveId ?? "root" : folderId;
-    const supportedTypesQuery = `(${SUPPORTED_MIME_TYPES.map(
+    const supportedTypesQuery = `(${[...SUPPORTED_MIME_TYPES, ...GENERIC_DRIVE_MIME_TYPES].map(
       (mime) => `mimeType = '${mime}'`
     ).join(" or ")} or mimeType = '${GOOGLE_MIME_TYPE_FOLDER}')`;
 
@@ -279,8 +287,12 @@ export class GoogleDriveClient {
 
     const res = await this.drive.files.list(listParams);
 
+    const files = (res.data.files ?? []) as DriveFile[];
     return {
-      files: (res.data.files ?? []) as DriveFile[],
+      files: files.filter((file) =>
+        GoogleDriveClient.isFolder(file.mimeType) ||
+        GoogleDriveClient.isSupported(file.mimeType, file.name),
+      ),
       nextPageToken: res.data.nextPageToken || undefined,
     };
   }
@@ -460,7 +472,7 @@ export class GoogleDriveClient {
     isVideo: boolean;
   }> {
     const file = await this.getFile(fileId);
-    const isSupported = SUPPORTED_MIME_TYPES.includes(file.mimeType);
+    const isSupported = GoogleDriveClient.isSupported(file.mimeType, file.name);
     return {
       name: file.name,
       mimeType: file.mimeType,
@@ -475,15 +487,27 @@ export class GoogleDriveClient {
   /**
    * Check if a MIME type is an image
    */
-  static isImage(mimeType: string): boolean {
-    return IMAGE_MIME_TYPES.includes(mimeType);
+  static isImage(mimeType: string, filename?: string): boolean {
+    const normalizedMimeType = mimeType.split(";", 1)[0].trim().toLowerCase();
+    if (IMAGE_MIME_TYPES.includes(normalizedMimeType)) return true;
+    return Boolean(
+      filename &&
+      GENERIC_DRIVE_MIME_TYPES.includes(normalizedMimeType) &&
+      HEIC_EXTENSIONS.has(extname(filename).toLowerCase()),
+    );
+  }
+
+  static isSupported(mimeType: string, filename?: string): boolean {
+    return GoogleDriveClient.isImage(mimeType, filename) ||
+      GoogleDriveClient.isVideo(mimeType) ||
+      GoogleDriveClient.isAudio(mimeType);
   }
 
   /**
    * Check if a MIME type is a video
    */
   static isVideo(mimeType: string): boolean {
-    return VIDEO_MIME_TYPES.includes(mimeType);
+    return VIDEO_MIME_TYPES.includes(mimeType.split(";", 1)[0].trim().toLowerCase());
   }
 
   async getProjectDocumentationFolder(): Promise<DriveFolder> {
@@ -529,17 +553,18 @@ export class GoogleDriveClient {
     file?: DriveFile;
     matches: DriveFile[];
     matchCount: number;
+    driveMatches: DriveFile[];
+    driveMatchCount: number;
   }> {
     const rootFolder = await this.getFolder(folderId);
     const driveId = rootFolder.driveId;
     const searchStem = driveFilenameSearchStem(filename);
-    if (!searchStem) return { matches: [], matchCount: 0 };
+    if (!searchStem) {
+      return { matches: [], matchCount: 0, driveMatches: [], driveMatchCount: 0 };
+    }
 
-    const supportedTypesQuery = `(${SUPPORTED_MIME_TYPES.map(
-      (mime) => `mimeType = '${mime}'`,
-    ).join(" or ")})`;
     const listParams: drive_v3.Params$Resource$Files$List = {
-      q: `(name contains '${escapeDriveQueryValue(searchStem)}' or fullText contains '${escapeDriveQueryValue(searchStem)}') and trashed = false and ${supportedTypesQuery}`,
+      q: `(name contains '${escapeDriveQueryValue(searchStem)}' or fullText contains '${escapeDriveQueryValue(searchStem)}') and trashed = false and mimeType != '${GOOGLE_MIME_TYPE_FOLDER}'`,
       pageSize: 1000,
       fields: "nextPageToken,files(id,name,mimeType,size,createdTime,modifiedTime,md5Checksum,sha1Checksum,parents,webViewLink,thumbnailLink)",
     };
@@ -576,6 +601,8 @@ export class GoogleDriveClient {
       ...(matches.length === 1 ? { file: matches[0] } : {}),
       matches,
       matchCount: matches.length,
+      driveMatches: candidates,
+      driveMatchCount: candidates.length,
     };
   }
 
@@ -734,21 +761,14 @@ export class GoogleDriveClient {
    * Check if a MIME type is supported audio
    */
   static isAudio(mimeType: string): boolean {
-    return AUDIO_MIME_TYPES.includes(mimeType);
-  }
-
-  /**
-   * Check if a MIME type is supported
-   */
-  static isSupported(mimeType: string): boolean {
-    return SUPPORTED_MIME_TYPES.includes(mimeType);
+    return AUDIO_MIME_TYPES.includes(mimeType.split(";", 1)[0].trim().toLowerCase());
   }
 
   /**
    * Check if file is a folder
    */
   static isFolder(mimeType: string): boolean {
-    return mimeType === GOOGLE_MIME_TYPE_FOLDER;
+    return mimeType.split(";", 1)[0].trim().toLowerCase() === GOOGLE_MIME_TYPE_FOLDER;
   }
 }
 

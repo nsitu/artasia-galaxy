@@ -879,7 +879,7 @@ router.get("/files", async (req: Request, res: Response) => {
         modifiedTime: file.modifiedTime,
         thumbnailLink: file.thumbnailLink,
         isFolder: GoogleDriveClient.isFolder(file.mimeType),
-        isImage: GoogleDriveClient.isImage(file.mimeType),
+        isImage: GoogleDriveClient.isImage(file.mimeType, file.name),
         isVideo: GoogleDriveClient.isVideo(file.mimeType),
         isAudio: GoogleDriveClient.isAudio(file.mimeType),
       })),
@@ -1118,13 +1118,25 @@ router.post("/assets/:assetId/lookup", async (req: Request, res: Response) => {
 
     const lookup = await client.findUniqueFileInFolderTree(folderId, asset.originalFileName);
     if (lookup.matchCount === 0) {
+      if (lookup.driveMatchCount > 0) {
+        res.json({
+          status: "ambiguous",
+          matchCount: lookup.driveMatchCount,
+          matches: reportedDriveMatches(lookup.driveMatches),
+          detail: `Found ${lookup.driveMatchCount} matching Google Drive file${lookup.driveMatchCount === 1 ? "" : "s"}, but Atlas could not identify one safely within the ${placement ? "assigned site's folder" : "project Documentation folder"}. Compare the files manually, assign this asset to the matching Artasia site, and run the lookup again.`,
+        });
+        return;
+      }
       res.json({ status: "not-found" });
       return;
     }
     const selection = selectDriveFilenameMatch(asset, lookup);
     if (!selection.file) {
-      res.status(409).json({
-        error: `Found ${lookup.matchCount} matching files in the ${placement ? "site's" : "project Documentation"} Google Drive folder. The asset was not linked.`,
+      res.json({
+        status: "ambiguous",
+        matchCount: lookup.matchCount,
+        matches: reportedDriveMatches(lookup.matches),
+        detail: `Found ${lookup.matchCount} matching files in the ${placement ? "site's" : "project Documentation"} Google Drive folder, but Atlas could not choose one safely. Compare the files manually${placement ? "" : ", assign this asset to the matching Artasia site,"} and run the lookup again.`,
       });
       return;
     }
