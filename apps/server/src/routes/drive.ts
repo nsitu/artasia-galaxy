@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { readAuthSession } from "../services/auth.service.js";
 import {
   createDriveClient,
+  driveSourceSearchFilename,
   ensureDriveFileExtension,
   GoogleDriveClient,
   inferActivityFromDriveFolders,
@@ -382,7 +383,7 @@ async function resolveAmbiguousPlacementFromDrive(params: {
     placement,
     lookup: await params.client.findUniqueFileInFolderTree(
       placement.google_drive_folder_id!.trim(),
-      params.asset.originalFileName,
+      driveSourceSearchFilename(params.asset.originalFileName),
     ),
   })));
   const evaluated = lookups.map(({ placement, lookup }) => ({
@@ -420,11 +421,12 @@ async function runBulkDriveLookup(client: GoogleDriveClient): Promise<DriveBulkL
       string,
       {
         folderId: string;
-        placementId: number;
-        placementName: string;
+        placementId: number | null;
+        placementName: string | null;
         asset: ImmichAsset;
       }[]
     >();
+    let globalDocumentationFolder: DriveFolder | null = null;
     let candidates = 0;
 
     for (const listedAsset of assets) {
@@ -465,7 +467,7 @@ async function runBulkDriveLookup(client: GoogleDriveClient): Promise<DriveBulkL
               placementId: placement.placement_id,
               placementName: placement.placement_name,
               folderId: placement.google_drive_folder_id?.trim(),
-              searchedFileName: asset.originalFileName.trim(),
+              searchedFileName: driveSourceSearchFilename(asset.originalFileName),
               fileId: file.id,
               driveFileName: `${file.name} (${selection.detail ?? "resolved conflicting placement and Drive tags"})`,
             });
@@ -492,13 +494,16 @@ async function runBulkDriveLookup(client: GoogleDriveClient): Promise<DriveBulkL
         continue;
       }
       if (placementId == null) {
-        results.push({
-          assetId: asset.id,
-          fileName: asset.originalFileName,
-          status: "skipped",
-          placementTags: [],
-          error: "Asset is not assigned to an Artasia site.",
+        globalDocumentationFolder ??= await client.getProjectDocumentationFolder();
+        candidates += 1;
+        const group = groupedCandidates.get(globalDocumentationFolder.id) ?? [];
+        group.push({
+          folderId: globalDocumentationFolder.id,
+          placementId: null,
+          placementName: null,
+          asset,
         });
+        groupedCandidates.set(globalDocumentationFolder.id, group);
         continue;
       }
       const placement = placementsById.get(placementId);
@@ -533,7 +538,7 @@ async function runBulkDriveLookup(client: GoogleDriveClient): Promise<DriveBulkL
       try {
         lookups = await client.findUniqueFilesInFolderTree(
           folderId,
-          group.map(({ asset }) => asset.originalFileName),
+          group.map(({ asset }) => driveSourceSearchFilename(asset.originalFileName)),
         );
       } catch (err) {
         for (const { asset, placementId, placementName } of group) {
@@ -541,10 +546,10 @@ async function runBulkDriveLookup(client: GoogleDriveClient): Promise<DriveBulkL
             assetId: asset.id,
             fileName: asset.originalFileName,
             status: "failed",
-            placementId,
-            placementName,
+            ...(placementId == null ? {} : { placementId }),
+            ...(placementName == null ? {} : { placementName }),
             folderId,
-            searchedFileName: asset.originalFileName.trim(),
+            searchedFileName: driveSourceSearchFilename(asset.originalFileName),
             error: (err as Error).message,
           });
         }
@@ -553,8 +558,9 @@ async function runBulkDriveLookup(client: GoogleDriveClient): Promise<DriveBulkL
 
       const lookupByFilename = new Map(lookups.map((lookup) => [lookup.filename, lookup]));
       for (const { asset, placementId, placementName } of group) {
-        const lookup = lookupByFilename.get(asset.originalFileName.trim()) ?? {
-          filename: asset.originalFileName.trim(),
+        const searchedFileName = driveSourceSearchFilename(asset.originalFileName);
+        const lookup = lookupByFilename.get(searchedFileName) ?? {
+          filename: searchedFileName,
           folderName: "Unknown folder",
           file: undefined,
           matches: [],
@@ -565,8 +571,8 @@ async function runBulkDriveLookup(client: GoogleDriveClient): Promise<DriveBulkL
             assetId: asset.id,
             fileName: asset.originalFileName,
             status: "not-found",
-            placementId,
-            placementName,
+            ...(placementId == null ? {} : { placementId }),
+            ...(placementName == null ? {} : { placementName }),
             folderId,
             folderName: lookup.folderName,
             searchedFileName: lookup.filename,
@@ -580,29 +586,43 @@ async function runBulkDriveLookup(client: GoogleDriveClient): Promise<DriveBulkL
             assetId: asset.id,
             fileName: asset.originalFileName,
             status: "ambiguous",
-            placementId,
-            placementName,
+            ...(placementId == null ? {} : { placementId }),
+            ...(placementName == null ? {} : { placementName }),
             folderId,
             folderName: lookup.folderName,
             searchedFileName: lookup.filename,
             matches: reportedDriveMatches(lookup.matches),
-            error: `Found ${lookup.matchCount} matching files in the site's Google Drive folder.`,
+            error: `Found ${lookup.matchCount} matching files in the ${placementId == null ? "project Documentation" : "site's"} Google Drive folder.`,
           });
           continue;
         }
 
         try {
+          const parentId = selection.file.parents?.[0];
+          const drivePath = parentId ? await client.getFolderPath(parentId) : [];
+          const resolvedPlacement = placementId == null
+            ? inferPlacementFromDriveFilePath({
+                path: drivePath,
+                placements: config.placements,
+              })
+            : placementsById.get(placementId) ?? null;
+          const inferredActivity = inferActivityFromDriveFilePath({
+            path: drivePath,
+            placement: resolvedPlacement,
+            activities: config.activities,
+          });
           await canonicalizeDriveManagedTags({
             assetId: asset.id,
             fileId: selection.file.id,
-            placement: placementsById.get(placementId) ?? null,
+            placement: resolvedPlacement,
+            ...(inferredActivity ? { activity: inferredActivity } : {}),
           });
           results.push({
             assetId: asset.id,
             fileName: asset.originalFileName,
             status: "linked",
-            placementId,
-            placementName,
+            placementId: resolvedPlacement?.placement_id,
+            placementName: resolvedPlacement?.placement_name,
             folderId,
             folderName: lookup.folderName,
             searchedFileName: lookup.filename,
@@ -619,8 +639,8 @@ async function runBulkDriveLookup(client: GoogleDriveClient): Promise<DriveBulkL
             assetId: asset.id,
             fileName: asset.originalFileName,
             status: "failed",
-            placementId,
-            placementName,
+            ...(placementId == null ? {} : { placementId }),
+            ...(placementName == null ? {} : { placementName }),
             folderId,
             folderName: lookup.folderName,
             searchedFileName: lookup.filename,

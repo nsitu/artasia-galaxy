@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   comparableMediaFilename,
+  driveSourceSearchFilename,
   ensureDriveFileExtension,
   inferActivityFromDriveFolders,
 } from "./googleDrive.service.js";
@@ -42,6 +43,17 @@ test("maps Atlas edit and trim derivatives back to their Drive source stem", () 
   assert.equal(
     comparableMediaFilename("Recording -artasia-trim.mp4"),
     "recording",
+  );
+});
+
+test("removes Atlas derivative suffixes from the reported Drive search filename", () => {
+  assert.equal(
+    driveSourceSearchFilename("IMG_9174-artasia-edit.jpg"),
+    "IMG_9174.jpg",
+  );
+  assert.equal(
+    driveSourceSearchFilename("Clip -artasia-trim-artasia-edit.mp4"),
+    "Clip.mp4",
   );
 });
 

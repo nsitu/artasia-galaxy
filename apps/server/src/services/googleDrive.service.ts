@@ -62,15 +62,25 @@ const COMPARABLE_MEDIA_EXTENSIONS = new Set([
   ".mp3", ".m4a", ".wav", ".aac", ".ogg", ".flac",
 ]);
 
+export function driveSourceSearchFilename(name: string) {
+  const trimmed = name.trim();
+  const extension = extname(trimmed);
+  const stem = COMPARABLE_MEDIA_EXTENSIONS.has(extension.toLocaleLowerCase())
+    ? trimmed.slice(0, -extension.length)
+    : trimmed;
+  const sourceStem = stem
+    .replace(/(?:\s*-\s*artasia-(?:edit|trim))+$/gi, "")
+    .trim();
+  return `${sourceStem}${COMPARABLE_MEDIA_EXTENSIONS.has(extension.toLocaleLowerCase()) ? extension : ""}`;
+}
+
 export function comparableMediaFilename(name: string) {
-  const normalized = name.trim().toLocaleLowerCase();
+  const normalized = driveSourceSearchFilename(name).toLocaleLowerCase();
   const extension = extname(normalized);
   const stem = COMPARABLE_MEDIA_EXTENSIONS.has(extension)
     ? normalized.slice(0, -extension.length)
     : normalized;
-  return stem
-    .replace(/(?:\s*-\s*artasia-(?:edit|trim))+$/g, "")
-    .trim();
+  return stem.trim();
 }
 
 /**
@@ -136,12 +146,12 @@ function escapeDriveQueryValue(value: string) {
 }
 
 function driveFilenameSearchStem(filename: string) {
-  const trimmed = filename.trim();
+  const trimmed = driveSourceSearchFilename(filename);
   const extension = extname(trimmed);
   const stem = COMPARABLE_MEDIA_EXTENSIONS.has(extension.toLocaleLowerCase())
     ? trimmed.slice(0, -extension.length)
     : trimmed;
-  return stem.replace(/(?:\s*-\s*artasia-(?:edit|trim))+$/gi, "").trim();
+  return stem.trim();
 }
 
 function folderActivityMatchScore(
