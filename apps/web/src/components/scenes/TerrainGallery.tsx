@@ -16,7 +16,7 @@ import {
   OrbitingPhotoBanner,
 } from "./TerrainPhotoMarker";
 import PlacementSignpost, {
-  PLACEMENT_SIGN_SPACING,
+  getPlacementSignStackHeight,
   type PlacementSign,
 } from "./PlacementSignpost";
 import PlaceMarker, { FlowerLayoutCoordinator } from "./PlaceMarker";
@@ -1564,7 +1564,7 @@ export default function TerrainGallery({
     const signpostHeight = getPlacementSignpostHeight(
       center.z,
       terrainMaxZ,
-      placementSigns.get(focusedPlacement.placement_id)?.length ?? 0,
+      placementSigns.get(focusedPlacement.placement_id) ?? [],
     );
     center.z += Math.max(ORBIT_HEIGHT, signpostHeight * 0.5);
     const outerRadius = activityOrbitRings.length > 0
@@ -1891,7 +1891,7 @@ export default function TerrainGallery({
             key={placement.placement_id}
             markerId={String(placement.placement_id)}
             position={position}
-            height={getPlacementSignpostHeight(position[2], terrainMaxZ, placementSigns.get(placement.placement_id)?.length ?? 0)}
+            height={getPlacementSignpostHeight(position[2], terrainMaxZ, placementSigns.get(placement.placement_id) ?? [])}
             signs={placementSigns.get(placement.placement_id) ?? []}
             placementName={formatPlacementPlaqueName(placement)}
             partnerBrandColor={placement.partner_brand_color_one}
@@ -2819,14 +2819,14 @@ function getPartnerAcronym(value?: string) {
 function getPlacementSignpostHeight(
   baseZ: number,
   terrainMaxZ: number | null,
-  signCount: number,
+  signs: PlacementSign[],
 ) {
   const terrainClearanceHeight = terrainMaxZ == null
     ? 0
     : terrainMaxZ - baseZ + SIGNPOST_TERRAIN_CLEARANCE;
   return Math.max(
     SIGNPOST_MIN_HEIGHT,
-    1.2 + signCount * PLACEMENT_SIGN_SPACING,
+    getPlacementSignStackHeight(signs),
     terrainClearanceHeight,
   );
 }

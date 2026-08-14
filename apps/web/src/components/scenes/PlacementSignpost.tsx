@@ -32,6 +32,7 @@ export const PLACEMENT_SIGN_SPACING = 0.1;
 const SIGN_TOP_OFFSET = 0.18;
 const SIGNPOST_MIN_HEIGHT = 2.8;
 const SIGNPOST_NAME_SIGN_GAP = 0.08;
+const SIGN_GROUP_GAP = 0.4;
 const NAME_SIGN_TEXT_DEPTH = 0.012;
 const POST_COLOR = "#687581";
 const POST_HIGHLIGHT_COLOR = "#aebbc4";
@@ -43,6 +44,7 @@ const SIGN_MIN_WIDTH = 0.9;
 const SHARED_SIGN_MIN_WIDTH = 0.7;
 const SHARED_SIGN_FONT_SIZE = 0.075;
 const SIGN_TIP_LENGTH = 0.085;
+const SHARED_SIGN_HALF_HEIGHT = 0.075;
 const SIGN_INNER_EDGE = POST_RADIUS;
 // Keep centered shared-location signs just in front of the pole so the pole
 // does not visually cut through their labels.
@@ -68,10 +70,11 @@ export default function PlacementSignpost({
   onPointerLeave,
 }: PlacementSignpostProps) {
   const [x, y, z] = position;
+  const signOffsets = getPlacementSignOffsets(signs);
   const signStackHeight = Math.max(
     SIGNPOST_MIN_HEIGHT,
     height,
-    1.2 + signs.length * PLACEMENT_SIGN_SPACING,
+    getPlacementSignStackHeight(signs),
   );
   const nameSignLayout = getPlacementNameSignLayout(placementName);
   const nameSignBottom = signStackHeight + SIGNPOST_NAME_SIGN_GAP;
@@ -174,7 +177,7 @@ export default function PlacementSignpost({
         <SignBoard
           key={sign.id}
           sign={sign}
-          index={index}
+          verticalOffset={signOffsets[index]}
           postHeight={signStackHeight}
         />
       ))}
@@ -309,11 +312,11 @@ function getColorLuminance(color: THREE.Color) {
 
 function SignBoard({
   sign,
-  index,
+  verticalOffset,
   postHeight,
 }: {
   sign: PlacementSign;
-  index: number;
+  verticalOffset: number;
   postHeight: number;
 }) {
   const [isHovered, setIsHovered] = useState(false);
@@ -321,7 +324,7 @@ function SignBoard({
   const renderOrder = isDown
     ? SIGN_SHARED_LOCATION_RENDER_ORDER
     : SIGN_POINTER_RENDER_ORDER;
-  const signZ = postHeight - SIGN_TOP_OFFSET - index * PLACEMENT_SIGN_SPACING;
+  const signZ = postHeight - SIGN_TOP_OFFSET - verticalOffset;
   const fontSize = isDown ? SHARED_SIGN_FONT_SIZE : 0.085;
   const signWidth = getSignWidth(sign.label, isDown, fontSize);
   const directionMultiplier = sign.direction === "left" ? -1 : 1;
@@ -392,6 +395,46 @@ function getSignWidth(label: string, isDown: boolean, fontSize: number) {
     isDown ? SHARED_SIGN_MIN_WIDTH : SIGN_MIN_WIDTH,
     estimatedTextWidth + SIGN_TEXT_PADDING,
   );
+}
+
+function getPlacementSignOffsets(signs: PlacementSign[]) {
+  const offsets: number[] = [];
+  const lastNearbyOffsetByDirection = new Map<PlacementSignDirection, number>();
+  let offset = 0;
+
+  for (let index = 0; index < signs.length; index += 1) {
+    const sign = signs[index];
+    const isShared = sign.direction === "down";
+
+    if (index > 0) {
+      const previousIsShared = signs[index - 1].direction === "down";
+
+      if (isShared && previousIsShared) {
+        offset += SHARED_SIGN_HALF_HEIGHT * 2 + PLACEMENT_SIGN_SPACING;
+      } else if (isShared) {
+        offset += SIGN_TIP_LENGTH + SIGN_GROUP_GAP + SHARED_SIGN_HALF_HEIGHT;
+      } else {
+        const compactOffset = offset + PLACEMENT_SIGN_SPACING;
+        const previousSameDirectionOffset = lastNearbyOffsetByDirection.get(
+          sign.direction,
+        );
+        const sameDirectionOffset = previousSameDirectionOffset == null
+          ? 0
+          : previousSameDirectionOffset + SIGN_TIP_LENGTH * 2 + PLACEMENT_SIGN_SPACING;
+        offset = Math.max(compactOffset, sameDirectionOffset);
+      }
+    }
+    if (!isShared) lastNearbyOffsetByDirection.set(sign.direction, offset);
+    offsets.push(offset);
+  }
+
+  return offsets;
+}
+
+export function getPlacementSignStackHeight(signs: PlacementSign[]) {
+  const offsets = getPlacementSignOffsets(signs);
+  const finalOffset = offsets.at(-1) ?? 0;
+  return 1.2 + finalOffset + PLACEMENT_SIGN_SPACING;
 }
 
 function createArrowShape(direction: PlacementSignDirection, width: number) {
