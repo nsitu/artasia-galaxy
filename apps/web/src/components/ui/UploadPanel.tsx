@@ -281,6 +281,15 @@ export default function UploadPanel({
         : "draft";
     },
   );
+  const browseAssetStatusIsAutomaticRef = useRef(
+    !BROWSE_ASSET_STATUSES.some(
+      (status) =>
+        status.value === new URLSearchParams(
+          adminSearch ?? window.location.search,
+        ).get("status"),
+    ),
+  );
+  const browseAssetStatusWasManuallySelectedRef = useRef(false);
   const [siteScope, setSiteScope] = useState<SiteScope>("select");
   const [siteSort, setSiteSort] = useState<SiteSort>("published-assets");
   const [siteActivityStats, setSiteActivityStats] = useState<
@@ -615,10 +624,14 @@ export default function UploadPanel({
     setAssetMode(requestedUntagged ? "untagged" : "placements");
     setActivityTagFilter(!requestedUntagged && activity ? String(activity.id) : "");
     if (mode === "browse") {
+      const hasRequestedStatus = BROWSE_ASSET_STATUSES.some(
+        (status) => status.value === requestedStatus,
+      );
+      browseAssetStatusIsAutomaticRef.current = hasRequestedStatus
+        ? false
+        : !browseAssetStatusWasManuallySelectedRef.current;
       setBrowseAssetStatus(
-        BROWSE_ASSET_STATUSES.some(
-          (status) => status.value === requestedStatus,
-        )
+        hasRequestedStatus
           ? requestedStatus as BrowseAssetStatus
           : "draft",
       );
@@ -1519,7 +1532,10 @@ export default function UploadPanel({
       setAssetsLoading(true);
       fetchUntaggedPlacementAssets()
         .then((assets) => {
-          if (!cancelled) setPlacementAssets(assets);
+          if (!cancelled) {
+            setPlacementAssets(assets);
+            applyAutomaticBrowseAssetStatus(assets);
+          }
         })
         .catch((err) => {
           if (!cancelled) setError((err as Error).message);
@@ -1545,7 +1561,10 @@ export default function UploadPanel({
       activityTagFilter ? parseInt(activityTagFilter, 10) : undefined,
     )
       .then((assets) => {
-        if (!cancelled) setPlacementAssets(assets);
+        if (!cancelled) {
+          setPlacementAssets(assets);
+          applyAutomaticBrowseAssetStatus(assets);
+        }
       })
       .catch((err) => {
         if (!cancelled) setError((err as Error).message);
@@ -2092,7 +2111,10 @@ export default function UploadPanel({
         : fetchPlacementAssetSet(visiblePlacementIds, activityId);
 
     request
-      .then(setPlacementAssets)
+      .then((assets) => {
+        setPlacementAssets(assets);
+        applyAutomaticBrowseAssetStatus(assets);
+      })
       .catch((err) => setError((err as Error).message))
       .finally(() => setAssetsLoading(false));
   }
@@ -2202,12 +2224,41 @@ export default function UploadPanel({
   }
 
   function selectBrowseAssetStatus(status: BrowseAssetStatus) {
+    browseAssetStatusWasManuallySelectedRef.current = true;
+    browseAssetStatusIsAutomaticRef.current = false;
     setBrowseAssetStatus(status);
     setSelectedBrowseAssetIds(new Set());
 
     const nextUrl = new URL(window.location.href);
     if (status === "draft") nextUrl.searchParams.delete("status");
     else nextUrl.searchParams.set("status", status);
+    window.history.replaceState(
+      null,
+      "",
+      `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`,
+    );
+  }
+
+  function applyAutomaticBrowseAssetStatus(assets: PlacementAsset[]) {
+    if (
+      workspaceMode !== "browse" ||
+      !browseAssetStatusIsAutomaticRef.current
+    ) return;
+
+    const hasDrafts = assets.some(
+      (asset) => !asset.published && !asset.archived,
+    );
+    const hasPublished = assets.some(
+      (asset) => Boolean(asset.published) && !asset.archived,
+    );
+    if (hasDrafts || !hasPublished) return;
+
+    browseAssetStatusIsAutomaticRef.current = false;
+    setBrowseAssetStatus("published");
+    setSelectedBrowseAssetIds(new Set());
+
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set("status", "published");
     window.history.replaceState(
       null,
       "",

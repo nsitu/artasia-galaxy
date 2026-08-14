@@ -2195,6 +2195,7 @@ function PlacementInfoPanel({
               {placement.documentation_url && (
                 <a
                   href={placement.documentation_url}
+                  className="atlas-control-surface"
                   target="_blank"
                   rel="noopener noreferrer"
                   style={siteDetailsActionLinkStyle}
@@ -2206,10 +2207,7 @@ function PlacementInfoPanel({
                 <a
                   href={adminHref}
                   className="atlas-control-surface"
-                  style={{
-                    ...siteDetailsActionLinkStyle,
-                    ...siteDetailsPrimaryActionStyle,
-                  }}
+                  style={siteDetailsActionLinkStyle}
                 >
                   Admin
                 </a>
@@ -2219,9 +2217,9 @@ function PlacementInfoPanel({
                   type="button"
                   className="atlas-control-surface"
                   onClick={onView}
-                  style={siteDetailsPrimaryActionStyle}
+                  style={siteDetailsActionLinkStyle}
                 >
-                  View
+                  Gallery
                 </button>
               )}
             </div>
@@ -2251,15 +2249,18 @@ export function PlacementHoverLabel({
 export function PlacementPreviewPanel({
   placement,
   onOpen,
+  adminHref,
 }: {
   placement: MapPlacement;
   onOpen: () => void;
+  adminHref?: string;
 }) {
   const isMobile = useIsMobileBreakpoint();
   if (isMobile) {
     return (
       <PlacementInfoPanel
         placement={placement}
+        adminHref={adminHref}
         onView={onOpen}
         preview
       />
@@ -2315,7 +2316,7 @@ export function PlacementPreviewPanel({
           )}
           <span style={placementPreviewMetaStyle}>{artistEducatorDetails}</span>
         </span>
-        <span style={placementPreviewActionStyle}>View</span>
+        <span style={placementPreviewActionStyle}>Gallery</span>
       </button>
     </section>
   );
@@ -2744,48 +2745,35 @@ const siteDetailsGridStyle: React.CSSProperties = {
 
 const siteDetailsActionsStyle: React.CSSProperties = {
   display: "flex",
-  flexWrap: "wrap",
+  flexWrap: "nowrap",
   gap: 8,
-  justifyContent: "flex-end",
+  width: "100%",
   marginTop: 10,
   pointerEvents: "auto",
 };
 
-const siteDetailsPrimaryActionStyle: React.CSSProperties = {
+const siteDetailsActionLinkStyle: React.CSSProperties = {
   ...atlasControlSurfaceStyle,
-  flex: "1 0 100%",
-  width: "100%",
+  flex: "1 1 0",
+  minWidth: 0,
   minHeight: 44,
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
   boxSizing: "border-box",
-  padding: "11px 12px",
+  padding: "11px 8px",
   border: "1px solid rgba(255,255,255,0.22)",
   borderRadius: 0,
   color: "#ffffff",
   fontFamily: "monospace",
-  fontSize: 12,
+  fontSize: "clamp(10px, 2.5vw, 12px)",
   fontWeight: 700,
   lineHeight: 1,
   textAlign: "center",
   textDecoration: "none",
   cursor: "pointer",
   pointerEvents: "auto",
-};
-
-const siteDetailsActionLinkStyle: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  minHeight: 30,
-  padding: "5px 9px",
-  border: "1px solid rgba(255,255,255,0.22)",
-  borderRadius: 4,
-  color: "#eef2f8",
-  textDecoration: "none",
-  fontSize: 12,
-  lineHeight: 1.2,
-  pointerEvents: "auto",
+  whiteSpace: "nowrap",
 };
 
 const siteDetailRowStyle: React.CSSProperties = {

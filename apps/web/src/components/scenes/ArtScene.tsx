@@ -64,6 +64,7 @@ function LightboxMedia({
   photo,
   active,
   zoom = 1,
+  pan = { x: 0, y: 0 },
   activityColour,
   style,
   onClick,
@@ -71,6 +72,7 @@ function LightboxMedia({
   photo: Photo;
   active: boolean;
   zoom?: number;
+  pan?: { x: number; y: number };
   activityColour?: string;
   style: React.CSSProperties;
   onClick: React.MouseEventHandler<HTMLImageElement | HTMLVideoElement>;
@@ -78,8 +80,11 @@ function LightboxMedia({
   const [loading, setLoading] = useState(active);
   const mediaStyle: React.CSSProperties = {
     ...style,
-    transform: active ? `scale(${zoom})` : undefined,
+    transform: active
+      ? `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`
+      : undefined,
     transformOrigin: "center",
+    cursor: active && zoom > 1.01 ? "grab" : style.cursor,
   };
 
   if (active && photo.mediaKind === "audio" && photo.audioUrl) {
@@ -197,13 +202,22 @@ export default function ArtScene() {
   const topControlsRef = useRef<HTMLDivElement | null>(null);
   const linkedAudioRef = useRef<HTMLAudioElement | null>(null);
   const [linkedAudioPlaying, setLinkedAudioPlaying] = useState(false);
-  const lightboxSwipeStartRef = useRef<{ x: number; y: number } | null>(null);
+  const lightboxDragStartRef = useRef<{
+    x: number;
+    y: number;
+    panX: number;
+    panY: number;
+    mode: "swipe" | "pan";
+  } | null>(null);
   const lightboxSwipeTimerRef = useRef<number | null>(null);
   const [lightboxSwipeOffset, setLightboxSwipeOffset] = useState(0);
   const [lightboxSwipeSettling, setLightboxSwipeSettling] = useState(false);
   const [lightboxZoom, setLightboxZoom] = useState(1);
+  const [lightboxPan, setLightboxPan] = useState({ x: 0, y: 0 });
   const [lightboxMetadataExpanded, setLightboxMetadataExpanded] = useState(true);
   const lightboxZoomRef = useRef(1);
+  const lightboxPanRef = useRef({ x: 0, y: 0 });
+  const lightboxStageRef = useRef<HTMLDivElement | null>(null);
   const lightboxTouchPointsRef = useRef(new Map<number, { x: number; y: number }>());
   const lightboxPinchRef = useRef<{ distance: number; zoom: number } | null>(null);
   const lightboxSuppressClickRef = useRef(false);
@@ -321,11 +335,15 @@ export default function ArtScene() {
       lightboxSwipeTimerRef.current = null;
     }
     lightboxZoomRef.current = 1;
+    lightboxPanRef.current = { x: 0, y: 0 };
     setLightboxZoom(1);
+    setLightboxPan({ x: 0, y: 0 });
     setLightboxSwipeSettling(false);
     setLightboxSwipeOffset(0);
     lightboxTouchPointsRef.current.clear();
     lightboxPinchRef.current = null;
+    lightboxDragStartRef.current = null;
+    lightboxSuppressClickRef.current = false;
     return () => {
       if (lightboxSwipeTimerRef.current !== null) {
         window.clearTimeout(lightboxSwipeTimerRef.current);
@@ -390,26 +408,60 @@ export default function ArtScene() {
     return () => document.removeEventListener("keydown", handleLightboxKeyDown);
   }, [selectAdjacentPhoto, selectPhoto, selectedPhoto]);
 
+  const setClampedLightboxPan = useCallback((
+    nextPan: { x: number; y: number },
+    zoom = lightboxZoomRef.current,
+  ) => {
+    const stage = lightboxStageRef.current;
+    const media = stage?.querySelector<HTMLElement>(
+      ".atlas-photo-lightbox-slide:nth-child(2) .atlas-photo-lightbox-media",
+    );
+    const maxX = stage && media
+      ? Math.max(0, (media.offsetWidth * zoom - stage.clientWidth) / 2)
+      : 0;
+    const maxY = stage && media
+      ? Math.max(0, (media.offsetHeight * zoom - stage.clientHeight) / 2)
+      : 0;
+    const clampedPan = {
+      x: THREE.MathUtils.clamp(nextPan.x, -maxX, maxX),
+      y: THREE.MathUtils.clamp(nextPan.y, -maxY, maxY),
+    };
+    lightboxPanRef.current = clampedPan;
+    setLightboxPan(clampedPan);
+  }, []);
+
   const handleLightboxPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.pointerType !== "touch") return;
+    const canPan = lightboxZoomRef.current > 1.01;
+    if (event.pointerType !== "touch" && !canPan) return;
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    if ((event.target as Element).closest("button, a, .atlas-photo-lightbox-metadata")) return;
     if (lightboxSwipeTimerRef.current !== null) {
       window.clearTimeout(lightboxSwipeTimerRef.current);
       lightboxSwipeTimerRef.current = null;
     }
-    lightboxTouchPointsRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    if (lightboxTouchPointsRef.current.size === 2) {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    if (event.pointerType === "touch") {
+      lightboxTouchPointsRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    }
+    if (event.pointerType === "touch" && lightboxTouchPointsRef.current.size === 2) {
       const [first, second] = [...lightboxTouchPointsRef.current.values()];
       lightboxPinchRef.current = {
         distance: Math.hypot(second.x - first.x, second.y - first.y),
         zoom: lightboxZoomRef.current,
       };
-      lightboxSwipeStartRef.current = null;
+      lightboxDragStartRef.current = null;
       setLightboxSwipeOffset(0);
       return;
     }
-    lightboxSwipeStartRef.current = { x: event.clientX, y: event.clientY };
+    lightboxDragStartRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+      panX: lightboxPanRef.current.x,
+      panY: lightboxPanRef.current.y,
+      mode: canPan ? "pan" : "swipe",
+    };
     setLightboxSwipeSettling(false);
-    setLightboxSwipeOffset(0);
+    if (!canPan) setLightboxSwipeOffset(0);
   }, []);
 
   const handleLightboxPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
@@ -426,25 +478,59 @@ export default function ArtScene() {
       );
       lightboxZoomRef.current = nextZoom;
       setLightboxZoom(nextZoom);
+      setClampedLightboxPan(lightboxPanRef.current, nextZoom);
       lightboxSuppressClickRef.current = true;
       return;
     }
-    const start = lightboxSwipeStartRef.current;
-    if (!start || event.pointerType !== "touch" || lightboxZoomRef.current > 1.01) return;
+    const start = lightboxDragStartRef.current;
+    if (!start) return;
+    if (start.mode === "pan") {
+      const deltaX = event.clientX - start.x;
+      const deltaY = event.clientY - start.y;
+      setClampedLightboxPan(
+        { x: start.panX + deltaX, y: start.panY + deltaY },
+        lightboxZoomRef.current,
+      );
+      if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) {
+        lightboxSuppressClickRef.current = true;
+      }
+      return;
+    }
+    if (event.pointerType !== "touch") return;
     setLightboxSwipeOffset(event.clientX - start.x);
-  }, []);
+  }, [setClampedLightboxPan]);
 
   const handleLightboxPointerUp = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     lightboxTouchPointsRef.current.delete(event.pointerId);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
     if (lightboxPinchRef.current) {
       if (lightboxTouchPointsRef.current.size < 2) lightboxPinchRef.current = null;
-      lightboxSwipeStartRef.current = null;
+      lightboxDragStartRef.current = null;
       lightboxSuppressClickRef.current = true;
+      window.setTimeout(() => {
+        lightboxSuppressClickRef.current = false;
+      }, 0);
       return;
     }
-    const start = lightboxSwipeStartRef.current;
-    lightboxSwipeStartRef.current = null;
-    if (!start || event.pointerType !== "touch") return;
+    const start = lightboxDragStartRef.current;
+    lightboxDragStartRef.current = null;
+    if (!start) return;
+
+    if (start.mode === "pan") {
+      if (
+        Math.abs(event.clientX - start.x) > 3 ||
+        Math.abs(event.clientY - start.y) > 3
+      ) {
+        lightboxSuppressClickRef.current = true;
+        window.setTimeout(() => {
+          lightboxSuppressClickRef.current = false;
+        }, 0);
+      }
+      return;
+    }
+    if (event.pointerType !== "touch") return;
 
     const deltaX = event.clientX - start.x;
     const deltaY = event.clientY - start.y;
@@ -473,7 +559,8 @@ export default function ArtScene() {
     );
     lightboxZoomRef.current = nextZoom;
     setLightboxZoom(nextZoom);
-  }, []);
+    setClampedLightboxPan(lightboxPanRef.current, nextZoom);
+  }, [setClampedLightboxPan]);
   const handleBackActionChange = useCallback((action: (() => void) | null) => {
     setBackAction(action ? () => action : null);
   }, []);
@@ -762,7 +849,15 @@ export default function ArtScene() {
         />
       )}
       {!focusedPlacementDetails && previewPlacementDetails && previewPlacementAction && (
-        <PlacementPreviewPanel placement={previewPlacementDetails} onOpen={previewPlacementAction} />
+        <PlacementPreviewPanel
+          placement={previewPlacementDetails}
+          onOpen={previewPlacementAction}
+          adminHref={
+            authUser?.authenticated
+              ? `/admin/browse?site=${encodeURIComponent(String(previewPlacementDetails.placement_id))}`
+              : undefined
+          }
+        />
       )}
       {!focusedPlacementDetails && hoveredPlacementDetails && (
         <PlacementHoverLabel placement={hoveredPlacementDetails} />
@@ -796,7 +891,11 @@ export default function ArtScene() {
                 : ""}
             </div>
           )}
-          <div className="atlas-photo-lightbox-stage" style={photoLightboxStageStyle}>
+          <div
+            ref={lightboxStageRef}
+            className="atlas-photo-lightbox-stage"
+            style={photoLightboxStageStyle}
+          >
             <div
               className="atlas-photo-lightbox-track"
               style={{
@@ -825,6 +924,7 @@ export default function ArtScene() {
                   photo={selectedPhoto}
                   active
                   zoom={lightboxZoom}
+                  pan={lightboxPan}
                   activityColour={selectedAudioActivityColour}
                   style={{
                     ...photoLightboxImageStyle,
