@@ -529,6 +529,7 @@ export type PartnerFilterOption = {
 };
 
 const SITE_PATH_PREFIX = "/sites/";
+const EARLY_ON_PARTNER_FILTER = "__earlyon__";
 
 interface TerrainGalleryProps {
   authenticated?: boolean | null;
@@ -643,7 +644,7 @@ export default function TerrainGallery({
             : null),
       });
     }
-    return [...partners.entries()]
+    const options = [...partners.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([partner, { count, whiteLogo }]) => ({
         value: partner,
@@ -651,9 +652,22 @@ export default function TerrainGallery({
         count,
         whiteLogo,
       }));
+    const earlyOnCount = placements.filter((placement) => placement.is_earlyon).length;
+    if (earlyOnCount > 0) {
+      options.push({
+        value: EARLY_ON_PARTNER_FILTER,
+        label: "EarlyON",
+        count: earlyOnCount,
+        whiteLogo: null,
+      });
+    }
+    return options;
   }, [placements]);
   const filteredRegionalPlacements = useMemo(() => {
     if (!selectedPartnerFilter) return placements;
+    if (selectedPartnerFilter === EARLY_ON_PARTNER_FILTER) {
+      return placements.filter((placement) => placement.is_earlyon);
+    }
     return placements.filter(
       (placement) => placement.partner_name?.trim() === selectedPartnerFilter,
     );
@@ -2174,9 +2188,17 @@ function PlacementInfoPanel({
           ...(!expanded ? siteDetailsHeaderCollapsedStyle : {}),
         }}
       >
-        <div style={siteDetailsTitleWrapStyle}>
+        <button
+          type="button"
+          aria-expanded={expanded}
+          aria-label={
+            expanded ? "Collapse placement details" : "Expand placement details"
+          }
+          onClick={() => setExpanded((current) => !current)}
+          style={siteDetailsTitleWrapStyle}
+        >
           <div style={siteNameStyle}>{formatPlacementDisplayName(placement)}</div>
-        </div>
+        </button>
         <button
           type="button"
           className="atlas-control-surface"
@@ -2274,7 +2296,7 @@ function PlacementInfoPanel({
                     ...siteDetailRowSeparatorStyle,
                   }}
                 >
-                  EarlyON Location
+                  EarlyON Child and Family Centre
                 </div>
               </>
             )}
@@ -2795,6 +2817,17 @@ const mobileSiteDetailsBodyStyle: React.CSSProperties = {
 const siteDetailsTitleWrapStyle: React.CSSProperties = {
   minWidth: 0,
   flex: "1 1 auto",
+  alignSelf: "stretch",
+  display: "flex",
+  alignItems: "center",
+  padding: 0,
+  color: "inherit",
+  font: "inherit",
+  textAlign: "left",
+  background: "transparent",
+  border: 0,
+  cursor: "pointer",
+  pointerEvents: "auto",
 };
 
 const siteDetailsToggleStyle: React.CSSProperties = {

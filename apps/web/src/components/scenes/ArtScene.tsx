@@ -112,6 +112,7 @@ function LightboxMedia({
           className="atlas-photo-lightbox-media"
           src={photo.videoUrl}
           poster={photo.previewUrl}
+          draggable={false}
           controls={active}
           autoPlay={active}
           playsInline
@@ -134,6 +135,7 @@ function LightboxMedia({
         className="atlas-photo-lightbox-media"
         src={photo.previewUrl}
         alt={active ? photo.fileName : ""}
+        draggable={false}
         aria-hidden={!active}
         loading="eager"
         decoding="async"
@@ -435,6 +437,7 @@ export default function ArtScene() {
     if (event.pointerType !== "touch" && !canPan) return;
     if (event.pointerType === "mouse" && event.button !== 0) return;
     if ((event.target as Element).closest("button, a, .atlas-photo-lightbox-metadata")) return;
+    if (canPan) event.preventDefault();
     if (lightboxSwipeTimerRef.current !== null) {
       window.clearTimeout(lightboxSwipeTimerRef.current);
       lightboxSwipeTimerRef.current = null;
@@ -717,7 +720,11 @@ export default function ArtScene() {
                 onClick={() => setOpenFilter((current) => current === "partner" ? null : "partner")}
                 style={{ ...filterTriggerStyle, ...partnerFilterTriggerStyle }}
               >
-                <span>{selectedPartnerFilter || "Partners"}</span>
+                <span>
+                  {partnerFilterOptions.find(
+                    (option) => option.value === selectedPartnerFilter,
+                  )?.label || "Partners"}
+                </span>
                 <ChevronIcon expanded={openFilter === "partner"} />
               </button>
               {openFilter === "partner" && (
@@ -755,7 +762,7 @@ export default function ArtScene() {
                       }}
                     />
                   )}
-                  {activityFilterOptions.find((option) => String(option.id) === selectedActivityFilter)?.label || "All Activities"}
+                  {activityFilterOptions.find((option) => String(option.id) === selectedActivityFilter)?.label || "Activities"}
                 </span>
                 <ChevronIcon expanded={openFilter === "activity"} />
               </button>
@@ -907,6 +914,7 @@ export default function ArtScene() {
           onPointerMove={handleLightboxPointerMove}
           onPointerUp={handleLightboxPointerUp}
           onPointerCancel={handleLightboxPointerUp}
+          onDragStart={(event) => event.preventDefault()}
           onWheel={handleLightboxWheel}
           onClick={() => {
             if (lightboxSuppressClickRef.current) {
@@ -2165,6 +2173,7 @@ const photoLightboxImageStyle: React.CSSProperties = {
   objectFit: "contain",
   boxShadow: "0 18px 60px rgba(0,0,0,0.5)",
   cursor: "default",
+  userSelect: "none",
 };
 
 const photoLightboxTrackStyle: React.CSSProperties = {
