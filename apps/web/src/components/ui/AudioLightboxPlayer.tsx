@@ -75,7 +75,7 @@ export default function AudioLightboxPlayer({
     });
   }, [waveform]);
 
-  const displayedIconName = iconName?.trim() || "play_arrow";
+  const displayedIconName = iconName?.trim() || "mic";
 
   function seek(event: React.PointerEvent<SVGSVGElement>) {
     if (duration <= 0 || !audioRef.current) return;

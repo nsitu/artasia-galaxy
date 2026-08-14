@@ -24,6 +24,7 @@ const coreIconNames = [
   "filter_alt_off",
   "warning",
   "child_hat",
+  "mic",
   "close",
   "play_arrow",
   "pause",

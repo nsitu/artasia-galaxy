@@ -2078,22 +2078,8 @@ export function FocusedPlacementOverlay({
           ...(!expanded ? siteDetailsHeaderCollapsedStyle : {}),
         }}
       >
-        {partnerLogo?.url && (
-          <img
-            src={partnerLogo.url}
-            alt={
-              partnerLogo.alt ||
-              placement.partner_name ||
-              "Partner logo"
-            }
-            style={placement.partner_white_logo?.url ? partnerWhiteLogoStyle : partnerLogoStyle}
-          />
-        )}
         <div style={siteDetailsTitleWrapStyle}>
           <div style={siteNameStyle}>{formatPlacementDisplayName(placement)}</div>
-          <div style={sitePartnerStyle}>
-            {placement.partner_name || "Partner organization"}
-          </div>
         </div>
         <button
           type="button"
@@ -2117,6 +2103,33 @@ export function FocusedPlacementOverlay({
           }}
         >
           <div style={siteDetailsGridStyle}>
+            <div
+              style={{
+                ...siteDetailLabelStyle,
+                ...siteDetailPartnerLogoCellStyle,
+                ...siteDetailRowSeparatorStyle,
+              }}
+            >
+              {partnerLogo?.url && (
+                <img
+                  src={partnerLogo.url}
+                  alt={partnerLogo.alt || ""}
+                  style={
+                    placement.partner_white_logo?.url
+                      ? partnerWhiteLogoStyle
+                      : partnerLogoStyle
+                  }
+                />
+              )}
+            </div>
+            <div
+              style={{
+                ...siteDetailValueStyle,
+                ...siteDetailRowSeparatorStyle,
+              }}
+            >
+              {placement.partner_name || "Partner organization"}
+            </div>
             <SiteDetail
               label="Location"
               icon="location_on"
@@ -2443,7 +2456,9 @@ const siteDetailsStyle: React.CSSProperties = {
   width: "100vw",
   maxWidth: "none",
   boxSizing: "border-box",
-  pointerEvents: "none",
+  pointerEvents: "auto",
+  userSelect: "text",
+  WebkitUserSelect: "text",
   border: "none",
   borderRadius: 0,
   padding: 0,
@@ -2720,13 +2735,6 @@ const partnerWhiteLogoStyle: React.CSSProperties = {
   padding: 0,
 };
 
-const sitePartnerStyle: React.CSSProperties = {
-  color: "#aeb7c6",
-  fontSize: 12,
-  fontWeight: 400,
-  lineHeight: 1.25,
-};
-
 const siteNameStyle: React.CSSProperties = {
   color: "#f4f7fb",
   fontSize: 16,
@@ -2782,6 +2790,10 @@ const siteDetailLabelStyle: React.CSSProperties = {
   padding: "5px 10px 5px 0",
   boxSizing: "border-box",
   borderRight: "1px solid rgba(255,255,255,0.14)",
+};
+
+const siteDetailPartnerLogoCellStyle: React.CSSProperties = {
+  justifyContent: "center",
 };
 
 const siteDetailIconStyle: React.CSSProperties = {
