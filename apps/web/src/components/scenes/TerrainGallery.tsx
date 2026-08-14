@@ -26,6 +26,7 @@ import {
   getGeoPhotos,
 } from "./terrainLayout";
 import { loadThreeGeo, type ThreeGeoProjection } from "./threeGeoRuntime";
+import { atlasPanelSurfaceStyle } from "./atlasSurfaceStyles";
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN ?? "";
 const REGIONAL_TERRAIN_ELEVATION_SCALE = 8;
@@ -2361,6 +2362,7 @@ function isMatchingPlacementPhotoScope(
 }
 
 const siteDetailsStyle: React.CSSProperties = {
+  ...atlasPanelSurfaceStyle,
   position: "fixed",
   left: 0,
   right: 0,
@@ -2371,7 +2373,6 @@ const siteDetailsStyle: React.CSSProperties = {
   maxWidth: "none",
   boxSizing: "border-box",
   pointerEvents: "none",
-  background: "rgba(10,10,20,0.86)",
   border: "none",
   borderRadius: 0,
   padding: "12px 16px",
@@ -2398,6 +2399,7 @@ const mobileSiteDetailsCollapsedStyle: React.CSSProperties = {
 };
 
 const placementHoverLabelStyle: React.CSSProperties = {
+  ...atlasPanelSurfaceStyle,
   position: "absolute",
   left: "50%",
   bottom: 18,
@@ -2405,7 +2407,6 @@ const placementHoverLabelStyle: React.CSSProperties = {
   width: "max-content",
   maxWidth: "min(460px, calc(100vw - 32px))",
   pointerEvents: "none",
-  background: "rgba(10,10,20,0.82)",
   border: "1px solid rgba(255,255,255,0.18)",
   borderRadius: 6,
   padding: "10px 14px",
@@ -2449,6 +2450,7 @@ const placementPreviewPanelStyle: React.CSSProperties = {
 };
 
 const placementPreviewButtonStyle: React.CSSProperties = {
+  ...atlasPanelSurfaceStyle,
   width: "100%",
   minHeight: 82,
   display: "flex",
@@ -2457,7 +2459,6 @@ const placementPreviewButtonStyle: React.CSSProperties = {
   padding: 12,
   borderRadius: 14,
   border: "1px solid rgba(255,255,255,0.18)",
-  background: "rgba(10,10,20,0.9)",
   color: "#eef2f8",
   boxShadow: "0 12px 32px rgba(0,0,0,0.32)",
   textAlign: "left",

@@ -15,6 +15,7 @@ import TerrainGallery, {
   PlacementPreviewPanel,
   type TerrainNotice,
 } from "./TerrainGallery";
+import { atlasPanelSurfaceStyle } from "./atlasSurfaceStyles";
 
 const DEFAULT_TERRAIN_CAMERA_POSITION: [number, number, number] = [0, -12, 10];
 const TERRAIN_MAP_HEADING = 0;
@@ -1391,6 +1392,7 @@ function TouchDoubleTapZoom({ enabled }: { enabled: boolean }) {
 }
 
 const topNavStyle: React.CSSProperties = {
+  ...atlasPanelSurfaceStyle,
   position: "absolute",
   top: 0,
   left: 0,
@@ -1402,8 +1404,6 @@ const topNavStyle: React.CSSProperties = {
   minHeight: "5rem",
   padding: 0,
   boxSizing: "border-box",
-  background: "rgba(0, 0, 0, 0.42)",
-  backdropFilter: "blur(8px)",
   fontFamily: "monospace",
   color: "#aaa",
   pointerEvents: "none",
@@ -1595,7 +1595,7 @@ const menuButtonStyle: React.CSSProperties = {
   height: "5rem",
   display: "grid",
   placeItems: "center",
-  background: "transparent",
+  background: "rgba(255,255,255,0.1)",
   color: "#ccc",
   border: 0,
   borderRadius: 0,
@@ -1617,14 +1617,13 @@ const menuLineStyle: React.CSSProperties = {
 };
 
 const menuPanelStyle: React.CSSProperties = {
+  ...atlasPanelSurfaceStyle,
   position: "absolute",
   top: "100%",
   right: 0,
   minWidth: 184,
   padding: 0,
   borderRadius: 0,
-  background: "rgba(8,10,16,0.78)",
-  backdropFilter: "blur(8px)",
   border: "1px solid rgba(255,255,255,0.14)",
   borderTop: 0,
   boxShadow: "0 18px 40px rgba(0,0,0,0.35)",
@@ -1656,7 +1655,7 @@ const backButtonStyle: React.CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   lineHeight: 0,
-  background: "rgba(0,0,0,0.18)",
+  background: "rgba(255,255,255,0.1)",
   color: "#eef2f8",
   border: 0,
   borderRight: "1px solid rgba(255,255,255,0.18)",
@@ -1708,7 +1707,7 @@ const filterTriggerStyle: React.CSSProperties = {
   alignItems: "center",
   justifyContent: "space-between",
   gap: 16,
-  background: "rgba(0,0,0,0.18)",
+  background: "rgba(255,255,255,0.1)",
   color: "#f4f7fb",
   border: "1px solid rgba(255,255,255,0.18)",
   borderRadius: 0,
@@ -1727,6 +1726,7 @@ const partnerFilterTriggerStyle: React.CSSProperties = {
 };
 
 const filterMenuStyle: React.CSSProperties = {
+  ...atlasPanelSurfaceStyle,
   position: "absolute",
   top: "100%",
   left: 0,
@@ -1736,8 +1736,6 @@ const filterMenuStyle: React.CSSProperties = {
   flexDirection: "column",
   maxHeight: "min(55vh, 420px)",
   overflowY: "auto",
-  background: "rgba(8,10,16,0.78)",
-  backdropFilter: "blur(8px)",
   border: "1px solid rgba(255,255,255,0.18)",
   borderTop: 0,
 };
@@ -1807,6 +1805,7 @@ const buildStampStyle: React.CSSProperties = {
 };
 
 const photoLightboxStyle: React.CSSProperties = {
+  ...atlasPanelSurfaceStyle,
   position: "fixed",
   inset: 0,
   zIndex: 30,
@@ -1817,7 +1816,6 @@ const photoLightboxStyle: React.CSSProperties = {
   padding: 0,
   boxSizing: "border-box",
   overflow: "hidden",
-  background: "rgba(3,3,8,0.88)",
   cursor: "zoom-out",
 };
 
@@ -1864,6 +1862,7 @@ const photoLightboxSlideStyle: React.CSSProperties = {
 };
 
 const photoLightboxMetadataStyle: React.CSSProperties = {
+  ...atlasPanelSurfaceStyle,
   position: "relative",
   zIndex: 3,
   width: "100%",
@@ -1872,7 +1871,6 @@ const photoLightboxMetadataStyle: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
   overflow: "hidden",
-  background: "rgba(10,10,20,0.96)",
   borderTop: "1px solid rgba(255,255,255,0.18)",
   padding: "12px 16px max(12px, env(safe-area-inset-bottom))",
   color: "#ddd",
