@@ -839,15 +839,24 @@ export default function ArtScene() {
             {selectedPhotoActivities.length > 0 && (
               <div style={photoLightboxActivityListStyle}>
                 {selectedPhotoActivities.map((activity) => (
-                  <span
+                  <div
                     key={activity.id}
-                    style={{
-                      ...photoLightboxActivityBadgeStyle,
-                      ...getActivityColourStyle(activity.colour),
-                    }}
+                    style={photoLightboxActivityContextStyle}
                   >
-                    {activity.label}
-                  </span>
+                    <span
+                      style={{
+                        ...photoLightboxActivityBadgeStyle,
+                        ...getActivityColourStyle(activity.colour),
+                      }}
+                    >
+                      {activity.label}
+                    </span>
+                    {activity.description?.trim() && (
+                      <div style={photoLightboxActivityDescriptionStyle}>
+                        {activity.description.trim()}
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             )}
@@ -1959,14 +1968,31 @@ const photoLightboxDescriptionStyle: React.CSSProperties = {
 
 const photoLightboxActivityListStyle: React.CSSProperties = {
   display: "flex",
+  flexDirection: "column",
+  gap: 8,
+  marginBottom: 10,
+};
+
+const photoLightboxActivityContextStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "flex-start",
   flexWrap: "wrap",
-  gap: 6,
-  marginBottom: 8,
+  gap: "6px 10px",
+};
+
+const photoLightboxActivityDescriptionStyle: React.CSSProperties = {
+  flex: "1 1 240px",
+  color: "#d8dce4",
+  fontSize: 13,
+  lineHeight: 1.45,
+  whiteSpace: "pre-wrap",
+  overflowWrap: "anywhere",
 };
 
 const photoLightboxActivityBadgeStyle: React.CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
+  flex: "0 0 auto",
   minHeight: 24,
   padding: "3px 9px",
   borderRadius: 0,

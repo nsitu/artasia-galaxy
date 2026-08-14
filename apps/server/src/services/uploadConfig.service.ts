@@ -15,6 +15,7 @@ export interface ActivityConfig {
   id: number;
   label: string;
   week?: number;
+  description?: string;
   colour?: string;
 }
 
@@ -215,6 +216,7 @@ export async function getUploadConfig(): Promise<UploadConfig> {
       id: a.id,
       label: a.label,
       ...(a.week ? { week: a.week } : {}),
+      ...(a.description ? { description: a.description } : {}),
       ...(a.colour ? { colour: a.colour } : {}),
     }));
   const uploaders = wpUploaders

@@ -155,6 +155,7 @@ export interface ActivityOption {
   id: number;
   label: string;
   week?: number;
+  description?: string;
   colour?: string;
   count?: number;
 }

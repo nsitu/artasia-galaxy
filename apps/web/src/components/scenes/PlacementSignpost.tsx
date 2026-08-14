@@ -28,7 +28,7 @@ interface PlacementSignpostProps {
 }
 
 const POST_RADIUS = 0.035;
-export const PLACEMENT_SIGN_SPACING = 0.1;
+export const PLACEMENT_SIGN_SPACING = 0.05;
 const SIGN_TOP_OFFSET = 0.18;
 const SIGNPOST_MIN_HEIGHT = 2.8;
 const SIGNPOST_NAME_SIGN_GAP = 0.08;
@@ -52,6 +52,7 @@ const SIGN_SHARED_TANGENT_OFFSET = POST_RADIUS + 0.04;
 const NAME_SIGN_TANGENT_OFFSET = POST_RADIUS + 0.002;
 const NAME_SIGN_CORNER_RADIUS = 0.055;
 const SIGN_HOVER_SCALE = 1.06;
+const SIGN_DIMMED_OPACITY = 0.45;
 const SIGN_POINTER_RENDER_ORDER = 1;
 const SIGN_POLE_RENDER_ORDER = 3;
 const SIGN_SHARED_LOCATION_RENDER_ORDER = 5;
@@ -70,6 +71,7 @@ export default function PlacementSignpost({
   onPointerLeave,
 }: PlacementSignpostProps) {
   const [x, y, z] = position;
+  const [hoveredSignId, setHoveredSignId] = useState<string | null>(null);
   const signOffsets = getPlacementSignOffsets(signs);
   const signStackHeight = Math.max(
     SIGNPOST_MIN_HEIGHT,
@@ -179,6 +181,12 @@ export default function PlacementSignpost({
           sign={sign}
           verticalOffset={signOffsets[index]}
           postHeight={signStackHeight}
+          isHovered={hoveredSignId === sign.id}
+          isDimmed={hoveredSignId !== null && hoveredSignId !== sign.id}
+          onPointerEnter={() => setHoveredSignId(sign.id)}
+          onPointerLeave={() => setHoveredSignId((current) =>
+            current === sign.id ? null : current
+          )}
         />
       ))}
     </group>
@@ -314,12 +322,19 @@ function SignBoard({
   sign,
   verticalOffset,
   postHeight,
+  isHovered,
+  isDimmed,
+  onPointerEnter,
+  onPointerLeave,
 }: {
   sign: PlacementSign;
   verticalOffset: number;
   postHeight: number;
+  isHovered: boolean;
+  isDimmed: boolean;
+  onPointerEnter: () => void;
+  onPointerLeave: () => void;
 }) {
-  const [isHovered, setIsHovered] = useState(false);
   const isDown = sign.direction === "down";
   const renderOrder = isDown
     ? SIGN_SHARED_LOCATION_RENDER_ORDER
@@ -327,6 +342,7 @@ function SignBoard({
   const signZ = postHeight - SIGN_TOP_OFFSET - verticalOffset;
   const fontSize = isDown ? SHARED_SIGN_FONT_SIZE : 0.085;
   const signWidth = getSignWidth(sign.label, isDown, fontSize);
+  const opacity = isDimmed ? SIGN_DIMMED_OPACITY : 1;
   const directionMultiplier = sign.direction === "left" ? -1 : 1;
   const textOffsetX = isDown
     ? 0
@@ -348,12 +364,12 @@ function SignBoard({
       } : undefined}
       onPointerEnter={(event) => {
         event.stopPropagation();
-        setIsHovered(true);
+        onPointerEnter();
         document.body.style.cursor = sign.onClick ? "pointer" : "";
       }}
       onPointerLeave={(event) => {
         event.stopPropagation();
-        setIsHovered(false);
+        onPointerLeave();
         document.body.style.cursor = "";
       }}
     >
@@ -365,8 +381,10 @@ function SignBoard({
             polygonOffset
             polygonOffsetFactor={-2}
             polygonOffsetUnits={-2}
+            transparent={isDimmed}
+            opacity={opacity}
             depthTest
-            depthWrite
+            depthWrite={!isDimmed}
           />
         </mesh>
         <Text
@@ -378,9 +396,12 @@ function SignBoard({
           anchorY="middle"
           textAlign="center"
           color={SIGN_TEXT_COLOR}
+          fillOpacity={opacity}
           depthOffset={-2}
+          material-transparent={isDimmed}
+          material-opacity={opacity}
           material-depthTest
-          material-depthWrite
+          material-depthWrite={!isDimmed}
         >
           {sign.label}
         </Text>
