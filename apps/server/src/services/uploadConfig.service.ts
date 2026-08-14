@@ -299,9 +299,15 @@ export async function findConfiguredUploader(params: {
 
 export const PLACEMENT_ANCHOR_TAG_PREFIX = "placement:";
 export const PLACEMENT_ANCHOR_TAG_PATTERN = /^placement:(\d+)$/;
+export const DISPLAY_PLACEMENT_TAG_PREFIX = "display-placement:";
+export const DISPLAY_PLACEMENT_TAG_PATTERN = /^display-placement:(\d+)$/;
 
 export function placementAnchorTag(postId: number): string {
   return `${PLACEMENT_ANCHOR_TAG_PREFIX}${postId}`;
+}
+
+export function displayPlacementTag(postId: number): string {
+  return `${DISPLAY_PLACEMENT_TAG_PREFIX}${postId}`;
 }
 
 export function getPlacementTagNames(location: WpArtasiaPlacement): string[] {

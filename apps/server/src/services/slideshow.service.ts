@@ -1,6 +1,11 @@
 import { getPublishedAlbum, listTags, searchAssetIdsByTag, searchAssetIdsByTags, searchAssets, ImmichAsset } from "../infra/ImmichClient.js";
 import { DEFAULT_ASSET_ADJUSTMENTS, getAssetAdjustmentMap, type AssetAdjustments } from "./assetAdjustments.service.js";
-import { activityAnchorTag, getUploadConfig, placementAnchorTag } from "./uploadConfig.service.js";
+import {
+  activityAnchorTag,
+  displayPlacementTag,
+  getUploadConfig,
+  placementAnchorTag,
+} from "./uploadConfig.service.js";
 import { isAudioAsset } from "./audioAsset.service.js";
 import { getGpsDisabledAssetIds } from "./assetGpsUsage.service.js";
 
@@ -276,10 +281,13 @@ export async function querySlideshow(
   if (query.placementFocus) {
     const focus = query.placementFocus;
     const directPlacementTag = placementAnchorTag(focus.placementId).toLowerCase();
+    const sharedPlacementTag = displayPlacementTag(focus.placementId).toLowerCase();
     const placementTagIds = allTags
       .filter((tag) =>
         tag.name.trim().toLowerCase() === directPlacementTag ||
-        tag.value.trim().toLowerCase() === directPlacementTag
+        tag.value.trim().toLowerCase() === directPlacementTag ||
+        tag.name.trim().toLowerCase() === sharedPlacementTag ||
+        tag.value.trim().toLowerCase() === sharedPlacementTag
       )
       .map((tag) => tag.id);
 

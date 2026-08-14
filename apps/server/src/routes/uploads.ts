@@ -52,6 +52,7 @@ import {
   findConfiguredPlacement,
   findConfiguredUploader,
   getPlacementTagNames,
+  displayPlacementTag,
   getActivityTagNames,
   getUploadConfig,
   placementAnchorTag,
@@ -211,11 +212,16 @@ function findExistingPlacementTagIds(
   const anchorTagName = placementAnchorTag(placement.placement_id)
     .trim()
     .toLowerCase();
+  const displayTagName = displayPlacementTag(placement.placement_id)
+    .trim()
+    .toLowerCase();
   const anchorTagIds = tags
     .filter(
       (tag) =>
         tag.name.trim().toLowerCase() === anchorTagName ||
-        tag.value.trim().toLowerCase() === anchorTagName,
+        tag.value.trim().toLowerCase() === anchorTagName ||
+        tag.name.trim().toLowerCase() === displayTagName ||
+        tag.value.trim().toLowerCase() === displayTagName,
     )
     .map((tag) => tag.id);
 
@@ -246,10 +252,28 @@ function isPlacementAnchorTagName(value: string) {
   return /^placement:\d+$/.test(value.trim().toLowerCase());
 }
 
+function isDisplayPlacementTagName(value: string) {
+  return /^display-placement:\d+$/.test(value.trim().toLowerCase());
+}
+
 async function getExistingPlacementTagIds() {
   const tags = await listTags();
   return tags
-    .filter((tag) => isPlacementAnchorTagName(tag.name) || isPlacementAnchorTagName(tag.value))
+    .filter((tag) =>
+      isPlacementAnchorTagName(tag.name) ||
+      isPlacementAnchorTagName(tag.value) ||
+      isDisplayPlacementTagName(tag.name) ||
+      isDisplayPlacementTagName(tag.value)
+    )
+    .map((tag) => tag.id);
+}
+
+async function getExistingDisplayPlacementTagIds() {
+  const tags = await listTags();
+  return tags
+    .filter((tag) =>
+      isDisplayPlacementTagName(tag.name) || isDisplayPlacementTagName(tag.value)
+    )
     .map((tag) => tag.id);
 }
 
@@ -419,6 +443,8 @@ function invalidateAdminBrowseIndexes() {
 interface AssetManagementAssignment {
   placementId?: number;
   placementName?: string;
+  displayPlacementId?: number;
+  displayPlacementName?: string;
   activityId?: number;
   activityLabel?: string;
   iconName?: string;
@@ -498,6 +524,8 @@ function mapAdminAsset(
     published: assignment?.published ?? false,
     placement_id: assignment?.placementId ?? null,
     placement_name: assignment?.placementName ?? null,
+    display_placement_id: assignment?.displayPlacementId ?? null,
+    display_placement_name: assignment?.displayPlacementName ?? null,
     activity_id: assignment?.activityId ?? null,
     activity_label: assignment?.activityLabel ?? null,
     iconName: assignment?.iconName ?? null,
@@ -899,6 +927,7 @@ async function getManagementAssignments(
   const tags = await listTags();
 
   const placementByTagId = new Map<string, { id: number; name: string }>();
+  const displayPlacementByTagId = new Map<string, { id: number; name: string }>();
   for (const placement of config.placements) {
     const anchor = placementAnchorTag(placement.placement_id);
     const normalizedAnchor = anchor.trim().toLowerCase();
@@ -909,6 +938,20 @@ async function getManagementAssignments(
     );
     if (tag) {
       placementByTagId.set(tag.id, {
+        id: placement.placement_id,
+        name: placement.placement_name,
+      });
+    }
+    const displayAnchor = displayPlacementTag(placement.placement_id)
+      .trim()
+      .toLowerCase();
+    const displayTag = tags.find(
+      (candidate) =>
+        candidate.name.trim().toLowerCase() === displayAnchor ||
+        candidate.value.trim().toLowerCase() === displayAnchor
+    );
+    if (displayTag) {
+      displayPlacementByTagId.set(displayTag.id, {
         id: placement.placement_id,
         name: placement.placement_name,
       });
@@ -969,6 +1012,24 @@ async function getManagementAssignments(
       const current = assignments.get(assetId) ?? {};
       current.activityId = activity.id;
       current.activityLabel = activity.label;
+      assignments.set(assetId, current);
+    }
+  }
+
+  const displayPlacementMemberships = await processWithConcurrency(
+    Array.from(displayPlacementByTagId.entries()),
+    8,
+    async ([tagId, placement]) => ({
+      placement,
+      assetIds: await searchAdminAssetIdsByTag(tagId),
+    }),
+  );
+  for (const { placement, assetIds: taggedAssetIds } of displayPlacementMemberships) {
+    for (const assetId of taggedAssetIds) {
+      if (!assetIdSet.has(assetId)) continue;
+      const current = assignments.get(assetId) ?? {};
+      current.displayPlacementId = placement.id;
+      current.displayPlacementName = placement.name;
       assignments.set(assetId, current);
     }
   }
@@ -1076,6 +1137,10 @@ function mapEmbeddedAssetMetadata(
     string,
     { id: number; name: string }
   >();
+  const displayPlacementsByTag = new Map<
+    string,
+    { id: number; name: string }
+  >();
   const activitiesByTag = new Map<
     string,
     { id: number; label: string }
@@ -1088,6 +1153,10 @@ function mapEmbeddedAssetMetadata(
     };
     placementsByTag.set(
       placementAnchorTag(placement.placement_id).toLowerCase(),
+      value,
+    );
+    displayPlacementsByTag.set(
+      displayPlacementTag(placement.placement_id).toLowerCase(),
       value,
     );
   }
@@ -1122,6 +1191,11 @@ function mapEmbeddedAssetMetadata(
       if (placement) {
         assignment.placementId = placement.id;
         assignment.placementName = placement.name;
+      }
+      const displayPlacement = displayPlacementsByTag.get(key);
+      if (displayPlacement) {
+        assignment.displayPlacementId = displayPlacement.id;
+        assignment.displayPlacementName = displayPlacement.name;
       }
       const activity = activitiesByTag.get(key);
       if (activity) {
@@ -1489,11 +1563,22 @@ router.post("/assets/:assetId/placement", async (req, res) => {
       return;
     }
 
-    await getAsset(assetId);
+    const asset = await getAsset(assetId);
 
     const existingPlacementTagIds = await getConfiguredPlacementAssignmentTagIds();
     if (existingPlacementTagIds.length > 0) {
       await untagAssets([assetId], existingPlacementTagIds);
+    }
+    if (
+      embeddedTagKeys(asset).has(
+        displayPlacementTag(placement.placement_id).toLowerCase(),
+      )
+    ) {
+      const existingDisplayPlacementTagIds =
+        await getExistingDisplayPlacementTagIds();
+      if (existingDisplayPlacementTagIds.length > 0) {
+        await untagAssets([assetId], existingDisplayPlacementTagIds);
+      }
     }
     await tagAsset(assetId, getPlacementTagNames(placement));
     await applyDefaultLocationIfMissing(assetId, {
@@ -1507,6 +1592,67 @@ router.post("/assets/:assetId/placement", async (req, res) => {
       asset_id: assetId,
       placement_id: placementId,
       tags: getPlacementTagNames(placement),
+    });
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
+});
+
+router.post("/assets/:assetId/display-placement", async (req, res) => {
+  try {
+    const rawPlacementId = req.body?.placement_id;
+    const placementId = rawPlacementId == null || rawPlacementId === ""
+      ? null
+      : parseInt(String(rawPlacementId), 10);
+    if (placementId != null && !Number.isFinite(placementId)) {
+      res.status(400).json({ error: "Select a valid shared placement." });
+      return;
+    }
+
+    const placement = placementId == null
+      ? null
+      : await findConfiguredPlacement(placementId);
+    if (placementId != null && !placement) {
+      res.status(404).json({ error: "The shared placement was not found." });
+      return;
+    }
+
+    const assetId = req.params.assetId.trim();
+    if (!assetId) {
+      res.status(400).json({ error: "Asset ID is required." });
+      return;
+    }
+
+    const asset = await getAsset(assetId);
+    const primaryPlacementId = [...embeddedTagKeys(asset)]
+      .map((key) => key.match(/^placement:(\d+)$/)?.[1])
+      .find(Boolean);
+    if (
+      placementId != null &&
+      primaryPlacementId != null &&
+      Number(primaryPlacementId) === placementId
+    ) {
+      res.status(400).json({
+        error: "Choose a placement other than the asset's primary placement.",
+      });
+      return;
+    }
+
+    const existingDisplayPlacementTagIds =
+      await getExistingDisplayPlacementTagIds();
+    if (existingDisplayPlacementTagIds.length > 0) {
+      await untagAssets([assetId], existingDisplayPlacementTagIds);
+    }
+    if (placement) {
+      await tagAsset(assetId, [displayPlacementTag(placement.placement_id)]);
+    }
+    invalidateSiteActivityStats();
+
+    res.json({
+      ok: true,
+      asset_id: assetId,
+      display_placement_id: placement?.placement_id ?? null,
+      tag: placement ? displayPlacementTag(placement.placement_id) : null,
     });
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });

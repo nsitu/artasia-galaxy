@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   assignAssetActivityTag,
+  assignAssetDisplayPlacement,
   assignAssetPlacement,
   assignAssetUploader,
   createAudioTrim,
@@ -303,6 +304,7 @@ export default function UploadPanel({
   );
   const [editNavigationAssets, setEditNavigationAssets] = useState<PlacementAsset[]>([]);
   const [managePlacementKey, setManagePlacementKey] = useState("");
+  const [manageDisplayPlacementKey, setManageDisplayPlacementKey] = useState("");
   const [manageUploaderKey, setManageUploaderKey] = useState("");
   const [manageActivityTag, setManageActivityTag] = useState("");
   const [manageIconName, setManageIconName] = useState<string | null>(null);
@@ -2270,6 +2272,9 @@ export default function UploadPanel({
     const adjustments = normalizeAdjustments(asset.adjustments);
     setSelectedAsset(asset);
     setManagePlacementKey(asset.placement_id ? String(asset.placement_id) : "");
+    setManageDisplayPlacementKey(
+      asset.display_placement_id ? String(asset.display_placement_id) : "",
+    );
     setManageUploaderKey(asset.uploader_id ? String(asset.uploader_id) : "");
     setManageActivityTag(asset.activity_id ? String(asset.activity_id) : "");
     setManageIconName(asset.iconName ?? null);
@@ -2313,6 +2318,7 @@ export default function UploadPanel({
   function closeAssetManager() {
     setSelectedAsset(null);
     setManagePlacementKey("");
+    setManageDisplayPlacementKey("");
     setManageUploaderKey("");
     setManageActivityTag("");
     setManageIconName(null);
@@ -2482,6 +2488,11 @@ export default function UploadPanel({
       Boolean(managePlacementKey) &&
       managePlacementKey !==
         (selectedAsset.placement_id ? String(selectedAsset.placement_id) : "");
+    const displayPlacementChanged =
+      manageDisplayPlacementKey !==
+      (selectedAsset.display_placement_id
+        ? String(selectedAsset.display_placement_id)
+        : "");
     const uploaderChanged =
       Boolean(manageUploaderKey) &&
       manageUploaderKey !==
@@ -2500,6 +2511,7 @@ export default function UploadPanel({
 
     if (
       !placementChanged &&
+      !displayPlacementChanged &&
       !uploaderChanged &&
       !activityTagChanged &&
       !iconChanged &&
@@ -2508,12 +2520,19 @@ export default function UploadPanel({
       !archivedChanged
     ) {
       setError(
-        "Choose a placement, team member album, program week, or publication status to save.",
+        "Choose a placement, sharing destination, team member album, program week, or publication status to save.",
       );
       return;
     }
     if (placementChanged && (!placementId || !Number.isFinite(placementId))) {
       setError("Select a placement to assign this upload.");
+      return;
+    }
+    if (
+      manageDisplayPlacementKey &&
+      manageDisplayPlacementKey === managePlacementKey
+    ) {
+      setError("Choose a shared placement other than the primary placement.");
       return;
     }
     if (uploaderChanged && (!uploaderId || !Number.isFinite(uploaderId))) {
@@ -2527,6 +2546,14 @@ export default function UploadPanel({
         await assignAssetPlacement({
           assetId: selectedAsset.id,
           placementId,
+        });
+      }
+      if (displayPlacementChanged) {
+        await assignAssetDisplayPlacement({
+          assetId: selectedAsset.id,
+          placementId: manageDisplayPlacementKey
+            ? parseInt(manageDisplayPlacementKey, 10)
+            : null,
         });
       }
       if (uploaderChanged && uploaderId) {
@@ -2585,6 +2612,11 @@ export default function UploadPanel({
       Boolean(managePlacementKey) &&
       managePlacementKey !==
         (selectedAsset.placement_id ? String(selectedAsset.placement_id) : "");
+    const displayPlacementChanged =
+      manageDisplayPlacementKey !==
+      (selectedAsset.display_placement_id
+        ? String(selectedAsset.display_placement_id)
+        : "");
     const uploaderChanged =
       Boolean(manageUploaderKey) &&
       manageUploaderKey !==
@@ -2623,6 +2655,7 @@ export default function UploadPanel({
 
     if (
       !placementChanged &&
+      !displayPlacementChanged &&
       !uploaderChanged &&
       !activityChanged &&
       !iconChanged &&
@@ -2642,6 +2675,13 @@ export default function UploadPanel({
     }
     if (pixelEditsChanged && !cropRect) {
       setError("Choose a crop area before saving.");
+      return;
+    }
+    if (
+      manageDisplayPlacementKey &&
+      manageDisplayPlacementKey === destinationPlacementKey
+    ) {
+      setError("Choose a shared placement other than the primary placement.");
       return;
     }
     if (videoRotationChanged && manageArchived) {
@@ -2688,6 +2728,13 @@ export default function UploadPanel({
         await assignAssetPlacement({
           assetId,
           placementId: parseInt(managePlacementKey, 10),
+        });
+      if (displayPlacementChanged)
+        await assignAssetDisplayPlacement({
+          assetId,
+          placementId: manageDisplayPlacementKey
+            ? parseInt(manageDisplayPlacementKey, 10)
+            : null,
         });
       if (uploaderChanged)
         await assignAssetUploader({
@@ -4865,6 +4912,11 @@ export default function UploadPanel({
       Boolean(managePlacementKey) &&
       managePlacementKey !==
         (selectedAsset.placement_id ? String(selectedAsset.placement_id) : "");
+    const displayPlacementChanged =
+      manageDisplayPlacementKey !==
+      (selectedAsset.display_placement_id
+        ? String(selectedAsset.display_placement_id)
+        : "");
     const uploaderChanged =
       Boolean(manageUploaderKey) &&
       manageUploaderKey !==
@@ -4902,6 +4954,7 @@ export default function UploadPanel({
         Math.abs(audioTrimEnd - audioDuration) > 0.005);
     const hasAnyChanges =
       placementChanged ||
+      displayPlacementChanged ||
       uploaderChanged ||
       activityChanged ||
       iconChanged ||
@@ -5306,7 +5359,13 @@ export default function UploadPanel({
             Artasia Site
             <select
               value={managePlacementKey}
-              onChange={(e) => setManagePlacementKey(e.target.value)}
+              onChange={(e) => {
+                const placementKey = e.target.value;
+                setManagePlacementKey(placementKey);
+                if (placementKey === manageDisplayPlacementKey) {
+                  setManageDisplayPlacementKey("");
+                }
+              }}
               style={inputStyle}
             >
               <option value="">Select a placement</option>
@@ -5325,6 +5384,39 @@ export default function UploadPanel({
                 ),
               )}
             </select>
+          </label>
+          <label style={labelStyle}>
+            Shared with
+            <select
+              value={manageDisplayPlacementKey}
+              onChange={(e) => setManageDisplayPlacementKey(e.target.value)}
+              style={inputStyle}
+            >
+              <option value="">Not shared</option>
+              {groupedPlacementsByPartner(options?.placements ?? []).map(
+                (group) => (
+                  <optgroup key={group.partner} label={group.partner}>
+                    {group.placements
+                      .filter(
+                        (placement) =>
+                          String(placement.placement_id) !== managePlacementKey,
+                      )
+                      .map((placement) => (
+                        <option
+                          key={placement.placement_id}
+                          value={String(placement.placement_id)}
+                        >
+                          {placementLabel(placement)}
+                        </option>
+                      ))}
+                  </optgroup>
+                ),
+              )}
+            </select>
+            <span style={fieldHelpStyle}>
+              Shows this asset at one additional placement while keeping the
+              Artasia Site above as its primary placement.
+            </span>
           </label>
           <label style={labelStyle}>
             Program Week / Activity

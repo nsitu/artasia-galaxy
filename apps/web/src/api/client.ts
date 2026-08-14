@@ -226,6 +226,8 @@ export interface PlacementAsset {
   height?: number | null;
   placement_id?: number | null;
   placement_name?: string | null;
+  display_placement_id?: number | null;
+  display_placement_name?: string | null;
   activity_id?: number | null;
   activity_label?: string | null;
   iconName?: string | null;
@@ -364,6 +366,24 @@ export async function assignAssetPlacement(params: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ placement_id: params.placementId }),
   });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+}
+
+export async function assignAssetDisplayPlacement(params: {
+  assetId: string;
+  placementId: number | null;
+}): Promise<void> {
+  const res = await fetch(
+    `/api/v1/uploads/assets/${params.assetId}/display-placement`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ placement_id: params.placementId }),
+    },
+  );
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(body.error ?? `HTTP ${res.status}`);
