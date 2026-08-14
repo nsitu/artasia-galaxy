@@ -680,6 +680,7 @@ export default function ArtScene() {
                   <button
                     key={item.href}
                     type="button"
+                    className="atlas-control-surface"
                     role="menuitem"
                     style={{
                       ...menuItemStyle,
@@ -694,6 +695,7 @@ export default function ArtScene() {
                   </button>
                 ) : <a
                   key={item.href}
+                  className="atlas-control-surface"
                   role="menuitem"
                   href={item.href}
                   style={menuItemStyle}
@@ -992,6 +994,7 @@ export default function ArtScene() {
                 <div style={photoLightboxActionRowStyle}>
                 <a
                   href={`/api/v1/assets/${selectedPhoto.id}/original`}
+                  className="atlas-control-surface"
                   download={selectedPhoto.fileName}
                   aria-label={`Download original asset: ${selectedPhoto.fileName}`}
                   title="Download original asset"
@@ -1012,6 +1015,7 @@ export default function ArtScene() {
                 {authUser?.authenticated && (
                   <a
                     href={`/edit/${selectedPhoto.id}`}
+                    className="atlas-control-surface"
                     aria-label={`Edit asset: ${selectedPhoto.fileName}`}
                     style={photoLightboxActionLinkStyle}
                   >
@@ -2132,7 +2136,7 @@ const photoLightboxActionLinkStyle: React.CSSProperties = {
   alignItems: "center",
   gap: 6,
   padding: "0 10px",
-  borderRadius: 999,
+  borderRadius: 0,
   background: "rgba(255,255,255,0.08)",
   color: "#eef2f8",
   border: "1px solid rgba(255,255,255,0.14)",

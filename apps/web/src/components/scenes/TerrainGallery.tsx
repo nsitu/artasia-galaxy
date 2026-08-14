@@ -2141,7 +2141,11 @@ export function FocusedPlacementOverlay({
                 </a>
               )}
               {adminHref && (
-                <a href={adminHref} style={siteDetailsActionLinkStyle}>
+                <a
+                  href={adminHref}
+                  className="atlas-control-surface"
+                  style={{ ...siteDetailsActionLinkStyle, borderRadius: 0 }}
+                >
                   Admin
                 </a>
               )}
