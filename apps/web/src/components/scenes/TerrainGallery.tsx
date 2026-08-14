@@ -478,7 +478,7 @@ type TerrainPhase =
 type LocalPhotoLayoutItem = {
   kind: "orbit";
   photo: Photo;
-  index: number;
+  sourceIndex: number;
   center: [number, number, number];
   orbitRadius: number;
   orbitAssetCount: number;
@@ -642,6 +642,10 @@ export default function TerrainGallery({
     }
     return photoScope.mode === "regional" ? photos : [];
   }, [focusedPlacement, photoScope, photos, selectedActivityId]);
+  const photoIndexById = useMemo(
+    () => new Map(photos.map((photo, index) => [photo.id, index])),
+    [photos],
+  );
   const geoPhotos = useMemo(() => {
     return getGeoPhotos(
       photosForCurrentView.filter((photo) => photo.mediaKind === "image"),
@@ -756,14 +760,20 @@ export default function TerrainGallery({
       };
     };
 
-    const orbitItems = photosForCurrentView.map<LocalPhotoLayoutItem>(
-      (photo, index) => ({
-        kind: "orbit",
-        photo,
-        index,
-        center: placementCenter,
-        ...orbitForPhoto(photo),
-      }),
+    const orbitItems = photosForCurrentView.flatMap<LocalPhotoLayoutItem>(
+      (photo) => {
+        const sourceIndex = photoIndexById.get(photo.id);
+        if (sourceIndex == null) return [];
+        return [
+          {
+            kind: "orbit",
+            photo,
+            sourceIndex,
+            center: placementCenter,
+            ...orbitForPhoto(photo),
+          },
+        ];
+      },
     );
     const orbitCounts = new Map<number, number>();
     for (const item of orbitItems) {
@@ -773,7 +783,14 @@ export default function TerrainGallery({
       ...item,
       orbitAssetCount: orbitCounts.get(item.activityId) ?? 1,
     }));
-  }, [activityOptions, focusedPlacement, photosForCurrentView, projection, terrain]);
+  }, [
+    activityOptions,
+    focusedPlacement,
+    photoIndexById,
+    photosForCurrentView,
+    projection,
+    terrain,
+  ]);
   const activityOrbitRings = useMemo(() => {
     const rings = new Map<number, {
       radius: number;
@@ -1860,9 +1877,9 @@ export default function TerrainGallery({
               orbitHeight={orbitHeight}
               activityColour={item.orbitColour}
               isDenseOrbit={item.orbitAssetCount >= 5}
-              isHighlighted={item.index === hoveredIndex}
-              onClick={() => selectPhoto(item.index)}
-              onPointerEnter={() => setHoveredIndex(item.index)}
+              isHighlighted={item.sourceIndex === hoveredIndex}
+              onClick={() => selectPhoto(item.sourceIndex)}
+              onPointerEnter={() => setHoveredIndex(item.sourceIndex)}
               onPointerLeave={() => setHoveredIndex(null)}
             />
           ) : (
@@ -1878,12 +1895,14 @@ export default function TerrainGallery({
               orbitRadius={item.orbitRadius}
               orbitHeight={orbitHeight}
               isDenseOrbit={item.orbitAssetCount >= 5}
-              isSelected={item.index === selectedIndex}
-              isHighlighted={item.index === hoveredIndex}
+              isSelected={item.sourceIndex === selectedIndex}
+              isHighlighted={item.sourceIndex === hoveredIndex}
               onClick={() =>
-                selectPhoto(item.index === selectedIndex ? null : item.index)
+                selectPhoto(
+                  item.sourceIndex === selectedIndex ? null : item.sourceIndex,
+                )
               }
-              onPointerEnter={() => setHoveredIndex(item.index)}
+              onPointerEnter={() => setHoveredIndex(item.sourceIndex)}
               onPointerLeave={() => setHoveredIndex(null)}
             />
           ),

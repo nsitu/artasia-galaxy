@@ -2036,7 +2036,6 @@ const photoLightboxMetadataStyle: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
   overflow: "hidden",
-  borderTop: "1px solid rgba(255,255,255,0.18)",
   padding: 0,
   color: "#ddd",
   fontFamily: "monospace",
