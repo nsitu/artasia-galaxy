@@ -2106,7 +2106,6 @@ export function FocusedPlacementOverlay({
             <div
               style={{
                 ...siteDetailLabelStyle,
-                ...siteDetailPartnerLogoCellStyle,
                 ...siteDetailRowSeparatorStyle,
               }}
             >
@@ -2130,6 +2129,30 @@ export function FocusedPlacementOverlay({
             >
               {placement.partner_name || "Partner organization"}
             </div>
+            {placement.is_earlyon && (
+              <>
+                <div
+                  style={{
+                    ...siteDetailLabelStyle,
+                    ...siteDetailRowSeparatorStyle,
+                  }}
+                >
+                  <img
+                    src="/early-on-white.svg"
+                    alt=""
+                    style={siteDetailEarlyOnLogoStyle}
+                  />
+                </div>
+                <div
+                  style={{
+                    ...siteDetailValueStyle,
+                    ...siteDetailRowSeparatorStyle,
+                  }}
+                >
+                  EarlyON Location
+                </div>
+              </>
+            )}
             <SiteDetail
               label="Location"
               icon="location_on"
@@ -2792,10 +2815,6 @@ const siteDetailLabelStyle: React.CSSProperties = {
   borderRight: "1px solid rgba(255,255,255,0.14)",
 };
 
-const siteDetailPartnerLogoCellStyle: React.CSSProperties = {
-  justifyContent: "center",
-};
-
 const siteDetailIconStyle: React.CSSProperties = {
   flex: "0 0 auto",
   fontFamily: "'Material Symbols Outlined'",
@@ -2804,6 +2823,15 @@ const siteDetailIconStyle: React.CSSProperties = {
   fontStyle: "normal",
   fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20",
   lineHeight: 1,
+};
+
+const siteDetailEarlyOnLogoStyle: React.CSSProperties = {
+  display: "block",
+  width: 110,
+  maxWidth: "100%",
+  height: 40,
+  objectFit: "contain",
+  objectPosition: "left center",
 };
 
 const siteDetailLabelTextStyle: React.CSSProperties = {
