@@ -1174,6 +1174,7 @@ function FilterOption({
   return (
     <button
       type="button"
+      className="atlas-filter-menu-option"
       role="option"
       aria-selected={active}
       aria-disabled={disabled}
@@ -1506,11 +1507,21 @@ const responsiveTopNavStyles = `
       background-image: linear-gradient(45deg, rgba(142, 29, 88, 0.3) 0%, rgba(242, 139, 32, 0.3) 100%) !important;
       
     }
+
+    .atlas-filter-menu-option:not(:disabled):hover {
+      background-color: rgba(142, 29, 88, 0.3) !important;
+      background-image: linear-gradient(45deg, rgba(142, 29, 88, 0.3) 0%, rgba(242, 139, 32, 0.3) 100%) !important;
+    }
   }
 
   .atlas-control-surface:focus-visible {
     background-color: rgba(142, 29, 88, 0.3);
       background-image: linear-gradient(45deg, rgba(142, 29, 88, 0.3) 0%, rgba(242, 139, 32, 0.3) 100%) !important;
+  }
+
+  .atlas-filter-menu-option:not(:disabled):focus-visible {
+    background-color: rgba(142, 29, 88, 0.3) !important;
+    background-image: linear-gradient(45deg, rgba(142, 29, 88, 0.3) 0%, rgba(242, 139, 32, 0.3) 100%) !important;
   }
 
   .atlas-top-nav::before {
