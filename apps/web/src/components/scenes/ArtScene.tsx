@@ -2259,17 +2259,18 @@ const photoLightboxActionRowStyle: React.CSSProperties = {
 };
 
 const photoLightboxActionLinkStyle: React.CSSProperties = {
+  ...atlasControlSurfaceStyle,
   flex: "0 0 auto",
-  minHeight: 30,
+  minHeight: 44,
   display: "inline-flex",
   alignItems: "center",
+  justifyContent: "center",
   gap: 6,
-  padding: "0 10px",
+  padding: "0 16px",
   borderRadius: 0,
-  background: "rgba(255,255,255,0.08)",
   color: "#eef2f8",
-  border: "1px solid rgba(255,255,255,0.14)",
-  fontSize: 11,
+  border: "1px solid rgba(255,255,255,0.22)",
+  fontSize: 12,
   fontWeight: 700,
   lineHeight: 1,
   textDecoration: "none",
@@ -2278,8 +2279,8 @@ const photoLightboxActionLinkStyle: React.CSSProperties = {
 };
 
 const photoLightboxActionIconStyle: React.CSSProperties = {
-  width: 15,
-  height: 15,
+  width: 16,
+  height: 16,
 };
 
 const photoLightboxMetadataToggleStyle: React.CSSProperties = {

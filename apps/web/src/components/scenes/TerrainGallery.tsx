@@ -2713,8 +2713,10 @@ const siteDetailsChevronStyle: React.CSSProperties = {
 
 const partnerLogoStyle: React.CSSProperties = {
   flex: "0 0 auto",
-  width: 54,
-  height: 40,
+  width: "8rem",
+  maxWidth: "100%",
+  height: "3rem",
+  boxSizing: "border-box",
   objectFit: "contain",
   background: "rgba(255,255,255,0.9)",
   borderRadius: 4,
@@ -2807,9 +2809,9 @@ const siteDetailIconStyle: React.CSSProperties = {
 
 const siteDetailEarlyOnLogoStyle: React.CSSProperties = {
   display: "block",
-  width: 110,
-  maxWidth: "50%",
-  height: 40,
+  width: "6rem",
+  maxWidth: "100%",
+  height: "2.5rem",
   objectFit: "contain",
   objectPosition: "left center",
 };
