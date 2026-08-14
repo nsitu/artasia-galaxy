@@ -1488,6 +1488,7 @@ const responsiveTopNavStyles = `
     }
 
     .atlas-home-logo-link {
+      padding-left: 0 !important;
       padding-bottom: 8px;
       box-sizing: border-box;
     }

@@ -2582,6 +2582,7 @@ const siteDetailsHeaderStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 10,
+  paddingRight: "calc(5rem + 8px)",
   paddingBottom: 10,
   borderBottom: "1px solid rgba(255,255,255,0.12)",
 };
@@ -2597,16 +2598,19 @@ const siteDetailsTitleWrapStyle: React.CSSProperties = {
 };
 
 const siteDetailsToggleStyle: React.CSSProperties = {
+  position: "absolute",
+  top: 0,
+  right: 0,
   pointerEvents: "auto",
-  flex: "0 0 auto",
-  width: 30,
-  height: 30,
+  width: "5rem",
+  height: "5rem",
   display: "grid",
   placeItems: "center",
-  borderRadius: 999,
-  background: "rgba(255,255,255,0.08)",
+  padding: 0,
+  borderRadius: 0,
+  background: "rgba(255,255,255,0.1)",
   color: "#eef2f8",
-  border: "1px solid rgba(255,255,255,0.14)",
+  border: 0,
   cursor: "pointer",
   fontSize: 18,
   lineHeight: 1,

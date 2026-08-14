@@ -52,7 +52,7 @@ const SIGN_SHARED_TANGENT_OFFSET = POST_RADIUS + 0.04;
 const NAME_SIGN_TANGENT_OFFSET = POST_RADIUS + 0.002;
 const NAME_SIGN_CORNER_RADIUS = 0.055;
 const SIGN_HOVER_SCALE = 1.06;
-const SIGN_DIMMED_OPACITY = 0.45;
+const SIGN_DIMMED_OPACITY = 0.7;
 const SIGN_POINTER_RENDER_ORDER = 1;
 const SIGN_POLE_RENDER_ORDER = 3;
 const SIGN_SHARED_LOCATION_RENDER_ORDER = 5;
@@ -72,6 +72,8 @@ export default function PlacementSignpost({
 }: PlacementSignpostProps) {
   const [x, y, z] = position;
   const [hoveredSignId, setHoveredSignId] = useState<string | null>(null);
+  const hoveredSignIndex = signs.findIndex((sign) => sign.id === hoveredSignId);
+  const hoveredSign = hoveredSignIndex >= 0 ? signs[hoveredSignIndex] : null;
   const signOffsets = getPlacementSignOffsets(signs);
   const signStackHeight = Math.max(
     SIGNPOST_MIN_HEIGHT,
@@ -182,7 +184,11 @@ export default function PlacementSignpost({
           verticalOffset={signOffsets[index]}
           postHeight={signStackHeight}
           isHovered={hoveredSignId === sign.id}
-          isDimmed={hoveredSignId !== null && hoveredSignId !== sign.id}
+          isDimmed={
+            hoveredSign !== null &&
+            index > hoveredSignIndex &&
+            sign.direction === hoveredSign.direction
+          }
           onPointerEnter={() => setHoveredSignId(sign.id)}
           onPointerLeave={() => setHoveredSignId((current) =>
             current === sign.id ? null : current
@@ -235,6 +241,7 @@ function PlacementNameSign({
         position={[0, 0, NAME_SIGN_TEXT_DEPTH]}
         renderOrder={SIGN_SHARED_LOCATION_RENDER_ORDER + 1}
         fontSize={layout.fontSize}
+        sdfGlyphSize={128}
         lineHeight={1.15}
         maxWidth={layout.textWidth}
         anchorX="center"
@@ -391,6 +398,7 @@ function SignBoard({
           position={[textOffsetX, 0, 0.012]}
           renderOrder={renderOrder + 1}
           fontSize={fontSize}
+          sdfGlyphSize={128}
           maxWidth={signWidth - SIGN_TEXT_PADDING}
           anchorX="center"
           anchorY="middle"
@@ -398,10 +406,11 @@ function SignBoard({
           color={SIGN_TEXT_COLOR}
           fillOpacity={opacity}
           depthOffset={-2}
-          material-transparent={isDimmed}
+          material-transparent
           material-opacity={opacity}
           material-depthTest
-          material-depthWrite={!isDimmed}
+          material-depthWrite={false}
+          material-toneMapped={false}
         >
           {sign.label}
         </Text>
