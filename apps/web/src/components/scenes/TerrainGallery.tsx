@@ -1030,7 +1030,6 @@ export default function TerrainGallery({
 
   useEffect(() => {
     const filterChanged = previousPartnerFilterRef.current !== selectedPartnerFilter;
-    previousPartnerFilterRef.current = selectedPartnerFilter;
     if (
       !filterChanged ||
       focusedPlacement ||
@@ -1038,6 +1037,8 @@ export default function TerrainGallery({
       !controls?.target ||
       (introEnabled && introPhase !== "complete")
     ) return;
+
+    previousPartnerFilterRef.current = selectedPartnerFilter;
 
     const bounds = new THREE.Box3();
     for (const item of placementLayout) {
