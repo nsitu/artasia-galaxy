@@ -2738,7 +2738,7 @@ const siteNameStyle: React.CSSProperties = {
 const siteDetailsGridStyle: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "max-content minmax(0, 1fr)",
-  alignItems: "baseline",
+  alignItems: "stretch",
   columnGap: 0,
   rowGap: 0,
 };
@@ -2780,6 +2780,7 @@ const siteDetailLabelStyle: React.CSSProperties = {
   textAlign: "left",
   letterSpacing: 0,
   padding: "5px 10px 5px 0",
+  boxSizing: "border-box",
   borderRight: "1px solid rgba(255,255,255,0.14)",
 };
 
@@ -2799,6 +2800,8 @@ const siteDetailLabelTextStyle: React.CSSProperties = {
 };
 
 const siteDetailValueStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
   minWidth: 0,
   color: "#eef2f8",
   fontSize: 12,
@@ -2806,6 +2809,7 @@ const siteDetailValueStyle: React.CSSProperties = {
   textAlign: "left",
   overflowWrap: "anywhere",
   padding: "5px 0 5px 10px",
+  boxSizing: "border-box",
 };
 
 const siteDetailRowSeparatorStyle: React.CSSProperties = {

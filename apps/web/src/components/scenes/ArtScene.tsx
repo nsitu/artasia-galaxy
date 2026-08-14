@@ -2072,6 +2072,7 @@ const lightboxLoadingSpinnerStyle: React.CSSProperties = {
 
 const photoLightboxMetadataStyle: React.CSSProperties = {
   ...atlasPanelSurfaceStyle,
+  background: "transparent",
   position: "relative",
   zIndex: 3,
   width: "100%",
