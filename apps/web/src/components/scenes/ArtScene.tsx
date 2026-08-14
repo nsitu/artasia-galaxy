@@ -15,7 +15,10 @@ import TerrainGallery, {
   PlacementPreviewPanel,
   type TerrainNotice,
 } from "./TerrainGallery";
-import { atlasPanelSurfaceStyle } from "./atlasSurfaceStyles";
+import {
+  atlasControlSurfaceStyle,
+  atlasPanelSurfaceStyle,
+} from "./atlasSurfaceStyles";
 
 const DEFAULT_TERRAIN_CAMERA_POSITION: [number, number, number] = [0, -12, 10];
 const TERRAIN_MAP_HEADING = 0;
@@ -72,6 +75,7 @@ function LightboxMedia({
   style: React.CSSProperties;
   onClick: React.MouseEventHandler<HTMLImageElement | HTMLVideoElement>;
 }) {
+  const [loading, setLoading] = useState(active);
   const mediaStyle: React.CSSProperties = {
     ...style,
     transform: active ? `scale(${zoom})` : undefined,
@@ -80,45 +84,68 @@ function LightboxMedia({
 
   if (active && photo.mediaKind === "audio" && photo.audioUrl) {
     return (
-      <AudioLightboxPlayer
-        assetId={photo.id}
-        audioUrl={photo.audioUrl}
-        iconName={photo.iconName}
-        activityColour={activityColour}
-        style={mediaStyle}
-      />
+      <>
+        {loading && <LightboxLoadingSpinner />}
+        <AudioLightboxPlayer
+          assetId={photo.id}
+          audioUrl={photo.audioUrl}
+          iconName={photo.iconName}
+          activityColour={activityColour}
+          style={mediaStyle}
+          onReady={() => setLoading(false)}
+          onError={() => setLoading(false)}
+        />
+      </>
     );
   }
 
   if (photo.mediaKind === "video" && photo.videoUrl) {
     return (
-      <video
-        className="atlas-photo-lightbox-media"
-        src={photo.videoUrl}
-        poster={photo.previewUrl}
-        controls={active}
-        autoPlay={active}
-        playsInline
-        preload={active ? "metadata" : "auto"}
-        aria-label={active ? photo.fileName : undefined}
-        aria-hidden={!active}
-        style={mediaStyle}
-        onClick={onClick}
-      />
+      <>
+        {active && loading && <LightboxLoadingSpinner />}
+        <video
+          className="atlas-photo-lightbox-media"
+          src={photo.videoUrl}
+          poster={photo.previewUrl}
+          controls={active}
+          autoPlay={active}
+          playsInline
+          preload={active ? "metadata" : "auto"}
+          aria-label={active ? photo.fileName : undefined}
+          aria-hidden={!active}
+          style={mediaStyle}
+          onLoadedData={() => setLoading(false)}
+          onError={() => setLoading(false)}
+          onClick={onClick}
+        />
+      </>
     );
   }
 
   return (
-    <img
-      className="atlas-photo-lightbox-media"
-      src={photo.previewUrl}
-      alt={active ? photo.fileName : ""}
-      aria-hidden={!active}
-      loading="eager"
-      decoding="async"
-      style={mediaStyle}
-      onClick={onClick}
-    />
+    <>
+      {active && loading && <LightboxLoadingSpinner />}
+      <img
+        className="atlas-photo-lightbox-media"
+        src={photo.previewUrl}
+        alt={active ? photo.fileName : ""}
+        aria-hidden={!active}
+        loading="eager"
+        decoding="async"
+        style={mediaStyle}
+        onLoad={() => setLoading(false)}
+        onError={() => setLoading(false)}
+        onClick={onClick}
+      />
+    </>
+  );
+}
+
+function LightboxLoadingSpinner() {
+  return (
+    <div role="status" aria-label="Loading artwork" style={lightboxLoadingStyle}>
+      <span aria-hidden="true" style={lightboxLoadingSpinnerStyle} />
+    </div>
   );
 }
 
@@ -546,7 +573,7 @@ export default function ArtScene() {
           )}
 
           {!focusedPlacementDetails && partnerFilterOptions.length > 0 && (
-            <div style={filterControlStyle}>
+            <div className="atlas-partner-filter-control" style={filterControlStyle}>
               <button
                 type="button"
                 className="atlas-partner-filter-trigger"
@@ -555,11 +582,11 @@ export default function ArtScene() {
                 onClick={() => setOpenFilter((current) => current === "partner" ? null : "partner")}
                 style={{ ...filterTriggerStyle, ...partnerFilterTriggerStyle }}
               >
-                <span>{selectedPartnerFilter || "All partners"}</span>
+                <span>{selectedPartnerFilter || "Partners"}</span>
                 <ChevronIcon expanded={openFilter === "partner"} />
               </button>
               {openFilter === "partner" && (
-                <div role="listbox" aria-label="Filter placements by partner" style={filterMenuStyle}>
+                <div className="atlas-partner-filter-menu" role="listbox" aria-label="Filter placements by partner" style={filterMenuStyle}>
                   <FilterOption active={!selectedPartnerFilter} onSelect={() => {
                     setSelectedPartnerFilter(""); updatePartnerPath(""); setOpenFilter(null);
                   }}>All partners</FilterOption>
@@ -602,11 +629,23 @@ export default function ArtScene() {
                   <FilterOption active={!selectedActivityFilter} onSelect={() => {
                     setSelectedActivityFilter(""); setOpenFilter(null);
                   }}>All Activities ({photos.length})</FilterOption>
-                  {activityFilterOptions.map((option) => (
-                    <FilterOption key={option.id} active={selectedActivityFilter === String(option.id)} colour={option.colour} onSelect={() => {
-                      setSelectedActivityFilter(String(option.id)); setOpenFilter(null);
-                    }}>{option.label} ({option.count ?? 0})</FilterOption>
-                  ))}
+                  {activityFilterOptions.map((option) => {
+                    const disabled = option.count === 0;
+                    return (
+                      <FilterOption
+                        key={option.id}
+                        active={selectedActivityFilter === String(option.id)}
+                        colour={option.colour}
+                        disabled={disabled}
+                        onSelect={() => {
+                          setSelectedActivityFilter(String(option.id));
+                          setOpenFilter(null);
+                        }}
+                      >
+                        {option.label} ({option.count ?? 0})
+                      </FilterOption>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1084,11 +1123,13 @@ function FilterOption({
   children,
   active,
   colour,
+  disabled = false,
   onSelect,
 }: {
   children: React.ReactNode;
   active: boolean;
   colour?: string;
+  disabled?: boolean;
   onSelect: () => void;
 }) {
   return (
@@ -1096,16 +1137,23 @@ function FilterOption({
       type="button"
       role="option"
       aria-selected={active}
+      aria-disabled={disabled}
+      disabled={disabled}
       onClick={onSelect}
       style={{
         ...filterMenuOptionStyle,
         ...(active ? filterMenuOptionActiveStyle : {}),
+        ...(disabled ? filterMenuOptionDisabledStyle : {}),
       }}
     >
       {colour && (
         <span
           aria-hidden="true"
-          style={{ ...activityColourDotStyle, background: colour }}
+          style={{
+            ...activityColourDotStyle,
+            background: colour,
+            ...(disabled ? filterMenuOptionDisabledDotStyle : {}),
+          }}
         />
       )}
       {children}
@@ -1410,6 +1458,10 @@ const topNavStyle: React.CSSProperties = {
 };
 
 const responsiveTopNavStyles = `
+  @keyframes atlas-lightbox-loading-spin {
+    to { transform: rotate(360deg); }
+  }
+
   .atlas-home-logo-link {
     padding-bottom: 8px;
     box-sizing: border-box;
@@ -1538,6 +1590,22 @@ const responsiveTopNavStyles = `
     .atlas-back-button {
       height: 40px !important;
     }
+
+    .atlas-back-button {
+      flex-basis: 48px !important;
+      width: 48px !important;
+    }
+  }
+
+  @media (min-width: 800px) {
+    .atlas-partner-filter-control {
+      width: clamp(460px, 45vw, 560px) !important;
+    }
+
+    .atlas-partner-filter-trigger > span,
+    .atlas-partner-filter-menu [role="option"] {
+      white-space: nowrap;
+    }
   }
 `;
 
@@ -1591,12 +1659,12 @@ const menuWrapStyle: React.CSSProperties = {
 };
 
 const menuButtonStyle: React.CSSProperties = {
+  ...atlasControlSurfaceStyle,
   pointerEvents: "auto",
   width: "5rem",
   height: "5rem",
   display: "grid",
   placeItems: "center",
-  background: "rgba(255,255,255,0.1)",
   color: "#ccc",
   border: 0,
   borderRadius: 0,
@@ -1646,9 +1714,10 @@ const menuItemStyle: React.CSSProperties = {
 };
 
 const backButtonStyle: React.CSSProperties = {
+  ...atlasControlSurfaceStyle,
   pointerEvents: "auto",
-  flex: "0 0 48px",
-  width: 48,
+  flex: "0 0 5rem",
+  width: "5rem",
   height: "5rem",
   padding: 0,
   borderRadius: 0,
@@ -1656,7 +1725,6 @@ const backButtonStyle: React.CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   lineHeight: 0,
-  background: "rgba(255,255,255,0.1)",
   color: "#eef2f8",
   border: 0,
   borderRight: "1px solid rgba(255,255,255,0.18)",
@@ -1702,13 +1770,13 @@ const filterControlStyle: React.CSSProperties = {
 };
 
 const filterTriggerStyle: React.CSSProperties = {
+  ...atlasControlSurfaceStyle,
   width: "100%",
   height: 40,
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
   gap: 16,
-  background: "rgba(255,255,255,0.1)",
   color: "#f4f7fb",
   border: "1px solid rgba(255,255,255,0.18)",
   borderRadius: 0,
@@ -1761,6 +1829,15 @@ const filterMenuOptionStyle: React.CSSProperties = {
 
 const filterMenuOptionActiveStyle: React.CSSProperties = {
   boxShadow: "inset 4px 0 0 #ffffff",
+};
+
+const filterMenuOptionDisabledStyle: React.CSSProperties = {
+  color: "rgba(244, 247, 251, 0.5)",
+  cursor: "not-allowed",
+};
+
+const filterMenuOptionDisabledDotStyle: React.CSSProperties = {
+  opacity: 0.5,
 };
 
 const activityFilterLabelStyle: React.CSSProperties = {
@@ -1850,6 +1927,7 @@ const photoLightboxTrackStyle: React.CSSProperties = {
 };
 
 const photoLightboxSlideStyle: React.CSSProperties = {
+  position: "relative",
   flex: "0 0 33.333333%",
   width: "33.333333%",
   height: "100%",
@@ -1860,6 +1938,24 @@ const photoLightboxSlideStyle: React.CSSProperties = {
   justifyContent: "center",
   padding: 24,
   overflow: "hidden",
+};
+
+const lightboxLoadingStyle: React.CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  zIndex: 2,
+  display: "grid",
+  placeItems: "center",
+  pointerEvents: "none",
+};
+
+const lightboxLoadingSpinnerStyle: React.CSSProperties = {
+  width: 36,
+  height: 36,
+  border: "3px solid rgba(255,255,255,0.22)",
+  borderTopColor: "#f5f7fb",
+  borderRadius: "50%",
+  animation: "atlas-lightbox-loading-spin 0.85s linear infinite",
 };
 
 const photoLightboxMetadataStyle: React.CSSProperties = {
@@ -2005,13 +2101,13 @@ const photoLightboxAudioStyle: React.CSSProperties = {
 };
 
 const photoLightboxAudioButtonStyle: React.CSSProperties = {
+  ...atlasControlSurfaceStyle,
   display: "inline-flex",
   alignItems: "center",
   gap: 8,
   padding: "7px 11px",
   border: "1px solid rgba(255,255,255,0.28)",
   borderRadius: 999,
-  background: "rgba(255,255,255,0.1)",
   color: "#fff",
   font: "inherit",
   fontWeight: 700,
@@ -2019,13 +2115,13 @@ const photoLightboxAudioButtonStyle: React.CSSProperties = {
 };
 
 const photoLightboxCloseStyle: React.CSSProperties = {
+  ...atlasControlSurfaceStyle,
   pointerEvents: "auto",
   width: "5rem",
   height: "5rem",
   display: "grid",
   placeItems: "center",
   padding: 0,
-  background: "rgba(255,255,255,0.1)",
   color: "#eef2f8",
   border: "none",
   borderRadius: 0,
@@ -2090,6 +2186,7 @@ const aboutTextStyle: React.CSSProperties = { margin: "0 auto 22px", maxWidth: 3
 const aboutLinkStyle: React.CSSProperties = { color: "#fff", fontFamily: "monospace", fontSize: 12, textDecoration: "underline" };
 
 const photoLightboxNavStyle: React.CSSProperties = {
+  ...atlasControlSurfaceStyle,
   pointerEvents: "auto",
   position: "absolute",
   top: "50%",
@@ -2099,7 +2196,6 @@ const photoLightboxNavStyle: React.CSSProperties = {
   display: "grid",
   placeItems: "center",
   padding: 0,
-  background: "rgba(255,255,255,0.1)",
   color: "#eef2f8",
   border: "none",
   borderRadius: 0,

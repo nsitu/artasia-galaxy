@@ -26,7 +26,10 @@ import {
   getGeoPhotos,
 } from "./terrainLayout";
 import { loadThreeGeo, type ThreeGeoProjection } from "./threeGeoRuntime";
-import { atlasPanelSurfaceStyle } from "./atlasSurfaceStyles";
+import {
+  atlasControlSurfaceStyle,
+  atlasPanelSurfaceStyle,
+} from "./atlasSurfaceStyles";
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN ?? "";
 const REGIONAL_TERRAIN_ELEVATION_SCALE = 8;
@@ -2052,6 +2055,7 @@ export function FocusedPlacementOverlay({
       <div
         style={{
           ...siteDetailsHeaderStyle,
+          ...(isMobile ? mobileSiteDetailsHeaderStyle : {}),
           ...(!expanded ? siteDetailsHeaderCollapsedStyle : {}),
         }}
       >
@@ -2086,7 +2090,12 @@ export function FocusedPlacementOverlay({
       </div>
 
       {expanded && (
-        <>
+        <div
+          style={{
+            ...siteDetailsBodyStyle,
+            ...(isMobile ? mobileSiteDetailsBodyStyle : {}),
+          }}
+        >
           <div style={siteDetailsGridStyle}>
             <SiteDetail label="Site" value={siteDetails || "Not specified"} />
             <SiteDetail
@@ -2118,7 +2127,7 @@ export function FocusedPlacementOverlay({
               )}
             </div>
           )}
-        </>
+        </div>
       )}
     </section>
   );
@@ -2375,7 +2384,7 @@ const siteDetailsStyle: React.CSSProperties = {
   pointerEvents: "none",
   border: "none",
   borderRadius: 0,
-  padding: "12px 16px",
+  padding: 0,
   color: "#d8dde7",
   fontFamily: "monospace",
   boxShadow: "none",
@@ -2390,7 +2399,7 @@ const mobileSiteDetailsStyle: React.CSSProperties = {
   maxWidth: "none",
   zIndex: 13,
   borderRadius: 0,
-  padding: "12px 12px max(12px, env(safe-area-inset-bottom))",
+  padding: 0,
   overflow: "hidden",
 };
 
@@ -2579,17 +2588,29 @@ const placementPreviewActionStyle: React.CSSProperties = {
 };
 
 const siteDetailsHeaderStyle: React.CSSProperties = {
+  height: "5rem",
+  boxSizing: "border-box",
   display: "flex",
   alignItems: "center",
   gap: 10,
-  paddingRight: "calc(5rem + 8px)",
-  paddingBottom: 10,
+  paddingLeft: 16,
   borderBottom: "1px solid rgba(255,255,255,0.12)",
 };
 
+const mobileSiteDetailsHeaderStyle: React.CSSProperties = {
+  paddingLeft: 12,
+};
+
 const siteDetailsHeaderCollapsedStyle: React.CSSProperties = {
-  paddingBottom: 0,
   borderBottom: "none",
+};
+
+const siteDetailsBodyStyle: React.CSSProperties = {
+  padding: "10px 16px 12px",
+};
+
+const mobileSiteDetailsBodyStyle: React.CSSProperties = {
+  padding: "10px 12px max(12px, env(safe-area-inset-bottom))",
 };
 
 const siteDetailsTitleWrapStyle: React.CSSProperties = {
@@ -2598,17 +2619,17 @@ const siteDetailsTitleWrapStyle: React.CSSProperties = {
 };
 
 const siteDetailsToggleStyle: React.CSSProperties = {
-  position: "absolute",
-  top: 0,
-  right: 0,
+  ...atlasControlSurfaceStyle,
   pointerEvents: "auto",
+  flex: "0 0 5rem",
+  alignSelf: "stretch",
+  marginLeft: "auto",
   width: "5rem",
-  height: "5rem",
+  height: "100%",
   display: "grid",
   placeItems: "center",
   padding: 0,
   borderRadius: 0,
-  background: "rgba(255,255,255,0.1)",
   color: "#eef2f8",
   border: 0,
   cursor: "pointer",
@@ -2655,7 +2676,6 @@ const siteNameStyle: React.CSSProperties = {
 const siteDetailsGridStyle: React.CSSProperties = {
   display: "grid",
   gap: 9,
-  paddingTop: 10,
 };
 
 const siteDetailsActionsStyle: React.CSSProperties = {

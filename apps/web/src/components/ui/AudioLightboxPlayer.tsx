@@ -15,6 +15,8 @@ export default function AudioLightboxPlayer({
   autoPlay = true,
   activityColour = "#b7bac3",
   style,
+  onReady,
+  onError,
 }: {
   assetId: string;
   audioUrl: string;
@@ -22,6 +24,8 @@ export default function AudioLightboxPlayer({
   autoPlay?: boolean;
   activityColour?: string;
   style?: CSSProperties;
+  onReady?: () => void;
+  onError?: () => void;
 }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [waveform, setWaveform] = useState<AudioWaveform | null>(null);
@@ -116,6 +120,8 @@ export default function AudioLightboxPlayer({
         src={audioUrl}
         autoPlay={autoPlay}
         preload="metadata"
+        onCanPlay={onReady}
+        onError={onError}
         onLoadedMetadata={(event) => {
           if (Number.isFinite(event.currentTarget.duration)) {
             setDuration(event.currentTarget.duration);

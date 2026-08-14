@@ -53,6 +53,7 @@ const NAME_SIGN_TANGENT_OFFSET = POST_RADIUS + 0.002;
 const NAME_SIGN_CORNER_RADIUS = 0.055;
 const SIGN_HOVER_SCALE = 1.06;
 const SIGN_DIMMED_OPACITY = 0.7;
+const SIGN_VERTICAL_ANGLE_THRESHOLD = THREE.MathUtils.degToRad(2);
 const SIGN_POINTER_RENDER_ORDER = 1;
 const SIGN_POLE_RENDER_ORDER = 3;
 const SIGN_SHARED_LOCATION_RENDER_ORDER = 5;
@@ -187,7 +188,7 @@ export default function PlacementSignpost({
           isDimmed={
             hoveredSign !== null &&
             index > hoveredSignIndex &&
-            sign.direction === hoveredSign.direction
+            canObscureHoveredSign(hoveredSign, sign)
           }
           onPointerEnter={() => setHoveredSignId(sign.id)}
           onPointerLeave={() => setHoveredSignId((current) =>
@@ -424,6 +425,25 @@ function getSignWidth(label: string, isDown: boolean, fontSize: number) {
   return Math.max(
     isDown ? SHARED_SIGN_MIN_WIDTH : SIGN_MIN_WIDTH,
     estimatedTextWidth + SIGN_TEXT_PADDING,
+  );
+}
+
+function canObscureHoveredSign(
+  hoveredSign: PlacementSign,
+  candidateSign: PlacementSign,
+) {
+  if (
+    hoveredSign.direction === "down" ||
+    candidateSign.direction !== hoveredSign.direction
+  ) return false;
+
+  const directionMultiplier = hoveredSign.direction === "left" ? -1 : 1;
+  const hoveredNorthSouthAngle = (hoveredSign.angle ?? 0) * directionMultiplier;
+  const candidateNorthSouthAngle = (candidateSign.angle ?? 0) * directionMultiplier;
+
+  return (
+    hoveredNorthSouthAngle > SIGN_VERTICAL_ANGLE_THRESHOLD &&
+    candidateNorthSouthAngle < -SIGN_VERTICAL_ANGLE_THRESHOLD
   );
 }
 
