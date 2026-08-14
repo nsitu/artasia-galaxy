@@ -2042,8 +2042,22 @@ export function FocusedPlacementOverlay({
   placement: MapPlacement;
   adminHref?: string;
 }) {
+  return <PlacementInfoPanel placement={placement} adminHref={adminHref} />;
+}
+
+function PlacementInfoPanel({
+  placement,
+  adminHref,
+  onView,
+  preview = false,
+}: {
+  placement: MapPlacement;
+  adminHref?: string;
+  onView?: () => void;
+  preview?: boolean;
+}) {
   const isMobile = useIsMobileBreakpoint();
-  const [expanded, setExpanded] = useState(!isMobile);
+  const [expanded, setExpanded] = useState(preview || !isMobile);
   const people = [
     placement.team_member,
     placement.secondary_team_member,
@@ -2059,8 +2073,8 @@ export function FocusedPlacementOverlay({
     : placement.partner_logo;
 
   useEffect(() => {
-    setExpanded(!isMobile);
-  }, [isMobile, placement.placement_id]);
+    setExpanded(preview || !isMobile);
+  }, [isMobile, placement.placement_id, preview]);
 
   return (
     <section
@@ -2068,6 +2082,7 @@ export function FocusedPlacementOverlay({
         ...siteDetailsStyle,
         ...(isMobile ? mobileSiteDetailsStyle : {}),
         ...(isMobile && !expanded ? mobileSiteDetailsCollapsedStyle : {}),
+        ...(preview ? placementPreviewSharedPanelStyle : {}),
       }}
       aria-label="Placement details"
     >
@@ -2175,7 +2190,7 @@ export function FocusedPlacementOverlay({
               />
             )}
           </div>
-          {(placement.documentation_url || adminHref) && (
+          {(placement.documentation_url || adminHref || onView) && (
             <div style={siteDetailsActionsStyle}>
               {placement.documentation_url && (
                 <a
@@ -2191,10 +2206,23 @@ export function FocusedPlacementOverlay({
                 <a
                   href={adminHref}
                   className="atlas-control-surface"
-                  style={{ ...siteDetailsActionLinkStyle, borderRadius: 0 }}
+                  style={{
+                    ...siteDetailsActionLinkStyle,
+                    ...siteDetailsPrimaryActionStyle,
+                  }}
                 >
                   Admin
                 </a>
+              )}
+              {onView && (
+                <button
+                  type="button"
+                  className="atlas-control-surface"
+                  onClick={onView}
+                  style={siteDetailsPrimaryActionStyle}
+                >
+                  View
+                </button>
               )}
             </div>
           )}
@@ -2228,6 +2256,15 @@ export function PlacementPreviewPanel({
   onOpen: () => void;
 }) {
   const isMobile = useIsMobileBreakpoint();
+  if (isMobile) {
+    return (
+      <PlacementInfoPanel
+        placement={placement}
+        onView={onOpen}
+        preview
+      />
+    );
+  }
   const siteDetails = formatSiteDetails(placement);
   const participantDetails = formatParticipantDetails(placement);
   const artistEducatorDetails = formatArtistEducatorDetails(placement);
@@ -2239,7 +2276,6 @@ export function PlacementPreviewPanel({
     <section
       style={{
         ...placementPreviewPanelStyle,
-        ...(isMobile ? placementPreviewMobilePanelStyle : {}),
       }}
       aria-label="Placement preview"
     >
@@ -2248,11 +2284,10 @@ export function PlacementPreviewPanel({
         onClick={onOpen}
         style={{
           ...placementPreviewButtonStyle,
-          ...(isMobile ? placementPreviewMobileButtonStyle : {}),
         }}
       >
-        {(partnerLogo?.url || (isMobile && placement.is_earlyon)) && (
-          <span style={isMobile ? placementPreviewMobileLogoRowStyle : placementPreviewDesktopLogoRowStyle}>
+        {partnerLogo?.url && (
+          <span style={placementPreviewDesktopLogoRowStyle}>
             {partnerLogo?.url && (
               <img
                 src={partnerLogo.url}
@@ -2263,20 +2298,12 @@ export function PlacementPreviewPanel({
                 }
                 style={{
                   ...(placement.partner_white_logo?.url ? placementPreviewWhiteLogoStyle : placementPreviewLogoStyle),
-                  ...(isMobile ? placementPreviewMobileLogoStyle : {}),
                 }}
-              />
-            )}
-            {isMobile && placement.is_earlyon && (
-              <img
-                src="/early-on-white.svg"
-                alt="EarlyON"
-                style={placementPreviewEarlyOnLogoStyle}
               />
             )}
           </span>
         )}
-        <span style={{ ...placementPreviewContentStyle, ...(isMobile ? placementPreviewMobileContentStyle : {}) }}>
+        <span style={placementPreviewContentStyle}>
           <span style={placementPreviewNameStyle}>
             {formatPlacementDisplayName(placement)}
           </span>
@@ -2288,7 +2315,7 @@ export function PlacementPreviewPanel({
           )}
           <span style={placementPreviewMetaStyle}>{artistEducatorDetails}</span>
         </span>
-        <span style={{ ...placementPreviewActionStyle, ...(isMobile ? placementPreviewMobileActionStyle : {}) }}>View</span>
+        <span style={placementPreviewActionStyle}>View</span>
       </button>
     </section>
   );
@@ -2507,6 +2534,10 @@ const mobileSiteDetailsCollapsedStyle: React.CSSProperties = {
   maxHeight: 86,
 };
 
+const placementPreviewSharedPanelStyle: React.CSSProperties = {
+  zIndex: 17,
+};
+
 const placementHoverLabelStyle: React.CSSProperties = {
   ...atlasPanelSurfaceStyle,
   position: "absolute",
@@ -2584,63 +2615,8 @@ const placementPreviewLogoStyle: React.CSSProperties = {
   padding: 5,
 };
 
-const placementPreviewMobilePanelStyle: React.CSSProperties = {
-  left: 0,
-  right: 0,
-  bottom: 0,
-  width: "100vw",
-  margin: 0,
-  overflow: "hidden",
-  zIndex: 17,
-};
-
-const placementPreviewMobileButtonStyle: React.CSSProperties = {
-  flexDirection: "column",
-  alignItems: "stretch",
-  gap: 10,
-  padding: 14,
-  boxSizing: "border-box",
-  borderRadius: 0,
-};
-
-const placementPreviewMobileLogoStyle: React.CSSProperties = {
-  width: "min(50vw, 280px)",
-  height: 72,
-  alignSelf: "flex-start",
-  objectPosition: "left center",
-};
-
 const placementPreviewDesktopLogoRowStyle: React.CSSProperties = {
   display: "contents",
-};
-
-const placementPreviewMobileLogoRowStyle: React.CSSProperties = {
-  width: "100%",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "flex-start",
-  gap: 16,
-};
-
-const placementPreviewEarlyOnLogoStyle: React.CSSProperties = {
-  width: "min(30vw, 160px)",
-  height: 58,
-  flex: "0 1 auto",
-  objectFit: "contain",
-  objectPosition: "left center",
-};
-
-const placementPreviewMobileContentStyle: React.CSSProperties = {
-  width: "100%",
-};
-
-const placementPreviewMobileActionStyle: React.CSSProperties = {
-  width: "100%",
-  boxSizing: "border-box",
-  padding: "11px 12px",
-  borderRadius: 8,
-  textAlign: "center",
-  background: "rgba(255,255,255,0.12)",
 };
 
 const placementPreviewWhiteLogoStyle: React.CSSProperties = {
@@ -2654,14 +2630,6 @@ const placementPreviewContentStyle: React.CSSProperties = {
   flex: "1 1 auto",
   display: "grid",
   gap: 3,
-};
-
-const placementPreviewPartnerStyle: React.CSSProperties = {
-  color: "#aeb7c6",
-  fontSize: 11,
-  fontWeight: 400,
-  lineHeight: 1.25,
-  overflowWrap: "anywhere",
 };
 
 const placementPreviewNameStyle: React.CSSProperties = {
@@ -2776,9 +2744,33 @@ const siteDetailsGridStyle: React.CSSProperties = {
 
 const siteDetailsActionsStyle: React.CSSProperties = {
   display: "flex",
+  flexWrap: "wrap",
   gap: 8,
   justifyContent: "flex-end",
   marginTop: 10,
+  pointerEvents: "auto",
+};
+
+const siteDetailsPrimaryActionStyle: React.CSSProperties = {
+  ...atlasControlSurfaceStyle,
+  flex: "1 0 100%",
+  width: "100%",
+  minHeight: 44,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  boxSizing: "border-box",
+  padding: "11px 12px",
+  border: "1px solid rgba(255,255,255,0.22)",
+  borderRadius: 0,
+  color: "#ffffff",
+  fontFamily: "monospace",
+  fontSize: 12,
+  fontWeight: 700,
+  lineHeight: 1,
+  textAlign: "center",
+  textDecoration: "none",
+  cursor: "pointer",
   pointerEvents: "auto",
 };
 
@@ -2828,7 +2820,7 @@ const siteDetailIconStyle: React.CSSProperties = {
 const siteDetailEarlyOnLogoStyle: React.CSSProperties = {
   display: "block",
   width: 110,
-  maxWidth: "100%",
+  maxWidth: "50%",
   height: 40,
   objectFit: "contain",
   objectPosition: "left center",
