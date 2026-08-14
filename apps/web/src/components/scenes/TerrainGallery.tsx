@@ -1,5 +1,12 @@
 import { useThree } from "@react-three/fiber";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent,
+} from "react";
 import * as THREE from "three";
 import {
   fetchMapPlacements,
@@ -514,6 +521,10 @@ export type PartnerFilterOption = {
   value: string;
   label: string;
   count: number;
+  whiteLogo?: {
+    url: string;
+    alt: string;
+  } | null;
 };
 
 const SITE_PATH_PREFIX = "/sites/";
@@ -611,15 +622,34 @@ export default function TerrainGallery({
   const placementOrbitFitAnimationRef = useRef<number | null>(null);
 
   const partnerFilterOptions = useMemo<PartnerFilterOption[]>(() => {
-    const counts = new Map<string, number>();
+    const partners = new Map<
+      string,
+      { count: number; whiteLogo?: PartnerFilterOption["whiteLogo"] }
+    >();
     for (const placement of placements) {
       const partner = placement.partner_name?.trim();
       if (!partner) continue;
-      counts.set(partner, (counts.get(partner) ?? 0) + 1);
+      const current = partners.get(partner);
+      partners.set(partner, {
+        count: (current?.count ?? 0) + 1,
+        whiteLogo:
+          current?.whiteLogo ??
+          (placement.partner_white_logo?.url
+            ? {
+                url: placement.partner_white_logo.url,
+                alt: placement.partner_white_logo.alt,
+              }
+            : null),
+      });
     }
-    return [...counts.entries()]
+    return [...partners.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([partner, count]) => ({ value: partner, label: partner, count }));
+      .map(([partner, { count, whiteLogo }]) => ({
+        value: partner,
+        label: partner,
+        count,
+        whiteLogo,
+      }));
   }, [placements]);
   const filteredRegionalPlacements = useMemo(() => {
     if (!selectedPartnerFilter) return placements;
@@ -2038,21 +2068,36 @@ function applyTerrainCameraFrame(
 export function FocusedPlacementOverlay({
   placement,
   adminHref,
+  partnerHref,
+  onPartnerSelect,
 }: {
   placement: MapPlacement;
   adminHref?: string;
+  partnerHref?: string;
+  onPartnerSelect?: (partner: string) => void;
 }) {
-  return <PlacementInfoPanel placement={placement} adminHref={adminHref} />;
+  return (
+    <PlacementInfoPanel
+      placement={placement}
+      adminHref={adminHref}
+      partnerHref={partnerHref}
+      onPartnerSelect={onPartnerSelect}
+    />
+  );
 }
 
 function PlacementInfoPanel({
   placement,
   adminHref,
+  partnerHref,
+  onPartnerSelect,
   onView,
   preview = false,
 }: {
   placement: MapPlacement;
   adminHref?: string;
+  partnerHref?: string;
+  onPartnerSelect?: (partner: string) => void;
   onView?: () => void;
   preview?: boolean;
 }) {
@@ -2071,6 +2116,26 @@ function PlacementInfoPanel({
   const partnerLogo = placement.partner_white_logo?.url
     ? placement.partner_white_logo
     : placement.partner_logo;
+  const partnerName = placement.partner_name?.trim();
+  const partnerLinkEnabled = Boolean(
+    partnerName && partnerHref && onPartnerSelect,
+  );
+  const handlePartnerLinkClick = (
+    event: MouseEvent<HTMLAnchorElement>,
+  ) => {
+    if (
+      !partnerLinkEnabled ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return;
+    }
+    event.preventDefault();
+    onPartnerSelect?.(partnerName!);
+  };
 
   useEffect(() => {
     setExpanded(preview || !isMobile);
@@ -2125,15 +2190,34 @@ function PlacementInfoPanel({
               }}
             >
               {partnerLogo?.url && (
-                <img
-                  src={partnerLogo.url}
-                  alt={partnerLogo.alt || ""}
-                  style={
-                    placement.partner_white_logo?.url
-                      ? partnerWhiteLogoStyle
-                      : partnerLogoStyle
-                  }
-                />
+                partnerLinkEnabled ? (
+                  <a
+                    href={partnerHref}
+                    onClick={handlePartnerLinkClick}
+                    aria-label={`View ${partnerName} placements`}
+                    style={siteDetailsPartnerLogoLinkStyle}
+                  >
+                    <img
+                      src={partnerLogo.url}
+                      alt={partnerLogo.alt || `${partnerName} logo`}
+                      style={
+                        placement.partner_white_logo?.url
+                          ? partnerWhiteLogoStyle
+                          : partnerLogoStyle
+                      }
+                    />
+                  </a>
+                ) : (
+                  <img
+                    src={partnerLogo.url}
+                    alt={partnerLogo.alt || ""}
+                    style={
+                      placement.partner_white_logo?.url
+                        ? partnerWhiteLogoStyle
+                        : partnerLogoStyle
+                    }
+                  />
+                )
               )}
             </div>
             <div
@@ -2142,7 +2226,17 @@ function PlacementInfoPanel({
                 ...siteDetailRowSeparatorStyle,
               }}
             >
-              {placement.partner_name || "Partner organization"}
+              {partnerLinkEnabled ? (
+                <a
+                  href={partnerHref}
+                  onClick={handlePartnerLinkClick}
+                  style={siteDetailsPartnerNameLinkStyle}
+                >
+                  {partnerName}
+                </a>
+              ) : (
+                placement.partner_name || "Partner organization"
+              )}
             </div>
             {placement.is_earlyon && (
               <>
@@ -2727,6 +2821,24 @@ const partnerWhiteLogoStyle: React.CSSProperties = {
   ...partnerLogoStyle,
   background: "transparent",
   padding: 0,
+};
+
+const siteDetailsPartnerLogoLinkStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "flex-start",
+  maxWidth: "100%",
+  color: "inherit",
+  textDecoration: "none",
+  pointerEvents: "auto",
+};
+
+const siteDetailsPartnerNameLinkStyle: React.CSSProperties = {
+  color: "inherit",
+  textDecoration: "underline",
+  textDecorationColor: "rgba(255,255,255,0.38)",
+  textUnderlineOffset: 3,
+  pointerEvents: "auto",
 };
 
 const siteNameStyle: React.CSSProperties = {

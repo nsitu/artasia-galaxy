@@ -577,6 +577,10 @@ export default function ArtScene() {
     setSelectedActivityFilter("");
     setFocusedPlacementDetails(placement);
   }, []);
+  const handlePartnerNavigation = useCallback((partner: string) => {
+    setSelectedPartnerFilter(partner);
+    updatePartnerPath(partner);
+  }, []);
 
   useEffect(() => {
     if (!selectedPartnerFilter) return;
@@ -644,6 +648,10 @@ export default function ArtScene() {
     if (!focusedPlacementDetails) setSelectedActivityFilter("");
   }, [focusedPlacementDetails]);
 
+  const selectedPartnerOption = !focusedPlacementDetails && selectedPartnerFilter
+    ? partnerFilterOptions.find((option) => option.value === selectedPartnerFilter)
+    : undefined;
+
   return (
     <div className={window.location.pathname.startsWith("/sites/") ? "atlas-site-view" : undefined} style={{ width: "100vw", height: "100vh", position: "relative" }}>
       <style>{responsiveTopNavStyles}</style>
@@ -659,6 +667,19 @@ export default function ArtScene() {
             <img src="/artasia-atlas.svg" alt="Artasia Atlas" style={homeLogoImageStyle} />
           </a>
         </div>
+
+        {selectedPartnerOption?.whiteLogo?.url && (
+          <div
+            className="atlas-selected-partner-logo"
+            style={selectedPartnerLogoWrapStyle}
+          >
+            <img
+              src={selectedPartnerOption.whiteLogo.url}
+              alt={selectedPartnerOption.whiteLogo.alt || `${selectedPartnerOption.label} logo`}
+              style={selectedPartnerLogoImageStyle}
+            />
+          </div>
+        )}
 
         <div ref={topControlsRef} className="atlas-top-controls" style={topControlGroupStyle}>
           {backAction && (
@@ -841,6 +862,8 @@ export default function ArtScene() {
       {focusedPlacementDetails && (
         <FocusedPlacementOverlay
           placement={focusedPlacementDetails}
+          partnerHref={getPartnerPath(focusedPlacementDetails.partner_name || "")}
+          onPartnerSelect={handlePartnerNavigation}
           adminHref={
             authUser?.authenticated
               ? `/admin/browse?site=${encodeURIComponent(String(focusedPlacementDetails.placement_id))}`
@@ -1348,13 +1371,17 @@ function slugifyPartnerName(value: string) {
 }
 
 function updatePartnerPath(partner: string) {
-  const slug = slugifyPartnerName(partner);
-  const path = slug
-    ? `${PARTNER_PATH_PREFIX}${encodeURIComponent(slug)}`
-    : "/";
+  const path = getPartnerPath(partner);
   if (window.location.pathname === path) return;
   window.history.pushState(null, "", path);
   window.dispatchEvent(new PopStateEvent("popstate"));
+}
+
+function getPartnerPath(partner: string) {
+  const slug = slugifyPartnerName(partner);
+  return slug
+    ? `${PARTNER_PATH_PREFIX}${encodeURIComponent(slug)}`
+    : "/";
 }
 
 function getWebGL2SupportError() {
@@ -1747,8 +1774,17 @@ const responsiveTopNavStyles = `
 
     .atlas-home-brand {
       flex: 1 1 auto !important;
+      min-width: 0;
       padding-left: 12px;
       box-sizing: border-box;
+    }
+
+    .atlas-selected-partner-logo {
+      order: 1;
+      flex: 0 1 clamp(5rem, 24vw, 9rem) !important;
+      width: clamp(5rem, 24vw, 9rem) !important;
+      height: 5rem !important;
+      padding: 0.75rem !important;
     }
 
     .atlas-home-logo-link {
@@ -1972,6 +2008,30 @@ const homeLogoImageStyle: React.CSSProperties = {
   aspectRatio: "484.7404381 / 244.2527827",
   objectFit: "contain",
   display: "block",
+};
+
+const selectedPartnerLogoWrapStyle: React.CSSProperties = {
+  flex: "0 1 clamp(7rem, 14vw, 12rem)",
+  width: "clamp(7rem, 14vw, 12rem)",
+  height: "5rem",
+  minWidth: 0,
+  alignSelf: "flex-start",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "0.625rem 1rem",
+  boxSizing: "border-box",
+  pointerEvents: "none",
+};
+
+const selectedPartnerLogoImageStyle: React.CSSProperties = {
+  display: "block",
+  width: "100%",
+  height: "100%",
+  maxWidth: "100%",
+  maxHeight: "100%",
+  objectFit: "contain",
+  objectPosition: "center",
 };
 
 const filterControlStyle: React.CSSProperties = {
