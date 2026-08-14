@@ -2078,6 +2078,7 @@ export function FocusedPlacementOverlay({
         </div>
         <button
           type="button"
+          className="atlas-control-surface"
           aria-expanded={expanded}
           aria-label={
             expanded ? "Collapse placement details" : "Expand placement details"

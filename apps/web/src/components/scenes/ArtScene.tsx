@@ -561,7 +561,7 @@ export default function ArtScene() {
           {backAction && (
             <button
               type="button"
-              className="atlas-back-button"
+              className="atlas-back-button atlas-control-surface"
               aria-label="Back to regional view"
               onClick={backAction}
               style={backButtonStyle}
@@ -576,7 +576,7 @@ export default function ArtScene() {
             <div className="atlas-partner-filter-control" style={filterControlStyle}>
               <button
                 type="button"
-                className="atlas-partner-filter-trigger"
+                className="atlas-partner-filter-trigger atlas-control-surface"
                 aria-expanded={openFilter === "partner"}
                 aria-haspopup="listbox"
                 onClick={() => setOpenFilter((current) => current === "partner" ? null : "partner")}
@@ -604,7 +604,7 @@ export default function ArtScene() {
             <div style={filterControlStyle}>
               <button
                 type="button"
-                className="atlas-activity-filter-trigger"
+                className="atlas-activity-filter-trigger atlas-control-surface"
                 aria-expanded={openFilter === "activity"}
                 aria-haspopup="listbox"
                 onClick={() => setOpenFilter((current) => current === "activity" ? null : "activity")}
@@ -655,6 +655,7 @@ export default function ArtScene() {
         <div ref={menuRef} className="atlas-menu-wrap" style={menuWrapStyle}>
           <button
             type="button"
+            className="atlas-control-surface"
             aria-label="Open navigation menu"
             aria-expanded={menuOpen}
             aria-haspopup="menu"
@@ -833,7 +834,7 @@ export default function ArtScene() {
               <>
                 <button
                   type="button"
-                  className="atlas-lightbox-nav-button"
+                  className="atlas-lightbox-nav-button atlas-control-surface"
                   onClick={(event) => {
                     event.stopPropagation();
                     selectAdjacentPhoto(-1);
@@ -847,7 +848,7 @@ export default function ArtScene() {
                 </button>
                 <button
                   type="button"
-                  className="atlas-lightbox-nav-button"
+                  className="atlas-lightbox-nav-button atlas-control-surface"
                   onClick={(event) => {
                     event.stopPropagation();
                     selectAdjacentPhoto(1);
@@ -871,110 +872,20 @@ export default function ArtScene() {
             onPointerUp={(event) => event.stopPropagation()}
             onWheel={(event) => event.stopPropagation()}
           >
-            <div style={photoLightboxMetadataHeaderStyle}>
-              <div style={photoLightboxTitleStyle}>{selectedPhoto.fileName}</div>
-            </div>
-            {lightboxMetadataExpanded && (
-              <div id="atlas-lightbox-caption-details" style={photoLightboxMetadataBodyStyle}>
-            {selectedPhotoActivities.length > 0 && (
-              <div style={photoLightboxActivityListStyle}>
-                {selectedPhotoActivities.map((activity) => (
-                  <div
-                    key={activity.id}
-                    style={photoLightboxActivityContextStyle}
-                  >
-                    <span
-                      style={{
-                        ...photoLightboxActivityBadgeStyle,
-                        ...getActivityColourStyle(activity.colour),
-                      }}
-                    >
-                      {activity.label}
-                    </span>
-                    {activity.description?.trim() && (
-                      <div style={photoLightboxActivityDescriptionStyle}>
-                        {activity.description.trim()}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-            {selectedDescription && (
-              <div style={photoLightboxDescriptionStyle}>
-                {selectedDescription}
-              </div>
-            )}
-            {selectedPhoto.linkedAudioUrl && (
-              <div style={photoLightboxAudioStyle}>
-                <audio
-                  ref={linkedAudioRef}
-                  src={selectedPhoto.linkedAudioUrl}
-                  preload="metadata"
-                  onEnded={() => setLinkedAudioPlaying(false)}
-                  onPause={() => setLinkedAudioPlaying(false)}
-                  onPlay={() => setLinkedAudioPlaying(true)}
-                />
-                <button
-                  type="button"
-                  onClick={toggleLinkedAudio}
-                  style={photoLightboxAudioButtonStyle}
-                  aria-label={
-                    linkedAudioPlaying
-                      ? "Pause linked sound"
-                      : "Play linked sound"
-                  }
-                >
-                  <span aria-hidden="true">
-                    {linkedAudioPlaying ? "Ⅱ" : "▶"}
-                  </span>
-                  {linkedAudioPlaying ? "Pause sound" : "Play sound"}
-                </button>
-              </div>
-            )}
-              </div>
-            )}
-            <div style={photoLightboxActionRowStyle}>
-              <a
-                href={`/api/v1/assets/${selectedPhoto.id}/original`}
-                download={selectedPhoto.fileName}
-                aria-label={`Download original asset: ${selectedPhoto.fileName}`}
-                title="Download original asset"
-                style={photoLightboxActionLinkStyle}
-              >
-                <svg viewBox="0 0 16 16" aria-hidden="true" style={photoLightboxActionIconStyle}>
-                  <path
-                    d="M8 2.5v7m-3-3 3 3 3-3M3 12.5h10"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                <span>Download</span>
-              </a>
-              {authUser?.authenticated && (
-                <a
-                  href={`/edit/${selectedPhoto.id}`}
-                  aria-label={`Edit asset: ${selectedPhoto.fileName}`}
-                  style={photoLightboxActionLinkStyle}
-                >
-                  <svg viewBox="0 0 16 16" aria-hidden="true" style={photoLightboxActionIconStyle}>
-                    <path
-                      d="m3 11.5-.5 2 2-.5 7.6-7.6-1.5-1.5L3 11.5Zm6.6-6.6 1.5 1.5"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.6"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  <span>Edit</span>
-                </a>
+            <div
+              style={{
+                ...photoLightboxMetadataHeaderStyle,
+                ...(!lightboxMetadataExpanded
+                  ? photoLightboxMetadataHeaderCollapsedStyle
+                  : {}),
+              }}
+            >
+              {selectedDescription && (
+                <div style={photoLightboxTitleStyle}>{selectedDescription}</div>
               )}
               <button
                 type="button"
+                className="atlas-control-surface"
                 aria-expanded={lightboxMetadataExpanded}
                 aria-controls="atlas-lightbox-caption-details"
                 aria-label={lightboxMetadataExpanded ? "Collapse asset details" : "Expand asset details"}
@@ -993,9 +904,110 @@ export default function ArtScene() {
                 </svg>
               </button>
             </div>
+            {lightboxMetadataExpanded && (
+              <div id="atlas-lightbox-caption-details" style={photoLightboxMetadataBodyStyle}>
+            {selectedPhotoActivities.length > 0 && (
+              <div style={photoLightboxActivityListStyle}>
+                {selectedPhotoActivities.map((activity) => (
+                  <div
+                    key={activity.id}
+                    className="atlas-lightbox-activity-context"
+                    style={photoLightboxActivityContextStyle}
+                  >
+                    <span
+                      style={{
+                        ...photoLightboxActivityBadgeStyle,
+                        ...getActivityColourStyle(activity.colour),
+                      }}
+                    >
+                      {activity.label}
+                    </span>
+                    {activity.description?.trim() && (
+                      <div
+                        className="atlas-lightbox-activity-description"
+                        style={photoLightboxActivityDescriptionStyle}
+                      >
+                        {activity.description.trim()}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            {selectedPhoto.linkedAudioUrl && (
+              <div style={photoLightboxAudioStyle}>
+                <audio
+                  ref={linkedAudioRef}
+                  src={selectedPhoto.linkedAudioUrl}
+                  preload="metadata"
+                  onEnded={() => setLinkedAudioPlaying(false)}
+                  onPause={() => setLinkedAudioPlaying(false)}
+                  onPlay={() => setLinkedAudioPlaying(true)}
+                />
+                <button
+                  type="button"
+                  className="atlas-control-surface"
+                  onClick={toggleLinkedAudio}
+                  style={photoLightboxAudioButtonStyle}
+                  aria-label={
+                    linkedAudioPlaying
+                      ? "Pause linked sound"
+                      : "Play linked sound"
+                  }
+                >
+                  <span aria-hidden="true">
+                    {linkedAudioPlaying ? "Ⅱ" : "▶"}
+                  </span>
+                  {linkedAudioPlaying ? "Pause sound" : "Play sound"}
+                </button>
+              </div>
+            )}
+                <div style={photoLightboxActionRowStyle}>
+                <a
+                  href={`/api/v1/assets/${selectedPhoto.id}/original`}
+                  download={selectedPhoto.fileName}
+                  aria-label={`Download original asset: ${selectedPhoto.fileName}`}
+                  title="Download original asset"
+                  style={photoLightboxActionLinkStyle}
+                >
+                  <svg viewBox="0 0 16 16" aria-hidden="true" style={photoLightboxActionIconStyle}>
+                    <path
+                      d="M8 2.5v7m-3-3 3 3 3-3M3 12.5h10"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  <span>Download</span>
+                </a>
+                {authUser?.authenticated && (
+                  <a
+                    href={`/edit/${selectedPhoto.id}`}
+                    aria-label={`Edit asset: ${selectedPhoto.fileName}`}
+                    style={photoLightboxActionLinkStyle}
+                  >
+                    <svg viewBox="0 0 16 16" aria-hidden="true" style={photoLightboxActionIconStyle}>
+                      <path
+                        d="m3 11.5-.5 2 2-.5 7.6-7.6-1.5-1.5L3 11.5Zm6.6-6.6 1.5 1.5"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    <span>Edit</span>
+                  </a>
+                )}
+                </div>
+              </div>
+            )}
           </div>
-          <button
-            type="button"
+              <button
+                type="button"
+                className="atlas-control-surface"
             onClick={() => selectPhoto(null)}
             aria-label="Close photo"
             style={photoLightboxCloseStyle}
@@ -1462,6 +1474,18 @@ const responsiveTopNavStyles = `
     to { transform: rotate(360deg); }
   }
 
+  @media (hover: hover) {
+    .atlas-control-surface:hover {
+      background-color: rgba(255, 255, 255, 0.1) !important;
+      background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.2) 100%) !important;
+    }
+  }
+
+  .atlas-control-surface:focus-visible {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.2) 100%) !important;
+  }
+
   .atlas-home-logo-link {
     padding-bottom: 8px;
     box-sizing: border-box;
@@ -1520,6 +1544,16 @@ const responsiveTopNavStyles = `
       width: 100% !important;
       max-height: min(42dvh, 360px) !important;
       overflow: hidden;
+    }
+
+    .atlas-lightbox-activity-context {
+      flex-direction: column !important;
+      align-items: flex-start !important;
+    }
+
+    .atlas-lightbox-activity-description {
+      flex: 0 1 auto !important;
+      width: 100%;
     }
 
     .atlas-top-nav {
@@ -1969,7 +2003,7 @@ const photoLightboxMetadataStyle: React.CSSProperties = {
   flexDirection: "column",
   overflow: "hidden",
   borderTop: "1px solid rgba(255,255,255,0.18)",
-  padding: "12px 16px max(12px, env(safe-area-inset-bottom))",
+  padding: 0,
   color: "#ddd",
   fontFamily: "monospace",
   fontSize: 13,
@@ -1980,18 +2014,31 @@ const photoLightboxMetadataStyle: React.CSSProperties = {
 };
 
 const photoLightboxMetadataHeaderStyle: React.CSSProperties = {
+  flex: "0 0 5rem",
+  height: "5rem",
+  boxSizing: "border-box",
   display: "flex",
   alignItems: "center",
   gap: 12,
-  minHeight: 30,
+  paddingLeft: 16,
+  borderBottom: "1px solid rgba(255,255,255,0.12)",
+};
+
+const photoLightboxMetadataHeaderCollapsedStyle: React.CSSProperties = {
+  borderBottom: "none",
 };
 
 const photoLightboxTitleStyle: React.CSSProperties = {
   flex: "1 1 auto",
   minWidth: 0,
+  display: "-webkit-box",
+  WebkitBoxOrient: "vertical",
+  WebkitLineClamp: 3,
+  overflow: "hidden",
   color: "#fff",
   fontSize: 12,
   fontWeight: 700,
+  whiteSpace: "pre-wrap",
   overflowWrap: "anywhere",
 };
 
@@ -2029,17 +2076,18 @@ const photoLightboxActionIconStyle: React.CSSProperties = {
 };
 
 const photoLightboxMetadataToggleStyle: React.CSSProperties = {
-  flex: "0 0 auto",
+  ...atlasControlSurfaceStyle,
+  flex: "0 0 5rem",
+  alignSelf: "stretch",
   marginLeft: "auto",
-  width: 30,
-  height: 30,
+  width: "5rem",
+  height: "100%",
   display: "grid",
   placeItems: "center",
   padding: 0,
-  borderRadius: 999,
-  background: "rgba(255,255,255,0.08)",
+  borderRadius: 0,
   color: "#eef2f8",
-  border: "1px solid rgba(255,255,255,0.14)",
+  border: 0,
   cursor: "pointer",
 };
 
@@ -2051,14 +2099,7 @@ const photoLightboxMetadataChevronStyle: React.CSSProperties = {
 const photoLightboxMetadataBodyStyle: React.CSSProperties = {
   minHeight: 0,
   overflowY: "auto",
-  marginTop: 10,
-  paddingRight: 4,
-};
-
-const photoLightboxDescriptionStyle: React.CSSProperties = {
-  color: "#c7ccd6",
-  whiteSpace: "pre-wrap",
-  overflowWrap: "anywhere",
+  padding: "10px 16px max(12px, env(safe-area-inset-bottom))",
 };
 
 const photoLightboxActivityListStyle: React.CSSProperties = {
