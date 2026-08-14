@@ -307,6 +307,11 @@ export default function ArtScene() {
       activityFilterOptions.find((activity) => activity.id === activityId),
     )
     .filter((activity): activity is ActivityOption => Boolean(activity)) ?? [];
+  const selectedActivityDescriptions = selectedPhotoActivities.flatMap((activity) => {
+    const description = activity.description?.trim();
+    return description ? [{ id: activity.id, description }] : [];
+  });
+  const selectedActivityPreview = selectedActivityDescriptions[0]?.description;
   const selectedAudioActivityColour = selectedPhotoActivities.find(
     (activity) => activity.colour?.trim(),
   )?.colour;
@@ -880,9 +885,35 @@ export default function ArtScene() {
                   : {}),
               }}
             >
-              {selectedDescription && (
-                <div style={photoLightboxTitleStyle}>{selectedDescription}</div>
-              )}
+              <div
+                className="atlas-lightbox-caption-header-content"
+                style={photoLightboxCaptionHeaderContentStyle}
+              >
+                {selectedPhotoActivities.length > 0 ? (
+                  <>
+                    <div style={photoLightboxHeaderBadgeListStyle}>
+                      {selectedPhotoActivities.map((activity) => (
+                        <span
+                          key={activity.id}
+                          style={{
+                            ...photoLightboxActivityBadgeStyle,
+                            ...getActivityColourStyle(activity.colour),
+                          }}
+                        >
+                          {activity.label}
+                        </span>
+                      ))}
+                    </div>
+                    {!lightboxMetadataExpanded && selectedActivityPreview && (
+                      <div style={photoLightboxActivityPreviewStyle}>
+                        {selectedActivityPreview}
+                      </div>
+                    )}
+                  </>
+                ) : selectedDescription ? (
+                  <div style={photoLightboxTitleStyle}>{selectedDescription}</div>
+                ) : null}
+              </div>
               <button
                 type="button"
                 className="atlas-control-surface"
@@ -906,32 +937,28 @@ export default function ArtScene() {
             </div>
             {lightboxMetadataExpanded && (
               <div id="atlas-lightbox-caption-details" style={photoLightboxMetadataBodyStyle}>
-            {selectedPhotoActivities.length > 0 && (
+            {selectedActivityDescriptions.length > 0 && (
               <div style={photoLightboxActivityListStyle}>
-                {selectedPhotoActivities.map((activity) => (
+                {selectedActivityDescriptions.map((activity) => (
                   <div
                     key={activity.id}
-                    className="atlas-lightbox-activity-context"
-                    style={photoLightboxActivityContextStyle}
+                    style={photoLightboxActivityDescriptionStyle}
                   >
-                    <span
-                      style={{
-                        ...photoLightboxActivityBadgeStyle,
-                        ...getActivityColourStyle(activity.colour),
-                      }}
-                    >
-                      {activity.label}
-                    </span>
-                    {activity.description?.trim() && (
-                      <div
-                        className="atlas-lightbox-activity-description"
-                        style={photoLightboxActivityDescriptionStyle}
-                      >
-                        {activity.description.trim()}
-                      </div>
-                    )}
+                    {activity.description}
                   </div>
                 ))}
+              </div>
+            )}
+            {selectedDescription && selectedPhotoActivities.length > 0 && (
+              <div
+                style={{
+                  ...photoLightboxAssetCaptionStyle,
+                  ...(selectedActivityDescriptions.length > 0
+                    ? photoLightboxAssetCaptionSeparatedStyle
+                    : {}),
+                }}
+              >
+                {selectedDescription}
               </div>
             )}
             {selectedPhoto.linkedAudioUrl && (
@@ -1452,7 +1479,6 @@ function TouchDoubleTapZoom({ enabled }: { enabled: boolean }) {
 }
 
 const topNavStyle: React.CSSProperties = {
-  ...atlasPanelSurfaceStyle,
   position: "absolute",
   top: 0,
   left: 0,
@@ -1484,6 +1510,17 @@ const responsiveTopNavStyles = `
   .atlas-control-surface:focus-visible {
     background-color: rgba(255, 255, 255, 0.1) !important;
     background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.2) 100%) !important;
+  }
+
+  .atlas-top-nav::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: rgba(0, 0, 0, 0.42);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
   }
 
   .atlas-home-logo-link {
@@ -1546,14 +1583,11 @@ const responsiveTopNavStyles = `
       overflow: hidden;
     }
 
-    .atlas-lightbox-activity-context {
+    .atlas-lightbox-caption-header-content {
       flex-direction: column !important;
       align-items: flex-start !important;
-    }
-
-    .atlas-lightbox-activity-description {
-      flex: 0 1 auto !important;
-      width: 100%;
+      justify-content: center !important;
+      gap: 4px !important;
     }
 
     .atlas-top-nav {
@@ -1561,7 +1595,7 @@ const responsiveTopNavStyles = `
       right: 0 !important;
       padding: 0 !important;
       box-sizing: border-box;
-      background: rgba(0, 0, 0, 0.42);
+      background: transparent;
       flex-wrap: wrap;
       align-items: flex-start !important;
       gap: 0 !important;
@@ -2028,6 +2062,35 @@ const photoLightboxMetadataHeaderCollapsedStyle: React.CSSProperties = {
   borderBottom: "none",
 };
 
+const photoLightboxCaptionHeaderContentStyle: React.CSSProperties = {
+  flex: "1 1 auto",
+  minWidth: 0,
+  height: "100%",
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  overflow: "hidden",
+};
+
+const photoLightboxHeaderBadgeListStyle: React.CSSProperties = {
+  flex: "0 0 auto",
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 6,
+};
+
+const photoLightboxActivityPreviewStyle: React.CSSProperties = {
+  flex: "1 1 auto",
+  minWidth: 0,
+  width: "100%",
+  overflow: "hidden",
+  color: "#d8dce4",
+  fontSize: 12,
+  lineHeight: 1.4,
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+
 const photoLightboxTitleStyle: React.CSSProperties = {
   flex: "1 1 auto",
   minWidth: 0,
@@ -2106,23 +2169,28 @@ const photoLightboxActivityListStyle: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: 8,
-  marginBottom: 10,
-};
-
-const photoLightboxActivityContextStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "flex-start",
-  flexWrap: "wrap",
-  gap: "6px 10px",
 };
 
 const photoLightboxActivityDescriptionStyle: React.CSSProperties = {
-  flex: "1 1 240px",
   color: "#d8dce4",
   fontSize: 13,
   lineHeight: 1.45,
   whiteSpace: "pre-wrap",
   overflowWrap: "anywhere",
+};
+
+const photoLightboxAssetCaptionStyle: React.CSSProperties = {
+  color: "#c7ccd6",
+  fontSize: 13,
+  lineHeight: 1.45,
+  whiteSpace: "pre-wrap",
+  overflowWrap: "anywhere",
+};
+
+const photoLightboxAssetCaptionSeparatedStyle: React.CSSProperties = {
+  marginTop: 10,
+  paddingTop: 10,
+  borderTop: "1px solid rgba(255,255,255,0.12)",
 };
 
 const photoLightboxActivityBadgeStyle: React.CSSProperties = {
