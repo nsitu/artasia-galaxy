@@ -441,9 +441,11 @@ function canObscureHoveredSign(
   const hoveredNorthSouthAngle = (hoveredSign.angle ?? 0) * directionMultiplier;
   const candidateNorthSouthAngle = (candidateSign.angle ?? 0) * directionMultiplier;
 
+  // A lower, neutral sign can cross a sign that points north just as a sign
+  // pointing south can. Signs that also point north remain in a parallel fan.
   return (
     hoveredNorthSouthAngle > SIGN_VERTICAL_ANGLE_THRESHOLD &&
-    candidateNorthSouthAngle < -SIGN_VERTICAL_ANGLE_THRESHOLD
+    candidateNorthSouthAngle <= SIGN_VERTICAL_ANGLE_THRESHOLD
   );
 }
 
