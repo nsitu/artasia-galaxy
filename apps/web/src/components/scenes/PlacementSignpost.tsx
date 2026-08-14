@@ -28,7 +28,7 @@ interface PlacementSignpostProps {
 }
 
 const POST_RADIUS = 0.035;
-const SIGN_SPACING = 0.34;
+export const PLACEMENT_SIGN_SPACING = 0.1;
 const SIGN_TOP_OFFSET = 0.18;
 const SIGNPOST_MIN_HEIGHT = 2.8;
 const SIGNPOST_NAME_SIGN_GAP = 0.08;
@@ -71,7 +71,7 @@ export default function PlacementSignpost({
   const signStackHeight = Math.max(
     SIGNPOST_MIN_HEIGHT,
     height,
-    1.2 + signs.length * SIGN_SPACING,
+    1.2 + signs.length * PLACEMENT_SIGN_SPACING,
   );
   const nameSignLayout = getPlacementNameSignLayout(placementName);
   const nameSignBottom = signStackHeight + SIGNPOST_NAME_SIGN_GAP;
@@ -321,7 +321,7 @@ function SignBoard({
   const renderOrder = isDown
     ? SIGN_SHARED_LOCATION_RENDER_ORDER
     : SIGN_POINTER_RENDER_ORDER;
-  const signZ = postHeight - SIGN_TOP_OFFSET - index * SIGN_SPACING;
+  const signZ = postHeight - SIGN_TOP_OFFSET - index * PLACEMENT_SIGN_SPACING;
   const fontSize = isDown ? SHARED_SIGN_FONT_SIZE : 0.085;
   const signWidth = getSignWidth(sign.label, isDown, fontSize);
   const directionMultiplier = sign.direction === "left" ? -1 : 1;

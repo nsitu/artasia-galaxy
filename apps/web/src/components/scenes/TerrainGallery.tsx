@@ -15,7 +15,10 @@ import {
   OrbitingAudioMarker,
   OrbitingPhotoBanner,
 } from "./TerrainPhotoMarker";
-import PlacementSignpost, { type PlacementSign } from "./PlacementSignpost";
+import PlacementSignpost, {
+  PLACEMENT_SIGN_SPACING,
+  type PlacementSign,
+} from "./PlacementSignpost";
 import PlaceMarker, { FlowerLayoutCoordinator } from "./PlaceMarker";
 import {
   createMaxDetailTerrainRequest,
@@ -2823,7 +2826,7 @@ function getPlacementSignpostHeight(
     : terrainMaxZ - baseZ + SIGNPOST_TERRAIN_CLEARANCE;
   return Math.max(
     SIGNPOST_MIN_HEIGHT,
-    1.2 + signCount * 0.34,
+    1.2 + signCount * PLACEMENT_SIGN_SPACING,
     terrainClearanceHeight,
   );
 }
