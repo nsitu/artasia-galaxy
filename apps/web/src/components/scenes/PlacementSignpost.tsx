@@ -73,13 +73,14 @@ export default function PlacementSignpost({
 }: PlacementSignpostProps) {
   const [x, y, z] = position;
   const [hoveredSignId, setHoveredSignId] = useState<string | null>(null);
-  const hoveredSignIndex = signs.findIndex((sign) => sign.id === hoveredSignId);
-  const hoveredSign = hoveredSignIndex >= 0 ? signs[hoveredSignIndex] : null;
-  const signOffsets = getPlacementSignOffsets(signs);
+  const orderedSigns = useMemo(() => orderPlacementSigns(signs), [signs]);
+  const hoveredSignIndex = orderedSigns.findIndex((sign) => sign.id === hoveredSignId);
+  const hoveredSign = hoveredSignIndex >= 0 ? orderedSigns[hoveredSignIndex] : null;
+  const signOffsets = getPlacementSignOffsets(orderedSigns);
   const signStackHeight = Math.max(
     SIGNPOST_MIN_HEIGHT,
     height,
-    getPlacementSignStackHeight(signs),
+    getPlacementSignStackHeight(orderedSigns),
   );
   const nameSignLayout = getPlacementNameSignLayout(placementName);
   const nameSignBottom = signStackHeight + SIGNPOST_NAME_SIGN_GAP;
@@ -178,7 +179,7 @@ export default function PlacementSignpost({
           positionZ={nameSignBottom + nameSignLayout.height / 2}
         />
       )}
-      {signs.map((sign, index) => (
+      {orderedSigns.map((sign, index) => (
         <SignBoard
           key={sign.id}
           sign={sign}
@@ -484,9 +485,27 @@ function getPlacementSignOffsets(signs: PlacementSign[]) {
 }
 
 export function getPlacementSignStackHeight(signs: PlacementSign[]) {
-  const offsets = getPlacementSignOffsets(signs);
+  const orderedSigns = orderPlacementSigns(signs);
+  const offsets = getPlacementSignOffsets(orderedSigns);
   const finalOffset = offsets.at(-1) ?? 0;
   return 1.2 + finalOffset + PLACEMENT_SIGN_SPACING;
+}
+
+function orderPlacementSigns(signs: PlacementSign[]) {
+  const nearbySigns = signs.filter((sign) => sign.direction !== "down");
+  const sharedLocationSigns = signs.filter((sign) => sign.direction === "down");
+
+  nearbySigns.sort(
+    (first, second) =>
+      getNorthSouthPointingAngle(second) - getNorthSouthPointingAngle(first),
+  );
+
+  return [...nearbySigns, ...sharedLocationSigns];
+}
+
+function getNorthSouthPointingAngle(sign: PlacementSign) {
+  const directionMultiplier = sign.direction === "left" ? -1 : 1;
+  return (sign.angle ?? 0) * directionMultiplier;
 }
 
 function createArrowShape(direction: PlacementSignDirection, width: number) {

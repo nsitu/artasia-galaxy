@@ -2276,7 +2276,7 @@ function formatArtistEducatorDetails(placement: MapPlacement) {
 
 function SiteDetail({ label, value }: { label: string; value: string }) {
   return (
-    <div>
+    <div style={siteDetailRowStyle}>
       <div style={siteDetailLabelStyle}>{label}</div>
       <div style={siteDetailValueStyle}>{value}</div>
     </div>
@@ -2724,15 +2724,23 @@ const siteDetailsActionLinkStyle: React.CSSProperties = {
   pointerEvents: "auto",
 };
 
+const siteDetailRowStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "max-content minmax(0, 1fr)",
+  alignItems: "baseline",
+  columnGap: 8,
+};
+
 const siteDetailLabelStyle: React.CSSProperties = {
-  color: "#8490a3",
+  color: "#eef2f8",
   fontSize: 10,
+  lineHeight: 1.35,
   textTransform: "uppercase",
   letterSpacing: 0,
-  marginBottom: 3,
 };
 
 const siteDetailValueStyle: React.CSSProperties = {
+  minWidth: 0,
   color: "#eef2f8",
   fontSize: 12,
   lineHeight: 1.35,

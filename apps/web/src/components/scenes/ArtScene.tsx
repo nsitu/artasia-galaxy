@@ -477,6 +477,11 @@ export default function ArtScene() {
   const handleBackActionChange = useCallback((action: (() => void) | null) => {
     setBackAction(action ? () => action : null);
   }, []);
+  const handleHomeLogoClick = useCallback((event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!backAction) return;
+    event.preventDefault();
+    backAction();
+  }, [backAction]);
   const handlePreviewPlacementChange = useCallback((placement: MapPlacement | null, action?: (() => void) | null) => {
     setPreviewPlacementDetails(placement);
     setPreviewPlacementAction(action ? () => action : null);
@@ -557,7 +562,13 @@ export default function ArtScene() {
       <style>{responsiveTopNavStyles}</style>
       <div className="atlas-top-nav" style={topNavStyle}>
         <div className="atlas-home-brand" style={homeBrandStyle}>
-          <a className="atlas-home-logo-link" href="/" aria-label="Artasia home" style={homeLogoLinkStyle}>
+          <a
+            className="atlas-home-logo-link"
+            href="/"
+            aria-label={backAction ? "Back to regional view" : "Artasia home"}
+            onClick={handleHomeLogoClick}
+            style={homeLogoLinkStyle}
+          >
             <img src="/artasia-atlas.svg" alt="Artasia Atlas" style={homeLogoImageStyle} />
           </a>
         </div>
@@ -871,7 +882,11 @@ export default function ArtScene() {
             )}
           </div>
           <div
-            className="atlas-photo-lightbox-metadata"
+            className={`atlas-photo-lightbox-metadata ${
+              lightboxMetadataExpanded
+                ? "atlas-photo-lightbox-metadata-expanded"
+                : "atlas-photo-lightbox-metadata-collapsed"
+            }`}
             style={photoLightboxMetadataStyle}
             onClick={(event) => event.stopPropagation()}
             onPointerDown={(event) => event.stopPropagation()}
@@ -907,7 +922,10 @@ export default function ArtScene() {
                       ))}
                     </div>
                     {!lightboxMetadataExpanded && selectedActivityPreview && (
-                      <div style={photoLightboxActivityPreviewStyle}>
+                      <div
+                        className="atlas-lightbox-activity-preview"
+                        style={photoLightboxActivityPreviewStyle}
+                      >
                         {selectedActivityPreview}
                       </div>
                     )}
@@ -1604,6 +1622,16 @@ const responsiveTopNavStyles = `
       align-items: flex-start !important;
       justify-content: center !important;
       gap: 4px !important;
+    }
+
+    .atlas-photo-lightbox-metadata-collapsed .atlas-lightbox-caption-header-content {
+      flex-direction: row !important;
+      align-items: center !important;
+      gap: 10px !important;
+    }
+
+    .atlas-photo-lightbox-metadata-collapsed .atlas-lightbox-activity-preview {
+      width: auto !important;
     }
 
     .atlas-top-nav {
