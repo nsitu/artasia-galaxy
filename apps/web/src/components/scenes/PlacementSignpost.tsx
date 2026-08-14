@@ -52,8 +52,6 @@ const SIGN_SHARED_TANGENT_OFFSET = POST_RADIUS + 0.04;
 const NAME_SIGN_TANGENT_OFFSET = POST_RADIUS + 0.002;
 const NAME_SIGN_CORNER_RADIUS = 0.055;
 const SIGN_HOVER_SCALE = 1.06;
-const SIGN_DIMMED_OPACITY = 0.7;
-const SIGN_VERTICAL_ANGLE_THRESHOLD = THREE.MathUtils.degToRad(2);
 const SIGN_POINTER_RENDER_ORDER = 1;
 const SIGN_POLE_RENDER_ORDER = 3;
 const SIGN_SHARED_LOCATION_RENDER_ORDER = 5;
@@ -74,8 +72,6 @@ export default function PlacementSignpost({
   const [x, y, z] = position;
   const [hoveredSignId, setHoveredSignId] = useState<string | null>(null);
   const orderedSigns = useMemo(() => orderPlacementSigns(signs), [signs]);
-  const hoveredSignIndex = orderedSigns.findIndex((sign) => sign.id === hoveredSignId);
-  const hoveredSign = hoveredSignIndex >= 0 ? orderedSigns[hoveredSignIndex] : null;
   const signOffsets = getPlacementSignOffsets(orderedSigns);
   const signStackHeight = Math.max(
     SIGNPOST_MIN_HEIGHT,
@@ -186,11 +182,6 @@ export default function PlacementSignpost({
           verticalOffset={signOffsets[index]}
           postHeight={signStackHeight}
           isHovered={hoveredSignId === sign.id}
-          isDimmed={
-            hoveredSign !== null &&
-            index > hoveredSignIndex &&
-            canObscureHoveredSign(hoveredSign, sign)
-          }
           onPointerEnter={() => setHoveredSignId(sign.id)}
           onPointerLeave={() => setHoveredSignId((current) =>
             current === sign.id ? null : current
@@ -332,7 +323,6 @@ function SignBoard({
   verticalOffset,
   postHeight,
   isHovered,
-  isDimmed,
   onPointerEnter,
   onPointerLeave,
 }: {
@@ -340,7 +330,6 @@ function SignBoard({
   verticalOffset: number;
   postHeight: number;
   isHovered: boolean;
-  isDimmed: boolean;
   onPointerEnter: () => void;
   onPointerLeave: () => void;
 }) {
@@ -351,7 +340,6 @@ function SignBoard({
   const signZ = postHeight - SIGN_TOP_OFFSET - verticalOffset;
   const fontSize = isDown ? SHARED_SIGN_FONT_SIZE : 0.085;
   const signWidth = getSignWidth(sign.label, isDown, fontSize);
-  const opacity = isDimmed ? SIGN_DIMMED_OPACITY : 1;
   const directionMultiplier = sign.direction === "left" ? -1 : 1;
   const textOffsetX = isDown
     ? 0
@@ -390,10 +378,7 @@ function SignBoard({
             polygonOffset
             polygonOffsetFactor={-2}
             polygonOffsetUnits={-2}
-            transparent={isDimmed}
-            opacity={opacity}
             depthTest
-            depthWrite={!isDimmed}
           />
         </mesh>
         <Text
@@ -406,10 +391,8 @@ function SignBoard({
           anchorY="middle"
           textAlign="center"
           color={SIGN_TEXT_COLOR}
-          fillOpacity={opacity}
           depthOffset={-2}
           material-transparent
-          material-opacity={opacity}
           material-depthTest
           material-depthWrite={false}
           material-toneMapped={false}
@@ -426,27 +409,6 @@ function getSignWidth(label: string, isDown: boolean, fontSize: number) {
   return Math.max(
     isDown ? SHARED_SIGN_MIN_WIDTH : SIGN_MIN_WIDTH,
     estimatedTextWidth + SIGN_TEXT_PADDING,
-  );
-}
-
-function canObscureHoveredSign(
-  hoveredSign: PlacementSign,
-  candidateSign: PlacementSign,
-) {
-  if (
-    hoveredSign.direction === "down" ||
-    candidateSign.direction !== hoveredSign.direction
-  ) return false;
-
-  const directionMultiplier = hoveredSign.direction === "left" ? -1 : 1;
-  const hoveredNorthSouthAngle = (hoveredSign.angle ?? 0) * directionMultiplier;
-  const candidateNorthSouthAngle = (candidateSign.angle ?? 0) * directionMultiplier;
-
-  // A lower, neutral sign can cross a sign that points north just as a sign
-  // pointing south can. Signs that also point north remain in a parallel fan.
-  return (
-    hoveredNorthSouthAngle > SIGN_VERTICAL_ANGLE_THRESHOLD &&
-    candidateNorthSouthAngle <= SIGN_VERTICAL_ANGLE_THRESHOLD
   );
 }
 
