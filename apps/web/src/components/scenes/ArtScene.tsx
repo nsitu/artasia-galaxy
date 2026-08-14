@@ -1502,14 +1502,15 @@ const responsiveTopNavStyles = `
 
   @media (hover: hover) {
     .atlas-control-surface:hover {
-      background-color: rgba(255, 255, 255, 0.1) !important;
-      background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.2) 100%) !important;
+      background-color: rgba(142, 29, 88, 0.3);
+      background-image: linear-gradient(45deg, rgba(142, 29, 88, 0.3) 0%, rgba(242, 139, 32, 0.3) 100%) !important;
+      
     }
   }
 
   .atlas-control-surface:focus-visible {
-    background-color: rgba(255, 255, 255, 0.1) !important;
-    background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.2) 100%) !important;
+    background-color: rgba(142, 29, 88, 0.3);
+      background-image: linear-gradient(45deg, rgba(142, 29, 88, 0.3) 0%, rgba(242, 139, 32, 0.3) 100%) !important;
   }
 
   .atlas-top-nav::before {
