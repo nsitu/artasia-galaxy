@@ -2117,15 +2117,26 @@ export function FocusedPlacementOverlay({
           }}
         >
           <div style={siteDetailsGridStyle}>
-            <SiteDetail label="Site" value={siteDetails || "Not specified"} />
+            <SiteDetail
+              label="Location"
+              icon="location_on"
+              value={siteDetails || "Not specified"}
+              separated
+            />
             <SiteDetail
               label={peopleLabel}
+              icon="person"
               value={
                 people.map((person) => person.name).join(", ") || "Unassigned"
               }
+              separated={Boolean(participantDetails)}
             />
             {participantDetails && (
-              <SiteDetail label="Age range" value={participantDetails} />
+              <SiteDetail
+                label="Age range"
+                icon="child_hat"
+                value={participantDetails}
+              />
             )}
           </div>
           {(placement.documentation_url || adminHref) && (
@@ -2274,11 +2285,38 @@ function formatArtistEducatorDetails(placement: MapPlacement) {
   return `${label}: ${people.map((person) => person.name).join(", ") || "Unassigned"}`;
 }
 
-function SiteDetail({ label, value }: { label: string; value: string }) {
+function SiteDetail({
+  label,
+  icon,
+  value,
+  separated = false,
+}: {
+  label: string;
+  icon: string;
+  value: string;
+  separated?: boolean;
+}) {
   return (
     <div style={siteDetailRowStyle}>
-      <div style={siteDetailLabelStyle}>{label}</div>
-      <div style={siteDetailValueStyle}>{value}</div>
+      <div
+        style={{
+          ...siteDetailLabelStyle,
+          ...(separated ? siteDetailRowSeparatorStyle : {}),
+        }}
+      >
+        <span aria-hidden="true" style={siteDetailIconStyle}>
+          {icon}
+        </span>
+        <span style={siteDetailLabelTextStyle}>{label}</span>
+      </div>
+      <div
+        style={{
+          ...siteDetailValueStyle,
+          ...(separated ? siteDetailRowSeparatorStyle : {}),
+        }}
+      >
+        {value}
+      </div>
     </div>
   );
 }
@@ -2701,8 +2739,8 @@ const siteDetailsGridStyle: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "max-content minmax(0, 1fr)",
   alignItems: "baseline",
-  columnGap: 8,
-  rowGap: 9,
+  columnGap: 0,
+  rowGap: 0,
 };
 
 const siteDetailsActionsStyle: React.CSSProperties = {
@@ -2732,12 +2770,32 @@ const siteDetailRowStyle: React.CSSProperties = {
 };
 
 const siteDetailLabelStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "flex-start",
+  gap: 6,
   color: "#eef2f8",
   fontSize: 10,
   lineHeight: 1.35,
-  textTransform: "uppercase",
-  textAlign: "right",
+  textAlign: "left",
   letterSpacing: 0,
+  padding: "5px 10px 5px 0",
+  borderRight: "1px solid rgba(255,255,255,0.14)",
+};
+
+const siteDetailIconStyle: React.CSSProperties = {
+  flex: "0 0 auto",
+  fontFamily: "'Material Symbols Outlined'",
+  fontSize: 16,
+  fontWeight: 400,
+  fontStyle: "normal",
+  fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20",
+  lineHeight: 1,
+};
+
+const siteDetailLabelTextStyle: React.CSSProperties = {
+  textTransform: "uppercase",
+  whiteSpace: "nowrap",
 };
 
 const siteDetailValueStyle: React.CSSProperties = {
@@ -2747,6 +2805,11 @@ const siteDetailValueStyle: React.CSSProperties = {
   lineHeight: 1.35,
   textAlign: "left",
   overflowWrap: "anywhere",
+  padding: "5px 0 5px 10px",
+};
+
+const siteDetailRowSeparatorStyle: React.CSSProperties = {
+  borderBottom: "1px solid rgba(255,255,255,0.12)",
 };
 
 const tileStatusStyle: React.CSSProperties = {
