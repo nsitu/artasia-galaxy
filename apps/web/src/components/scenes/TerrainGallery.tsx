@@ -40,6 +40,7 @@ import {
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN ?? "";
 const REGIONAL_TERRAIN_ELEVATION_SCALE = 8;
+const FLOWER_PREVIEW_VERTICAL_NDC = 1 / 3;
 const LOCAL_TERRAIN_ELEVATION_SCALE = 1.25;
 const DEFAULT_TERRAIN_CAMERA_POSITION = new THREE.Vector3(0, -12, 10);
 const LOCAL_PLACEMENT_RADIUS_KM = 0.5;
@@ -1133,12 +1134,26 @@ export default function TerrainGallery({
       if (panAnimationFrame.current !== null) cancelAnimationFrame(panAnimationFrame.current);
       const startTarget = controls.target.clone();
       const startPosition = camera.position.clone();
-      const endPosition = startPosition.clone().add(nextTarget.clone().sub(startTarget));
+      const centeredEndPosition = startPosition
+        .clone()
+        .add(nextTarget.clone().sub(startTarget));
+      const cameraDistance = centeredEndPosition.distanceTo(nextTarget);
+      const halfViewHeight = camera instanceof THREE.PerspectiveCamera
+        ? Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * cameraDistance
+        : camera instanceof THREE.OrthographicCamera
+          ? (camera.top - camera.bottom) / (2 * camera.zoom)
+          : 0;
+      const previewOffset = new THREE.Vector3(0, 1, 0)
+        .applyQuaternion(camera.quaternion)
+        .normalize()
+        .multiplyScalar(halfViewHeight * FLOWER_PREVIEW_VERTICAL_NDC);
+      const endTarget = nextTarget.clone().sub(previewOffset);
+      const endPosition = centeredEndPosition.sub(previewOffset);
       const startedAt = performance.now();
       const animatePan = (timestamp: number) => {
         const progress = Math.min(1, (timestamp - startedAt) / 300);
         const eased = 1 - Math.pow(1 - progress, 3);
-        controls.target!.lerpVectors(startTarget, nextTarget, eased);
+        controls.target!.lerpVectors(startTarget, endTarget, eased);
         camera.position.lerpVectors(startPosition, endPosition, eased);
         camera.lookAt(controls.target!);
         controls.update?.();
