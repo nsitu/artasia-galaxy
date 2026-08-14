@@ -581,6 +581,22 @@ export default function ArtScene() {
     setSelectedPartnerFilter(partner);
     updatePartnerPath(partner);
   }, []);
+  const handleTopPartnerLogoClick = useCallback((
+    event: React.MouseEvent<HTMLAnchorElement>,
+    partner: string,
+  ) => {
+    if (
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return;
+    }
+    event.preventDefault();
+    handlePartnerNavigation(partner);
+  }, [handlePartnerNavigation]);
 
   useEffect(() => {
     if (!selectedPartnerFilter) return;
@@ -651,6 +667,12 @@ export default function ArtScene() {
   const selectedPartnerOption = !focusedPlacementDetails && selectedPartnerFilter
     ? partnerFilterOptions.find((option) => option.value === selectedPartnerFilter)
     : undefined;
+  const topNavPartner = focusedPlacementDetails?.partner_name?.trim()
+    ? {
+        label: focusedPlacementDetails.partner_name.trim(),
+        whiteLogo: focusedPlacementDetails.partner_white_logo,
+      }
+    : selectedPartnerOption;
 
   return (
     <div className={window.location.pathname.startsWith("/sites/") ? "atlas-site-view" : undefined} style={{ width: "100vw", height: "100vh", position: "relative" }}>
@@ -668,34 +690,23 @@ export default function ArtScene() {
           </a>
         </div>
 
-        {selectedPartnerOption?.whiteLogo?.url && (
-          <div
+        {topNavPartner?.whiteLogo?.url && (
+          <a
             className="atlas-selected-partner-logo"
+            href={getPartnerPath(topNavPartner.label)}
+            aria-label={`View ${topNavPartner.label} placements`}
+            onClick={(event) => handleTopPartnerLogoClick(event, topNavPartner.label)}
             style={selectedPartnerLogoWrapStyle}
           >
             <img
-              src={selectedPartnerOption.whiteLogo.url}
-              alt={selectedPartnerOption.whiteLogo.alt || `${selectedPartnerOption.label} logo`}
+              src={topNavPartner.whiteLogo.url}
+              alt={topNavPartner.whiteLogo.alt || `${topNavPartner.label} logo`}
               style={selectedPartnerLogoImageStyle}
             />
-          </div>
+          </a>
         )}
 
         <div ref={topControlsRef} className="atlas-top-controls" style={topControlGroupStyle}>
-          {backAction && (
-            <button
-              type="button"
-              className="atlas-back-button atlas-control-surface"
-              aria-label="Back to regional view"
-              onClick={backAction}
-              style={backButtonStyle}
-            >
-              <svg viewBox="0 0 16 16" aria-hidden="true" style={backChevronStyle}>
-                <path d="M10.5 2.5 5 8l5.5 5.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-          )}
-
           {!focusedPlacementDetails && partnerFilterOptions.length > 0 && (
             <div className="atlas-partner-filter-control" style={filterControlStyle}>
               <button
@@ -1834,14 +1845,8 @@ const responsiveTopNavStyles = `
     }
 
     .atlas-partner-filter-trigger,
-    .atlas-activity-filter-trigger,
-    .atlas-back-button {
+    .atlas-activity-filter-trigger {
       height: 40px !important;
-    }
-
-    .atlas-back-button {
-      flex-basis: 48px !important;
-      width: 48px !important;
     }
   }
 
@@ -1961,32 +1966,6 @@ const menuItemStyle: React.CSSProperties = {
   borderBottom: "1px solid rgba(255,255,255,0.12)",
 };
 
-const backButtonStyle: React.CSSProperties = {
-  ...atlasControlSurfaceStyle,
-  pointerEvents: "auto",
-  flex: "0 0 5rem",
-  width: "5rem",
-  height: "5rem",
-  padding: 0,
-  borderRadius: 0,
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  lineHeight: 0,
-  color: "#eef2f8",
-  border: 0,
-  borderRight: "1px solid rgba(255,255,255,0.18)",
-  boxShadow: "none",
-  cursor: "pointer",
-  fontFamily: "monospace",
-  fontSize: 12,
-};
-
-const backChevronStyle: React.CSSProperties = {
-  width: 14,
-  height: 14,
-};
-
 const homeLogoLinkStyle: React.CSSProperties = {
   padding: "0 1rem",
   height: "4.5rem",
@@ -2021,7 +2000,9 @@ const selectedPartnerLogoWrapStyle: React.CSSProperties = {
   justifyContent: "center",
   padding: "0.625rem 1rem",
   boxSizing: "border-box",
-  pointerEvents: "none",
+  color: "inherit",
+  textDecoration: "none",
+  pointerEvents: "auto",
 };
 
 const selectedPartnerLogoImageStyle: React.CSSProperties = {
