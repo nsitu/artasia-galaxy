@@ -436,6 +436,29 @@ function artasia_register_meta_fields(): void
         ],
         'sanitize_callback' => 'artasia_sanitize_text_array_meta',
     ]);
+
+    // --- Learning Anecdote meta ---
+    register_post_meta('artasia_anecdote', 'artasia_anecdote_placement_id', [
+        'type'         => 'integer',
+        'single'       => true,
+        'default'      => 0,
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_integer_meta',
+    ]);
+    register_post_meta('artasia_anecdote', 'artasia_anecdote_person_id', [
+        'type'         => 'integer',
+        'single'       => true,
+        'default'      => 0,
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_integer_meta',
+    ]);
+    register_post_meta('artasia_anecdote', 'artasia_anecdote_activity_id', [
+        'type'         => 'integer',
+        'single'       => true,
+        'default'      => 0,
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_integer_meta',
+    ]);
 }
 
 function artasia_sanitize_integer_meta($value, string $meta_key = '', string $object_type = '', string $object_subtype = ''): int

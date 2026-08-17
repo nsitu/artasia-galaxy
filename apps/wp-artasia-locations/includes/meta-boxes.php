@@ -124,6 +124,22 @@ function artasia_post_type_contexts(): array
                 'Published records are indexed with the <code>[artasia_documentation year="2026"]</code> shortcode or the Artasia Documentation Elementor widget. A record appears under the partner connected to its selected placement and project, and opens in that project’s annual Documentation viewer.',
             ],
         ],
+        'artasia_anecdote' => [
+            'title' => 'About Learning Anecdotes',
+            'nav_label' => 'Anecdotes',
+            'paragraphs' => [
+                sprintf(
+                    'A Learning Anecdote records a concise observation or reflection by an Artasia %s.',
+                    artasia_context_post_type_link('artasia_people', 'person')
+                ),
+                sprintf(
+                    'Use the classic rich text editor for the anecdote itself, then optionally connect its %s and %s context.',
+                    artasia_context_post_type_link('artasia_placement', 'placement'),
+                    artasia_context_post_type_link('artasia_activity', 'activity')
+                ),
+                'Learning anecdotes are internal records and do not have public archive or single-post pages.',
+            ],
+        ],
     ];
 }
 
@@ -1530,9 +1546,161 @@ function artasia_save_documentation_meta(int $post_id): void
 }
 add_action('save_post_artasia_document', 'artasia_save_documentation_meta');
 
+// --- Learning Anecdote meta box ---
+
+function artasia_anecdote_meta_box_html(WP_Post $post): void
+{
+    $placements = get_posts([
+        'post_type'   => 'artasia_placement',
+        'numberposts' => -1,
+        'orderby'     => 'title',
+        'order'       => 'ASC',
+    ]);
+    $people = get_posts([
+        'post_type'   => 'artasia_people',
+        'numberposts' => -1,
+        'orderby'     => 'title',
+        'order'       => 'ASC',
+    ]);
+    $activities = get_posts([
+        'post_type'   => 'artasia_activity',
+        'numberposts' => -1,
+        'orderby'     => 'title',
+        'order'       => 'ASC',
+    ]);
+
+    $placement_id = intval(get_post_meta($post->ID, 'artasia_anecdote_placement_id', true));
+    $person_id = intval(get_post_meta($post->ID, 'artasia_anecdote_person_id', true));
+    $activity_id = intval(get_post_meta($post->ID, 'artasia_anecdote_activity_id', true));
+
+    wp_nonce_field('artasia_anecdote_meta', 'artasia_anecdote_meta_nonce');
+?>
+    <table class="form-table">
+        <tr>
+            <th><label for="artasia_anecdote_person_id">Author</label></th>
+            <td>
+                <select id="artasia_anecdote_person_id" name="artasia_anecdote_person_id" class="widefat">
+                    <option value="">&mdash; Select Person &mdash;</option>
+                    <?php foreach ($people as $person) : ?>
+                        <option value="<?php echo esc_attr($person->ID); ?>" <?php selected($person_id, $person->ID); ?>>
+                            <?php echo esc_html($person->post_title); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <p class="description">Select the person who authored the anecdote.</p>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_anecdote_placement_id">Placement</label></th>
+            <td>
+                <select id="artasia_anecdote_placement_id" name="artasia_anecdote_placement_id" class="widefat">
+                    <option value="">&mdash; Select Placement &mdash;</option>
+                    <?php foreach ($placements as $placement) : ?>
+                        <?php
+                        $placement_section = trim((string) get_post_meta($placement->ID, 'artasia_section', true));
+                        $placement_label = $placement->post_title
+                            . ($placement_section !== '' ? ' — ' . $placement_section : '');
+                        ?>
+                        <option value="<?php echo esc_attr($placement->ID); ?>" <?php selected($placement_id, $placement->ID); ?>>
+                            <?php echo esc_html($placement_label); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <p class="description">Optional placement context for where the learning occurred.</p>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_anecdote_activity_id">Activity</label></th>
+            <td>
+                <select id="artasia_anecdote_activity_id" name="artasia_anecdote_activity_id" class="widefat">
+                    <option value="">&mdash; Select Activity &mdash;</option>
+                    <?php foreach ($activities as $activity) : ?>
+                        <option value="<?php echo esc_attr($activity->ID); ?>" <?php selected($activity_id, $activity->ID); ?>>
+                            <?php echo esc_html($activity->post_title); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <p class="description">Optional activity context for the learning described.</p>
+            </td>
+        </tr>
+    </table>
+<?php
+}
+
+function artasia_anecdote_context_meta_box_html(): void
+{
+    $context = artasia_get_post_type_context('artasia_anecdote');
+    if (!$context) {
+        return;
+    }
+
+    artasia_context_meta_box_html($context['paragraphs']);
+}
+
+function artasia_register_anecdote_meta_boxes(): void
+{
+    $context = artasia_get_post_type_context('artasia_anecdote');
+
+    add_meta_box(
+        'artasia_anecdote_context',
+        'Anecdote Context',
+        'artasia_anecdote_meta_box_html',
+        'artasia_anecdote',
+        'normal',
+        'default'
+    );
+
+    add_meta_box(
+        'artasia_anecdote_about',
+        $context['title'],
+        'artasia_anecdote_context_meta_box_html',
+        'artasia_anecdote',
+        'side',
+        'high'
+    );
+}
+add_action('add_meta_boxes', 'artasia_register_anecdote_meta_boxes');
+
+function artasia_validate_related_post_id($value, string $post_type): int
+{
+    $post_id = intval($value);
+
+    return $post_id && get_post_type($post_id) === $post_type ? $post_id : 0;
+}
+
+function artasia_save_anecdote_meta(int $post_id): void
+{
+    if (!isset($_POST['artasia_anecdote_meta_nonce']) || !wp_verify_nonce($_POST['artasia_anecdote_meta_nonce'], 'artasia_anecdote_meta')) {
+        return;
+    }
+    if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
+        return;
+    }
+    if (!current_user_can('edit_post', $post_id)) {
+        return;
+    }
+
+    update_post_meta(
+        $post_id,
+        'artasia_anecdote_placement_id',
+        artasia_validate_related_post_id($_POST['artasia_anecdote_placement_id'] ?? 0, 'artasia_placement')
+    );
+    update_post_meta(
+        $post_id,
+        'artasia_anecdote_person_id',
+        artasia_validate_related_post_id($_POST['artasia_anecdote_person_id'] ?? 0, 'artasia_people')
+    );
+    update_post_meta(
+        $post_id,
+        'artasia_anecdote_activity_id',
+        artasia_validate_related_post_id($_POST['artasia_anecdote_activity_id'] ?? 0, 'artasia_activity')
+    );
+}
+add_action('save_post_artasia_anecdote', 'artasia_save_anecdote_meta');
+
 function artasia_remove_unnecessary_meta_boxes(): void
 {
-    $post_types = ['artasia_project', 'artasia_activity', 'artasia_partner', 'artasia_place', 'artasia_people', 'artasia_role', 'artasia_placement', 'artasia_document'];
+    $post_types = ['artasia_project', 'artasia_activity', 'artasia_partner', 'artasia_place', 'artasia_people', 'artasia_role', 'artasia_placement', 'artasia_document', 'artasia_anecdote'];
     $meta_box_contexts = ['side', 'normal', 'advanced'];
 
     foreach ($post_types as $post_type) {

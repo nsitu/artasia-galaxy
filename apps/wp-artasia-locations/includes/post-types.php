@@ -204,6 +204,31 @@ function artasia_register_post_types(): void
         'menu_icon'    => 'dashicons-welcome-write-blog',
         'supports'     => ['title', 'editor', 'author', 'revisions'],
     ]);
+
+    register_post_type('artasia_anecdote', [
+        'labels' => [
+            'name'          => 'Learning Anecdotes',
+            'singular_name' => 'Learning Anecdote',
+            'add_new_item'  => 'Add New Learning Anecdote',
+            'edit_item'     => 'Edit Learning Anecdote',
+            'new_item'      => 'New Learning Anecdote',
+            'view_item'     => 'View Learning Anecdote',
+            'search_items'  => 'Search Learning Anecdotes',
+            'not_found'     => 'No learning anecdotes found',
+        ],
+        'public'              => false,
+        'publicly_queryable'  => false,
+        'show_ui'             => true,
+        'exclude_from_search' => true,
+        'rewrite'             => false,
+        'query_var'           => false,
+        'has_archive'         => false,
+        'show_in_menu'        => false,
+        'show_in_rest'        => true,
+        'rest_base'           => 'artasia_anecdotes',
+        'menu_icon'           => 'dashicons-format-quote',
+        'supports'            => ['title', 'editor', 'revisions'],
+    ]);
 }
 
 add_action('init', 'artasia_register_post_types');
@@ -290,6 +315,14 @@ function artasia_register_admin_menu(): void
         'edit.php?post_type=artasia_document'
     );
 
+    add_submenu_page(
+        'edit.php?post_type=artasia_placement',
+        'Learning Anecdotes',
+        'Anecdotes',
+        'edit_posts',
+        'edit.php?post_type=artasia_anecdote'
+    );
+
     remove_submenu_page(
         'edit.php?post_type=artasia_placement',
         'edit.php?post_type=artasia_placement'
@@ -300,7 +333,7 @@ add_action('admin_menu', 'artasia_register_admin_menu');
 function artasia_admin_parent_file($parent_file)
 {
     $screen = get_current_screen();
-    if (!$screen || !in_array($screen->post_type, ['artasia_project', 'artasia_activity', 'artasia_partner', 'artasia_place', 'artasia_people', 'artasia_role', 'artasia_placement', 'artasia_document'], true)) {
+    if (!$screen || !in_array($screen->post_type, ['artasia_project', 'artasia_activity', 'artasia_partner', 'artasia_place', 'artasia_people', 'artasia_role', 'artasia_placement', 'artasia_document', 'artasia_anecdote'], true)) {
         return $parent_file;
     }
 
@@ -311,7 +344,7 @@ add_filter('parent_file', 'artasia_admin_parent_file');
 function artasia_admin_submenu_file($submenu_file)
 {
     $screen = get_current_screen();
-    if (!$screen || !in_array($screen->post_type, ['artasia_project', 'artasia_activity', 'artasia_partner', 'artasia_place', 'artasia_people', 'artasia_role', 'artasia_placement', 'artasia_document'], true)) {
+    if (!$screen || !in_array($screen->post_type, ['artasia_project', 'artasia_activity', 'artasia_partner', 'artasia_place', 'artasia_people', 'artasia_role', 'artasia_placement', 'artasia_document', 'artasia_anecdote'], true)) {
         return $submenu_file;
     }
 
@@ -321,7 +354,7 @@ add_filter('submenu_file', 'artasia_admin_submenu_file');
 
 function artasia_use_block_editor_for_post_type(bool $use_block_editor, string $post_type): bool
 {
-    $artasia_post_types = ['artasia_project', 'artasia_activity', 'artasia_partner', 'artasia_place', 'artasia_people', 'artasia_role', 'artasia_placement', 'artasia_document'];
+    $artasia_post_types = ['artasia_project', 'artasia_activity', 'artasia_partner', 'artasia_place', 'artasia_people', 'artasia_role', 'artasia_placement', 'artasia_document', 'artasia_anecdote'];
 
     if (in_array($post_type, $artasia_post_types, true)) {
         return false;
@@ -343,6 +376,10 @@ function artasia_enter_title_here(string $title, WP_Post $post): string
 
     if ($post->post_type === 'artasia_document') {
         return 'Add documentation title';
+    }
+
+    if ($post->post_type === 'artasia_anecdote') {
+        return 'Add a short anecdote title';
     }
 
     if ($post->post_type === 'artasia_role') {

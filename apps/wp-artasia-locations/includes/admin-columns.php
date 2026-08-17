@@ -385,3 +385,37 @@ function artasia_documentation_column(string $column, int $post_id): void
     }
 }
 add_action('manage_artasia_document_posts_custom_column', 'artasia_documentation_column', 10, 2);
+
+// --- Learning Anecdote columns ---
+
+function artasia_anecdote_columns(array $columns): array
+{
+    $new = [];
+    foreach ($columns as $key => $label) {
+        $new[$key] = $label;
+        if ($key === 'title') {
+            $new['artasia_anecdote_person'] = 'Author';
+            $new['artasia_anecdote_placement'] = 'Placement';
+            $new['artasia_anecdote_activity'] = 'Activity';
+        }
+    }
+
+    return $new;
+}
+add_filter('manage_artasia_anecdote_posts_columns', 'artasia_anecdote_columns');
+
+function artasia_anecdote_column(string $column, int $post_id): void
+{
+    $meta_keys = [
+        'artasia_anecdote_person' => 'artasia_anecdote_person_id',
+        'artasia_anecdote_placement' => 'artasia_anecdote_placement_id',
+        'artasia_anecdote_activity' => 'artasia_anecdote_activity_id',
+    ];
+    if (!isset($meta_keys[$column])) {
+        return;
+    }
+
+    $related_post_id = intval(get_post_meta($post_id, $meta_keys[$column], true));
+    echo $related_post_id ? esc_html(get_the_title($related_post_id)) : '—';
+}
+add_action('manage_artasia_anecdote_posts_custom_column', 'artasia_anecdote_column', 10, 2);

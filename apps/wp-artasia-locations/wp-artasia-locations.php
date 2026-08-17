@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Artasia Locations
- * Description: Custom post types for Artasia placements, projects, activities, places, partners, people, and pedagogical documentation with a REST API endpoint for the Node.js backend.
- * Version:     2.1.6
+ * Description: Custom post types for Artasia placements, projects, activities, places, partners, people, learning anecdotes, and pedagogical documentation with a REST API endpoint for the Node.js backend.
+ * Version:     2.1.8
  * License:     GPL-2.0-or-later
  */
 
@@ -10,7 +10,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('ARTASIA_LOCATIONS_VERSION', '2.1.6');
+define('ARTASIA_LOCATIONS_VERSION', '2.1.8');
 define('ARTASIA_LOCATIONS_PATH', plugin_dir_path(__FILE__));
 define('ARTASIA_LOCATIONS_URL', plugin_dir_url(__FILE__));
 
@@ -33,7 +33,7 @@ function artasia_admin_enqueue_assets(string $hook_suffix): void
     }
 
     $screen = get_current_screen();
-    if (!$screen || !in_array($screen->post_type, ['artasia_project', 'artasia_activity', 'artasia_partner', 'artasia_place', 'artasia_people', 'artasia_role', 'artasia_placement', 'artasia_document'], true)) {
+    if (!$screen || !in_array($screen->post_type, ['artasia_project', 'artasia_activity', 'artasia_partner', 'artasia_place', 'artasia_people', 'artasia_role', 'artasia_placement', 'artasia_document', 'artasia_anecdote'], true)) {
         return;
     }
 

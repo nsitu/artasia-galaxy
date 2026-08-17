@@ -164,6 +164,28 @@ function artasia_render_tools_page(): void
             </table>
             <?php submit_button('Import CSV'); ?>
         </form>
+
+        <hr />
+
+        <h2>Anecdote CSV Dry Run</h2>
+        <p>Upload an anecdote CSV or tab-separated file to infer its WordPress relationships. This first-pass tool does not create or update any posts.</p>
+        <p>The report preserves the original columns and adds the matched person, the most likely placement from that person's primary and secondary assignments, and an activity inferred by ordering submission dates within that placement and mapping them to the project's configured activity week numbers.</p>
+        <p>Required data: timestamp, person, site, participant age, and anecdote text. Header matching is case-insensitive and accepts the current form-export names (<code>Artasia Team Member</code>, <code>Participant ages</code>, and <code>Anecdote</code>) as well as the shorter names (<code>Person</code>, <code>Age</code>, and <code>Story</code>).</p>
+
+        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" enctype="multipart/form-data">
+            <input type="hidden" name="action" value="artasia_anecdotes_dry_run" />
+            <?php wp_nonce_field('artasia_anecdotes_dry_run', 'artasia_anecdotes_dry_run_nonce'); ?>
+            <table class="form-table">
+                <tr>
+                    <th scope="row"><label for="artasia_anecdotes_csv">Anecdote CSV File</label></th>
+                    <td>
+                        <input type="file" id="artasia_anecdotes_csv" name="artasia_anecdotes_csv" accept=".csv,.tsv,text/csv,text/tab-separated-values" required />
+                        <p class="description">CSV and TSV exports are accepted. No anecdotes will be imported.</p>
+                    </td>
+                </tr>
+            </table>
+            <?php submit_button('Download Inference Report'); ?>
+        </form>
     </div>
     <?php
 }
@@ -326,6 +348,647 @@ function artasia_handle_import_csv(): void
     artasia_redirect_import_page($result);
 }
 add_action('admin_post_artasia_placements_import_csv', 'artasia_handle_import_csv');
+
+function artasia_handle_anecdotes_dry_run(): void
+{
+    if (!current_user_can('edit_posts')) {
+        wp_die(esc_html__('You do not have permission to map Artasia anecdotes.', 'wp-artasia-locations'));
+    }
+
+    if (!isset($_POST['artasia_anecdotes_dry_run_nonce']) || !wp_verify_nonce($_POST['artasia_anecdotes_dry_run_nonce'], 'artasia_anecdotes_dry_run')) {
+        wp_die(esc_html__('Invalid anecdote dry-run request.', 'wp-artasia-locations'));
+    }
+
+    if (empty($_FILES['artasia_anecdotes_csv']['tmp_name']) || !is_uploaded_file($_FILES['artasia_anecdotes_csv']['tmp_name'])) {
+        wp_die(esc_html__('Choose an anecdote CSV or TSV file.', 'wp-artasia-locations'));
+    }
+
+    $filename = isset($_FILES['artasia_anecdotes_csv']['name'])
+        ? sanitize_file_name((string) $_FILES['artasia_anecdotes_csv']['name'])
+        : '';
+    $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+    if (!in_array($extension, ['csv', 'tsv'], true)) {
+        wp_die(esc_html__('The anecdote file must use a .csv or .tsv extension.', 'wp-artasia-locations'));
+    }
+
+    $file_size = intval($_FILES['artasia_anecdotes_csv']['size'] ?? 0);
+    if ($file_size > 5 * 1024 * 1024) {
+        wp_die(esc_html__('The anecdote file must be 5 MB or smaller.', 'wp-artasia-locations'));
+    }
+
+    $dataset = artasia_read_anecdote_csv((string) $_FILES['artasia_anecdotes_csv']['tmp_name']);
+    if (!empty($dataset['error'])) {
+        wp_die(esc_html($dataset['error']));
+    }
+
+    $report_rows = artasia_infer_anecdote_relationships($dataset['rows']);
+    artasia_download_anecdote_inference_report($dataset['headers'], $report_rows);
+}
+add_action('admin_post_artasia_anecdotes_dry_run', 'artasia_handle_anecdotes_dry_run');
+
+function artasia_detect_csv_delimiter(string $path): string
+{
+    $handle = fopen($path, 'r');
+    if (!$handle) {
+        return ',';
+    }
+
+    $line = fgets($handle);
+    fclose($handle);
+    if ($line === false) {
+        return ',';
+    }
+
+    $best_delimiter = ',';
+    $best_count = 1;
+    foreach ([",", "\t", ";"] as $delimiter) {
+        $count = count(str_getcsv($line, $delimiter));
+        if ($count > $best_count) {
+            $best_count = $count;
+            $best_delimiter = $delimiter;
+        }
+    }
+
+    return $best_delimiter;
+}
+
+function artasia_read_anecdote_csv(string $path): array
+{
+    $delimiter = artasia_detect_csv_delimiter($path);
+    $handle = fopen($path, 'r');
+    if (!$handle) {
+        return ['error' => 'The anecdote file could not be opened.', 'headers' => [], 'rows' => []];
+    }
+
+    $source_headers = fgetcsv($handle, 0, $delimiter);
+    if (!$source_headers) {
+        fclose($handle);
+        return ['error' => 'The anecdote file does not contain a header row.', 'headers' => [], 'rows' => []];
+    }
+
+    $source_headers = array_map(static function ($header): string {
+        return preg_replace('/^\xEF\xBB\xBF/', '', trim((string) $header));
+    }, $source_headers);
+    $normalized_headers = array_map('artasia_normalize_anecdote_header', $source_headers);
+    $required_headers = ['timestamp', 'person', 'site', 'age', 'story'];
+    $missing_headers = array_values(array_diff($required_headers, $normalized_headers));
+    if ($missing_headers) {
+        fclose($handle);
+        return [
+            'error' => sprintf('The anecdote file is missing required header(s): %s.', implode(', ', $missing_headers)),
+            'headers' => [],
+            'rows' => [],
+        ];
+    }
+
+    $rows = [];
+    $source_row_number = 1;
+    while (($source_row = fgetcsv($handle, 0, $delimiter)) !== false) {
+        $source_row_number++;
+        if (artasia_import_row_is_empty($source_row)) {
+            continue;
+        }
+
+        $source_values = [];
+        foreach ($source_headers as $index => $unused_header) {
+            $source_values[] = isset($source_row[$index]) ? (string) $source_row[$index] : '';
+        }
+        $rows[] = [
+            'source_row' => $source_row_number,
+            'source_values' => $source_values,
+            'record' => artasia_import_combine_row($normalized_headers, $source_values),
+        ];
+    }
+    fclose($handle);
+
+    if (!$rows) {
+        return ['error' => 'The anecdote file does not contain any data rows.', 'headers' => [], 'rows' => []];
+    }
+
+    return ['error' => '', 'headers' => $source_headers, 'rows' => $rows];
+}
+
+function artasia_normalize_anecdote_header(string $header): string
+{
+    $normalized = artasia_normalize_import_header($header);
+    $aliases = [
+        'artasia team member' => 'person',
+        'participant ages' => 'age',
+        'participant age' => 'age',
+        'anecdote' => 'story',
+    ];
+
+    return $aliases[$normalized] ?? $normalized;
+}
+
+function artasia_anecdote_normalize_match_text(string $value): string
+{
+    $value = function_exists('remove_accents') ? remove_accents($value) : $value;
+    $value = function_exists('mb_strtolower') ? mb_strtolower($value, 'UTF-8') : strtolower($value);
+    $value = str_replace('&', ' and ', $value);
+    $value = preg_replace('/[^a-z0-9]+/u', ' ', $value);
+
+    return trim(preg_replace('/\s+/', ' ', (string) $value));
+}
+
+function artasia_anecdote_match_person(string $source_person, array $people): array
+{
+    $needle = artasia_anecdote_normalize_match_text($source_person);
+    if ($needle === '') {
+        return ['id' => 0, 'title' => '', 'score' => 0, 'status' => 'missing', 'candidates' => '', 'notes' => 'Person is blank.'];
+    }
+
+    $matches = [];
+    foreach ($people as $person) {
+        $candidate = artasia_anecdote_normalize_match_text((string) $person->post_title);
+        if ($candidate === '') {
+            continue;
+        }
+
+        if ($candidate === $needle) {
+            $score = 100;
+        } elseif (strpos($candidate, $needle) !== false || strpos($needle, $candidate) !== false) {
+            $score = 90;
+        } else {
+            similar_text($needle, $candidate, $score);
+            $score = round($score, 1);
+        }
+        $matches[] = ['id' => intval($person->ID), 'title' => (string) $person->post_title, 'score' => $score];
+    }
+
+    usort($matches, static function (array $left, array $right): int {
+        return $right['score'] <=> $left['score'] ?: $left['id'] <=> $right['id'];
+    });
+    $top = $matches[0] ?? null;
+    $runner_up = $matches[1] ?? null;
+    $candidate_text = implode('; ', array_map(static function (array $match): string {
+        return sprintf('%d: %s [%.1f]', $match['id'], $match['title'], $match['score']);
+    }, array_slice($matches, 0, 5)));
+
+    if (!$top || $top['score'] < 75) {
+        return ['id' => 0, 'title' => '', 'score' => $top['score'] ?? 0, 'status' => 'unmatched', 'candidates' => $candidate_text, 'notes' => 'No sufficiently similar person was found.'];
+    }
+
+    $ambiguous = $runner_up && $top['score'] - $runner_up['score'] < 5;
+    return [
+        'id' => $top['id'],
+        'title' => $top['title'],
+        'score' => $top['score'],
+        'status' => $ambiguous ? 'ambiguous' : ($top['score'] === 100 ? 'exact' : 'fuzzy'),
+        'candidates' => $candidate_text,
+        'notes' => $ambiguous ? 'The top person matches are too close; review the selected ID.' : '',
+    ];
+}
+
+function artasia_anecdote_text_tokens(string $value): array
+{
+    $ignored = ['the', 'and', 'at', 'of', 'in', 'on', 'am', 'pm', 'years', 'year', 'old'];
+    $tokens = preg_split('/\s+/', artasia_anecdote_normalize_match_text($value), -1, PREG_SPLIT_NO_EMPTY);
+
+    return array_values(array_unique(array_filter($tokens ?: [], static function (string $token) use ($ignored): bool {
+        return strlen($token) >= 3 && !in_array($token, $ignored, true);
+    })));
+}
+
+function artasia_anecdote_extract_weekday(string $value): string
+{
+    $normalized = artasia_anecdote_normalize_match_text($value);
+    $weekdays = [
+        'monday' => ['monday', 'mon'],
+        'tuesday' => ['tuesday', 'tue', 'tues'],
+        'wednesday' => ['wednesday', 'wed'],
+        'thursday' => ['thursday', 'thu', 'thur', 'thurs'],
+        'friday' => ['friday', 'fri'],
+    ];
+    foreach ($weekdays as $weekday => $aliases) {
+        foreach ($aliases as $alias) {
+            if (preg_match('/(?:^|\s)' . preg_quote($alias, '/') . '(?:\s|$)/', $normalized)) {
+                return $weekday;
+            }
+        }
+    }
+
+    return '';
+}
+
+function artasia_anecdote_extract_times(string $value): array
+{
+    preg_match_all('/\b(1[0-2]|0?[1-9])(?::([0-5]\d))?\s*(a\.?m\.?|p\.?m\.?)?/i', $value, $matches, PREG_SET_ORDER);
+    $minutes = [];
+    foreach ($matches as $match) {
+        $hour = intval($match[1]);
+        $minute = isset($match[2]) && $match[2] !== '' ? intval($match[2]) : 0;
+        $meridiem = strtolower(str_replace('.', '', $match[3] ?? ''));
+        if ($meridiem === 'pm' && $hour < 12) {
+            $hour += 12;
+        } elseif ($meridiem === 'am' && $hour === 12) {
+            $hour = 0;
+        }
+        $minutes[] = $hour * 60 + $minute;
+    }
+
+    return array_values(array_unique($minutes));
+}
+
+function artasia_anecdote_time_matches(string $stored_time, array $source_times): bool
+{
+    if (!preg_match('/^(\d{1,2}):(\d{2})$/', trim($stored_time), $match)) {
+        return false;
+    }
+    $expected = intval($match[1]) * 60 + intval($match[2]);
+    foreach ($source_times as $source_time) {
+        $differences = [
+            abs($expected - $source_time),
+            abs(($expected % 720) - ($source_time % 720)),
+        ];
+        if (min($differences) <= 15) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function artasia_anecdote_extract_age_range(string $value): ?array
+{
+    preg_match_all('/\d+(?:\.\d+)?/', $value, $matches);
+    $numbers = array_map('floatval', $matches[0] ?? []);
+    if (!$numbers) {
+        return null;
+    }
+
+    return [min($numbers), max($numbers)];
+}
+
+function artasia_anecdote_age_score(string $source_age, string $placement_age): array
+{
+    if (trim($source_age) === '' || trim($placement_age) === '') {
+        return [0, 'age unavailable'];
+    }
+    if (artasia_anecdote_normalize_match_text($source_age) === artasia_anecdote_normalize_match_text($placement_age)) {
+        return [30, 'age exact'];
+    }
+
+    $source_range = artasia_anecdote_extract_age_range($source_age);
+    $placement_range = artasia_anecdote_extract_age_range($placement_age);
+    if (!$source_range || !$placement_range) {
+        return [0, 'age text differs'];
+    }
+
+    $intersection = max(0, min($source_range[1], $placement_range[1]) - max($source_range[0], $placement_range[0]));
+    $union = max($source_range[1], $placement_range[1]) - min($source_range[0], $placement_range[0]);
+    if ($union <= 0) {
+        return [$source_range[0] === $placement_range[0] ? 30 : -15, 'single age comparison'];
+    }
+    if ($intersection <= 0) {
+        return [-20, 'age ranges do not overlap'];
+    }
+
+    $score = (int) round(30 * $intersection / $union);
+    return [$score, sprintf('age overlap %.0f%%', 100 * $intersection / $union)];
+}
+
+function artasia_anecdote_score_placement(WP_Post $placement, string $source_site, string $source_age): array
+{
+    $place_id = intval(get_post_meta($placement->ID, 'artasia_place_id', true));
+    $partner_id = intval(get_post_meta($placement->ID, 'artasia_partner_id', true));
+    $fields = [
+        'placement' => (string) $placement->post_title,
+        'place' => $place_id ? (string) get_the_title($place_id) : '',
+        'partner' => $partner_id ? (string) get_the_title($partner_id) : '',
+        'section' => (string) get_post_meta($placement->ID, 'artasia_section', true),
+        'program' => (string) get_post_meta($placement->ID, 'artasia_program_context', true),
+    ];
+    $site_normalized = artasia_anecdote_normalize_match_text($source_site);
+    $score = 0;
+    $reasons = [];
+    $weights = ['placement' => 30, 'place' => 28, 'partner' => 18, 'section' => 14, 'program' => 8];
+    foreach ($fields as $label => $field) {
+        $field_normalized = artasia_anecdote_normalize_match_text($field);
+        if ($field_normalized !== '' && strpos($site_normalized, $field_normalized) !== false) {
+            $score += $weights[$label];
+            $reasons[] = $label . ' exact';
+        }
+    }
+
+    $site_tokens = artasia_anecdote_text_tokens($source_site);
+    $placement_tokens = artasia_anecdote_text_tokens(implode(' ', $fields));
+    if ($site_tokens && $placement_tokens) {
+        $overlap = count(array_intersect($site_tokens, $placement_tokens));
+        $token_score = (int) round(25 * $overlap / count($site_tokens));
+        $score += $token_score;
+        if ($token_score) {
+            $reasons[] = sprintf('site token overlap %d/%d', $overlap, count($site_tokens));
+        }
+    }
+
+    $source_weekday = artasia_anecdote_extract_weekday($source_site);
+    $placement_weekday = (string) get_post_meta($placement->ID, 'artasia_delivery_weekday', true);
+    if ($source_weekday && $placement_weekday) {
+        if ($source_weekday === $placement_weekday) {
+            $score += 18;
+            $reasons[] = 'weekday exact';
+        } else {
+            $score -= 10;
+            $reasons[] = 'weekday differs';
+        }
+    }
+
+    $source_times = artasia_anecdote_extract_times($source_site);
+    foreach (['artasia_delivery_start_time' => 'start time', 'artasia_delivery_end_time' => 'end time'] as $meta_key => $label) {
+        $stored_time = (string) get_post_meta($placement->ID, $meta_key, true);
+        if ($stored_time !== '' && $source_times) {
+            if (artasia_anecdote_time_matches($stored_time, $source_times)) {
+                $score += 12;
+                $reasons[] = $label . ' exact';
+            } else {
+                $score -= 4;
+                $reasons[] = $label . ' differs';
+            }
+        }
+    }
+
+    [$age_score, $age_reason] = artasia_anecdote_age_score(
+        $source_age,
+        (string) get_post_meta($placement->ID, 'artasia_participant_age', true)
+    );
+    $score += $age_score;
+    $reasons[] = $age_reason;
+
+    return ['score' => $score, 'reasons' => implode(', ', array_filter($reasons))];
+}
+
+function artasia_anecdote_match_placement(int $person_id, string $source_site, string $source_age): array
+{
+    if (!$person_id) {
+        return ['id' => 0, 'title' => '', 'project_id' => 0, 'score' => 0, 'status' => 'unmatched', 'candidates' => '', 'notes' => 'A person match is required before placements can be considered.'];
+    }
+
+    $placements = get_posts([
+        'post_type' => 'artasia_placement',
+        'post_status' => ['publish', 'draft', 'pending', 'private'],
+        'numberposts' => -1,
+        'meta_query' => [
+            'relation' => 'OR',
+            ['key' => 'artasia_team_member_id', 'value' => $person_id, 'compare' => '=', 'type' => 'NUMERIC'],
+            ['key' => 'artasia_secondary_team_member_id', 'value' => $person_id, 'compare' => '=', 'type' => 'NUMERIC'],
+        ],
+    ]);
+    if (!$placements) {
+        return ['id' => 0, 'title' => '', 'project_id' => 0, 'score' => 0, 'status' => 'unmatched', 'candidates' => '', 'notes' => 'The matched person has no primary or secondary placement assignments.'];
+    }
+
+    $matches = [];
+    foreach ($placements as $placement) {
+        $placement_score = artasia_anecdote_score_placement($placement, $source_site, $source_age);
+        $matches[] = [
+            'id' => intval($placement->ID),
+            'title' => (string) $placement->post_title,
+            'project_id' => intval(get_post_meta($placement->ID, 'artasia_project_id', true)),
+            'score' => $placement_score['score'],
+            'reasons' => $placement_score['reasons'],
+        ];
+    }
+    usort($matches, static function (array $left, array $right): int {
+        return $right['score'] <=> $left['score'] ?: $left['id'] <=> $right['id'];
+    });
+
+    $top = $matches[0];
+    $runner_up = $matches[1] ?? null;
+    $ambiguous = $runner_up && $top['score'] - $runner_up['score'] < 10;
+    $low_confidence = $top['score'] < 30;
+    $candidate_text = implode('; ', array_map(static function (array $match): string {
+        return sprintf('%d: %s [%d; %s]', $match['id'], $match['title'], $match['score'], $match['reasons']);
+    }, $matches));
+
+    return [
+        'id' => $top['id'],
+        'title' => $top['title'],
+        'project_id' => $top['project_id'],
+        'score' => $top['score'],
+        'status' => $ambiguous ? 'ambiguous' : ($low_confidence ? 'low_confidence' : 'matched'),
+        'candidates' => $candidate_text,
+        'notes' => $ambiguous
+            ? 'The two highest placement scores are close; review the selected ID.'
+            : ($low_confidence ? 'The selected placement has a low evidence score; review it.' : ''),
+    ];
+}
+
+function artasia_anecdote_parse_timestamp(string $value): ?DateTimeImmutable
+{
+    $timezone = function_exists('wp_timezone') ? wp_timezone() : new DateTimeZone('UTC');
+    $formats = ['!n/j/Y H:i:s', '!n/j/Y H:i', '!Y-m-d H:i:s', '!Y-m-d H:i', '!n/j/Y'];
+    foreach ($formats as $format) {
+        $date = DateTimeImmutable::createFromFormat($format, trim($value), $timezone);
+        $errors = DateTimeImmutable::getLastErrors();
+        if ($date && ($errors === false || ($errors['warning_count'] === 0 && $errors['error_count'] === 0))) {
+            return $date;
+        }
+    }
+
+    return null;
+}
+
+function artasia_anecdote_activities_for_project(int $project_id): array
+{
+    if (!$project_id) {
+        return [];
+    }
+
+    $activities = get_posts([
+        'post_type' => 'artasia_activity',
+        'post_status' => ['publish', 'draft', 'pending', 'private'],
+        'numberposts' => -1,
+        'meta_key' => 'artasia_project_id',
+        'meta_value' => $project_id,
+        'orderby' => 'title',
+        'order' => 'ASC',
+    ]);
+    $result = [];
+    foreach ($activities as $activity) {
+        $week = intval(get_post_meta($activity->ID, 'artasia_activity_week', true));
+        if ($week < 1) {
+            continue;
+        }
+        $result[] = ['id' => intval($activity->ID), 'title' => (string) $activity->post_title, 'week' => $week];
+    }
+    usort($result, static function (array $left, array $right): int {
+        return $left['week'] <=> $right['week'] ?: strcmp($left['title'], $right['title']) ?: $left['id'] <=> $right['id'];
+    });
+
+    return $result;
+}
+
+function artasia_infer_anecdote_relationships(array $rows): array
+{
+    $people = get_posts([
+        'post_type' => 'artasia_people',
+        'post_status' => ['publish', 'draft', 'pending', 'private'],
+        'numberposts' => -1,
+        'orderby' => 'title',
+        'order' => 'ASC',
+    ]);
+
+    foreach ($rows as $index => $row) {
+        $record = $row['record'];
+        $person = artasia_anecdote_match_person(artasia_import_value($record, 'person'), $people);
+        $placement = artasia_anecdote_match_placement(
+            $person['id'],
+            artasia_import_value($record, 'site'),
+            artasia_import_value($record, 'age')
+        );
+        $timestamp = artasia_anecdote_parse_timestamp(artasia_import_value($record, 'timestamp'));
+        $rows[$index]['person_match'] = $person;
+        $rows[$index]['placement_match'] = $placement;
+        $rows[$index]['parsed_timestamp'] = $timestamp;
+        $rows[$index]['timestamp_date'] = $timestamp ? $timestamp->format('Y-m-d') : '';
+    }
+
+    $dates_by_placement = [];
+    $project_ids = [];
+    foreach ($rows as $row) {
+        $project_id = intval($row['placement_match']['project_id']);
+        $placement_id = intval($row['placement_match']['id']);
+        if ($project_id) {
+            $project_ids[$project_id] = true;
+        }
+        if ($placement_id && $row['timestamp_date']) {
+            $dates_by_placement[$placement_id][$row['timestamp_date']] = true;
+        }
+    }
+    foreach ($dates_by_placement as $placement_id => $dates) {
+        $ordered_dates = array_keys($dates);
+        sort($ordered_dates, SORT_STRING);
+        $dates_by_placement[$placement_id] = $ordered_dates;
+    }
+
+    $activities_by_project = [];
+    foreach (array_keys($project_ids) as $project_id) {
+        $activities_by_project[$project_id] = artasia_anecdote_activities_for_project(intval($project_id));
+    }
+
+    foreach ($rows as $index => $row) {
+        $project_id = intval($row['placement_match']['project_id']);
+        $placement_id = intval($row['placement_match']['id']);
+        $activity_match = ['id' => 0, 'title' => '', 'week' => 0, 'status' => 'unmatched', 'candidates' => '', 'notes' => ''];
+        if (!$row['parsed_timestamp']) {
+            $activity_match['status'] = 'invalid_timestamp';
+            $activity_match['notes'] = 'Timestamp could not be parsed, so chronological activity mapping was not possible.';
+        } elseif (!$project_id) {
+            $activity_match['status'] = 'missing_project';
+            $activity_match['notes'] = 'The inferred placement has no project, so project activities could not be considered.';
+        } else {
+            $activities = $activities_by_project[$project_id] ?? [];
+            $weeks = array_values(array_unique(array_column($activities, 'week')));
+            sort($weeks, SORT_NUMERIC);
+            $date_index = array_search($row['timestamp_date'], $dates_by_placement[$placement_id] ?? [], true);
+            $inferred_week = $date_index !== false && isset($weeks[$date_index]) ? intval($weeks[$date_index]) : 0;
+            $candidates = array_values(array_filter($activities, static function (array $activity) use ($inferred_week): bool {
+                return $inferred_week > 0 && $activity['week'] === $inferred_week;
+            }));
+            $activity_match['week'] = $inferred_week;
+            $activity_match['candidates'] = implode('; ', array_map(static function (array $activity): string {
+                return sprintf('%d: %s [week %d]', $activity['id'], $activity['title'], $activity['week']);
+            }, $candidates));
+            if (!$activities) {
+                $activity_match['status'] = 'no_project_activities';
+                $activity_match['notes'] = 'No activities with week numbers were found for the inferred project.';
+            } elseif (!$inferred_week) {
+                $activity_match['status'] = 'no_week_available';
+                $activity_match['notes'] = 'There are more distinct anecdote dates than configured activity weeks.';
+            } elseif (!$candidates) {
+                $activity_match['status'] = 'no_activity_for_week';
+                $activity_match['notes'] = sprintf('No activity was found for inferred week %d.', $inferred_week);
+            } else {
+                $activity_match['id'] = $candidates[0]['id'];
+                $activity_match['title'] = $candidates[0]['title'];
+                $activity_match['status'] = count($candidates) > 1 ? 'ambiguous' : 'matched';
+                $activity_match['notes'] = count($candidates) > 1
+                    ? sprintf('Multiple activities use week %d; review the selected ID.', $inferred_week)
+                    : '';
+            }
+        }
+        $rows[$index]['activity_match'] = $activity_match;
+    }
+
+    return $rows;
+}
+
+function artasia_anecdote_report_headers(): array
+{
+    return [
+        'source_row',
+        'normalized_timestamp',
+        'inferred_person_id',
+        'inferred_person_name',
+        'person_match_status',
+        'person_match_score',
+        'person_candidates',
+        'inferred_placement_id',
+        'inferred_placement_name',
+        'placement_match_status',
+        'placement_match_score',
+        'placement_candidates',
+        'inferred_project_id',
+        'inferred_activity_week',
+        'inferred_activity_id',
+        'inferred_activity_name',
+        'activity_match_status',
+        'activity_candidates',
+        'inference_status',
+        'inference_notes',
+    ];
+}
+
+function artasia_anecdote_report_values(array $row): array
+{
+    $person = $row['person_match'];
+    $placement = $row['placement_match'];
+    $activity = $row['activity_match'];
+    $statuses = [$person['status'], $placement['status'], $activity['status']];
+    $ready = !array_intersect($statuses, ['missing', 'unmatched', 'invalid_timestamp', 'missing_project', 'no_project_activities', 'no_week_available', 'no_activity_for_week']);
+    $review = (bool) array_intersect($statuses, ['ambiguous', 'fuzzy', 'low_confidence']);
+    $notes = array_values(array_filter([$person['notes'], $placement['notes'], $activity['notes']]));
+
+    return [
+        $row['source_row'],
+        $row['parsed_timestamp'] ? $row['parsed_timestamp']->format(DateTimeInterface::ATOM) : '',
+        $person['id'],
+        $person['title'],
+        $person['status'],
+        $person['score'],
+        $person['candidates'],
+        $placement['id'],
+        $placement['title'],
+        $placement['status'],
+        $placement['score'],
+        $placement['candidates'],
+        $placement['project_id'],
+        $activity['week'],
+        $activity['id'],
+        $activity['title'],
+        $activity['status'],
+        $activity['candidates'],
+        !$ready ? 'unmatched' : ($review ? 'review' : 'ready'),
+        implode(' ', $notes),
+    ];
+}
+
+function artasia_download_anecdote_inference_report(array $source_headers, array $rows): void
+{
+    nocache_headers();
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="artasia-anecdote-inference-' . gmdate('Y-m-d-His') . '.csv"');
+
+    $output = fopen('php://output', 'w');
+    fwrite($output, "\xEF\xBB\xBF");
+    fputcsv($output, array_merge($source_headers, artasia_anecdote_report_headers()));
+    foreach ($rows as $row) {
+        fputcsv($output, array_merge($row['source_values'], artasia_anecdote_report_values($row)));
+    }
+    fclose($output);
+    exit;
+}
 
 function artasia_import_placements_csv(string $path): array
 {

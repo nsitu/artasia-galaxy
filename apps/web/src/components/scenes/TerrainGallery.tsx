@@ -1846,8 +1846,15 @@ export default function TerrainGallery({
   }, [onFocusedPlacementChange]);
 
   useEffect(() => {
-    onHoveredPlacementChange?.(focusedPlacement ? null : hoveredPlacement);
-  }, [focusedPlacement, hoveredPlacement, onHoveredPlacementChange]);
+    onHoveredPlacementChange?.(
+      focusedPlacement || previewPlacement ? null : hoveredPlacement,
+    );
+  }, [
+    focusedPlacement,
+    hoveredPlacement,
+    onHoveredPlacementChange,
+    previewPlacement,
+  ]);
 
   useEffect(() => {
     return () => onHoveredPlacementChange?.(null);
@@ -1906,7 +1913,7 @@ export default function TerrainGallery({
   return (
     <group
       onClick={
-        usesTouchPreview && previewPlacement
+        previewPlacement
           ? () => setPreviewPlacement(null)
           : undefined
       }
@@ -2008,24 +2015,19 @@ export default function TerrainGallery({
             clusterCount={clusterCount}
             hasAssets={placementsWithAssets.has(placement.placement_id)}
             isSelected={
-              (
-                usesTouchPreview
-                  ? previewPlacement
-                  : hoveredPlacement
-              )?.placement_id === placement.placement_id
+              (previewPlacement ?? hoveredPlacement)?.placement_id ===
+              placement.placement_id
             }
             onClick={() => {
+              setHoveredPlacement(null);
+              setPreviewPlacement((current) =>
+                current?.placement_id === placement.placement_id
+                  ? null
+                  : placement,
+              );
               if (usesTouchPreview) {
-                setHoveredPlacement(null);
-                setPreviewPlacement((current) =>
-                  current?.placement_id === placement.placement_id
-                    ? null
-                    : placement,
-                );
                 panToPlacement(position);
-                return;
               }
-              focusPlacement(placement);
             }}
             onPointerEnter={
               usesTouchPreview
