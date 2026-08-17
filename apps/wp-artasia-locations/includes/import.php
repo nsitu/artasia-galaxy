@@ -493,7 +493,13 @@ function artasia_anecdote_normalize_match_text(string $value): string
 
 function artasia_anecdote_match_person(string $source_person, array $people): array
 {
-    $needle = artasia_anecdote_normalize_match_text($source_person);
+    $person_names = array_map('trim', explode(',', $source_person));
+    $selected_source_person = (string) ($person_names[0] ?? '');
+    $additional_names_ignored = count(array_filter(array_slice($person_names, 1))) > 0;
+    $selection_note = $additional_names_ignored
+        ? sprintf('Used the first comma-separated person, "%s"; additional names were ignored.', $selected_source_person)
+        : '';
+    $needle = artasia_anecdote_normalize_match_text($selected_source_person);
     if ($needle === '') {
         return ['id' => 0, 'title' => '', 'score' => 0, 'status' => 'missing', 'candidates' => '', 'notes' => 'Person is blank.'];
     }
@@ -526,7 +532,14 @@ function artasia_anecdote_match_person(string $source_person, array $people): ar
     }, array_slice($matches, 0, 5)));
 
     if (!$top || $top['score'] < 75) {
-        return ['id' => 0, 'title' => '', 'score' => $top['score'] ?? 0, 'status' => 'unmatched', 'candidates' => $candidate_text, 'notes' => 'No sufficiently similar person was found.'];
+        return [
+            'id' => 0,
+            'title' => '',
+            'score' => $top['score'] ?? 0,
+            'status' => 'unmatched',
+            'candidates' => $candidate_text,
+            'notes' => trim($selection_note . ' No sufficiently similar person was found.'),
+        ];
     }
 
     $ambiguous = $runner_up && $top['score'] - $runner_up['score'] < 5;
@@ -536,7 +549,10 @@ function artasia_anecdote_match_person(string $source_person, array $people): ar
         'score' => $top['score'],
         'status' => $ambiguous ? 'ambiguous' : ($top['score'] === 100 ? 'exact' : 'fuzzy'),
         'candidates' => $candidate_text,
-        'notes' => $ambiguous ? 'The top person matches are too close; review the selected ID.' : '',
+        'notes' => trim(implode(' ', array_filter([
+            $selection_note,
+            $ambiguous ? 'The top person matches are too close; review the selected ID.' : '',
+        ]))),
     ];
 }
 
@@ -550,7 +566,7 @@ function artasia_anecdote_text_tokens(string $value): array
     })));
 }
 
-function artasia_anecdote_extract_weekday(string $value): string
+function artasia_anecdote_extract_weekdays(string $value): array
 {
     $normalized = artasia_anecdote_normalize_match_text($value);
     $weekdays = [
@@ -560,15 +576,24 @@ function artasia_anecdote_extract_weekday(string $value): string
         'thursday' => ['thursday', 'thu', 'thur', 'thurs'],
         'friday' => ['friday', 'fri'],
     ];
+    $matches = [];
     foreach ($weekdays as $weekday => $aliases) {
         foreach ($aliases as $alias) {
             if (preg_match('/(?:^|\s)' . preg_quote($alias, '/') . '(?:\s|$)/', $normalized)) {
-                return $weekday;
+                $matches[] = $weekday;
+                break;
             }
         }
     }
 
-    return '';
+    return $matches;
+}
+
+function artasia_anecdote_extract_weekday(string $value): string
+{
+    $weekdays = artasia_anecdote_extract_weekdays($value);
+
+    return $weekdays[0] ?? '';
 }
 
 function artasia_anecdote_extract_times(string $value): array
@@ -662,13 +687,51 @@ function artasia_anecdote_score_placement(WP_Post $placement, string $source_sit
     $site_normalized = artasia_anecdote_normalize_match_text($source_site);
     $score = 0;
     $reasons = [];
-    $weights = ['placement' => 30, 'place' => 28, 'partner' => 18, 'section' => 14, 'program' => 8];
+    $weights = ['placement' => 65, 'place' => 28, 'partner' => 18, 'section' => 14, 'program' => 8];
     foreach ($fields as $label => $field) {
         $field_normalized = artasia_anecdote_normalize_match_text($field);
         if ($field_normalized !== '' && strpos($site_normalized, $field_normalized) !== false) {
             $score += $weights[$label];
             $reasons[] = $label . ' exact';
         }
+    }
+
+    $placement_title_tokens = artasia_anecdote_text_tokens($fields['placement']);
+    $site_title_tokens = artasia_anecdote_text_tokens($source_site);
+    if ($placement_title_tokens) {
+        $title_token_overlap = count(array_intersect($placement_title_tokens, $site_title_tokens));
+        $title_token_coverage = $title_token_overlap / count($placement_title_tokens);
+        $title_token_score = (int) round(35 * $title_token_coverage);
+        $score += $title_token_score;
+        if ($title_token_score) {
+            $reasons[] = sprintf(
+                'placement title token coverage %d/%d',
+                $title_token_overlap,
+                count($placement_title_tokens)
+            );
+        }
+    }
+
+    $placement_title_normalized = artasia_anecdote_normalize_match_text($fields['placement']);
+    if ($placement_title_normalized !== '' && strpos($site_normalized, $placement_title_normalized) === 0) {
+        $score += 25;
+        $reasons[] = 'placement title prefix';
+    }
+
+    $source_is_earlyon = preg_match('/(?:^|\s)earlyon(?:\s|$)/', $site_normalized) === 1;
+    $placement_earlyon_text = artasia_anecdote_normalize_match_text(implode(' ', [
+        $fields['placement'],
+        $fields['partner'],
+        $fields['program'],
+    ]));
+    $placement_is_earlyon = (bool) get_post_meta($placement->ID, 'artasia_is_earlyon', true)
+        || preg_match('/(?:^|\s)earlyon(?:\s|$)/', $placement_earlyon_text) === 1;
+    if ($source_is_earlyon && $placement_is_earlyon) {
+        $score += 35;
+        $reasons[] = 'EarlyON exact';
+    } elseif ($source_is_earlyon !== $placement_is_earlyon) {
+        $score -= 25;
+        $reasons[] = 'EarlyON differs';
     }
 
     $site_tokens = artasia_anecdote_text_tokens($source_site);
@@ -682,12 +745,12 @@ function artasia_anecdote_score_placement(WP_Post $placement, string $source_sit
         }
     }
 
-    $source_weekday = artasia_anecdote_extract_weekday($source_site);
+    $source_weekdays = artasia_anecdote_extract_weekdays($source_site);
     $placement_weekday = (string) get_post_meta($placement->ID, 'artasia_delivery_weekday', true);
-    if ($source_weekday && $placement_weekday) {
-        if ($source_weekday === $placement_weekday) {
+    if ($source_weekdays && $placement_weekday) {
+        if (in_array($placement_weekday, $source_weekdays, true)) {
             $score += 18;
-            $reasons[] = 'weekday exact';
+            $reasons[] = count($source_weekdays) > 1 ? 'weekday among listed options' : 'weekday exact';
         } else {
             $score -= 10;
             $reasons[] = 'weekday differs';
@@ -894,8 +957,8 @@ function artasia_infer_anecdote_relationships(array $rows): array
                 $activity_match['status'] = 'no_project_activities';
                 $activity_match['notes'] = 'No activities with week numbers were found for the inferred project.';
             } elseif (!$inferred_week) {
-                $activity_match['status'] = 'no_week_available';
-                $activity_match['notes'] = 'There are more distinct anecdote dates than configured activity weeks.';
+                $activity_match['status'] = 'skipped_activity_limit';
+                $activity_match['notes'] = 'Activity assignment was skipped because this placement has more distinct anecdote dates than the project has configured activity weeks.';
             } elseif (!$candidates) {
                 $activity_match['status'] = 'no_activity_for_week';
                 $activity_match['notes'] = sprintf('No activity was found for inferred week %d.', $inferred_week);
@@ -946,8 +1009,8 @@ function artasia_anecdote_report_values(array $row): array
     $placement = $row['placement_match'];
     $activity = $row['activity_match'];
     $statuses = [$person['status'], $placement['status'], $activity['status']];
-    $ready = !array_intersect($statuses, ['missing', 'unmatched', 'invalid_timestamp', 'missing_project', 'no_project_activities', 'no_week_available', 'no_activity_for_week']);
-    $review = (bool) array_intersect($statuses, ['ambiguous', 'fuzzy', 'low_confidence']);
+    $ready = !array_intersect($statuses, ['missing', 'unmatched', 'invalid_timestamp', 'missing_project', 'no_project_activities', 'skipped_activity_limit', 'no_activity_for_week']);
+    $review = (bool) array_intersect($statuses, ['ambiguous', 'low_confidence']);
     $notes = array_values(array_filter([$person['notes'], $placement['notes'], $activity['notes']]));
 
     return [
