@@ -459,6 +459,13 @@ function artasia_register_meta_fields(): void
         'show_in_rest' => true,
         'sanitize_callback' => 'artasia_sanitize_integer_meta',
     ]);
+    register_post_meta('artasia_anecdote', 'artasia_anecdote_import_fingerprint', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => false,
+        'sanitize_callback' => 'sanitize_text_field',
+    ]);
 }
 
 function artasia_sanitize_integer_meta($value, string $meta_key = '', string $object_type = '', string $object_subtype = ''): int

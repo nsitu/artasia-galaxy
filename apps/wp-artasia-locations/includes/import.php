@@ -167,24 +167,33 @@ function artasia_render_tools_page(): void
 
         <hr />
 
-        <h2>Anecdote CSV Dry Run</h2>
-        <p>Upload an anecdote CSV or tab-separated file to infer its WordPress relationships. This first-pass tool does not create or update any posts.</p>
+        <h2>Anecdote CSV Import</h2>
+        <p>Upload an anecdote CSV or tab-separated file to infer its WordPress relationships and create Learning Anecdote posts. Every run downloads a detailed audit report.</p>
         <p>The report preserves the original columns and adds the matched person, the most likely placement from that person's primary and secondary assignments, and an activity inferred by ordering submission dates within that placement and mapping them to the project's configured activity week numbers.</p>
         <p>Required data: timestamp, person, site, participant age, and anecdote text. Header matching is case-insensitive and accepts the current form-export names (<code>Artasia Team Member</code>, <code>Participant ages</code>, and <code>Anecdote</code>) as well as the shorter names (<code>Person</code>, <code>Age</code>, and <code>Story</code>).</p>
 
         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" enctype="multipart/form-data">
-            <input type="hidden" name="action" value="artasia_anecdotes_dry_run" />
-            <?php wp_nonce_field('artasia_anecdotes_dry_run', 'artasia_anecdotes_dry_run_nonce'); ?>
+            <input type="hidden" name="action" value="artasia_anecdotes_import" />
+            <?php wp_nonce_field('artasia_anecdotes_import', 'artasia_anecdotes_import_nonce'); ?>
             <table class="form-table">
                 <tr>
                     <th scope="row"><label for="artasia_anecdotes_csv">Anecdote CSV File</label></th>
                     <td>
                         <input type="file" id="artasia_anecdotes_csv" name="artasia_anecdotes_csv" accept=".csv,.tsv,text/csv,text/tab-separated-values" required />
-                        <p class="description">CSV and TSV exports are accepted. No anecdotes will be imported.</p>
+                        <p class="description">CSV and TSV exports are accepted. Previously imported rows are detected and skipped.</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">Mode</th>
+                    <td>
+                        <label>
+                            <input type="checkbox" name="artasia_anecdotes_dry_run" value="1" />
+                            Dry run only — infer mappings and download the report without creating anecdotes
+                        </label>
                     </td>
                 </tr>
             </table>
-            <?php submit_button('Download Inference Report'); ?>
+            <?php submit_button('Run Anecdote Import'); ?>
         </form>
     </div>
     <?php
@@ -349,14 +358,14 @@ function artasia_handle_import_csv(): void
 }
 add_action('admin_post_artasia_placements_import_csv', 'artasia_handle_import_csv');
 
-function artasia_handle_anecdotes_dry_run(): void
+function artasia_handle_anecdotes_import(): void
 {
     if (!current_user_can('edit_posts')) {
         wp_die(esc_html__('You do not have permission to map Artasia anecdotes.', 'wp-artasia-locations'));
     }
 
-    if (!isset($_POST['artasia_anecdotes_dry_run_nonce']) || !wp_verify_nonce($_POST['artasia_anecdotes_dry_run_nonce'], 'artasia_anecdotes_dry_run')) {
-        wp_die(esc_html__('Invalid anecdote dry-run request.', 'wp-artasia-locations'));
+    if (!isset($_POST['artasia_anecdotes_import_nonce']) || !wp_verify_nonce($_POST['artasia_anecdotes_import_nonce'], 'artasia_anecdotes_import')) {
+        wp_die(esc_html__('Invalid anecdote import request.', 'wp-artasia-locations'));
     }
 
     if (empty($_FILES['artasia_anecdotes_csv']['tmp_name']) || !is_uploaded_file($_FILES['artasia_anecdotes_csv']['tmp_name'])) {
@@ -381,10 +390,12 @@ function artasia_handle_anecdotes_dry_run(): void
         wp_die(esc_html($dataset['error']));
     }
 
+    $dry_run = !empty($_POST['artasia_anecdotes_dry_run']);
     $report_rows = artasia_infer_anecdote_relationships($dataset['rows']);
-    artasia_download_anecdote_inference_report($dataset['headers'], $report_rows);
+    $report_rows = artasia_import_inferred_anecdotes($report_rows, $dry_run);
+    artasia_download_anecdote_inference_report($dataset['headers'], $report_rows, $dry_run);
 }
-add_action('admin_post_artasia_anecdotes_dry_run', 'artasia_handle_anecdotes_dry_run');
+add_action('admin_post_artasia_anecdotes_import', 'artasia_handle_anecdotes_import');
 
 function artasia_detect_csv_delimiter(string $path): string
 {
@@ -1027,6 +1038,136 @@ function artasia_infer_anecdote_relationships(array $rows): array
     return $rows;
 }
 
+function artasia_anecdote_import_fingerprint(array $record): string
+{
+    $identity = [
+        'timestamp' => artasia_import_value($record, 'timestamp'),
+        'person' => artasia_import_value($record, 'person'),
+        'site' => artasia_import_value($record, 'site'),
+        'age' => artasia_import_value($record, 'age'),
+        'story' => artasia_import_value($record, 'story'),
+    ];
+
+    return hash('sha256', (string) wp_json_encode($identity, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+}
+
+function artasia_find_imported_anecdote(string $fingerprint): int
+{
+    $matches = get_posts([
+        'post_type' => 'artasia_anecdote',
+        'post_status' => ['publish', 'draft', 'pending', 'private', 'trash'],
+        'numberposts' => 1,
+        'fields' => 'ids',
+        'meta_key' => 'artasia_anecdote_import_fingerprint',
+        'meta_value' => $fingerprint,
+    ]);
+
+    return empty($matches) ? 0 : intval($matches[0]);
+}
+
+function artasia_anecdote_import_title(array $row): string
+{
+    $person_name = $row['person_match']['title'] ?: artasia_import_value($row['record'], 'person');
+    $date_label = $row['parsed_timestamp']
+        ? wp_date('F j, Y', $row['parsed_timestamp']->getTimestamp(), $row['parsed_timestamp']->getTimezone())
+        : 'Undated';
+    $story_excerpt = wp_trim_words(
+        wp_strip_all_tags(artasia_import_value($row['record'], 'story')),
+        8,
+        '…'
+    );
+
+    return trim(sprintf('%s — %s%s',
+        $person_name ?: 'Learning Anecdote',
+        $date_label,
+        $story_excerpt ? ' — ' . $story_excerpt : ''
+    ));
+}
+
+function artasia_import_inferred_anecdotes(array $rows, bool $dry_run): array
+{
+    foreach ($rows as $index => $row) {
+        $story = artasia_import_value($row['record'], 'story');
+        $person_id = intval($row['person_match']['id']);
+        $placement_id = intval($row['placement_match']['id']);
+        $activity_id = intval($row['activity_match']['id']);
+        $missing = [];
+        if ($story === '') {
+            $missing[] = 'story';
+        }
+        if (!$person_id) {
+            $missing[] = 'person';
+        }
+        if (!$placement_id) {
+            $missing[] = 'placement';
+        }
+
+        if ($missing) {
+            $rows[$index]['import_result'] = [
+                'id' => 0,
+                'status' => $dry_run ? 'dry_run_skipped' : 'skipped_missing_required_mapping',
+                'notes' => 'Not importable because the following required value(s) are missing: ' . implode(', ', $missing) . '.',
+            ];
+            continue;
+        }
+
+        if ($dry_run) {
+            $rows[$index]['import_result'] = [
+                'id' => 0,
+                'status' => 'dry_run_ready',
+                'notes' => $activity_id ? 'Ready to import with all three relationships.' : 'Ready to import without an activity relationship.',
+            ];
+            continue;
+        }
+
+        $fingerprint = artasia_anecdote_import_fingerprint($row['record']);
+        $existing_id = artasia_find_imported_anecdote($fingerprint);
+        if ($existing_id) {
+            $rows[$index]['import_result'] = [
+                'id' => $existing_id,
+                'status' => 'skipped_duplicate',
+                'notes' => 'A previously imported anecdote has the same source fingerprint.',
+            ];
+            continue;
+        }
+
+        $post_data = [
+            'post_type' => 'artasia_anecdote',
+            'post_status' => 'publish',
+            'post_title' => artasia_anecdote_import_title($row),
+            'post_content' => wp_kses_post(wpautop($story)),
+        ];
+        if ($row['parsed_timestamp']) {
+            $post_date = $row['parsed_timestamp']->format('Y-m-d H:i:s');
+            $post_data['post_date'] = $post_date;
+            $post_data['post_date_gmt'] = get_gmt_from_date($post_date);
+        }
+
+        $post_id = wp_insert_post($post_data, true);
+        if (is_wp_error($post_id) || !$post_id) {
+            $rows[$index]['import_result'] = [
+                'id' => 0,
+                'status' => 'error',
+                'notes' => is_wp_error($post_id) ? $post_id->get_error_message() : 'WordPress did not return a post ID.',
+            ];
+            continue;
+        }
+
+        $post_id = intval($post_id);
+        update_post_meta($post_id, 'artasia_anecdote_person_id', $person_id);
+        update_post_meta($post_id, 'artasia_anecdote_placement_id', $placement_id);
+        update_post_meta($post_id, 'artasia_anecdote_activity_id', $activity_id);
+        update_post_meta($post_id, 'artasia_anecdote_import_fingerprint', $fingerprint);
+        $rows[$index]['import_result'] = [
+            'id' => $post_id,
+            'status' => 'imported',
+            'notes' => $activity_id ? '' : 'Imported without an activity relationship.',
+        ];
+    }
+
+    return $rows;
+}
+
 function artasia_anecdote_report_headers(): array
 {
     return [
@@ -1051,6 +1192,9 @@ function artasia_anecdote_report_headers(): array
         'activity_candidates',
         'inference_status',
         'inference_notes',
+        'anecdote_post_id',
+        'import_status',
+        'import_notes',
     ];
 }
 
@@ -1063,6 +1207,7 @@ function artasia_anecdote_report_values(array $row): array
     $ready = !array_intersect($statuses, ['missing', 'unmatched', 'invalid_timestamp', 'missing_project', 'no_project_activities', 'skipped_activity_limit', 'no_activity_for_week']);
     $review = (bool) array_intersect($statuses, ['ambiguous', 'low_confidence']);
     $notes = array_values(array_filter([$person['notes'], $placement['notes'], $activity['notes']]));
+    $import_result = $row['import_result'] ?? ['id' => 0, 'status' => 'not_run', 'notes' => ''];
 
     return [
         $row['source_row'],
@@ -1086,14 +1231,18 @@ function artasia_anecdote_report_values(array $row): array
         $activity['candidates'],
         !$ready ? 'unmatched' : ($review ? 'review' : 'ready'),
         implode(' ', $notes),
+        $import_result['id'],
+        $import_result['status'],
+        $import_result['notes'],
     ];
 }
 
-function artasia_download_anecdote_inference_report(array $source_headers, array $rows): void
+function artasia_download_anecdote_inference_report(array $source_headers, array $rows, bool $dry_run): void
 {
     nocache_headers();
     header('Content-Type: text/csv; charset=utf-8');
-    header('Content-Disposition: attachment; filename="artasia-anecdote-inference-' . gmdate('Y-m-d-His') . '.csv"');
+    $report_type = $dry_run ? 'dry-run' : 'import';
+    header('Content-Disposition: attachment; filename="artasia-anecdote-' . $report_type . '-report-' . gmdate('Y-m-d-His') . '.csv"');
 
     $output = fopen('php://output', 'w');
     fwrite($output, "\xEF\xBB\xBF");
