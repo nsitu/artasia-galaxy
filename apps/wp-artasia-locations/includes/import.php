@@ -852,6 +852,38 @@ function artasia_anecdote_parse_timestamp(string $value): ?DateTimeImmutable
     return null;
 }
 
+function artasia_anecdote_activity_hint(string $story): ?array
+{
+    $normalized = artasia_anecdote_normalize_match_text($story);
+    if ($normalized === '') {
+        return null;
+    }
+
+    if (preg_match('/(?:^|\s)(?:last day|final week)(?:\s|$)/', $normalized)) {
+        return [
+            'week' => 5,
+            'title_term' => 'imagining',
+            'basis' => 'Story phrase "last day" or "final week" indicates Week 5 Imagining.',
+        ];
+    }
+    if (preg_match('/(?:^|\s)sound[a-z]*(?:\s|$)/', $normalized)) {
+        return [
+            'week' => 4,
+            'title_term' => 'listening',
+            'basis' => 'Story contains "sound", indicating Week 4 Listening.',
+        ];
+    }
+    if (preg_match('/(?:^|\s)(?:smell|scent)[a-z]*(?:\s|$)/', $normalized)) {
+        return [
+            'week' => 2,
+            'title_term' => 'smelling',
+            'basis' => 'Story contains "smell" or "scent", indicating Week 2 Smelling.',
+        ];
+    }
+
+    return null;
+}
+
 function artasia_anecdote_activities_for_project(int $project_id): array
 {
     if (!$project_id) {
@@ -933,8 +965,9 @@ function artasia_infer_anecdote_relationships(array $rows): array
     foreach ($rows as $index => $row) {
         $project_id = intval($row['placement_match']['project_id']);
         $placement_id = intval($row['placement_match']['id']);
-        $activity_match = ['id' => 0, 'title' => '', 'week' => 0, 'status' => 'unmatched', 'candidates' => '', 'notes' => ''];
-        if (!$row['parsed_timestamp']) {
+        $activity_hint = artasia_anecdote_activity_hint(artasia_import_value($row['record'], 'story'));
+        $activity_match = ['id' => 0, 'title' => '', 'week' => 0, 'status' => 'unmatched', 'basis' => '', 'candidates' => '', 'notes' => ''];
+        if (!$row['parsed_timestamp'] && !$activity_hint) {
             $activity_match['status'] = 'invalid_timestamp';
             $activity_match['notes'] = 'Timestamp could not be parsed, so chronological activity mapping was not possible.';
         } elseif (!$project_id) {
@@ -945,11 +978,24 @@ function artasia_infer_anecdote_relationships(array $rows): array
             $weeks = array_values(array_unique(array_column($activities, 'week')));
             sort($weeks, SORT_NUMERIC);
             $date_index = array_search($row['timestamp_date'], $dates_by_placement[$placement_id] ?? [], true);
-            $inferred_week = $date_index !== false && isset($weeks[$date_index]) ? intval($weeks[$date_index]) : 0;
-            $candidates = array_values(array_filter($activities, static function (array $activity) use ($inferred_week): bool {
+            $chronological_week = $date_index !== false && isset($weeks[$date_index]) ? intval($weeks[$date_index]) : 0;
+            $inferred_week = $activity_hint ? intval($activity_hint['week']) : $chronological_week;
+            $week_candidates = array_values(array_filter($activities, static function (array $activity) use ($inferred_week): bool {
                 return $inferred_week > 0 && $activity['week'] === $inferred_week;
             }));
+            $preferred_candidates = $activity_hint
+                ? array_values(array_filter($week_candidates, static function (array $activity) use ($activity_hint): bool {
+                    return strpos(
+                        artasia_anecdote_normalize_match_text($activity['title']),
+                        $activity_hint['title_term']
+                    ) !== false;
+                }))
+                : [];
+            $candidates = $preferred_candidates ?: $week_candidates;
             $activity_match['week'] = $inferred_week;
+            $activity_match['basis'] = $activity_hint
+                ? $activity_hint['basis']
+                : ($chronological_week ? 'Submission-date order within the inferred placement.' : '');
             $activity_match['candidates'] = implode('; ', array_map(static function (array $activity): string {
                 return sprintf('%d: %s [week %d]', $activity['id'], $activity['title'], $activity['week']);
             }, $candidates));
@@ -965,10 +1011,14 @@ function artasia_infer_anecdote_relationships(array $rows): array
             } else {
                 $activity_match['id'] = $candidates[0]['id'];
                 $activity_match['title'] = $candidates[0]['title'];
-                $activity_match['status'] = count($candidates) > 1 ? 'ambiguous' : 'matched';
+                $activity_match['status'] = count($candidates) > 1
+                    ? 'ambiguous'
+                    : ($activity_hint ? 'matched_content_hint' : 'matched');
                 $activity_match['notes'] = count($candidates) > 1
                     ? sprintf('Multiple activities use week %d; review the selected ID.', $inferred_week)
-                    : '';
+                    : ($activity_hint && !$preferred_candidates
+                        ? sprintf('The story indicated week %d, but no activity title contained "%s"; the only week match was used.', $inferred_week, $activity_hint['title_term'])
+                        : '');
             }
         }
         $rows[$index]['activity_match'] = $activity_match;
@@ -996,6 +1046,7 @@ function artasia_anecdote_report_headers(): array
         'inferred_activity_week',
         'inferred_activity_id',
         'inferred_activity_name',
+        'activity_inference_basis',
         'activity_match_status',
         'activity_candidates',
         'inference_status',
@@ -1030,6 +1081,7 @@ function artasia_anecdote_report_values(array $row): array
         $activity['week'],
         $activity['id'],
         $activity['title'],
+        $activity['basis'],
         $activity['status'],
         $activity['candidates'],
         !$ready ? 'unmatched' : ($review ? 'review' : 'ready'),
