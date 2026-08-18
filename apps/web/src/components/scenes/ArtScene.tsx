@@ -946,6 +946,7 @@ export default function ArtScene() {
     : undefined;
   const topNavPartner = focusedPlacementDetails?.partner_name?.trim()
     ? {
+        value: focusedPlacementDetails.partner_name.trim(),
         label: focusedPlacementDetails.partner_name.trim(),
         whiteLogo: focusedPlacementDetails.partner_white_logo,
       }
@@ -972,7 +973,7 @@ export default function ArtScene() {
             className="atlas-selected-partner-logo"
             href={getPartnerPath(topNavPartner.label)}
             aria-label={`View ${topNavPartner.label} placements`}
-            onClick={(event) => handleTopPartnerLogoClick(event, topNavPartner.label)}
+            onClick={(event) => handleTopPartnerLogoClick(event, topNavPartner.value)}
             style={selectedPartnerLogoWrapStyle}
           >
             <img

@@ -683,7 +683,10 @@ export default function TerrainGallery({
         value: EARLY_ON_PARTNER_FILTER,
         label: "EarlyON",
         count: earlyOnCount,
-        whiteLogo: null,
+        whiteLogo: {
+          url: "/early-on-white.svg",
+          alt: "EarlyON Child and Family Centre",
+        },
       });
     }
     return options;
