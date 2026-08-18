@@ -169,7 +169,10 @@ function LightboxMedia({
                 className="atlas-control-surface"
                 style={anecdoteLightboxActionLinkStyle}
               >
-                Documentation
+                <span aria-hidden="true" style={anecdoteLightboxActionIconStyle}>
+                  open_in_new
+                </span>
+                <span>Documentation</span>
               </a>
             )}
             {wordpressEditUrl && (
@@ -180,7 +183,10 @@ function LightboxMedia({
                 className="atlas-control-surface"
                 style={anecdoteLightboxActionLinkStyle}
               >
-                Edit anecdote
+                <span aria-hidden="true" style={anecdoteLightboxActionIconStyle}>
+                  edit
+                </span>
+                <span>Edit</span>
               </a>
             )}
           </div>
@@ -1070,6 +1076,11 @@ export default function ArtScene() {
               ? `/admin/browse?site=${encodeURIComponent(String(focusedPlacementDetails.placement_id))}`
               : undefined
           }
+          wordpressHref={
+            authUser?.authenticated
+              ? getWordPressPostEditUrl(focusedPlacementDetails.placement_id)
+              : undefined
+          }
         />
       )}
       {!focusedPlacementDetails && previewPlacementDetails && previewPlacementAction && (
@@ -1083,6 +1094,11 @@ export default function ArtScene() {
           adminHref={
             authUser?.authenticated
               ? `/admin/browse?site=${encodeURIComponent(String(previewPlacementDetails.placement_id))}`
+              : undefined
+          }
+          wordpressHref={
+            authUser?.authenticated
+              ? getWordPressPostEditUrl(previewPlacementDetails.placement_id)
               : undefined
           }
         />
@@ -1888,6 +1904,17 @@ const responsiveTopNavStyles = `
       background-image: linear-gradient(45deg, rgba(142, 29, 88, 0.3) 0%, rgba(242, 139, 32, 0.3) 100%) !important;
   }
 
+  @container placement-actions (max-width: 650px) {
+    .atlas-placement-action-label {
+      display: none;
+    }
+
+    .atlas-placement-actions .atlas-placement-action-link {
+      padding-left: 5px !important;
+      padding-right: 5px !important;
+    }
+  }
+
   .atlas-filter-menu-option:not(:disabled):focus-visible {
     background-color: rgba(142, 29, 88, 0.3) !important;
     background-image: linear-gradient(45deg, rgba(142, 29, 88, 0.3) 0%, rgba(242, 139, 32, 0.3) 100%) !important;
@@ -2437,6 +2464,7 @@ const anecdoteLightboxActionLinkStyle: React.CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
+  gap: 6,
   padding: "0 16px",
   border: "1px solid rgba(255,255,255,0.28)",
   borderRadius: 0,
@@ -2446,6 +2474,16 @@ const anecdoteLightboxActionLinkStyle: React.CSSProperties = {
   lineHeight: 1,
   textDecoration: "none",
   whiteSpace: "nowrap",
+};
+
+const anecdoteLightboxActionIconStyle: React.CSSProperties = {
+  flex: "0 0 auto",
+  fontFamily: "'Material Symbols Outlined'",
+  fontSize: 18,
+  fontWeight: 400,
+  fontStyle: "normal",
+  fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20",
+  lineHeight: 1,
 };
 
 const photoLightboxTrackStyle: React.CSSProperties = {

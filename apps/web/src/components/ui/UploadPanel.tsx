@@ -101,6 +101,7 @@ type SiteScope = "select" | "all" | "placement";
 type SiteSort = "alphabetical" | "published-assets";
 type WorkspaceMode = "sites" | "browse" | "edit" | "upload" | "import";
 type BrowseAssetStatus = "draft" | "published" | "archived";
+const CUSTOM_ACTIVITY_OPTION = "__custom_activity__";
 type PlacementMetaLine = {
   text: string;
   icon?: string;
@@ -307,6 +308,7 @@ export default function UploadPanel({
   const [manageDisplayPlacementKey, setManageDisplayPlacementKey] = useState("");
   const [manageUploaderKey, setManageUploaderKey] = useState("");
   const [manageActivityTag, setManageActivityTag] = useState("");
+  const [manageCustomActivity, setManageCustomActivity] = useState("");
   const [manageIconName, setManageIconName] = useState<string | null>(null);
   const [manageLinkedAudioAssetId, setManageLinkedAudioAssetId] = useState("");
   const [linkedAudioOptions, setLinkedAudioOptions] = useState<LinkedAudioOption[]>(
@@ -2276,7 +2278,14 @@ export default function UploadPanel({
       asset.display_placement_id ? String(asset.display_placement_id) : "",
     );
     setManageUploaderKey(asset.uploader_id ? String(asset.uploader_id) : "");
-    setManageActivityTag(asset.activity_id ? String(asset.activity_id) : "");
+    setManageActivityTag(
+      asset.custom_activity?.trim()
+        ? CUSTOM_ACTIVITY_OPTION
+        : asset.activity_id
+          ? String(asset.activity_id)
+          : "",
+    );
+    setManageCustomActivity(asset.custom_activity?.trim() ?? "");
     setManageIconName(asset.iconName ?? null);
     setManageLinkedAudioAssetId(asset.linkedAudioAssetId ?? "");
     setManagePublished(Boolean(asset.published) && !asset.archived);
@@ -2321,6 +2330,7 @@ export default function UploadPanel({
     setManageDisplayPlacementKey("");
     setManageUploaderKey("");
     setManageActivityTag("");
+    setManageCustomActivity("");
     setManageIconName(null);
     setManageLinkedAudioAssetId("");
     setLinkedAudioOptions([]);
@@ -2497,9 +2507,18 @@ export default function UploadPanel({
       Boolean(manageUploaderKey) &&
       manageUploaderKey !==
         (selectedAsset.uploader_id ? String(selectedAsset.uploader_id) : "");
+    const selectedActivityMode = selectedAsset.custom_activity?.trim()
+      ? CUSTOM_ACTIVITY_OPTION
+      : selectedAsset.activity_id
+        ? String(selectedAsset.activity_id)
+        : "";
+    const customActivityValue = manageActivityTag === CUSTOM_ACTIVITY_OPTION
+      ? manageCustomActivity.trim()
+      : "";
     const activityTagChanged =
-      manageActivityTag !==
-      (selectedAsset.activity_id ? String(selectedAsset.activity_id) : "");
+      manageActivityTag !== selectedActivityMode ||
+      (manageActivityTag === CUSTOM_ACTIVITY_OPTION &&
+        customActivityValue !== (selectedAsset.custom_activity?.trim() ?? ""));
     const iconChanged = manageIconName !== (selectedAsset.iconName ?? null);
     const linkedAudioChanged =
       selectedAsset.type === "IMAGE" &&
@@ -2539,6 +2558,10 @@ export default function UploadPanel({
       setError("Select a team member album for this upload.");
       return;
     }
+    if (manageActivityTag === CUSTOM_ACTIVITY_OPTION && !customActivityValue) {
+      setError("Enter a custom activity name.");
+      return;
+    }
 
     setSavingAsset(true);
     try {
@@ -2565,9 +2588,10 @@ export default function UploadPanel({
       if (activityTagChanged) {
         await assignAssetActivityTag({
           assetId: selectedAsset.id,
-          activityId: manageActivityTag
+          activityId: manageActivityTag && manageActivityTag !== CUSTOM_ACTIVITY_OPTION
             ? parseInt(manageActivityTag, 10)
             : null,
+          customActivity: customActivityValue || null,
         });
       }
       if (iconChanged) {
@@ -2621,9 +2645,18 @@ export default function UploadPanel({
       Boolean(manageUploaderKey) &&
       manageUploaderKey !==
         (selectedAsset.uploader_id ? String(selectedAsset.uploader_id) : "");
+    const selectedActivityMode = selectedAsset.custom_activity?.trim()
+      ? CUSTOM_ACTIVITY_OPTION
+      : selectedAsset.activity_id
+        ? String(selectedAsset.activity_id)
+        : "";
+    const customActivityValue = manageActivityTag === CUSTOM_ACTIVITY_OPTION
+      ? manageCustomActivity.trim()
+      : "";
     const activityChanged =
-      manageActivityTag !==
-      (selectedAsset.activity_id ? String(selectedAsset.activity_id) : "");
+      manageActivityTag !== selectedActivityMode ||
+      (manageActivityTag === CUSTOM_ACTIVITY_OPTION &&
+        customActivityValue !== (selectedAsset.custom_activity?.trim() ?? ""));
     const iconChanged = manageIconName !== (selectedAsset.iconName ?? null);
     const linkedAudioChanged =
       selectedAsset.type === "IMAGE" &&
@@ -2688,6 +2721,10 @@ export default function UploadPanel({
       setError("Restore this video before rotating it.");
       return;
     }
+    if (manageActivityTag === CUSTOM_ACTIVITY_OPTION && !customActivityValue) {
+      setError("Enter a custom activity name.");
+      return;
+    }
     const latitude = Number(manageLatitude);
     const longitude = Number(manageLongitude);
     if (
@@ -2744,9 +2781,10 @@ export default function UploadPanel({
       if (activityChanged) {
         await assignAssetActivityTag({
           assetId,
-          activityId: manageActivityTag
+          activityId: manageActivityTag && manageActivityTag !== CUSTOM_ACTIVITY_OPTION
             ? parseInt(manageActivityTag, 10)
             : null,
+          customActivity: customActivityValue || null,
         });
       }
       if (iconChanged)
@@ -3917,7 +3955,8 @@ export default function UploadPanel({
     const activity = options?.activities.find(
       (candidate) => candidate.id === asset.activity_id,
     );
-    const activityLabel = asset.activity_label?.trim() || activity?.label;
+    const activityLabel =
+      asset.custom_activity?.trim() || asset.activity_label?.trim() || activity?.label;
     const activityColour = activity?.colour?.trim();
     const isDraft = !asset.published && !asset.archived;
     const isSelected = selectedBrowseAssetIds.has(asset.id);
@@ -4921,9 +4960,15 @@ export default function UploadPanel({
       Boolean(manageUploaderKey) &&
       manageUploaderKey !==
         (selectedAsset.uploader_id ? String(selectedAsset.uploader_id) : "");
+    const selectedActivityMode = selectedAsset.custom_activity?.trim()
+      ? CUSTOM_ACTIVITY_OPTION
+      : selectedAsset.activity_id
+        ? String(selectedAsset.activity_id)
+        : "";
     const activityChanged =
-      manageActivityTag !==
-      (selectedAsset.activity_id ? String(selectedAsset.activity_id) : "");
+      manageActivityTag !== selectedActivityMode ||
+      (manageActivityTag === CUSTOM_ACTIVITY_OPTION &&
+        manageCustomActivity.trim() !== (selectedAsset.custom_activity?.trim() ?? ""));
     const iconChanged = manageIconName !== (selectedAsset.iconName ?? null);
     const linkedAudioChanged =
       selectedAsset.type === "IMAGE" &&
@@ -5426,6 +5471,7 @@ export default function UploadPanel({
               style={inputStyle}
             >
               <option value="">No activity tag</option>
+              <option value={CUSTOM_ACTIVITY_OPTION}>Custom Activity</option>
               {(options?.activities ?? []).map((activity) => (
                 <option key={activity.id} value={String(activity.id)}>
                   {activity.label}
@@ -5433,6 +5479,24 @@ export default function UploadPanel({
               ))}
             </select>
           </label>
+          {manageActivityTag === CUSTOM_ACTIVITY_OPTION && (
+            <label style={labelStyle}>
+              Custom Activity
+              <input
+                type="text"
+                value={manageCustomActivity}
+                onChange={(event) => setManageCustomActivity(event.target.value)}
+                placeholder="e.g. One-off texture exploration"
+                maxLength={120}
+                disabled={savingAsset}
+                style={inputStyle}
+              />
+              <span style={fieldHelpStyle}>
+                Assets with the same custom activity name will share an orbit in
+                the Atlas viewer.
+              </span>
+            </label>
+          )}
           {selectedAsset.mediaKind === "audio" && (
             <div style={labelStyle}>
               <span>Asset Icon</span>

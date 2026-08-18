@@ -2,6 +2,7 @@ import { getPublishedAlbum, listTags, searchAssetIdsByTag, searchAssetIdsByTags,
 import { DEFAULT_ASSET_ADJUSTMENTS, getAssetAdjustmentMap, type AssetAdjustments } from "./assetAdjustments.service.js";
 import {
   activityAnchorTag,
+  getCustomActivityTagValue,
   displayPlacementTag,
   getUploadConfig,
   placementAnchorTag,
@@ -42,6 +43,7 @@ export interface Photo {
   adjustments: AssetAdjustments;
   iconName?: string;
   activityIds?: number[];
+  customActivities?: string[];
   anecdoteHtml?: string;
   attribution?: string;
   wordpressPostId?: number;
@@ -98,6 +100,7 @@ function assetToPhoto(
   useGpsLocation = true,
   iconName?: string,
   activityIds?: number[],
+  customActivities?: string[],
   linkedAudioAssetId?: string,
 ): Photo {
   const audio = forceAudio || isAudioAsset(asset);
@@ -152,6 +155,7 @@ function assetToPhoto(
     adjustments: adjustments ?? { ...DEFAULT_ASSET_ADJUSTMENTS },
     ...(iconName ? { iconName } : {}),
     ...(activityIds?.length ? { activityIds } : {}),
+    ...(customActivities?.length ? { customActivities } : {}),
     ...(linkedAudioAssetId
       ? {
           linkedAudioUrl: `/api/v1/assets/${linkedAudioAssetId}/original`,
@@ -224,6 +228,7 @@ async function mapEmbeddedFocusedMetadata(assets: ImmichAsset[]) {
 
   const audioAssetIds = new Set<string>();
   const activityIdsByAssetId = new Map<string, Set<number>>();
+  const customActivitiesByAssetId = new Map<string, Set<string>>();
   const adjustmentMap = new Map<string, AssetAdjustments>();
   const gpsDisabledAssetIds = new Set<string>();
   const iconNameByAssetId = new Map<string, string>();
@@ -252,6 +257,13 @@ async function mapEmbeddedFocusedMetadata(assets: ImmichAsset[]) {
         activityIds.add(activityId);
         activityIdsByAssetId.set(asset.id, activityIds);
       }
+      const customActivity = getCustomActivityTagValue(key);
+      if (customActivity) {
+        const customActivities =
+          customActivitiesByAssetId.get(asset.id) ?? new Set<string>();
+        customActivities.add(customActivity);
+        customActivitiesByAssetId.set(asset.id, customActivities);
+      }
 
       const adjustmentMatch = key.match(
         /^artasia:adjust:(brightness|contrast|saturation):(\d{1,3})$/,
@@ -269,6 +281,7 @@ async function mapEmbeddedFocusedMetadata(assets: ImmichAsset[]) {
 
   return {
     activityIdsByAssetId,
+    customActivitiesByAssetId,
     adjustmentMap,
     audioAssetIds,
     gpsDisabledAssetIds,
@@ -307,6 +320,7 @@ export async function querySlideshow(
   let assets: ImmichAsset[] = [];
   let audioIdSet = new Set<string>();
   let activityIdsByAssetId = new Map<string, Set<number>>();
+  let customActivitiesByAssetId = new Map<string, Set<string>>();
   let adjustmentMap = new Map<string, AssetAdjustments>();
   let gpsDisabledAssetIds = new Set<string>();
   let iconNameByAssetId = new Map<string, string>();
@@ -349,6 +363,7 @@ export async function querySlideshow(
       const metadata = await mapEmbeddedFocusedMetadata(assets);
       audioIdSet = metadata.audioAssetIds;
       activityIdsByAssetId = metadata.activityIdsByAssetId;
+      customActivitiesByAssetId = metadata.customActivitiesByAssetId;
       adjustmentMap = metadata.adjustmentMap;
       gpsDisabledAssetIds = metadata.gpsDisabledAssetIds;
       iconNameByAssetId = metadata.iconNameByAssetId;
@@ -392,6 +407,30 @@ export async function querySlideshow(
             activityIdsByAssetId.get(assetId) ?? new Set<number>();
           activityIds.add(membership.activityId);
           activityIdsByAssetId.set(assetId, activityIds);
+        }
+      }
+
+      const customActivityAssignments = allTags.flatMap((tag) => {
+        const customActivity = [tag.name, tag.value]
+          .map((value) => getCustomActivityTagValue(value))
+          .find((value): value is string => Boolean(value));
+        return customActivity
+          ? [{ tagId: tag.id, customActivity }]
+          : [];
+      });
+      const customActivityMemberships = await Promise.all(
+        customActivityAssignments.map(async ({ tagId, customActivity }) => ({
+          customActivity,
+          assetIds: await searchAssetIdsByTag(tagId),
+        })),
+      );
+      for (const membership of customActivityMemberships) {
+        for (const assetId of membership.assetIds) {
+          if (!placementAssetIds.has(assetId)) continue;
+          const customActivities =
+            customActivitiesByAssetId.get(assetId) ?? new Set<string>();
+          customActivities.add(membership.customActivity);
+          customActivitiesByAssetId.set(assetId, customActivities);
         }
       }
     }
@@ -507,6 +546,7 @@ export async function querySlideshow(
       !gpsDisabledAssetIds.has(asset.id),
       iconNameByAssetId.get(asset.id),
       Array.from(activityIdsByAssetId.get(asset.id) ?? []),
+      Array.from(customActivitiesByAssetId.get(asset.id) ?? []),
       linkedAudioAssetIdByAssetId.get(asset.id),
     ),
   );

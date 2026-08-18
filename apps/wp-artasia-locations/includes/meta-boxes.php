@@ -582,6 +582,14 @@ function artasia_project_meta_box_html(WP_Post $post): void
     }
     $description = get_post_meta($post->ID, 'artasia_project_description', true);
     $documentation_page_id = intval(get_post_meta($post->ID, 'artasia_documentation_page_id', true));
+    $documentation_page_url = '';
+    if ($documentation_page_id && get_post_type($documentation_page_id) === 'page') {
+        $documentation_page_url = get_permalink($documentation_page_id);
+        if (!is_string($documentation_page_url)) {
+            $documentation_page_url = '';
+        }
+    }
+    $pages_admin_url = admin_url('edit.php?post_type=page');
 
     wp_nonce_field('artasia_project_meta', 'artasia_project_meta_nonce');
 ?>
@@ -607,7 +615,13 @@ function artasia_project_meta_box_html(WP_Post $post): void
                     'class'             => 'widefat',
                 ]);
                 ?>
-                <p class="description">Select the annual WordPress page containing the Artasia Documentation widget. Documentation links use this page for their public viewer URL.</p>
+                <p class="description">
+                    Select the annual WordPress page containing the Artasia Documentation widget. Documentation links use this page for their public viewer URL.
+                    <?php if ($documentation_page_url) : ?>
+                        <a href="<?php echo esc_url($documentation_page_url); ?>" target="_blank" rel="noopener noreferrer">View selected page</a>.
+                    <?php endif; ?>
+                    <a href="<?php echo esc_url($pages_admin_url); ?>">Manage WordPress pages</a>.
+                </p>
             </td>
         </tr>
     </table>

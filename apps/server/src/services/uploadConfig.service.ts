@@ -11,6 +11,25 @@ import {
 
 export { activityAnchorTag, isActivityAnchorTagName };
 
+export const CUSTOM_ACTIVITY_TAG_PREFIX = "custom_activity:";
+
+export function customActivityTag(value: string): string {
+  return `${CUSTOM_ACTIVITY_TAG_PREFIX}${value.trim()}`;
+}
+
+export function getCustomActivityTagValue(value: string): string | null {
+  const normalized = value.trim();
+  if (!normalized.toLowerCase().startsWith(CUSTOM_ACTIVITY_TAG_PREFIX)) {
+    return null;
+  }
+  const customActivity = normalized.slice(CUSTOM_ACTIVITY_TAG_PREFIX.length).trim();
+  return customActivity || null;
+}
+
+export function isCustomActivityTagName(value: string): boolean {
+  return getCustomActivityTagValue(value) !== null;
+}
+
 export interface ActivityConfig {
   id: number;
   label: string;

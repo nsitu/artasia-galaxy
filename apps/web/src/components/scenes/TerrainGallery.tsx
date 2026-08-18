@@ -494,7 +494,7 @@ type LocalPhotoLayoutItem = {
   orbitRadius: number;
   orbitAssetCount: number;
   orbitColour?: string;
-  activityId: number;
+  activityKey: string;
 };
 type TerrainOrbitControls = {
   target?: THREE.Vector3;
@@ -537,6 +537,13 @@ export type PlacementNavigationActions = {
 
 const SITE_PATH_PREFIX = "/sites/";
 const EARLY_ON_PARTNER_FILTER = "__earlyon__";
+const CUSTOM_ACTIVITY_COLOURS = [
+  "#8e1d58",
+  "#c45b2c",
+  "#367b76",
+  "#6b5aa8",
+  "#9a7b1f",
+];
 
 interface TerrainGalleryProps {
   authenticated?: boolean | null;
@@ -813,26 +820,51 @@ export default function TerrainGallery({
   }, [focusedPlacement, projection, projectionMatchesRequest, terrain]);
   const localPhotoLayout = useMemo<LocalPhotoLayoutItem[]>(() => {
     if (!focusedPlacementCenter) return [];
+    const customActivityNames = [
+      ...new Set(
+        photosForCurrentView.flatMap((photo) =>
+          (photo.customActivities ?? [])
+            .map((activity) => activity.trim().toLocaleLowerCase())
+            .filter(Boolean),
+        ),
+      ),
+    ].sort((a, b) => a.localeCompare(b));
+    const activityGroupCount = activityOptions.length + customActivityNames.length;
     const orbitForPhoto = (photo: Photo) => {
       const activity = activityOptions.find((option) =>
         photo.activityIds?.includes(option.id),
       );
-      const rank = activity
+      const customActivity = (photo.customActivities ?? [])
+        .map((value) => value.trim().toLocaleLowerCase())
+        .find(Boolean);
+      const customActivityIndex = customActivity
+        ? customActivityNames.indexOf(customActivity)
+        : -1;
+      const rank = customActivityIndex >= 0
+        ? activityOptions.length + customActivityIndex
+        : activity
         ? activityOptions.findIndex((option) => option.id === activity.id)
         : -1;
-      const outerRank = Math.max(0, activityOptions.length - 1);
+      const outerRank = Math.max(0, activityGroupCount - 1);
       const currentOuterRadius = 0.78 + outerRank * 0.3;
       const expandedStep = outerRank > 0
         ? (currentOuterRadius * 2 - 0.78) / outerRank
         : 0.6;
       const untaggedRadius = currentOuterRadius * 2 + expandedStep;
+      const activityKey = customActivityIndex >= 0
+        ? `custom:${customActivity}`
+        : activity
+          ? `activity:${activity.id}`
+          : "untagged";
       return {
         orbitRadius: rank >= 0
           ? 0.78 + rank * expandedStep
           : untaggedRadius,
         orbitAssetCount: 0,
-        activityId: activity?.id ?? -1,
-        orbitColour: activity?.colour ?? "#8a9099",
+        activityKey,
+        orbitColour: customActivityIndex >= 0
+          ? CUSTOM_ACTIVITY_COLOURS[customActivityIndex % CUSTOM_ACTIVITY_COLOURS.length]
+          : activity?.colour ?? "#8a9099",
       };
     };
 
@@ -851,13 +883,13 @@ export default function TerrainGallery({
         ];
       },
     );
-    const orbitCounts = new Map<number, number>();
+    const orbitCounts = new Map<string, number>();
     for (const item of orbitItems) {
-      orbitCounts.set(item.activityId, (orbitCounts.get(item.activityId) ?? 0) + 1);
+      orbitCounts.set(item.activityKey, (orbitCounts.get(item.activityKey) ?? 0) + 1);
     }
     return orbitItems.map((item) => ({
       ...item,
-      orbitAssetCount: orbitCounts.get(item.activityId) ?? 1,
+      orbitAssetCount: orbitCounts.get(item.activityKey) ?? 1,
     }));
   }, [
     activityOptions,
@@ -866,7 +898,7 @@ export default function TerrainGallery({
     photosForCurrentView,
   ]);
   const activityOrbitRings = useMemo(() => {
-    const rings = new Map<number, {
+    const rings = new Map<string, {
       radius: number;
       colour: string;
       center: [number, number, number];
@@ -886,12 +918,12 @@ export default function TerrainGallery({
           item.sourceIndex === selectedIndex
         ),
       });
-      const existingRing = rings.get(item.activityId);
+      const existingRing = rings.get(item.activityKey);
       if (existingRing) {
         existingRing.gaps.push(gap);
         continue;
       }
-      rings.set(item.activityId, {
+      rings.set(item.activityKey, {
         radius: item.orbitRadius,
         colour: item.orbitColour ?? "#ffffff",
         center: item.center,
@@ -2342,6 +2374,7 @@ function applyTerrainCameraFrame(
 export function FocusedPlacementOverlay({
   placement,
   adminHref,
+  wordpressHref,
   partnerHref,
   onPartnerSelect,
   previousAction,
@@ -2349,6 +2382,7 @@ export function FocusedPlacementOverlay({
 }: {
   placement: MapPlacement;
   adminHref?: string;
+  wordpressHref?: string;
   partnerHref?: string;
   onPartnerSelect?: (partner: string) => void;
   previousAction?: () => void;
@@ -2358,6 +2392,7 @@ export function FocusedPlacementOverlay({
     <PlacementInfoPanel
       placement={placement}
       adminHref={adminHref}
+      wordpressHref={wordpressHref}
       partnerHref={partnerHref}
       onPartnerSelect={onPartnerSelect}
       previousAction={previousAction}
@@ -2369,6 +2404,7 @@ export function FocusedPlacementOverlay({
 function PlacementInfoPanel({
   placement,
   adminHref,
+  wordpressHref,
   partnerHref,
   onPartnerSelect,
   onView,
@@ -2378,6 +2414,7 @@ function PlacementInfoPanel({
 }: {
   placement: MapPlacement;
   adminHref?: string;
+  wordpressHref?: string;
   partnerHref?: string;
   onPartnerSelect?: (partner: string) => void;
   onView?: () => void;
@@ -2576,8 +2613,8 @@ function PlacementInfoPanel({
               />
             )}
           </div>
-          {(previousAction || placement.documentation_url || adminHref || onView || nextAction) && (
-            <div style={siteDetailsActionsStyle}>
+          {(previousAction || placement.documentation_url || adminHref || wordpressHref || onView || nextAction) && (
+            <div className="atlas-placement-actions" style={siteDetailsActionsStyle}>
               {previousAction && (
                 <PlacementNavigationButton
                   direction="previous"
@@ -2587,31 +2624,62 @@ function PlacementInfoPanel({
               {placement.documentation_url && (
                 <a
                   href={placement.documentation_url}
-                  className="atlas-control-surface"
+                  className="atlas-control-surface atlas-placement-action-link"
                   target="_blank"
                   rel="noopener noreferrer"
+                  aria-label="View documentation"
+                  title="View documentation"
                   style={siteDetailsActionLinkStyle}
                 >
-                  Documentation
+                  <span aria-hidden="true" style={siteDetailsActionIconStyle}>
+                    open_in_new
+                  </span>
+                  <span className="atlas-placement-action-label">Documentation</span>
                 </a>
               )}
               {adminHref && (
                 <a
                   href={adminHref}
-                  className="atlas-control-surface"
+                  className="atlas-control-surface atlas-placement-action-link"
+                  aria-label="Open Atlas Admin"
+                  title="Open Atlas Admin"
                   style={siteDetailsActionLinkStyle}
                 >
-                  Admin
+                  <span aria-hidden="true" style={siteDetailsActionIconStyle}>
+                    settings
+                  </span>
+                  <span className="atlas-placement-action-label">Admin</span>
+                </a>
+              )}
+              {wordpressHref && (
+                <a
+                  href={wordpressHref}
+                  className="atlas-control-surface atlas-placement-action-link"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Edit placement in WordPress"
+                  title="Edit placement in WordPress"
+                  style={siteDetailsActionLinkStyle}
+                >
+                  <span aria-hidden="true" style={siteDetailsActionIconStyle}>
+                    page_info
+                  </span>
+                  <span className="atlas-placement-action-label">WordPress</span>
                 </a>
               )}
               {onView && (
                 <button
                   type="button"
-                  className="atlas-control-surface"
+                  className="atlas-control-surface atlas-placement-action-link"
                   onClick={onView}
+                  aria-label="View gallery"
+                  title="View gallery"
                   style={siteDetailsActionLinkStyle}
                 >
-                  Gallery
+                  <span aria-hidden="true" style={siteDetailsActionIconStyle}>
+                    photo_prints
+                  </span>
+                  <span className="atlas-placement-action-label">Gallery</span>
                 </button>
               )}
               {nextAction && (
@@ -2682,6 +2750,7 @@ export function PlacementPreviewPanel({
   placement,
   onOpen,
   adminHref,
+  wordpressHref,
   partnerHref,
   onPartnerSelect,
   previousAction,
@@ -2690,6 +2759,7 @@ export function PlacementPreviewPanel({
   placement: MapPlacement;
   onOpen: () => void;
   adminHref?: string;
+  wordpressHref?: string;
   partnerHref?: string;
   onPartnerSelect?: (partner: string) => void;
   previousAction?: () => void;
@@ -2699,6 +2769,7 @@ export function PlacementPreviewPanel({
     <PlacementInfoPanel
       placement={placement}
       adminHref={adminHref}
+      wordpressHref={wordpressHref}
       partnerHref={partnerHref}
       onPartnerSelect={onPartnerSelect}
       onView={onOpen}
@@ -3088,6 +3159,8 @@ const siteDetailsActionsStyle: React.CSSProperties = {
   flexWrap: "nowrap",
   gap: 8,
   width: "100%",
+  containerType: "inline-size",
+  containerName: "placement-actions",
   marginTop: 10,
   pointerEvents: "auto",
 };
@@ -3100,6 +3173,7 @@ const siteDetailsActionLinkStyle: React.CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
+  gap: 6,
   boxSizing: "border-box",
   padding: "11px 8px",
   border: "1px solid rgba(255,255,255,0.22)",
@@ -3113,6 +3187,16 @@ const siteDetailsActionLinkStyle: React.CSSProperties = {
   cursor: "pointer",
   pointerEvents: "auto",
   whiteSpace: "nowrap",
+};
+
+const siteDetailsActionIconStyle: React.CSSProperties = {
+  flex: "0 0 auto",
+  fontFamily: "'Material Symbols Outlined'",
+  fontSize: 18,
+  fontWeight: 400,
+  fontStyle: "normal",
+  fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20",
+  lineHeight: 1,
 };
 
 const siteDetailsNavigationButtonStyle: React.CSSProperties = {

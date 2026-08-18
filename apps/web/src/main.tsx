@@ -14,10 +14,12 @@ const coreIconNames = [
 
   "reset_settings",
   "edit",
+  "settings",
   "schedule",
   "person",
   "upload",
   "open_in_new",
+  "photo_prints",
   "add_to_drive",
   "browse",
   "location_on",

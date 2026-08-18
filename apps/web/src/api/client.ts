@@ -20,6 +20,7 @@ export interface Photo {
   isFavorite: boolean;
   iconName?: string;
   activityIds?: number[];
+  customActivities?: string[];
   anecdoteHtml?: string;
   attribution?: string;
   wordpressPostId?: number;
@@ -238,6 +239,7 @@ export interface PlacementAsset {
   display_placement_name?: string | null;
   activity_id?: number | null;
   activity_label?: string | null;
+  custom_activity?: string | null;
   iconName?: string | null;
   linkedAudioAssetId?: string | null;
   driveFileId?: string | null;
@@ -416,11 +418,15 @@ export async function assignAssetUploader(params: {
 export async function assignAssetActivityTag(params: {
   assetId: string;
   activityId: number | null;
+  customActivity?: string | null;
 }): Promise<void> {
   const res = await fetch(`/api/v1/uploads/assets/${params.assetId}/activity-tag`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ activity_id: params.activityId }),
+    body: JSON.stringify({
+      activity_id: params.activityId,
+      custom_activity: params.customActivity ?? null,
+    }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));

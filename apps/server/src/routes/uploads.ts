@@ -55,6 +55,9 @@ import {
   displayPlacementTag,
   getActivityTagNames,
   getUploadConfig,
+  customActivityTag,
+  getCustomActivityTagValue,
+  isCustomActivityTagName,
   placementAnchorTag,
   activityAnchorTag,
   isActivityAnchorTagName,
@@ -447,6 +450,7 @@ interface AssetManagementAssignment {
   displayPlacementName?: string;
   activityId?: number;
   activityLabel?: string;
+  customActivity?: string;
   iconName?: string;
   linkedAudioAssetId?: string;
   driveFileId?: string;
@@ -528,6 +532,7 @@ function mapAdminAsset(
     display_placement_name: assignment?.displayPlacementName ?? null,
     activity_id: assignment?.activityId ?? null,
     activity_label: assignment?.activityLabel ?? null,
+    custom_activity: assignment?.customActivity ?? null,
     iconName: assignment?.iconName ?? null,
     linkedAudioAssetId: assignment?.linkedAudioAssetId ?? null,
     driveFileId: driveFileId || null,
@@ -718,7 +723,6 @@ export async function getSiteActivityStats(): Promise<SiteActivityStatsResponse>
 
 function invalidateSiteActivityStats() {
   siteActivityStatsCache = null;
-  invalidateAdminBrowseIndexes();
 }
 
 async function getUploaderAlbums(): Promise<UploaderAlbum[]> {
@@ -1016,6 +1020,33 @@ async function getManagementAssignments(
     }
   }
 
+  const customActivityTags = tags.flatMap((tag) => {
+    const customActivity = [tag.name, tag.value]
+      .map((value) => getCustomActivityTagValue(value))
+      .find((value): value is string => Boolean(value));
+    return customActivity
+      ? [{ tagId: tag.id, customActivity }]
+      : [];
+  });
+  const customActivityMemberships = await processWithConcurrency(
+    customActivityTags,
+    8,
+    async ({ tagId, customActivity }) => ({
+      customActivity,
+      assetIds: await searchAdminAssetIdsByTag(tagId),
+    }),
+  );
+  for (const { customActivity, assetIds: taggedAssetIds } of customActivityMemberships) {
+    for (const assetId of taggedAssetIds) {
+      if (!assetIdSet.has(assetId)) continue;
+      const current = assignments.get(assetId) ?? {};
+      current.customActivity = customActivity;
+      current.activityId = undefined;
+      current.activityLabel = undefined;
+      assignments.set(assetId, current);
+    }
+  }
+
   const displayPlacementMemberships = await processWithConcurrency(
     Array.from(displayPlacementByTagId.entries()),
     8,
@@ -1198,9 +1229,15 @@ function mapEmbeddedAssetMetadata(
         assignment.displayPlacementName = displayPlacement.name;
       }
       const activity = activitiesByTag.get(key);
-      if (activity) {
+      if (activity && !assignment.customActivity) {
         assignment.activityId = activity.id;
         assignment.activityLabel = activity.label;
+      }
+      const customActivity = getCustomActivityTagValue(key);
+      if (customActivity) {
+        assignment.customActivity = customActivity;
+        assignment.activityId = undefined;
+        assignment.activityLabel = undefined;
       }
       if (/^icon:[a-z0-9_]+$/.test(key)) {
         assignment.iconName = key.slice("icon:".length);
@@ -1646,6 +1683,7 @@ router.post("/assets/:assetId/display-placement", async (req, res) => {
     if (placement) {
       await tagAsset(assetId, [displayPlacementTag(placement.placement_id)]);
     }
+    invalidateAdminBrowseIndexes();
     invalidateSiteActivityStats();
 
     res.json({
@@ -1713,7 +1751,12 @@ router.post("/assets/:assetId/activity-tag", async (req, res) => {
     const activityId = rawActivityId != null && rawActivityId !== ""
       ? parseInt(String(rawActivityId), 10)
       : null;
-    const removing = rawActivityId === null || rawActivityId === "" || rawActivityId === 0;
+    const customActivity = typeof req.body?.custom_activity === "string"
+      ? req.body.custom_activity.trim().replace(/\s+/g, " ")
+      : "";
+    const removing =
+      (rawActivityId == null || rawActivityId === "" || rawActivityId === 0) &&
+      !customActivity;
 
     const assetId = req.params.assetId.trim();
     if (!assetId) {
@@ -1723,13 +1766,31 @@ router.post("/assets/:assetId/activity-tag", async (req, res) => {
 
     await getAsset(assetId);
 
+    if (customActivity && activityId != null && Number.isFinite(activityId)) {
+      res.status(400).json({ error: "Choose either a standard activity or a custom activity." });
+      return;
+    }
+    if (customActivity.length > 120) {
+      res.status(400).json({ error: "Custom activity names must be 120 characters or fewer." });
+      return;
+    }
+
     // Remove all existing activity tags (both anchor-style and label-style)
     const config = await getUploadConfig();
     const allTags = await listTags();
+    const standardActivityTagNames =
+      !customActivity && !removing && activityId != null && Number.isFinite(activityId)
+        ? await getActivityTagNames(activityId)
+        : [];
+    if (!customActivity && !removing && activityId != null && Number.isFinite(activityId) && standardActivityTagNames.length === 0) {
+      res.status(400).json({ error: "Unrecognised activity." });
+      return;
+    }
     const activityLabelKeys = new Set(config.activities.map((a) => a.label.trim().toLowerCase()));
     const activityTagIds = allTags
       .filter((tag) =>
         isActivityAnchorTagName(tag.name) || isActivityAnchorTagName(tag.value) ||
+        isCustomActivityTagName(tag.name) || isCustomActivityTagName(tag.value) ||
         activityLabelKeys.has(tag.name.trim().toLowerCase()) || activityLabelKeys.has(tag.value.trim().toLowerCase())
       )
       .map((tag) => tag.id);
@@ -1737,17 +1798,20 @@ router.post("/assets/:assetId/activity-tag", async (req, res) => {
       await untagAssets([assetId], activityTagIds);
     }
 
-    if (!removing && activityId != null && Number.isFinite(activityId)) {
-      const tagNames = await getActivityTagNames(activityId);
-      if (!tagNames.length) {
-        res.status(400).json({ error: "Unrecognised activity." });
-        return;
-      }
-      await tagAsset(assetId, tagNames);
+    if (customActivity) {
+      await tagAsset(assetId, [customActivityTag(customActivity)]);
+    } else if (!removing && activityId != null && Number.isFinite(activityId)) {
+      await tagAsset(assetId, standardActivityTagNames);
     }
+    invalidateAdminBrowseIndexes();
     invalidateSiteActivityStats();
 
-    res.json({ ok: true, asset_id: assetId, activity_id: activityId });
+    res.json({
+      ok: true,
+      asset_id: assetId,
+      activity_id: customActivity ? null : activityId,
+      custom_activity: customActivity || null,
+    });
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });
   }
