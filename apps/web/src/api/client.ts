@@ -6,7 +6,7 @@ export interface AssetAdjustments {
 
 export interface Photo {
   id: string;
-  mediaKind: "image" | "video" | "audio";
+  mediaKind: "image" | "video" | "audio" | "anecdote";
   audioUrl?: string;
   videoUrl?: string;
   linkedAudioUrl?: string;
@@ -20,6 +20,8 @@ export interface Photo {
   isFavorite: boolean;
   iconName?: string;
   activityIds?: number[];
+  anecdoteHtml?: string;
+  attribution?: string;
   useGpsLocation?: boolean;
   adjustments?: AssetAdjustments;
   exifInfo?: {

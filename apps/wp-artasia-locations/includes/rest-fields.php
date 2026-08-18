@@ -22,7 +22,83 @@ add_action('rest_api_init', function () {
         'callback'            => 'artasia_get_activities',
         'permission_callback' => '__return_true',
     ]);
+
+    register_rest_route('artasia/v1', '/anecdotes', [
+        'methods'             => 'GET',
+        'callback'            => 'artasia_get_anecdotes',
+        'permission_callback' => '__return_true',
+        'args'                => [
+            'placement_id' => [
+                'type'              => 'integer',
+                'required'          => false,
+                'sanitize_callback' => 'absint',
+            ],
+        ],
+    ]);
 });
+
+function artasia_get_anecdotes(WP_REST_Request $request): WP_REST_Response
+{
+    $placement_filter = absint($request->get_param('placement_id'));
+    $anecdote_query = new WP_Query([
+        'post_type'      => 'artasia_anecdote',
+        'posts_per_page' => -1,
+        'post_status'    => 'publish',
+        'orderby'        => [
+            'date'  => 'ASC',
+            'title' => 'ASC',
+        ],
+        'no_found_rows'  => true,
+    ]);
+
+    $results = [];
+    foreach ($anecdote_query->posts as $anecdote) {
+        if (!artasia_anecdote_displays_in_atlas($anecdote->ID)) {
+            continue;
+        }
+
+        $placement_id = intval(get_post_meta($anecdote->ID, 'artasia_anecdote_placement_id', true));
+        if (
+            !$placement_id
+            || get_post_type($placement_id) !== 'artasia_placement'
+            || get_post_status($placement_id) !== 'publish'
+        ) {
+            continue;
+        }
+        if ($placement_filter && $placement_id !== $placement_filter) {
+            continue;
+        }
+
+        $person_id = intval(get_post_meta($anecdote->ID, 'artasia_anecdote_person_id', true));
+        $activity_id = intval(get_post_meta($anecdote->ID, 'artasia_anecdote_activity_id', true));
+        $person_name = $person_id
+            && get_post_type($person_id) === 'artasia_people'
+            && get_post_status($person_id) === 'publish'
+            ? get_the_title($person_id)
+            : '';
+
+        $results[] = [
+            'id'            => $anecdote->ID,
+            'title'         => $anecdote->post_title,
+            'content_html'  => wp_kses_post(apply_filters('the_content', $anecdote->post_content)),
+            'placement_id'  => $placement_id,
+            'activity_id'   => $activity_id
+                && get_post_type($activity_id) === 'artasia_activity'
+                && get_post_status($activity_id) === 'publish'
+                ? $activity_id
+                : null,
+            'person'        => $person_name !== ''
+                ? [
+                    'id'   => $person_id,
+                    'name' => $person_name,
+                ]
+                : null,
+            'created_at'    => mysql_to_rfc3339($anecdote->post_date_gmt ?: $anecdote->post_date),
+        ];
+    }
+
+    return rest_ensure_response($results);
+}
 
 function artasia_get_activities(): WP_REST_Response
 {

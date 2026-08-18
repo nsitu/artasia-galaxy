@@ -397,6 +397,7 @@ function artasia_anecdote_columns(array $columns): array
             $new['artasia_anecdote_person'] = 'Author';
             $new['artasia_anecdote_placement'] = 'Placement';
             $new['artasia_anecdote_activity'] = 'Activity';
+            $new['artasia_anecdote_atlas_display'] = 'Atlas Display';
         }
     }
 
@@ -406,6 +407,11 @@ add_filter('manage_artasia_anecdote_posts_columns', 'artasia_anecdote_columns');
 
 function artasia_anecdote_column(string $column, int $post_id): void
 {
+    if ($column === 'artasia_anecdote_atlas_display') {
+        echo artasia_anecdote_displays_in_atlas($post_id) ? 'Displayed' : 'Hidden';
+        return;
+    }
+
     $meta_keys = [
         'artasia_anecdote_person' => 'artasia_anecdote_person_id',
         'artasia_anecdote_placement' => 'artasia_anecdote_placement_id',

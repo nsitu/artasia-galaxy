@@ -14,6 +14,7 @@ import driveRoutes from "./routes/drive.js";
 import { checkImmichHealth, getImmichConfig } from "./infra/ImmichClient.js";
 import { readAuthSession } from "./services/auth.service.js";
 import { initializeImmichStructure, logReconcileDriftAtBoot } from "./services/startup.service.js";
+import { getArtasiaAnecdotes } from "./infra/WordPressClient.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -30,13 +31,22 @@ app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/uploads", uploadRoutes);
 app.get("/api/v1/placements/gallery-availability", async (_req, res) => {
   try {
-    const stats = await getSiteActivityStats();
+    const [stats, anecdotes] = await Promise.all([
+      getSiteActivityStats(),
+      getArtasiaAnecdotes().catch((err) => {
+        console.warn(`[placements] continuing availability check without anecdotes: ${(err as Error).message}`);
+        return [];
+      }),
+    ]);
     const placements = Object.fromEntries(
       Object.entries(stats.sites).map(([placementId, site]) => [
         placementId,
         site.totalPublished > 0,
       ]),
     );
+    for (const anecdote of anecdotes) {
+      placements[String(anecdote.placement_id)] = true;
+    }
 
     res.set("Cache-Control", "public, max-age=30, stale-while-revalidate=300");
     res.json({ placements, generatedAt: stats.generatedAt });

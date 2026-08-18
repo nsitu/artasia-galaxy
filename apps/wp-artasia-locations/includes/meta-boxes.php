@@ -1572,6 +1572,7 @@ function artasia_anecdote_meta_box_html(WP_Post $post): void
     $placement_id = intval(get_post_meta($post->ID, 'artasia_anecdote_placement_id', true));
     $person_id = intval(get_post_meta($post->ID, 'artasia_anecdote_person_id', true));
     $activity_id = intval(get_post_meta($post->ID, 'artasia_anecdote_activity_id', true));
+    $display_in_atlas = artasia_anecdote_displays_in_atlas($post->ID);
 
     wp_nonce_field('artasia_anecdote_meta', 'artasia_anecdote_meta_nonce');
 ?>
@@ -1621,6 +1622,16 @@ function artasia_anecdote_meta_box_html(WP_Post $post): void
                     <?php endforeach; ?>
                 </select>
                 <p class="description">Optional activity context for the learning described.</p>
+            </td>
+        </tr>
+        <tr>
+            <th>Atlas Display</th>
+            <td>
+                <label>
+                    <input type="checkbox" name="artasia_anecdote_display_in_atlas" value="1" <?php checked($display_in_atlas); ?> />
+                    Display this anecdote in Atlas
+                </label>
+                <p class="description">Anecdotes are displayed in Atlas by default. Disable this option to hide this anecdote.</p>
             </td>
         </tr>
     </table>
@@ -1694,6 +1705,11 @@ function artasia_save_anecdote_meta(int $post_id): void
         $post_id,
         'artasia_anecdote_activity_id',
         artasia_validate_related_post_id($_POST['artasia_anecdote_activity_id'] ?? 0, 'artasia_activity')
+    );
+    update_post_meta(
+        $post_id,
+        'artasia_anecdote_display_in_atlas',
+        !empty($_POST['artasia_anecdote_display_in_atlas'])
     );
 }
 add_action('save_post_artasia_anecdote', 'artasia_save_anecdote_meta');

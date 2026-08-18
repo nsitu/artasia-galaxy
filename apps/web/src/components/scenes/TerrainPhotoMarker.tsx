@@ -623,7 +623,7 @@ interface OrbitBannerProps extends SharedPhotoProps {
   isDenseOrbit?: boolean;
 }
 
-interface OrbitAudioProps {
+interface OrbitIconProps {
   id: string;
   iconName?: string;
   center: [number, number, number];
@@ -745,7 +745,7 @@ function useMaterialSymbolTexture(iconName?: string) {
       })
       .catch((error) => {
         console.warn(
-          `[audio-icon] failed to render "${iconName}": ${(error as Error).message}`,
+          `[orbit-icon] failed to render "${iconName}": ${(error as Error).message}`,
         );
       });
     return () => {
@@ -1103,7 +1103,7 @@ export function OrbitingActivityRing({
   );
 }
 
-export function OrbitingAudioMarker({
+export function OrbitingIconMarker({
   id,
   iconName,
   center,
@@ -1115,7 +1115,7 @@ export function OrbitingAudioMarker({
   onClick,
   onPointerEnter,
   onPointerLeave,
-}: OrbitAudioProps) {
+}: OrbitIconProps) {
   const groupRef = useRef<THREE.Group>(null);
   const iconRef = useRef<THREE.Group>(null);
   const assignedIconTexture = useMaterialSymbolTexture(iconName);

@@ -19,7 +19,7 @@ import { useGalleryStore } from "../../stores/galleryStore";
 import {
   ORBIT_HEIGHT,
   OrbitingActivityRing,
-  OrbitingAudioMarker,
+  OrbitingIconMarker,
   OrbitingPhotoBanner,
 } from "./TerrainPhotoMarker";
 import PlacementSignpost, {
@@ -1934,8 +1934,9 @@ export default function TerrainGallery({
       {sceneReadyForMarkers &&
         showPhotoPins &&
         localPhotoLayout.map((item) =>
-          item.photo.mediaKind === "audio" && item.photo.audioUrl ? (
-            <OrbitingAudioMarker
+          item.photo.mediaKind === "anecdote" ||
+          (item.photo.mediaKind === "audio" && item.photo.audioUrl) ? (
+            <OrbitingIconMarker
               key={item.photo.id}
               id={item.photo.id}
               iconName={item.photo.iconName}

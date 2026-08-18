@@ -1157,6 +1157,7 @@ function artasia_import_inferred_anecdotes(array $rows, bool $dry_run): array
         update_post_meta($post_id, 'artasia_anecdote_person_id', $person_id);
         update_post_meta($post_id, 'artasia_anecdote_placement_id', $placement_id);
         update_post_meta($post_id, 'artasia_anecdote_activity_id', $activity_id);
+        update_post_meta($post_id, 'artasia_anecdote_display_in_atlas', true);
         update_post_meta($post_id, 'artasia_anecdote_import_fingerprint', $fingerprint);
         $rows[$index]['import_result'] = [
             'id' => $post_id,

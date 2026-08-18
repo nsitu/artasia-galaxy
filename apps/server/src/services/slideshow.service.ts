@@ -8,10 +8,11 @@ import {
 } from "./uploadConfig.service.js";
 import { isAudioAsset } from "./audioAsset.service.js";
 import { getGpsDisabledAssetIds } from "./assetGpsUsage.service.js";
+import { getArtasiaAnecdotes, type WpArtasiaAnecdote } from "../infra/WordPressClient.js";
 
 export interface Photo {
   id: string;
-  mediaKind: "image" | "video" | "audio";
+  mediaKind: "image" | "video" | "audio" | "anecdote";
   audioUrl?: string;
   videoUrl?: string;
   linkedAudioUrl?: string;
@@ -41,6 +42,8 @@ export interface Photo {
   adjustments: AssetAdjustments;
   iconName?: string;
   activityIds?: number[];
+  anecdoteHtml?: string;
+  attribution?: string;
 }
 
 export interface SlideshowQuery {
@@ -155,6 +158,27 @@ function assetToPhoto(
   };
 }
 
+function anecdoteToPhoto(anecdote: WpArtasiaAnecdote): Photo {
+  return {
+    id: `anecdote:${anecdote.id}`,
+    mediaKind: "anecdote",
+    thumbnailUrl: "",
+    previewUrl: "",
+    width: 1,
+    height: 1,
+    orientation: "square",
+    createdAt: anecdote.created_at,
+    fileName: anecdote.title || "Learning anecdote",
+    isFavorite: false,
+    useGpsLocation: false,
+    adjustments: { ...DEFAULT_ASSET_ADJUSTMENTS },
+    iconName: "format_quote",
+    ...(anecdote.activity_id ? { activityIds: [anecdote.activity_id] } : {}),
+    anecdoteHtml: anecdote.content_html,
+    ...(anecdote.person?.name ? { attribution: anecdote.person.name } : {}),
+  };
+}
+
 function assetMediaUrl(asset: ImmichAsset, kind: "thumbnail" | "preview") {
   const version = encodeURIComponent(asset.updatedAt || asset.fileModifiedAt || asset.checksum || asset.id);
   return `/api/v1/assets/${asset.id}/${kind}?v=${version}&edited=true`;
@@ -259,9 +283,16 @@ export async function querySlideshow(
   );
 
   const limit = Math.min(query.limit ?? 100, 500);
-  const [publishedAlbum, allTags] = await Promise.all([
+  const [publishedAlbum, allTags, anecdotes] = await Promise.all([
     getPublishedAlbum(),
     listTags(),
+    query.placementFocus
+      ? getArtasiaAnecdotes({ placementId: query.placementFocus.placementId })
+          .catch((err) => {
+            console.warn(`[slideshow] continuing without anecdotes: ${(err as Error).message}`);
+            return [];
+          })
+      : Promise.resolve([]),
   ]);
   const size = query.placementFocus ? 500 : limit;
   const audioTag = allTags.find((tag) => {
@@ -475,6 +506,15 @@ export async function querySlideshow(
       linkedAudioAssetIdByAssetId.get(asset.id),
     ),
   );
+
+  if (query.placementFocus) {
+    const focusedAnecdotes = query.placementFocus.activityId == null
+      ? anecdotes
+      : anecdotes.filter(
+          (anecdote) => anecdote.activity_id === query.placementFocus?.activityId,
+        );
+    photos.push(...focusedAnecdotes.map(anecdoteToPhoto));
+  }
 
   if (query.shuffle && query.seed != null) {
     photos = seededShuffle(photos, query.seed);

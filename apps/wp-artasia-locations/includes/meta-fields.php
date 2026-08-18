@@ -459,6 +459,13 @@ function artasia_register_meta_fields(): void
         'show_in_rest' => true,
         'sanitize_callback' => 'artasia_sanitize_integer_meta',
     ]);
+    register_post_meta('artasia_anecdote', 'artasia_anecdote_display_in_atlas', [
+        'type'         => 'boolean',
+        'single'       => true,
+        'default'      => true,
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_boolean_meta',
+    ]);
     register_post_meta('artasia_anecdote', 'artasia_anecdote_import_fingerprint', [
         'type'         => 'string',
         'single'       => true,
@@ -481,6 +488,15 @@ function artasia_sanitize_float_meta($value, string $meta_key = '', string $obje
 function artasia_sanitize_boolean_meta($value, string $meta_key = '', string $object_type = '', string $object_subtype = ''): bool
 {
     return filter_var($value, FILTER_VALIDATE_BOOLEAN);
+}
+
+function artasia_anecdote_displays_in_atlas(int $post_id): bool
+{
+    if (!metadata_exists('post', $post_id, 'artasia_anecdote_display_in_atlas')) {
+        return true;
+    }
+
+    return (bool) get_post_meta($post_id, 'artasia_anecdote_display_in_atlas', true);
 }
 
 function artasia_sanitize_integer_array_meta($value, string $meta_key = '', string $object_type = '', string $object_subtype = ''): array

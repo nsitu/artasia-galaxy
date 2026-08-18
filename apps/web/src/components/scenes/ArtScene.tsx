@@ -75,7 +75,7 @@ function LightboxMedia({
   pan?: { x: number; y: number };
   activityColour?: string;
   style: React.CSSProperties;
-  onClick: React.MouseEventHandler<HTMLImageElement | HTMLVideoElement>;
+  onClick: React.MouseEventHandler<HTMLElement>;
 }) {
   const [loading, setLoading] = useState(active);
   const mediaStyle: React.CSSProperties = {
@@ -86,6 +86,42 @@ function LightboxMedia({
     transformOrigin: "center",
     cursor: active && zoom > 1.01 ? "grab" : style.cursor,
   };
+
+  if (photo.mediaKind === "anecdote") {
+    return (
+      <article
+        className="atlas-photo-lightbox-media atlas-anecdote-lightbox"
+        aria-hidden={!active}
+        style={{
+          ...anecdoteLightboxStyle,
+          transform: mediaStyle.transform,
+          transformOrigin: mediaStyle.transformOrigin,
+        }}
+        onClick={onClick}
+        onWheel={(event) => event.stopPropagation()}
+      >
+        <span
+          aria-hidden="true"
+          style={{
+            ...anecdoteLightboxIconStyle,
+            color: activityColour ?? "#b7bac3",
+          }}
+        >
+          format_quote
+        </span>
+        <div
+          className="atlas-anecdote-lightbox-content"
+          style={anecdoteLightboxContentStyle}
+          dangerouslySetInnerHTML={{ __html: photo.anecdoteHtml ?? "" }}
+        />
+        {photo.attribution && (
+          <footer style={anecdoteLightboxAttributionStyle}>
+            — {photo.attribution}
+          </footer>
+        )}
+      </article>
+    );
+  }
 
   if (active && photo.mediaKind === "audio" && photo.audioUrl) {
     return (
@@ -923,7 +959,10 @@ export default function ArtScene() {
             }
             selectPhoto(null);
           }}
-          style={{ ...photoLightboxStyle, touchAction: "none" }}
+          style={{
+            ...photoLightboxStyle,
+            touchAction: selectedPhoto.mediaKind === "anecdote" ? "pan-y" : "none",
+          }}
         >
           {focusedPlacementDetails && (
             <div style={photoLightboxPlacementStyle}>
@@ -1029,7 +1068,10 @@ export default function ArtScene() {
                 ? "atlas-photo-lightbox-metadata-expanded"
                 : "atlas-photo-lightbox-metadata-collapsed"
             }`}
-            style={photoLightboxMetadataStyle}
+            style={{
+              ...photoLightboxMetadataStyle,
+              ...(selectedPhoto.mediaKind === "anecdote" ? { display: "none" } : {}),
+            }}
             onClick={(event) => event.stopPropagation()}
             onPointerDown={(event) => event.stopPropagation()}
             onPointerMove={(event) => event.stopPropagation()}
@@ -2174,6 +2216,46 @@ const photoLightboxImageStyle: React.CSSProperties = {
   boxShadow: "0 18px 60px rgba(0,0,0,0.5)",
   cursor: "default",
   userSelect: "none",
+};
+
+const anecdoteLightboxStyle: React.CSSProperties = {
+  width: "min(680px, calc(100vw - 64px))",
+  maxHeight: "calc(100% - 32px)",
+  boxSizing: "border-box",
+  overflowY: "auto",
+  padding: "clamp(28px, 6vw, 64px)",
+  border: "1px solid rgba(255,255,255,0.14)",
+  borderRadius: 24,
+  background: "rgba(20, 24, 32, 0.94)",
+  boxShadow: "0 18px 60px rgba(0,0,0,0.5)",
+  color: "#eef2f8",
+  cursor: "default",
+  touchAction: "pan-y",
+  scrollbarWidth: "thin",
+};
+
+const anecdoteLightboxIconStyle: React.CSSProperties = {
+  display: "block",
+  marginBottom: 20,
+  fontFamily: "'Material Symbols Outlined'",
+  fontSize: "clamp(72px, 14vw, 132px)",
+  fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 48",
+  lineHeight: 0.72,
+};
+
+const anecdoteLightboxContentStyle: React.CSSProperties = {
+  fontSize: "clamp(18px, 2.4vw, 26px)",
+  lineHeight: 1.55,
+  overflowWrap: "anywhere",
+};
+
+const anecdoteLightboxAttributionStyle: React.CSSProperties = {
+  marginTop: 28,
+  color: "#c7ccd6",
+  fontSize: "clamp(15px, 1.8vw, 19px)",
+  fontStyle: "italic",
+  lineHeight: 1.4,
+  textAlign: "right",
 };
 
 const photoLightboxTrackStyle: React.CSSProperties = {

@@ -73,6 +73,19 @@ export interface WpArtasiaPlacement {
   secondary_team_member: WpPerson | null;
 }
 
+export interface WpArtasiaAnecdote {
+  id: number;
+  title: string;
+  content_html: string;
+  placement_id: number;
+  activity_id: number | null;
+  person: {
+    id: number;
+    name: string;
+  } | null;
+  created_at: string;
+}
+
 const WORDPRESS_URL = process.env.WORDPRESS_URL ?? "https://artsforall.co";
 const CACHE_TTL_MS = 60_000;
 
@@ -84,6 +97,9 @@ let uploadTagLastKnownGood: WpActivityInfo[] | null = null;
 
 let uploaderCache: { data: WpPerson[]; timestamp: number } | null = null;
 let uploaderLastKnownGood: WpPerson[] | null = null;
+
+let anecdoteCache: { data: WpArtasiaAnecdote[]; timestamp: number } | null = null;
+let anecdoteLastKnownGood: WpArtasiaAnecdote[] | null = null;
 
 export function getWordPressConfig() {
   return { url: WORDPRESS_URL };
@@ -144,6 +160,35 @@ interface WpActivity {
   week?: number;
   description?: string;
   colour?: string;
+}
+
+export async function getArtasiaAnecdotes({
+  forceFresh = false,
+  placementId,
+}: { forceFresh?: boolean; placementId?: number } = {}): Promise<WpArtasiaAnecdote[]> {
+  let anecdotes: WpArtasiaAnecdote[];
+  if (!forceFresh && anecdoteCache && Date.now() - anecdoteCache.timestamp < CACHE_TTL_MS) {
+    anecdotes = anecdoteCache.data;
+  } else {
+    try {
+      const res = await wpRequest("/wp-json/artasia/v1/anecdotes");
+      anecdotes = (await res.json()) as WpArtasiaAnecdote[];
+      anecdoteCache = { data: anecdotes, timestamp: Date.now() };
+      anecdoteLastKnownGood = anecdotes;
+    } catch (err) {
+      console.warn(`[WordPress] failed to fetch anecdotes: ${(err as Error).message}`);
+      if (!forceFresh && anecdoteLastKnownGood) {
+        console.warn("[WordPress] serving last-known-good anecdotes");
+        anecdotes = anecdoteLastKnownGood;
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  return placementId == null
+    ? anecdotes
+    : anecdotes.filter((anecdote) => anecdote.placement_id === placementId);
 }
 
 export interface WpActivityInfo {
