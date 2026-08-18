@@ -889,8 +889,8 @@ export default function TerrainGallery({
     const terrainHeight = Math.max(1, maxY - minY);
     const width = THREE.MathUtils.clamp(terrainWidth * 0.38, 3.8, 4.8);
     const height = THREE.MathUtils.clamp(terrainHeight * 0.78, 5.2, 9.2);
-    const gap = Math.max(0.38, terrainWidth * 0.035);
-    const x = maxX + gap + width / 2;
+    const overlap = width * 0.42;
+    const x = maxX - overlap + width / 2;
     const y = (minY + maxY) / 2;
 
     return {
@@ -2030,6 +2030,7 @@ export default function TerrainGallery({
           position={documentationQuoteLayout.position}
           width={documentationQuoteLayout.width}
           height={documentationQuoteLayout.height}
+          attribution={focusedPlacement.documentation_attribution}
           accentColour={focusedPlacement.partner_brand_color_two}
         />
       )}

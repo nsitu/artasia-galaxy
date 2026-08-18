@@ -270,6 +270,7 @@ function artasia_get_expanded_placements(): WP_REST_Response
     }
 
     $documentation_lookup = [];
+    $documentation_attribution_lookup = [];
     $documentation_posts = get_posts([
         'post_type'      => 'artasia_document',
         'posts_per_page' => -1,
@@ -284,9 +285,20 @@ function artasia_get_expanded_placements(): WP_REST_Response
         $documentation_placement_ids = artasia_sanitize_integer_array_meta(
             get_post_meta($documentation->ID, 'artasia_documentation_placement_ids', true)
         );
+        $documentation_people_ids = artasia_sanitize_integer_array_meta(
+            get_post_meta($documentation->ID, 'artasia_documentation_people_ids', true)
+        );
+        $documentation_person = isset($documentation_people_ids[0])
+            ? get_post($documentation_people_ids[0])
+            : null;
+        $documentation_attribution = $documentation_person instanceof WP_Post
+            && $documentation_person->post_type === 'artasia_people'
+            ? $documentation_person->post_title
+            : '';
         foreach ($documentation_placement_ids as $documentation_placement_id) {
             if (!isset($documentation_lookup[$documentation_placement_id])) {
                 $documentation_lookup[$documentation_placement_id] = $documentation;
+                $documentation_attribution_lookup[$documentation_placement_id] = $documentation_attribution;
             }
         }
     }
@@ -316,6 +328,7 @@ function artasia_get_expanded_placements(): WP_REST_Response
             'placement_slug' => $placement->post_name,
             'documentation_url' => $documentation_url,
             'documentation_pull_quote' => $documentation_pull_quote,
+            'documentation_attribution' => $documentation_attribution_lookup[$placement->ID] ?? '',
             'project' => $project_lookup[$project_id] ?? null,
             'description' => get_post_meta($placement->ID, 'artasia_placement_description', true) ?: '',
             'program_context' => get_post_meta($placement->ID, 'artasia_program_context', true) ?: '',

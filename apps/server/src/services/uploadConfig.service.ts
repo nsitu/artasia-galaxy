@@ -26,6 +26,7 @@ export interface ArtasiaPlacement {
   placement_slug?: string;
   documentation_url?: string;
   documentation_pull_quote?: string;
+  documentation_attribution?: string;
   google_drive_folder_id?: string;
   team_member_id?: number;
   team_member_name?: string;
@@ -68,6 +69,7 @@ export interface ArtasiaMapPlacement {
   placement_slug?: string;
   documentation_url?: string;
   documentation_pull_quote?: string;
+  documentation_attribution?: string;
   is_earlyon: boolean;
   partner_name?: string;
   partner_acronym?: string;
@@ -180,6 +182,7 @@ function mapWpPlacement(wp: WpArtasiaPlacement): ArtasiaPlacement {
     ...(wp.placement_slug ? { placement_slug: wp.placement_slug } : {}),
     ...(wp.documentation_url ? { documentation_url: wp.documentation_url } : {}),
     ...(wp.documentation_pull_quote ? { documentation_pull_quote: wp.documentation_pull_quote } : {}),
+    ...(wp.documentation_attribution ? { documentation_attribution: wp.documentation_attribution } : {}),
     ...(wp.google_drive_folder_id ? { google_drive_folder_id: wp.google_drive_folder_id } : {}),
     ...(wp.team_member?.id ? { team_member_id: wp.team_member.id } : {}),
     ...(wp.team_member?.name ? { team_member_name: wp.team_member.name } : {}),
@@ -254,6 +257,7 @@ export async function getMapPlacements(): Promise<ArtasiaMapPlacement[]> {
       ...(wp.placement_slug ? { placement_slug: wp.placement_slug } : {}),
       ...(wp.documentation_url ? { documentation_url: wp.documentation_url } : {}),
       ...(wp.documentation_pull_quote ? { documentation_pull_quote: wp.documentation_pull_quote } : {}),
+      ...(wp.documentation_attribution ? { documentation_attribution: wp.documentation_attribution } : {}),
       ...(wp.partner?.name ? { partner_name: wp.partner.name } : {}),
       ...(wp.partner?.acronym ? { partner_acronym: wp.partner.acronym } : {}),
       ...(wp.partner?.logo ? { partner_logo: mapPartnerLogo(wp.partner.logo) } : {}),

@@ -79,6 +79,7 @@ export interface UploadPlacement {
   placement_slug?: string;
   documentation_url?: string;
   documentation_pull_quote?: string;
+  documentation_attribution?: string;
   google_drive_folder_id?: string;
   team_member_id?: number;
   team_member_name?: string;
@@ -127,6 +128,7 @@ export interface MapPlacement {
   placement_slug?: string;
   documentation_url?: string;
   documentation_pull_quote?: string;
+  documentation_attribution?: string;
   is_earlyon: boolean;
   partner_name?: string;
   partner_acronym?: string;
