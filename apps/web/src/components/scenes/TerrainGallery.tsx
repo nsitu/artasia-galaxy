@@ -591,6 +591,9 @@ export default function TerrainGallery({
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [terrain, setTerrain] = useState<THREE.Group | null>(null);
   const [projection, setProjection] = useState<ThreeGeoProjection | null>(null);
+  const [projectionRequestKey, setProjectionRequestKey] = useState<string | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [phase, setPhase] = useState<TerrainPhase>("idle");
@@ -617,6 +620,10 @@ export default function TerrainGallery({
   );
   const terrainCacheRef = useRef<Map<string, TerrainCacheEntry>>(new Map());
   const terrainRunsRef = useRef<Map<string, TerrainRun>>(new Map());
+  // Terrain loads can finish after the placement/view has changed. Keep the
+  // active request key separate from React state so late callbacks cannot
+  // publish a projection or terrain for an older view.
+  const activeTerrainRequestKeyRef = useRef<string | null>(null);
   const introStartSetRef = useRef(false);
   const previousPartnerFilterRef = useRef(selectedPartnerFilter);
   const partnerFitAnimationRef = useRef<number | null>(null);
@@ -746,6 +753,9 @@ export default function TerrainGallery({
       `dem${demZoomOffset}`,
     ].join(":");
   }, [focusedPlacement, request]);
+  const projectionMatchesRequest = Boolean(
+    request && requestKey && projectionRequestKey === requestKey,
+  );
   const terrainElevationScale = focusedPlacement
     ? LOCAL_TERRAIN_ELEVATION_SCALE
     : REGIONAL_TERRAIN_ELEVATION_SCALE;
@@ -760,7 +770,13 @@ export default function TerrainGallery({
   }, [terrain]);
   const terrainMaxZ = terrainBounds?.max.z ?? null;
   const orbitHeight = useMemo(() => {
-    if (!focusedPlacement || !projection || !terrain || terrainMaxZ == null) return ORBIT_HEIGHT;
+    if (
+      !focusedPlacement ||
+      !projection ||
+      !projectionMatchesRequest ||
+      !terrain ||
+      terrainMaxZ == null
+    ) return ORBIT_HEIGHT;
 
     const [placementX, placementY, placementZ = 0] = projection.proj([
       focusedPlacement.lat,
@@ -772,9 +788,9 @@ export default function TerrainGallery({
       ORBIT_HEIGHT,
       terrainMaxZ - placementTerrainZ + ORBIT_VISUAL_HALF_HEIGHT + ORBIT_TERRAIN_CLEARANCE,
     );
-  }, [focusedPlacement, projection, terrain, terrainMaxZ]);
+  }, [focusedPlacement, projection, projectionMatchesRequest, terrain, terrainMaxZ]);
   const focusedPlacementCenter = useMemo<[number, number, number] | null>(() => {
-    if (!focusedPlacement || !projection) return null;
+    if (!focusedPlacement || !projection || !projectionMatchesRequest) return null;
     const [placementX, placementY, placementZ = 0] = projection.proj([
       focusedPlacement.lat,
       focusedPlacement.lng,
@@ -786,7 +802,7 @@ export default function TerrainGallery({
         ? (sampleTerrainZ(terrain, placementX, placementY) ?? placementZ)
         : placementZ,
     ];
-  }, [focusedPlacement, projection, terrain]);
+  }, [focusedPlacement, projection, projectionMatchesRequest, terrain]);
   const localPhotoLayout = useMemo<LocalPhotoLayoutItem[]>(() => {
     if (!focusedPlacementCenter) return [];
     const orbitForPhoto = (photo: Photo) => {
@@ -1006,7 +1022,7 @@ export default function TerrainGallery({
   ]);
 
   const placementLayout = useMemo(() => {
-    if (!projection) return [];
+    if (!projection || !projectionMatchesRequest) return [];
     const projected = visiblePlacements.flatMap((placement) => {
       if (!Number.isFinite(placement.lat) || !Number.isFinite(placement.lng))
         return [];
@@ -1058,7 +1074,7 @@ export default function TerrainGallery({
         ] as [number, number, number],
       };
     });
-  }, [focusedPlacement, projection, terrain, visiblePlacements]);
+  }, [focusedPlacement, projection, projectionMatchesRequest, terrain, visiblePlacements]);
 
   const placementSigns = useMemo(() => {
     const signsByPlacementId = new Map<number, PlacementSign[]>();
@@ -1135,7 +1151,7 @@ export default function TerrainGallery({
       signsByPlacementId.set(current.placement.placement_id, signs);
     }
     return signsByPlacementId;
-  }, [focusedPlacement, placementLayout, placements, projection]);
+  }, [focusedPlacement, placementLayout, placements, projection, projectionMatchesRequest]);
 
   useEffect(() => {
     const filterChanged = previousPartnerFilterRef.current !== selectedPartnerFilter;
@@ -1355,9 +1371,11 @@ export default function TerrainGallery({
   }, []);
 
   useEffect(() => {
+    activeTerrainRequestKeyRef.current = requestKey;
     if (!request) {
       setTerrain(null);
       setProjection(null);
+      setProjectionRequestKey(null);
       setLoading(false);
       setError(null);
       setPhase("idle");
@@ -1372,6 +1390,7 @@ export default function TerrainGallery({
       console.info(`[terrain:cache-hit] ${requestKey}`);
       setTerrain(cached.terrain);
       setProjection(cached.projection);
+      setProjectionRequestKey(requestKey);
       setLoading(false);
       setError(null);
       setPhase(cached.phase);
@@ -1432,10 +1451,11 @@ export default function TerrainGallery({
     setRenderedTerrainKey(null);
     setTerrain(null);
     setProjection(null);
+    setProjectionRequestKey(null);
 
     loadThreeGeo()
       .then((ThreeGeo) => {
-        if (cancelled) return null;
+        if (cancelled || activeTerrainRequestKeyRef.current !== requestKey) return null;
         const tgeo = new ThreeGeo({
           tokenMapbox: MAPBOX_TOKEN,
           unitsSide: request.unitsSide,
@@ -1453,6 +1473,7 @@ export default function TerrainGallery({
           request.unitsSide,
         );
         setProjection(requestProjection);
+        setProjectionRequestKey(requestKey);
         logTerrainBenchmark("projected", bench, {
           unitsSide: request.unitsSide,
         });
@@ -1478,7 +1499,7 @@ export default function TerrainGallery({
           request.zoom,
           {
             onRgbDem: (meshes) => {
-              if (cancelled) return;
+              if (cancelled || activeTerrainRequestKeyRef.current !== requestKey) return;
               bench.rgbDemAt = performance.now();
               bench.totalTiles = meshes.length;
               logTerrainBenchmark("rgb-dem", bench, {
@@ -1494,7 +1515,7 @@ export default function TerrainGallery({
               setPhase("rendering");
             },
             onSatelliteMat: (mesh) => {
-              if (cancelled) return;
+              if (cancelled || activeTerrainRequestKeyRef.current !== requestKey) return;
               const now = performance.now();
               const isFirst = bench.firstSatMatAt === null;
               if (isFirst) bench.firstSatMatAt = now;
@@ -1531,11 +1552,11 @@ export default function TerrainGallery({
         );
       })
       .then((result) => {
-        if (!result) return;
+        if (!result || activeTerrainRequestKeyRef.current !== requestKey) return;
         const group =
           stagedGroup ??
           createTerrainGroup(result.rgbDem ?? [], terrainElevationScale);
-        if (cancelled) {
+        if (cancelled || activeTerrainRequestKeyRef.current !== requestKey) {
           disposeObject(group);
           return;
         }
@@ -1553,7 +1574,7 @@ export default function TerrainGallery({
           setRenderedTerrainKey(requestKey);
         }
         renderFrame = window.requestAnimationFrame(() => {
-          if (!cancelled) {
+          if (!cancelled && activeTerrainRequestKeyRef.current === requestKey) {
             setRenderedTerrainKey(requestKey);
             setPhase("ready");
             bench.readyAt = performance.now();
@@ -1578,7 +1599,7 @@ export default function TerrainGallery({
       })
       .catch((err) => {
         if ((err as Error).name === "AbortError") return;
-        if (!cancelled) {
+        if (!cancelled && activeTerrainRequestKeyRef.current === requestKey) {
           setTerrain(null);
           setRenderedTerrainKey(null);
           setError((err as Error).message);
@@ -1586,7 +1607,9 @@ export default function TerrainGallery({
         }
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled && activeTerrainRequestKeyRef.current === requestKey) {
+          setLoading(false);
+        }
       });
 
     return () => {
@@ -1610,7 +1633,8 @@ export default function TerrainGallery({
   const terrainMatchesRequest = Boolean(
     request && requestKey && renderedTerrainKey === requestKey,
   );
-  const sceneReadyForMarkers = terrainMatchesRequest || phase === "flat";
+  const sceneReadyForMarkers =
+    projectionMatchesRequest && (terrainMatchesRequest || phase === "flat");
   const showPhotoPins = Boolean(focusedPlacement);
 
   useEffect(() => {
