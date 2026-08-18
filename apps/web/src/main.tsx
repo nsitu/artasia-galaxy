@@ -11,6 +11,7 @@ const coreIconNames = [
   "reset_colors",
   "reset_shadow",
   "reset_exposure",
+  "page_info",
 
   "reset_settings",
   "edit",
