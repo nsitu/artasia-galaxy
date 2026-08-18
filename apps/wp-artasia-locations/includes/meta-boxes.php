@@ -137,7 +137,6 @@ function artasia_post_type_contexts(): array
                     artasia_context_post_type_link('artasia_placement', 'placement'),
                     artasia_context_post_type_link('artasia_activity', 'activity')
                 ),
-                'Learning anecdotes are internal records and do not have public archive or single-post pages.',
             ],
         ],
     ];
@@ -1355,9 +1354,39 @@ function artasia_documentation_meta_box_html(WP_Post $post): void
     $people_id = $people_ids[0] ?? 0;
     $placement_id = $placement_ids[0] ?? 0;
     $pull_quote = get_post_meta($post->ID, 'artasia_documentation_pull_quote', true);
+    $documentation_context = artasia_get_documentation_context($post);
+    $documentation_page_id = intval($documentation_context['index_page_id'] ?? 0);
+    $documentation_url = '';
+    if (
+        $post->post_status === 'publish'
+        && $post->post_name !== ''
+        && $documentation_page_id
+        && get_post_status($documentation_page_id) === 'publish'
+    ) {
+        $documentation_base_url = get_permalink($documentation_page_id);
+        if (is_string($documentation_base_url) && $documentation_base_url !== '') {
+            $documentation_url = add_query_arg(
+                'documentation',
+                $post->post_name,
+                $documentation_base_url
+            );
+        }
+    }
 
     wp_nonce_field('artasia_documentation_meta', 'artasia_documentation_meta_nonce');
 ?>
+    <?php if ($documentation_url) : ?>
+        <p>
+            <a
+                class="button button-secondary"
+                href="<?php echo esc_url($documentation_url); ?>"
+                target="_blank"
+                rel="noopener noreferrer"
+            >
+                View documentation
+            </a>
+        </p>
+    <?php endif; ?>
     <table class="form-table">
         <tr>
             <th><label for="artasia_documentation_people_ids">Person</label></th>

@@ -44,6 +44,8 @@ export interface Photo {
   activityIds?: number[];
   anecdoteHtml?: string;
   attribution?: string;
+  wordpressPostId?: number;
+  placementId?: number;
 }
 
 export interface SlideshowQuery {
@@ -173,6 +175,8 @@ function anecdoteToPhoto(anecdote: WpArtasiaAnecdote): Photo {
     useGpsLocation: false,
     adjustments: { ...DEFAULT_ASSET_ADJUSTMENTS },
     iconName: "format_quote",
+    wordpressPostId: anecdote.id,
+    placementId: anecdote.placement_id,
     ...(anecdote.activity_id ? { activityIds: [anecdote.activity_id] } : {}),
     anecdoteHtml: anecdote.content_html,
     ...(anecdote.person?.name ? { attribution: anecdote.person.name } : {}),

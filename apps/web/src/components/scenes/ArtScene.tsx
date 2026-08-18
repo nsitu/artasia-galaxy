@@ -81,6 +81,11 @@ function getPhotoActivityColour(
     ?.colour;
 }
 
+function getWordPressPostEditUrl(postId?: number): string | undefined {
+  if (postId == null || !Number.isFinite(postId)) return undefined;
+  return `https://artsforall.co/wp-admin/post.php?post=${encodeURIComponent(String(postId))}&action=edit`;
+}
+
 function LightboxMedia({
   photo,
   active,
@@ -88,6 +93,8 @@ function LightboxMedia({
   pan = { x: 0, y: 0 },
   activityColour,
   hasNavigation,
+  wordpressEditUrl,
+  documentationUrl,
   style,
   onClick,
 }: {
@@ -97,6 +104,8 @@ function LightboxMedia({
   pan?: { x: number; y: number };
   activityColour?: string;
   hasNavigation: boolean;
+  wordpressEditUrl?: string;
+  documentationUrl?: string;
   style: React.CSSProperties;
   onClick: React.MouseEventHandler<HTMLElement>;
 }) {
@@ -145,6 +154,35 @@ function LightboxMedia({
           <footer style={anecdoteLightboxAttributionStyle}>
             — {photo.attribution}
           </footer>
+        )}
+        {active && (wordpressEditUrl || documentationUrl) && (
+          <div
+            style={anecdoteLightboxActionsStyle}
+            onClick={(event) => event.stopPropagation()}
+          >
+            {documentationUrl && (
+              <a
+                href={documentationUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="atlas-control-surface"
+                style={anecdoteLightboxActionLinkStyle}
+              >
+                Documentation
+              </a>
+            )}
+            {wordpressEditUrl && (
+              <a
+                href={wordpressEditUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="atlas-control-surface"
+                style={anecdoteLightboxActionLinkStyle}
+              >
+                Edit anecdote
+              </a>
+            )}
+          </div>
         )}
       </article>
     );
@@ -381,6 +419,16 @@ export default function ArtScene() {
       ? photos[(selectedPhotoIndex + 1) % photos.length]
       : null;
   const selectedDescription = selectedPhoto?.exifInfo?.description?.trim();
+  const selectedAnecdoteEditUrl = selectedPhoto?.mediaKind === "anecdote" &&
+    authUser?.authenticated
+    ? getWordPressPostEditUrl(selectedPhoto.wordpressPostId)
+    : undefined;
+  const selectedAnecdoteDocumentationUrl = selectedPhoto?.mediaKind === "anecdote" &&
+    focusedPlacementDetails &&
+    (selectedPhoto.placementId == null ||
+      selectedPhoto.placementId === focusedPlacementDetails.placement_id)
+    ? focusedPlacementDetails.documentation_url?.trim() || undefined
+    : undefined;
   const selectedPhotoActivities = selectedPhoto?.activityIds
     ?.map((activityId) =>
       activityFilterOptions.find((activity) => activity.id === activityId),
@@ -1048,6 +1096,8 @@ export default function ArtScene() {
                   pan={lightboxPan}
                   activityColour={selectedPhotoActivityColour}
                   hasNavigation={photos.length > 1}
+                  wordpressEditUrl={selectedAnecdoteEditUrl}
+                  documentationUrl={selectedAnecdoteDocumentationUrl}
                   style={{
                     ...photoLightboxImageStyle,
                     ...photoAdjustmentFilterStyle(selectedPhoto.adjustments),
@@ -2306,6 +2356,30 @@ const anecdoteLightboxAttributionStyle: React.CSSProperties = {
   fontStyle: "italic",
   lineHeight: 1.4,
   textAlign: "right",
+};
+
+const anecdoteLightboxActionsStyle: React.CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 8,
+  marginTop: 32,
+};
+
+const anecdoteLightboxActionLinkStyle: React.CSSProperties = {
+  ...atlasControlSurfaceStyle,
+  minHeight: 44,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "0 16px",
+  border: "1px solid rgba(255,255,255,0.28)",
+  borderRadius: 0,
+  color: "#eef2f8",
+  fontSize: 12,
+  fontWeight: 700,
+  lineHeight: 1,
+  textDecoration: "none",
+  whiteSpace: "nowrap",
 };
 
 const photoLightboxTrackStyle: React.CSSProperties = {

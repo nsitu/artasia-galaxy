@@ -22,6 +22,8 @@ export interface Photo {
   activityIds?: number[];
   anecdoteHtml?: string;
   attribution?: string;
+  wordpressPostId?: number;
+  placementId?: number;
   useGpsLocation?: boolean;
   adjustments?: AssetAdjustments;
   exifInfo?: {
