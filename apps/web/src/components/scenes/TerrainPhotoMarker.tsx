@@ -432,6 +432,7 @@ class OrbitingActivityRingMaterial extends THREE.ShaderMaterial {
         ringOpacity: { value: 0.72 },
         innerRadius: { value: 1 },
         outerRadius: { value: 1.02 },
+        gapMask: { value: null },
         noiseCells: { value: 12 },
         noiseAmplitude: { value: 0.035 },
         noiseTimeScale: { value: 0.5 },
@@ -445,6 +446,8 @@ class OrbitingActivityRingMaterial extends THREE.ShaderMaterial {
         uniform float noiseTimeScale;
         uniform float time;
         varying float vNoise;
+        varying float vRadius;
+        varying float vAngleUv;
 
         float hash(vec2 point) {
           return fract(sin(dot(point, vec2(127.1, 311.7))) * 43758.5453);
@@ -498,16 +501,37 @@ class OrbitingActivityRingMaterial extends THREE.ShaderMaterial {
           float edgeDirection = radius < (innerRadius + outerRadius) * 0.5 ? -1.0 : 1.0;
           displaced.xy += normalize(position.xy) * noise * noiseAmplitude * edgeDirection;
           vNoise = noise;
+          vRadius = length(displaced.xy);
+          vAngleUv = (angle + 3.14159265) / 6.2831853;
           gl_Position = projectionMatrix * modelViewMatrix * vec4(displaced, 1.0);
         }
       `,
       fragmentShader: `
         uniform vec3 ringColour;
         uniform float ringOpacity;
+        uniform float innerRadius;
+        uniform float outerRadius;
+        uniform sampler2D gapMask;
         varying float vNoise;
+        varying float vRadius;
+        varying float vAngleUv;
 
         void main() {
-          gl_FragColor = vec4(ringColour, ringOpacity);
+          float thicknessRatio = texture2D(gapMask, vec2(fract(vAngleUv), 0.5)).r;
+          if (thicknessRatio < 0.02) discard;
+
+          float midRadius = (innerRadius + outerRadius) * 0.5;
+          float baseHalfWidth = (outerRadius - innerRadius) * 0.5;
+          float allowedHalfWidth = baseHalfWidth * thicknessRatio;
+          float radialDistance = abs(vRadius - midRadius);
+          float edgeAlpha = 1.0 - smoothstep(
+            max(0.0, allowedHalfWidth - 0.004),
+            allowedHalfWidth + 0.004,
+            radialDistance
+          );
+          if (edgeAlpha < 0.02) discard;
+
+          gl_FragColor = vec4(ringColour, ringOpacity * edgeAlpha);
           #include <colorspace_fragment>
         }
       `,
@@ -524,6 +548,8 @@ class OrbitingActivityRingMaterial extends THREE.ShaderMaterial {
   set innerRadius(value: number) { this.uniforms.innerRadius.value = value; }
   get outerRadius() { return this.uniforms.outerRadius.value as number; }
   set outerRadius(value: number) { this.uniforms.outerRadius.value = value; }
+  get gapMask() { return this.uniforms.gapMask.value as THREE.Texture | null; }
+  set gapMask(value: THREE.Texture | null) { this.uniforms.gapMask.value = value; }
   get noiseCells() { return this.uniforms.noiseCells.value as number; }
   set noiseCells(value: number) { this.uniforms.noiseCells.value = value; }
   get noiseAmplitude() { return this.uniforms.noiseAmplitude.value as number; }
@@ -584,6 +610,7 @@ declare module "@react-three/fiber" {
       ringOpacity?: number;
       innerRadius?: number;
       outerRadius?: number;
+      gapMask?: THREE.Texture | null;
       noiseCells?: number;
       noiseAmplitude?: number;
       noiseTimeScale?: number;
@@ -669,6 +696,8 @@ const ORBIT_RING_HALF_WIDTH = 0.1;
 const ORBIT_RING_NOISE_CELLS = 18;
 const ORBIT_RING_NOISE_AMPLITUDE = 0.09;
 const ORBIT_RING_NOISE_TIME_SCALE = 0.5;
+const ORBIT_GAP_MASK_RESOLUTION = 1024;
+const ORBIT_GAP_PADDING = 0.055;
 const CUTOUT_BORDER_COLORS = [
   "#8e1d58",
   "#eee111",
@@ -686,6 +715,61 @@ const AUDIO_ICON_RING_INNER_RADIUS = 0.32;
 const AUDIO_ICON_RING_OUTER_RADIUS = 0.41;
 const AUDIO_ICON_SIZE = 0.82;
 const AUDIO_ICON_BACKGROUND_OPACITY = 0.46;
+
+export interface OrbitGapMotion {
+  phase: number;
+  speed: number;
+  coreHalfAngle: number;
+  outerHalfAngle: number;
+}
+
+export function getOrbitMotion(id: string, radius?: number) {
+  return {
+    radius: radius ?? stableRange(`${id}:radius`, ORBIT_MIN_UNITS, ORBIT_MAX_UNITS),
+    phase: stableRange(`${id}:phase`, 0, Math.PI * 2),
+    speed: stableRange(`${id}:speed`, ORBIT_SPEED_MIN, ORBIT_SPEED_MAX),
+  };
+}
+
+export function createOrbitGapMotion({
+  id,
+  radius,
+  mediaKind,
+  width,
+  height,
+  isDenseOrbit,
+}: {
+  id: string;
+  radius: number;
+  mediaKind: "image" | "video" | "audio" | "anecdote";
+  width: number;
+  height: number;
+  isDenseOrbit: boolean;
+}): OrbitGapMotion {
+  let visualHalfWidth: number;
+  if (mediaKind === "audio" || mediaKind === "anecdote") {
+    visualHalfWidth = AUDIO_ICON_RING_OUTER_RADIUS * 1.22;
+  } else if (isDenseOrbit) {
+    visualHalfWidth = CIRCLE_FRAME_SIZE * 0.5 * 1.14;
+  } else {
+    const aspect = width > 0 && height > 0 ? width / height : 1;
+    const markerWidth = aspect >= 1
+      ? BANNER_MAX_WIDTH
+      : BANNER_MAX_HEIGHT * aspect;
+    visualHalfWidth = markerWidth * 0.5 * 1.14;
+  }
+
+  const motion = getOrbitMotion(id, radius);
+  const toHalfAngle = (halfWidth: number) => Math.asin(
+    THREE.MathUtils.clamp(halfWidth / Math.max(radius, 0.001), 0, 0.94),
+  );
+  return {
+    phase: motion.phase,
+    speed: motion.speed,
+    coreHalfAngle: toHalfAngle(visualHalfWidth),
+    outerHalfAngle: toHalfAngle(visualHalfWidth + ORBIT_GAP_PADDING),
+  };
+}
 
 const tempVector = new THREE.Vector3();
 const materialSymbolTexturePromises = new Map<
@@ -900,11 +984,10 @@ export function OrbitingPhotoBanner({
   const pointerInsideRef = useRef(false);
   const pointerDragRef = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   const texture = usePhotoTexture(url);
-  const orbit = useMemo(() => ({
-    radius: orbitRadius ?? stableRange(`${id}:radius`, ORBIT_MIN_UNITS, ORBIT_MAX_UNITS),
-    phase: stableRange(`${id}:phase`, 0, Math.PI * 2),
-    speed: stableRange(`${id}:speed`, ORBIT_SPEED_MIN, ORBIT_SPEED_MAX),
-  }), [id, orbitRadius]);
+  const orbit = useMemo(
+    () => getOrbitMotion(id, orbitRadius),
+    [id, orbitRadius],
+  );
   const cutout = useMemo(() => createCutoutCorners(id), [id]);
   const wakeCycle = useMemo(() => ({
     phase: stableRange(`${id}:wake:phase`, 0, 10),
@@ -1059,22 +1142,86 @@ export function OrbitingActivityRing({
   radius,
   colour,
   orbitHeight,
+  gaps,
 }: {
   center: [number, number, number];
   radius: number;
   colour: string;
   orbitHeight?: number;
+  gaps: OrbitGapMotion[];
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const materialRef = useRef<OrbitingActivityRingMaterial>(null);
+  const gapMask = useMemo(() => {
+    const data = new Uint8Array(ORBIT_GAP_MASK_RESOLUTION * 4);
+    data.fill(255);
+    const texture = new THREE.DataTexture(
+      data,
+      ORBIT_GAP_MASK_RESOLUTION,
+      1,
+      THREE.RGBAFormat,
+      THREE.UnsignedByteType,
+    );
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+    texture.generateMipmaps = false;
+    texture.needsUpdate = true;
+    return { data, texture };
+  }, []);
   const [cx, cy, cz] = center;
   const orbitZ = orbitHeight ?? ORBIT_HEIGHT;
   const innerRadius = radius - ORBIT_RING_HALF_WIDTH;
   const outerRadius = radius + ORBIT_RING_HALF_WIDTH;
 
+  useEffect(() => () => gapMask.texture.dispose(), [gapMask]);
+
   useFrame((state) => {
-    if (groupRef.current) groupRef.current.rotation.z = state.clock.elapsedTime * ORBIT_SPEED;
-    if (materialRef.current) materialRef.current.time = state.clock.elapsedTime;
+    const elapsedTime = state.clock.elapsedTime;
+    if (groupRef.current) groupRef.current.rotation.z = elapsedTime * ORBIT_SPEED;
+    if (materialRef.current) materialRef.current.time = elapsedTime;
+
+    gapMask.data.fill(255);
+    for (const gap of gaps) {
+      const localAngle = gap.phase + elapsedTime * (gap.speed - ORBIT_SPEED);
+      const centerUv = THREE.MathUtils.euclideanModulo(
+        localAngle + Math.PI,
+        Math.PI * 2,
+      ) / (Math.PI * 2);
+      const outerUv = gap.outerHalfAngle / (Math.PI * 2);
+      const firstSample = Math.floor(
+        (centerUv - outerUv) * ORBIT_GAP_MASK_RESOLUTION,
+      );
+      const lastSample = Math.ceil(
+        (centerUv + outerUv) * ORBIT_GAP_MASK_RESOLUTION,
+      );
+
+      for (let sample = firstSample; sample <= lastSample; sample++) {
+        const wrappedSample = THREE.MathUtils.euclideanModulo(
+          sample,
+          ORBIT_GAP_MASK_RESOLUTION,
+        );
+        const sampleUv = (wrappedSample + 0.5) / ORBIT_GAP_MASK_RESOLUTION;
+        const directDistance = Math.abs(sampleUv - centerUv);
+        const angularDistance = Math.min(
+          directDistance,
+          1 - directDistance,
+        ) * Math.PI * 2;
+        const thicknessRatio = THREE.MathUtils.smoothstep(
+          angularDistance,
+          gap.coreHalfAngle,
+          gap.outerHalfAngle,
+        );
+        const offset = wrappedSample * 4;
+        const encodedRatio = Math.round(thicknessRatio * 255);
+        const nextRatio = Math.min(gapMask.data[offset], encodedRatio);
+        gapMask.data[offset] = nextRatio;
+        gapMask.data[offset + 1] = nextRatio;
+        gapMask.data[offset + 2] = nextRatio;
+      }
+    }
+    gapMask.texture.needsUpdate = true;
   });
 
   return (
@@ -1090,6 +1237,7 @@ export function OrbitingActivityRing({
           ringOpacity={0.72}
           innerRadius={innerRadius}
           outerRadius={outerRadius}
+          gapMask={gapMask.texture}
           noiseCells={ORBIT_RING_NOISE_CELLS}
           noiseAmplitude={ORBIT_RING_NOISE_AMPLITUDE}
           noiseTimeScale={ORBIT_RING_NOISE_TIME_SCALE}
@@ -1119,11 +1267,10 @@ export function OrbitingIconMarker({
   const groupRef = useRef<THREE.Group>(null);
   const iconRef = useRef<THREE.Group>(null);
   const assignedIconTexture = useMaterialSymbolTexture(iconName);
-  const orbit = useMemo(() => ({
-    radius: orbitRadius ?? stableRange(`${id}:radius`, ORBIT_MIN_UNITS, ORBIT_MAX_UNITS),
-    phase: stableRange(`${id}:phase`, 0, Math.PI * 2),
-    speed: stableRange(`${id}:speed`, ORBIT_SPEED_MIN, ORBIT_SPEED_MAX),
-  }), [id, orbitRadius]);
+  const orbit = useMemo(
+    () => getOrbitMotion(id, orbitRadius),
+    [id, orbitRadius],
+  );
   const pulse = useMemo(() => ({
     phase: stableRange(`${id}:pulse:phase`, 0, Math.PI * 2),
     speed: stableRange(`${id}:pulse:speed`, 0.52, 0.78),

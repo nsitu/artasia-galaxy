@@ -21,6 +21,8 @@ import {
   OrbitingActivityRing,
   OrbitingIconMarker,
   OrbitingPhotoBanner,
+  createOrbitGapMotion,
+  type OrbitGapMotion,
 } from "./TerrainPhotoMarker";
 import PlacementSignpost, {
   getPlacementSignStackHeight,
@@ -841,12 +843,27 @@ export default function TerrainGallery({
       radius: number;
       colour: string;
       center: [number, number, number];
+      gaps: OrbitGapMotion[];
     }>();
     for (const item of localPhotoLayout) {
+      const gap = createOrbitGapMotion({
+        id: item.photo.id,
+        radius: item.orbitRadius,
+        mediaKind: item.photo.mediaKind,
+        width: item.photo.width,
+        height: item.photo.height,
+        isDenseOrbit: item.orbitAssetCount >= 5,
+      });
+      const existingRing = rings.get(item.activityId);
+      if (existingRing) {
+        existingRing.gaps.push(gap);
+        continue;
+      }
       rings.set(item.activityId, {
         radius: item.orbitRadius,
         colour: item.orbitColour ?? "#ffffff",
         center: item.center,
+        gaps: [gap],
       });
     }
     return [...rings.values()];
@@ -1928,6 +1945,7 @@ export default function TerrainGallery({
             radius={ring.radius}
             colour={ring.colour}
             orbitHeight={orbitHeight}
+            gaps={ring.gaps}
           />
         ))}
 
