@@ -52,20 +52,26 @@
 .artasia-documentation__navigation a {
   display: block;
   padding-left: 0.9rem;
-  border-left: 3px solid #8e1d58;
-  color: #8e1d58;
+  border-left: 3px solid #8e1d58 !important;
+  color: #8e1d58 !important;
   text-decoration: none;
+}
+
+.artasia-documentation__navigation a:visited,
+.artasia-documentation__navigation a .artasia-documentation__navigation-document-title,
+.artasia-documentation__navigation a .artasia-documentation__navigation-placement {
+  color: inherit !important;
 }
 
 .artasia-documentation__navigation a:hover,
 .artasia-documentation__navigation a:focus-visible {
-  border-left-color: #ec008c;
-  color: #ec008c;
+  border-left-color: #ec008c !important;
+  color: #ec008c !important;
 }
 
 .artasia-documentation__navigation a[aria-current="page"] {
-  border-left-color: #ec008c;
-  color: #ec008c;
+  border-left-color: #ec008c !important;
+  color: #ec008c !important;
 }
 
 .artasia-documentation__navigation-document-title {
@@ -88,8 +94,17 @@
 .artasia-documentation__back {
   display: inline-block;
   margin-bottom: 2rem;
-  color: inherit;
+  color: #8e1d58 !important;
   font-weight: 900;
+}
+
+.artasia-documentation__back:visited {
+  color: #8e1d58 !important;
+}
+
+.artasia-documentation__back:hover,
+.artasia-documentation__back:focus-visible {
+  color: #ec008c !important;
 }
 
 .artasia-documentation__content {
@@ -179,7 +194,7 @@
   border: 2px solid #8e1d58;
   border-radius: 3px;
   background: #8e1d58;
-  color: #fff;
+  color: #fff !important;
   font-weight: 700;
   line-height: 1.2;
   text-decoration: none;
@@ -189,7 +204,11 @@
 .artasia-documentation__action:focus-visible {
   border-color: #ec008c;
   background: #ec008c;
-  color: #fff;
+  color: #fff !important;
+}
+
+.artasia-documentation__action:visited {
+  color: #fff !important;
 }
 
 .artasia-documentation__title {

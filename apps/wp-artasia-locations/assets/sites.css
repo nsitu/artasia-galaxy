@@ -78,7 +78,7 @@
     border: 2px solid #8e1d58;
     border-radius: 3px;
     background: #8e1d58;
-    color: #fff;
+    color: #fff !important;
     font-weight: 700;
     line-height: 1.2;
     text-decoration: none;
@@ -88,7 +88,11 @@
 .artasia-sites__action:focus-visible {
     border-color: #ec008c;
     background: #ec008c;
-    color: #fff;
+    color: #fff !important;
+}
+
+.artasia-sites__action:visited {
+    color: #fff !important;
 }
 
 .artasia-sites__place-name {
