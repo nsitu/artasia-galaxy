@@ -2056,6 +2056,21 @@ const responsiveTopNavStyles = `
     background-image: linear-gradient(45deg, rgba(142, 29, 88, 0.3) 0%, rgba(242, 139, 32, 0.3) 100%) !important;
   }
 
+  .atlas-partner-filter-trigger > span,
+  .atlas-educator-filter-trigger > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .atlas-partner-filter-menu [role="option"],
+  .atlas-educator-filter-menu [role="option"] {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.35;
+  }
+
   .atlas-top-nav::before {
     content: "";
     position: absolute;
@@ -2238,9 +2253,7 @@ const responsiveTopNavStyles = `
     }
 
     .atlas-partner-filter-trigger > span,
-    .atlas-educator-filter-trigger > span,
-    .atlas-partner-filter-menu [role="option"],
-    .atlas-educator-filter-menu [role="option"] {
+    .atlas-educator-filter-trigger > span {
       white-space: nowrap;
     }
   }
