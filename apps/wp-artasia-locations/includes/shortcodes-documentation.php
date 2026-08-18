@@ -226,14 +226,37 @@ function artasia_render_documentation_article(WP_Post $document, string $partner
     return trim((string) ob_get_clean());
 }
 
-function artasia_render_documentation_directory(array $groups, string $base_url, int $selected_id = 0, bool $compact = false): string
+function artasia_render_documentation_directory(
+    array $groups,
+    string $base_url,
+    int $selected_id = 0,
+    bool $compact = false,
+    ?int $selected_partner_id = null
+): string
 {
+    if ($compact && $selected_partner_id !== null) {
+        $selected_groups = [];
+        $remaining_groups = [];
+        foreach ($groups as $group) {
+            if (intval($group['partner_id']) === $selected_partner_id) {
+                $selected_groups[] = $group;
+            } else {
+                $remaining_groups[] = $group;
+            }
+        }
+        $groups = array_merge($selected_groups, $remaining_groups);
+    }
+
     ob_start();
 ?>
     <nav class="artasia-documentation__navigation<?php echo $compact ? ' artasia-documentation__navigation--compact' : ''; ?>" aria-label="<?php echo esc_attr($compact ? 'All documentation' : 'Documentation'); ?>">
         <?php foreach ($groups as $group) : ?>
             <?php if ($compact) : ?>
-                <details class="artasia-documentation__navigation-group" data-partner-id="<?php echo esc_attr($group['partner_id']); ?>">
+                <details
+                    class="artasia-documentation__navigation-group"
+                    data-partner-id="<?php echo esc_attr($group['partner_id']); ?>"
+                    <?php echo $selected_partner_id !== null && intval($group['partner_id']) === $selected_partner_id ? 'open' : ''; ?>
+                >
                     <summary><?php echo esc_html($group['partner_name']); ?></summary>
             <?php else : ?>
                 <section class="artasia-documentation__navigation-group" data-partner-id="<?php echo esc_attr($group['partner_id']); ?>">
@@ -291,7 +314,6 @@ function artasia_render_documentation_viewer(int $project_id): string
     $selected = null;
     $selected_partner = '';
     $selected_partner_id = 0;
-    $selected_partner_document_count = 0;
 
     foreach ($groups as $group) {
         foreach ($group['documents'] as $entry) {
@@ -299,7 +321,6 @@ function artasia_render_documentation_viewer(int $project_id): string
                 $selected = $entry['document'];
                 $selected_partner = $group['partner_name'];
                 $selected_partner_id = intval($group['partner_id']);
-                $selected_partner_document_count = count($group['documents']);
                 break 2;
             }
         }
@@ -314,10 +335,6 @@ function artasia_render_documentation_viewer(int $project_id): string
     wp_enqueue_style('artasia-documentation-gallery');
     wp_enqueue_script('artasia-documentation-gallery');
     wp_enqueue_script('artasia-documentation-shortcode');
-
-    static $viewer_instance = 0;
-    $viewer_instance++;
-    $related_title_id = sprintf('artasia-documentation-related-title-%d-%d', $project_id, $viewer_instance);
 
     ob_start();
 ?>
@@ -337,31 +354,14 @@ function artasia_render_documentation_viewer(int $project_id): string
                     <?php echo artasia_render_documentation_article($selected, $selected_partner, artasia_get_documentation_context($selected)); ?>
                 <?php endif; ?>
             </div>
-            <aside class="artasia-documentation__related" aria-labelledby="<?php echo esc_attr($related_title_id); ?>" <?php echo $selected_partner_document_count > 1 ? '' : 'hidden'; ?>>
-                <h2 id="<?php echo esc_attr($related_title_id); ?>">More from this partner</h2>
-                <ul>
-                    <?php if ($selected) : ?>
-                        <?php foreach ($groups as $group) : ?>
-                            <?php if (intval($group['partner_id']) !== $selected_partner_id) continue; ?>
-                            <?php foreach ($group['documents'] as $entry) : ?>
-                                <?php $related_document = $entry['document']; ?>
-                                <?php if ($related_document->ID === $selected->ID) continue; ?>
-                                <li>
-                                    <a
-                                        href="<?php echo esc_url(add_query_arg('documentation', $related_document->post_name, $base_url)); ?>"
-                                        data-documentation-slug="<?php echo esc_attr($related_document->post_name); ?>"
-                                        data-documentation-id="<?php echo esc_attr($related_document->ID); ?>"
-                                        data-partner-id="<?php echo esc_attr($group['partner_id']); ?>"
-                                    ><?php echo esc_html($related_document->post_title); ?></a>
-                                </li>
-                            <?php endforeach; ?>
-                            <?php break; ?>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </ul>
-            </aside>
             <div class="artasia-documentation__all">
-                <?php echo artasia_render_documentation_directory($groups, $base_url, $selected ? $selected->ID : 0, true); ?>
+                <?php echo artasia_render_documentation_directory(
+                    $groups,
+                    $base_url,
+                    $selected ? $selected->ID : 0,
+                    true,
+                    $selected ? $selected_partner_id : null
+                ); ?>
             </div>
         </div>
     </section>

@@ -11,8 +11,7 @@
     var detail = viewer.querySelector('.artasia-documentation__viewer');
     var content = viewer.querySelector('.artasia-documentation__content');
     var status = viewer.querySelector('.artasia-documentation__status');
-    var related = viewer.querySelector('.artasia-documentation__related');
-    var relatedList = related ? related.querySelector('ul') : null;
+    var compactNavigation = viewer.querySelector('.artasia-documentation__navigation--compact');
     var back = viewer.querySelector('[data-documentation-back]');
     var requestController = null;
 
@@ -44,37 +43,34 @@
       });
     }
 
-    function updateRelated(slug) {
-      if (!related || !relatedList) {
+    function updateCompactNavigation(slug) {
+      if (!compactNavigation) {
         return;
       }
 
       var current = directoryLinks().find(function (link) {
         return link.dataset.documentationSlug === slug;
       });
-      relatedList.innerHTML = '';
+      var groups = Array.prototype.slice.call(
+        compactNavigation.querySelectorAll('details[data-partner-id]')
+      );
+
+      groups.forEach(function (group) {
+        group.open = false;
+      });
 
       if (!current) {
-        related.hidden = true;
         return;
       }
 
-      directoryLinks().forEach(function (link) {
-        if (
-          link.dataset.partnerId !== current.dataset.partnerId
-          || link.dataset.documentationSlug === slug
-        ) {
-          return;
-        }
-
-        var item = document.createElement('li');
-        var suggestion = link.cloneNode(true);
-        suggestion.removeAttribute('aria-current');
-        item.appendChild(suggestion);
-        relatedList.appendChild(item);
+      var activeGroup = groups.find(function (group) {
+        return group.dataset.partnerId === current.dataset.partnerId;
       });
 
-      related.hidden = !relatedList.children.length;
+      if (activeGroup) {
+        compactNavigation.insertBefore(activeGroup, compactNavigation.firstElementChild);
+        activeGroup.open = true;
+      }
     }
 
     function showDirectory(url, pushHistory) {
@@ -132,13 +128,9 @@
         .then(function (result) {
           content.innerHTML = result.html;
           setCurrentLink(result.slug);
-          updateRelated(result.slug);
+          updateCompactNavigation(result.slug);
           directory.hidden = true;
           detail.hidden = false;
-
-          detail.querySelectorAll('.artasia-documentation__all details').forEach(function (group) {
-            group.open = false;
-          });
 
           if (window.artasiaInitDocumentationGalleries) {
             window.artasiaInitDocumentationGalleries(content);
@@ -210,9 +202,7 @@
     });
     if (initial) {
       scrollToPageTop();
-      updateRelated(initial.dataset.documentationSlug);
-    } else if (related) {
-      related.hidden = true;
+      updateCompactNavigation(initial.dataset.documentationSlug);
     }
   }
 
