@@ -13,6 +13,7 @@ import TerrainGallery, {
   type PartnerFilterOption,
   PlacementHoverLabel,
   PlacementPreviewPanel,
+  type PlacementNavigationActions,
   type TerrainNotice,
 } from "./TerrainGallery";
 import {
@@ -289,6 +290,7 @@ export default function ArtScene() {
   const [hoveredPlacementDetails, setHoveredPlacementDetails] = useState<MapPlacement | null>(null);
   const [previewPlacementDetails, setPreviewPlacementDetails] = useState<MapPlacement | null>(null);
   const [previewPlacementAction, setPreviewPlacementAction] = useState<(() => void) | null>(null);
+  const [placementNavigation, setPlacementNavigation] = useState<PlacementNavigationActions | null>(null);
   const [partnerFilterOptions, setPartnerFilterOptions] = useState<PartnerFilterOption[]>([]);
   const [selectedPartnerFilter, setSelectedPartnerFilter] = useState("");
   const [requestedPartnerSlug, setRequestedPartnerSlug] = useState(() =>
@@ -410,13 +412,31 @@ export default function ArtScene() {
   );
 
   const selectedPhoto = selectedPhotoIndex !== null ? photos[selectedPhotoIndex] : null;
+  const selectedActivityId = selectedActivityFilter
+    ? Number.parseInt(selectedActivityFilter, 10)
+    : undefined;
+  const lightboxPhotos = useMemo(() => {
+    if (
+      photoScope.mode !== "placement" ||
+      selectedActivityId == null ||
+      !Number.isFinite(selectedActivityId)
+    ) {
+      return photos;
+    }
+    return photos.filter((photo) => photo.activityIds?.includes(selectedActivityId));
+  }, [photoScope.mode, photos, selectedActivityId]);
+  const selectedLightboxIndex = selectedPhoto
+    ? lightboxPhotos.findIndex((photo) => photo.id === selectedPhoto.id)
+    : -1;
   const lightboxPreviousPhoto =
-    selectedPhotoIndex !== null && photos.length > 1
-      ? photos[(selectedPhotoIndex - 1 + photos.length) % photos.length]
+    selectedLightboxIndex >= 0 && lightboxPhotos.length > 1
+      ? lightboxPhotos[
+          (selectedLightboxIndex - 1 + lightboxPhotos.length) % lightboxPhotos.length
+        ]
       : null;
   const lightboxNextPhoto =
-    selectedPhotoIndex !== null && photos.length > 1
-      ? photos[(selectedPhotoIndex + 1) % photos.length]
+    selectedLightboxIndex >= 0 && lightboxPhotos.length > 1
+      ? lightboxPhotos[(selectedLightboxIndex + 1) % lightboxPhotos.length]
       : null;
   const selectedDescription = selectedPhoto?.exifInfo?.description?.trim();
   const selectedAnecdoteEditUrl = selectedPhoto?.mediaKind === "anecdote" &&
@@ -479,6 +499,33 @@ export default function ArtScene() {
     )?.colour;
 
   useEffect(() => {
+    if (
+      selectedPhotoIndex === null ||
+      !selectedPhoto ||
+      photoScope.mode !== "placement" ||
+      selectedActivityId == null ||
+      !Number.isFinite(selectedActivityId) ||
+      selectedLightboxIndex >= 0
+    ) {
+      return;
+    }
+    const firstMatchingPhoto = lightboxPhotos[0];
+    const firstMatchingIndex = firstMatchingPhoto
+      ? photos.findIndex((photo) => photo.id === firstMatchingPhoto.id)
+      : -1;
+    selectPhoto(firstMatchingIndex >= 0 ? firstMatchingIndex : null);
+  }, [
+    lightboxPhotos,
+    photos,
+    photoScope.mode,
+    selectPhoto,
+    selectedActivityId,
+    selectedLightboxIndex,
+    selectedPhoto,
+    selectedPhotoIndex,
+  ]);
+
+  useEffect(() => {
     const audio = linkedAudioRef.current;
     return () => {
       audio?.pause();
@@ -505,10 +552,21 @@ export default function ArtScene() {
   }, []);
 
   const selectAdjacentPhoto = useCallback((direction: -1 | 1) => {
-    if (selectedPhotoIndex === null || photos.length < 2) return;
-    const nextIndex = (selectedPhotoIndex + direction + photos.length) % photos.length;
-    selectPhoto(nextIndex);
-  }, [photos.length, selectedPhotoIndex, selectPhoto]);
+    if (
+      selectedPhotoIndex === null ||
+      selectedLightboxIndex < 0 ||
+      lightboxPhotos.length < 2
+    ) {
+      return;
+    }
+    const nextPhoto = lightboxPhotos[
+      (selectedLightboxIndex + direction + lightboxPhotos.length) % lightboxPhotos.length
+    ];
+    const nextIndex = nextPhoto
+      ? photos.findIndex((photo) => photo.id === nextPhoto.id)
+      : -1;
+    if (nextIndex >= 0) selectPhoto(nextIndex);
+  }, [lightboxPhotos, photos, selectPhoto, selectedLightboxIndex, selectedPhotoIndex]);
 
   useEffect(() => {
     if (!selectedPhoto) return;
@@ -695,6 +753,9 @@ export default function ArtScene() {
   const handlePreviewPlacementChange = useCallback((placement: MapPlacement | null, action?: (() => void) | null) => {
     setPreviewPlacementDetails(placement);
     setPreviewPlacementAction(action ? () => action : null);
+  }, []);
+  const handlePlacementNavigationChange = useCallback((navigation: PlacementNavigationActions | null) => {
+    setPlacementNavigation(navigation);
   }, []);
   const handleFocusedPlacementChange = useCallback((placement: MapPlacement | null) => {
     setSelectedActivityFilter("");
@@ -1002,6 +1063,8 @@ export default function ArtScene() {
           placement={focusedPlacementDetails}
           partnerHref={getPartnerPath(focusedPlacementDetails.partner_name || "")}
           onPartnerSelect={handlePartnerNavigation}
+          previousAction={placementNavigation?.previous}
+          nextAction={placementNavigation?.next}
           adminHref={
             authUser?.authenticated
               ? `/admin/browse?site=${encodeURIComponent(String(focusedPlacementDetails.placement_id))}`
@@ -1015,6 +1078,8 @@ export default function ArtScene() {
           onOpen={previewPlacementAction}
           partnerHref={getPartnerPath(previewPlacementDetails.partner_name || "")}
           onPartnerSelect={handlePartnerNavigation}
+          previousAction={placementNavigation?.previous}
+          nextAction={placementNavigation?.next}
           adminHref={
             authUser?.authenticated
               ? `/admin/browse?site=${encodeURIComponent(String(previewPlacementDetails.placement_id))}`
@@ -1078,7 +1143,7 @@ export default function ArtScene() {
                     photo={lightboxPreviousPhoto}
                     active={false}
                     activityColour={previousActivityColour}
-                    hasNavigation={photos.length > 1}
+                    hasNavigation={lightboxPhotos.length > 1}
                     style={{
                       ...photoLightboxImageStyle,
                       ...photoAdjustmentFilterStyle(lightboxPreviousPhoto.adjustments),
@@ -1095,7 +1160,7 @@ export default function ArtScene() {
                   zoom={lightboxZoom}
                   pan={lightboxPan}
                   activityColour={selectedPhotoActivityColour}
-                  hasNavigation={photos.length > 1}
+                  hasNavigation={lightboxPhotos.length > 1}
                   wordpressEditUrl={selectedAnecdoteEditUrl}
                   documentationUrl={selectedAnecdoteDocumentationUrl}
                   style={{
@@ -1112,7 +1177,7 @@ export default function ArtScene() {
                     photo={lightboxNextPhoto}
                     active={false}
                     activityColour={nextActivityColour}
-                    hasNavigation={photos.length > 1}
+                    hasNavigation={lightboxPhotos.length > 1}
                     style={{
                       ...photoLightboxImageStyle,
                       ...photoAdjustmentFilterStyle(lightboxNextPhoto.adjustments),
@@ -1122,7 +1187,7 @@ export default function ArtScene() {
                 )}
               </div>
             </div>
-            {photos.length > 1 && (
+            {lightboxPhotos.length > 1 && (
               <>
                 <button
                   type="button"
@@ -1388,6 +1453,7 @@ export default function ArtScene() {
               onFocusedPlacementChange={handleFocusedPlacementChange}
               onHoveredPlacementChange={setHoveredPlacementDetails}
               onPreviewPlacementChange={handlePreviewPlacementChange}
+              onPlacementNavigationChange={handlePlacementNavigationChange}
               onPartnerFilterOptionsChange={setPartnerFilterOptions}
               selectedPartnerFilter={selectedPartnerFilter}
               selectedActivityFilter={selectedActivityFilter}

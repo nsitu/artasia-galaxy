@@ -530,6 +530,10 @@ export type PartnerFilterOption = {
     alt: string;
   } | null;
 };
+export type PlacementNavigationActions = {
+  previous?: () => void;
+  next?: () => void;
+};
 
 const SITE_PATH_PREFIX = "/sites/";
 const EARLY_ON_PARTNER_FILTER = "__earlyon__";
@@ -548,6 +552,9 @@ interface TerrainGalleryProps {
   onPreviewPlacementChange?: (
     placement: MapPlacement | null,
     openAction?: (() => void) | null,
+  ) => void;
+  onPlacementNavigationChange?: (
+    navigation: PlacementNavigationActions | null,
   ) => void;
   onPartnerFilterOptionsChange?: (options: PartnerFilterOption[]) => void;
   selectedPartnerFilter?: string;
@@ -568,6 +575,7 @@ export default function TerrainGallery({
   onFocusedPlacementChange,
   onHoveredPlacementChange,
   onPreviewPlacementChange,
+  onPlacementNavigationChange,
   onPartnerFilterOptionsChange,
   selectedPartnerFilter = "",
   selectedActivityFilter = "",
@@ -1287,6 +1295,69 @@ export default function TerrainGallery({
     },
     [camera, controls, usesTouchPreview],
   );
+
+  const navigatePlacement = useCallback(
+    (direction: -1 | 1) => {
+      const currentPlacement = focusedPlacement ?? previewPlacement;
+      const candidates = focusedPlacement ? placements : filteredRegionalPlacements;
+      if (!currentPlacement || candidates.length < 2) return;
+
+      const currentIndex = candidates.findIndex(
+        (candidate) => candidate.placement_id === currentPlacement.placement_id,
+      );
+      if (currentIndex < 0) return;
+
+      const nextIndex =
+        (currentIndex + direction + candidates.length) % candidates.length;
+      const nextPlacement = candidates[nextIndex];
+      if (!nextPlacement) return;
+
+      if (focusedPlacement) {
+        focusPlacement(nextPlacement);
+        return;
+      }
+
+      setHoveredPlacement(null);
+      setPreviewPlacement(nextPlacement);
+      const nextPosition = placementLayout.find(
+        (item) => item.placement.placement_id === nextPlacement.placement_id,
+      )?.position;
+      if (nextPosition) panToPlacement(nextPosition);
+    },
+    [
+      filteredRegionalPlacements,
+      focusPlacement,
+      focusedPlacement,
+      panToPlacement,
+      placementLayout,
+      placements,
+      previewPlacement,
+    ],
+  );
+
+  const placementNavigation = useMemo<PlacementNavigationActions | null>(() => {
+    const currentPlacement = focusedPlacement ?? previewPlacement;
+    const candidates = focusedPlacement ? placements : filteredRegionalPlacements;
+    if (
+      !currentPlacement ||
+      candidates.length < 2 ||
+      !candidates.some(
+        (candidate) => candidate.placement_id === currentPlacement.placement_id,
+      )
+    ) {
+      return null;
+    }
+    return {
+      previous: () => navigatePlacement(-1),
+      next: () => navigatePlacement(1),
+    };
+  }, [
+    filteredRegionalPlacements,
+    focusedPlacement,
+    navigatePlacement,
+    placements,
+    previewPlacement,
+  ]);
 
   useEffect(() => {
     const onPopState = () => {
@@ -2029,6 +2100,14 @@ export default function TerrainGallery({
   }, [onPreviewPlacementChange]);
 
   useEffect(() => {
+    onPlacementNavigationChange?.(placementNavigation);
+  }, [onPlacementNavigationChange, placementNavigation]);
+
+  useEffect(() => {
+    return () => onPlacementNavigationChange?.(null);
+  }, [onPlacementNavigationChange]);
+
+  useEffect(() => {
     if (!hoveredPlacement) return;
     if (focusedPlacement) return;
     if (
@@ -2265,11 +2344,15 @@ export function FocusedPlacementOverlay({
   adminHref,
   partnerHref,
   onPartnerSelect,
+  previousAction,
+  nextAction,
 }: {
   placement: MapPlacement;
   adminHref?: string;
   partnerHref?: string;
   onPartnerSelect?: (partner: string) => void;
+  previousAction?: () => void;
+  nextAction?: () => void;
 }) {
   return (
     <PlacementInfoPanel
@@ -2277,6 +2360,8 @@ export function FocusedPlacementOverlay({
       adminHref={adminHref}
       partnerHref={partnerHref}
       onPartnerSelect={onPartnerSelect}
+      previousAction={previousAction}
+      nextAction={nextAction}
     />
   );
 }
@@ -2287,6 +2372,8 @@ function PlacementInfoPanel({
   partnerHref,
   onPartnerSelect,
   onView,
+  previousAction,
+  nextAction,
   preview = false,
 }: {
   placement: MapPlacement;
@@ -2294,6 +2381,8 @@ function PlacementInfoPanel({
   partnerHref?: string;
   onPartnerSelect?: (partner: string) => void;
   onView?: () => void;
+  previousAction?: () => void;
+  nextAction?: () => void;
   preview?: boolean;
 }) {
   const isMobile = useIsMobileBreakpoint();
@@ -2487,8 +2576,14 @@ function PlacementInfoPanel({
               />
             )}
           </div>
-          {(placement.documentation_url || adminHref || onView) && (
+          {(previousAction || placement.documentation_url || adminHref || onView || nextAction) && (
             <div style={siteDetailsActionsStyle}>
+              {previousAction && (
+                <PlacementNavigationButton
+                  direction="previous"
+                  onClick={previousAction}
+                />
+              )}
               {placement.documentation_url && (
                 <a
                   href={placement.documentation_url}
@@ -2519,11 +2614,51 @@ function PlacementInfoPanel({
                   Gallery
                 </button>
               )}
+              {nextAction && (
+                <PlacementNavigationButton
+                  direction="next"
+                  onClick={nextAction}
+                />
+              )}
             </div>
           )}
         </div>
       )}
     </section>
+  );
+}
+
+function PlacementNavigationButton({
+  direction,
+  onClick,
+}: {
+  direction: "previous" | "next";
+  onClick: () => void;
+}) {
+  const label = direction === "previous" ? "Previous placement" : "Next placement";
+  return (
+    <button
+      type="button"
+      className="atlas-control-surface"
+      aria-label={label}
+      onClick={onClick}
+      style={siteDetailsNavigationButtonStyle}
+    >
+      <svg
+        viewBox="0 0 16 16"
+        aria-hidden="true"
+        style={siteDetailsNavigationIconStyle}
+      >
+        <path
+          d={direction === "previous" ? "M9.75 3.5 5.25 8l4.5 4.5" : "m6.25 3.5 4.5 4.5-4.5 4.5"}
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.8"
+        />
+      </svg>
+    </button>
   );
 }
 
@@ -2549,12 +2684,16 @@ export function PlacementPreviewPanel({
   adminHref,
   partnerHref,
   onPartnerSelect,
+  previousAction,
+  nextAction,
 }: {
   placement: MapPlacement;
   onOpen: () => void;
   adminHref?: string;
   partnerHref?: string;
   onPartnerSelect?: (partner: string) => void;
+  previousAction?: () => void;
+  nextAction?: () => void;
 }) {
   return (
     <PlacementInfoPanel
@@ -2563,6 +2702,8 @@ export function PlacementPreviewPanel({
       partnerHref={partnerHref}
       onPartnerSelect={onPartnerSelect}
       onView={onOpen}
+      previousAction={previousAction}
+      nextAction={nextAction}
       preview
     />
   );
@@ -2972,6 +3113,22 @@ const siteDetailsActionLinkStyle: React.CSSProperties = {
   cursor: "pointer",
   pointerEvents: "auto",
   whiteSpace: "nowrap",
+};
+
+const siteDetailsNavigationButtonStyle: React.CSSProperties = {
+  ...siteDetailsActionLinkStyle,
+  flex: "0 0 44px",
+  width: 44,
+  height: 44,
+  minWidth: 44,
+  minHeight: 44,
+  aspectRatio: "1",
+  padding: 0,
+};
+
+const siteDetailsNavigationIconStyle: React.CSSProperties = {
+  width: 18,
+  height: 18,
 };
 
 const siteDetailRowStyle: React.CSSProperties = {
