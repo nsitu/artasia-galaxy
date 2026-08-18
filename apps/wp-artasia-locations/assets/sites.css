@@ -75,9 +75,10 @@
 .artasia-sites__action {
     display: inline-block;
     padding: 0.4rem 0.85rem;
-    border: 2px solid currentColor;
-    border-radius: 999px;
-    color: inherit;
+    border: 2px solid #8e1d58;
+    border-radius: 3px;
+    background: #8e1d58;
+    color: #fff;
     font-weight: 700;
     line-height: 1.2;
     text-decoration: none;
@@ -85,7 +86,8 @@
 
 .artasia-sites__action:hover,
 .artasia-sites__action:focus-visible {
-    background: #8e1d58;
+    border-color: #ec008c;
+    background: #ec008c;
     color: #fff;
 }
 

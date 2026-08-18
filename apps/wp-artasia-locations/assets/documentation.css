@@ -52,17 +52,25 @@
 .artasia-documentation__navigation a {
   display: block;
   padding-left: 0.9rem;
-  border-left: 3px solid #f28b20;
-  color: inherit;
+  border-left: 3px solid #8e1d58;
+  color: #8e1d58;
   text-decoration: none;
 }
 
+.artasia-documentation__navigation a:hover,
+.artasia-documentation__navigation a:focus-visible {
+  border-left-color: #ec008c;
+  color: #ec008c;
+}
+
 .artasia-documentation__navigation a[aria-current="page"] {
-  border-left-color: currentColor;
+  border-left-color: #ec008c;
+  color: #ec008c;
 }
 
 .artasia-documentation__navigation-document-title {
   display: block;
+  color: inherit;
   font-weight: 900;
 }
 
@@ -107,9 +115,9 @@
 
 .artasia-documentation .artasia-documentation__edit-button,
 .artasia-documentation .artasia-documentation__edit-button:visited {
-  background: #ec008c;
-  border: 0;
-  border-radius: 4px;
+  background: #8e1d58;
+  border: 2px solid #8e1d58;
+  border-radius: 3px;
   color: #fff;
   display: inline-block;
   font-size: 0.875rem;
@@ -122,12 +130,13 @@
 
 .artasia-documentation .artasia-documentation__edit-button:hover,
 .artasia-documentation .artasia-documentation__edit-button:focus-visible {
-  background: #8e1d58;
+  background: #ec008c;
+  border-color: #ec008c;
   color: #fff;
 }
 
 .artasia-documentation .artasia-documentation__edit-button:focus-visible {
-  outline: 3px solid #f28b20;
+  outline: 3px solid #ec008c;
   outline-offset: 3px;
 }
 
@@ -167,9 +176,10 @@
 .artasia-documentation__action {
   display: inline-block;
   padding: 0.4rem 0.85rem;
-  border: 2px solid currentColor;
-  border-radius: 999px;
-  color: inherit;
+  border: 2px solid #8e1d58;
+  border-radius: 3px;
+  background: #8e1d58;
+  color: #fff;
   font-weight: 700;
   line-height: 1.2;
   text-decoration: none;
@@ -177,7 +187,8 @@
 
 .artasia-documentation__action:hover,
 .artasia-documentation__action:focus-visible {
-  background: #8e1d58;
+  border-color: #ec008c;
+  background: #ec008c;
   color: #fff;
 }
 
