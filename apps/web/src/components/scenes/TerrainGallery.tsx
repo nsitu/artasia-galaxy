@@ -530,6 +530,11 @@ export type PartnerFilterOption = {
     alt: string;
   } | null;
 };
+export type EducatorFilterOption = {
+  value: string;
+  label: string;
+  count: number;
+};
 export type PlacementNavigationActions = {
   previous?: () => void;
   next?: () => void;
@@ -564,7 +569,9 @@ interface TerrainGalleryProps {
     navigation: PlacementNavigationActions | null,
   ) => void;
   onPartnerFilterOptionsChange?: (options: PartnerFilterOption[]) => void;
+  onEducatorFilterOptionsChange?: (options: EducatorFilterOption[]) => void;
   selectedPartnerFilter?: string;
+  selectedEducatorFilter?: string;
   selectedActivityFilter?: string;
   selectedActivityColour?: string;
   activityOptions?: ActivityOption[];
@@ -584,7 +591,9 @@ export default function TerrainGallery({
   onPreviewPlacementChange,
   onPlacementNavigationChange,
   onPartnerFilterOptionsChange,
+  onEducatorFilterOptionsChange,
   selectedPartnerFilter = "",
+  selectedEducatorFilter = "",
   selectedActivityFilter = "",
   selectedActivityColour,
   activityOptions = [],
@@ -641,6 +650,7 @@ export default function TerrainGallery({
   const activeTerrainRequestKeyRef = useRef<string | null>(null);
   const introStartSetRef = useRef(false);
   const previousPartnerFilterRef = useRef(selectedPartnerFilter);
+  const previousEducatorFilterRef = useRef(selectedEducatorFilter);
   const partnerFitAnimationRef = useRef<number | null>(null);
   const lastFramedActivityFilterRef = useRef(selectedActivityFilter);
   const activityFitPlacementRef = useRef<number | null>(null);
@@ -691,15 +701,44 @@ export default function TerrainGallery({
     }
     return options;
   }, [placements]);
-  const filteredRegionalPlacements = useMemo(() => {
-    if (!selectedPartnerFilter) return placements;
-    if (selectedPartnerFilter === EARLY_ON_PARTNER_FILTER) {
-      return placements.filter((placement) => placement.is_earlyon);
+  const educatorFilterOptions = useMemo<EducatorFilterOption[]>(() => {
+    const educators = new Map<string, { label: string; count: number }>();
+    for (const placement of placements) {
+      const names = new Map<string, string>();
+      for (const person of [placement.team_member, placement.secondary_team_member]) {
+        const label = person?.name?.trim().replace(/\s+/g, " ");
+        if (!label) continue;
+        const value = label.toLocaleLowerCase();
+        if (!names.has(value)) names.set(value, label);
+      }
+      for (const [value, label] of names) {
+        const current = educators.get(value);
+        educators.set(value, {
+          label: current?.label ?? label,
+          count: (current?.count ?? 0) + 1,
+        });
+      }
     }
-    return placements.filter(
-      (placement) => placement.partner_name?.trim() === selectedPartnerFilter,
+    return [...educators.entries()]
+      .sort(([, a], [, b]) => a.label.localeCompare(b.label))
+      .map(([value, { label, count }]) => ({ value, label, count }));
+  }, [placements]);
+  const filteredRegionalPlacements = useMemo(() => {
+    let filtered = placements;
+    if (selectedPartnerFilter === EARLY_ON_PARTNER_FILTER) {
+      filtered = filtered.filter((placement) => placement.is_earlyon);
+    } else if (selectedPartnerFilter) {
+      filtered = filtered.filter(
+        (placement) => placement.partner_name?.trim() === selectedPartnerFilter,
+      );
+    }
+    if (!selectedEducatorFilter) return filtered;
+    return filtered.filter((placement) =>
+      [placement.team_member?.name, placement.secondary_team_member?.name]
+        .map((name) => name?.trim().replace(/\s+/g, " ").toLocaleLowerCase())
+        .some((name) => name === selectedEducatorFilter),
     );
-  }, [placements, selectedPartnerFilter]);
+  }, [placements, selectedEducatorFilter, selectedPartnerFilter]);
   const selectedActivityOption = useMemo(
     () => activityOptions.find(
       (option) => String(option.id) === selectedActivityFilter,
@@ -1219,7 +1258,9 @@ export default function TerrainGallery({
   }, [focusedPlacement, placementLayout, placements, projection, projectionMatchesRequest]);
 
   useEffect(() => {
-    const filterChanged = previousPartnerFilterRef.current !== selectedPartnerFilter;
+    const filterChanged =
+      previousPartnerFilterRef.current !== selectedPartnerFilter ||
+      previousEducatorFilterRef.current !== selectedEducatorFilter;
     if (
       !filterChanged ||
       focusedPlacement ||
@@ -1229,6 +1270,7 @@ export default function TerrainGallery({
     ) return;
 
     previousPartnerFilterRef.current = selectedPartnerFilter;
+    previousEducatorFilterRef.current = selectedEducatorFilter;
 
     const bounds = new THREE.Box3();
     for (const item of placementLayout) {
@@ -1276,7 +1318,16 @@ export default function TerrainGallery({
         partnerFitAnimationRef.current = null;
       }
     };
-  }, [camera, controls, focusedPlacement, introEnabled, introPhase, placementLayout, selectedPartnerFilter]);
+  }, [
+    camera,
+    controls,
+    focusedPlacement,
+    introEnabled,
+    introPhase,
+    placementLayout,
+    selectedEducatorFilter,
+    selectedPartnerFilter,
+  ]);
 
   const focusPlacement = useCallback(
     (
@@ -2193,8 +2244,16 @@ export default function TerrainGallery({
   }, [onPartnerFilterOptionsChange, partnerFilterOptions]);
 
   useEffect(() => {
+    onEducatorFilterOptionsChange?.(educatorFilterOptions);
+  }, [educatorFilterOptions, onEducatorFilterOptionsChange]);
+
+  useEffect(() => {
     return () => onPartnerFilterOptionsChange?.([]);
   }, [onPartnerFilterOptionsChange]);
+
+  useEffect(() => {
+    return () => onEducatorFilterOptionsChange?.([]);
+  }, [onEducatorFilterOptionsChange]);
 
   if (isPreparingTerrain || hasNoTerrainLocations) return null;
 

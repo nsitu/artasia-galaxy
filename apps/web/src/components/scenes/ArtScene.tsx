@@ -10,6 +10,7 @@ import WelcomeOverlay from "../ui/WelcomeOverlay";
 import { loadMaterialSymbols } from "../../modules/iconLoader";
 import TerrainGallery, {
   FocusedPlacementOverlay,
+  type EducatorFilterOption,
   type PartnerFilterOption,
   PlacementHoverLabel,
   PlacementPreviewPanel,
@@ -339,13 +340,15 @@ export default function ArtScene() {
   const [placementNavigation, setPlacementNavigation] = useState<PlacementNavigationActions | null>(null);
   const [partnerFilterOptions, setPartnerFilterOptions] = useState<PartnerFilterOption[]>([]);
   const [selectedPartnerFilter, setSelectedPartnerFilter] = useState("");
+  const [educatorFilterOptions, setEducatorFilterOptions] = useState<EducatorFilterOption[]>([]);
+  const [selectedEducatorFilter, setSelectedEducatorFilter] = useState("");
   const [requestedPartnerSlug, setRequestedPartnerSlug] = useState(() =>
     getPartnerSlugFromPath(window.location.pathname),
   );
   const [activityFilterOptions, setActivityFilterOptions] = useState<ActivityOption[]>([]);
   const [selectedActivityFilter, setSelectedActivityFilter] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [openFilter, setOpenFilter] = useState<"partner" | "activity" | null>(null);
+  const [openFilter, setOpenFilter] = useState<"partner" | "educator" | "activity" | null>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [webglError, setWebglError] = useState<string | null>(() => getWebGL2SupportError());
@@ -906,6 +909,13 @@ export default function ArtScene() {
   }, [partnerFilterOptions, selectedPartnerFilter]);
 
   useEffect(() => {
+    if (!selectedEducatorFilter) return;
+    if (!educatorFilterOptions.some((option) => option.value === selectedEducatorFilter)) {
+      setSelectedEducatorFilter("");
+    }
+  }, [educatorFilterOptions, selectedEducatorFilter]);
+
+  useEffect(() => {
     const onPopState = () => {
       setRequestedPartnerSlug(
         getPartnerSlugFromPath(window.location.pathname),
@@ -1010,6 +1020,38 @@ export default function ArtScene() {
                   {partnerFilterOptions.map((option) => (
                     <FilterOption key={option.value} active={selectedPartnerFilter === option.value} onSelect={() => {
                       setSelectedPartnerFilter(option.value); updatePartnerPath(option.value); setOpenFilter(null);
+                    }}>{option.label} ({option.count})</FilterOption>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {!focusedPlacementDetails && educatorFilterOptions.length > 0 && (
+            <div className="atlas-educator-filter-control" style={filterControlStyle}>
+              <button
+                type="button"
+                className="atlas-educator-filter-trigger atlas-control-surface"
+                aria-expanded={openFilter === "educator"}
+                aria-haspopup="listbox"
+                onClick={() => setOpenFilter((current) => current === "educator" ? null : "educator")}
+                style={{ ...filterTriggerStyle, ...partnerFilterTriggerStyle }}
+              >
+                <span>
+                  {educatorFilterOptions.find(
+                    (option) => option.value === selectedEducatorFilter,
+                  )?.label || "Educators"}
+                </span>
+                <ChevronIcon expanded={openFilter === "educator"} />
+              </button>
+              {openFilter === "educator" && (
+                <div className="atlas-educator-filter-menu" role="listbox" aria-label="Filter placements by educator" style={filterMenuStyle}>
+                  <FilterOption active={!selectedEducatorFilter} onSelect={() => {
+                    setSelectedEducatorFilter(""); setOpenFilter(null);
+                  }}>All educators</FilterOption>
+                  {educatorFilterOptions.map((option) => (
+                    <FilterOption key={option.value} active={selectedEducatorFilter === option.value} onSelect={() => {
+                      setSelectedEducatorFilter(option.value); setOpenFilter(null);
                     }}>{option.label} ({option.count})</FilterOption>
                   ))}
                 </div>
@@ -1563,7 +1605,9 @@ export default function ArtScene() {
               onPreviewPlacementChange={handlePreviewPlacementChange}
               onPlacementNavigationChange={handlePlacementNavigationChange}
               onPartnerFilterOptionsChange={setPartnerFilterOptions}
+              onEducatorFilterOptionsChange={setEducatorFilterOptions}
               selectedPartnerFilter={selectedPartnerFilter}
+              selectedEducatorFilter={selectedEducatorFilter}
               selectedActivityFilter={selectedActivityFilter}
               selectedActivityColour={selectedActivityColour}
               activityOptions={availableActivityFilterOptions}
@@ -2181,18 +2225,22 @@ const responsiveTopNavStyles = `
     }
 
     .atlas-partner-filter-trigger,
+    .atlas-educator-filter-trigger,
     .atlas-activity-filter-trigger {
       height: 40px !important;
     }
   }
 
   @media (min-width: 800px) {
-    .atlas-partner-filter-control {
-      width: clamp(460px, 45vw, 560px) !important;
+    .atlas-partner-filter-control,
+    .atlas-educator-filter-control {
+      width: clamp(220px, 22vw, 360px) !important;
     }
 
     .atlas-partner-filter-trigger > span,
-    .atlas-partner-filter-menu [role="option"] {
+    .atlas-educator-filter-trigger > span,
+    .atlas-partner-filter-menu [role="option"],
+    .atlas-educator-filter-menu [role="option"] {
       white-space: nowrap;
     }
   }
