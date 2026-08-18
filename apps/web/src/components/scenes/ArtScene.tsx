@@ -1809,6 +1809,13 @@ const responsiveTopNavStyles = `
       max-height: none !important;
       flex: 1 1 auto;
     }
+    .atlas-anecdote-lightbox {
+      height: 100%;
+      max-height: 100% !important;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+    }
     .atlas-photo-lightbox-audio {
       width: 100% !important;
       max-width: 100% !important;
@@ -2253,7 +2260,7 @@ const photoLightboxImageStyle: React.CSSProperties = {
 };
 
 const anecdoteLightboxStyle: React.CSSProperties = {
-  width: "min(1000px, calc(100vw - 64px))",
+  width: "100%",
   maxHeight: "calc(100% - 32px)",
   boxSizing: "border-box",
   overflowY: "auto",
