@@ -8,7 +8,6 @@ interface DocumentationPullQuotePanelProps {
   width: number;
   height: number;
   attribution?: string;
-  accentColour?: string;
 }
 
 function getQuoteFontSize(quote: string) {
@@ -24,9 +23,27 @@ export default function DocumentationPullQuotePanel({
   width,
   height,
   attribution,
-  accentColour,
 }: DocumentationPullQuotePanelProps) {
   const fontSize = getQuoteFontSize(quote);
+  const attributionFontSize = Math.max(0.19, fontSize * 0.62);
+  const contentWidth = width - 0.84;
+  const estimatedCharactersPerLine = Math.max(
+    10,
+    Math.floor(contentWidth / (fontSize * 0.54)),
+  );
+  const estimatedQuoteLines = Math.max(
+    1,
+    Math.ceil(displayQuoteLength(quote) / estimatedCharactersPerLine),
+  );
+  const estimatedQuoteHeight = estimatedQuoteLines * fontSize * 1.35;
+  const attributionGap = 0.3;
+  const combinedHeight = estimatedQuoteHeight
+    + (attribution ? attributionGap + attributionFontSize : 0);
+  const quoteTopY = Math.min(height / 2 - 0.52, combinedHeight / 2);
+  const attributionY = quoteTopY
+    - estimatedQuoteHeight
+    - attributionGap
+    - attributionFontSize / 2;
   const displayQuote = useMemo(
     () => `“${quote.replace(/^[“\"]|[”\"]$/g, "").trim()}”`,
     [quote],
@@ -34,8 +51,20 @@ export default function DocumentationPullQuotePanel({
 
   return (
     <group position={position}>
+      <mesh renderOrder={1} raycast={() => null}>
+        <planeGeometry args={[width, height]} />
+        <meshBasicMaterial
+          color="#000000"
+          transparent
+          opacity={0.46}
+          side={THREE.DoubleSide}
+          depthTest
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
       <Text
-        position={[-width / 2 + 0.42, attribution ? 0.3 : 0, 0.018]}
+        position={[-width / 2 + 0.42, quoteTopY, 0.018]}
         renderOrder={2}
         raycast={() => null}
         fontSize={fontSize}
@@ -43,7 +72,7 @@ export default function DocumentationPullQuotePanel({
         lineHeight={1.35}
         maxWidth={width - 0.84}
         anchorX="left"
-        anchorY="middle"
+        anchorY="top"
         textAlign="left"
         color="#ffffff"
         outlineWidth={fontSize * 0.018}
@@ -59,10 +88,10 @@ export default function DocumentationPullQuotePanel({
       </Text>
       {attribution && (
         <Text
-          position={[width / 2 - 0.42, -height / 2 + 0.52, 0.018]}
+          position={[width / 2 - 0.42, attributionY, 0.018]}
           renderOrder={2}
           raycast={() => null}
-          fontSize={Math.max(0.19, fontSize * 0.62)}
+          fontSize={attributionFontSize}
           sdfGlyphSize={128}
           lineHeight={1.2}
           maxWidth={width - 0.84}
@@ -83,20 +112,10 @@ export default function DocumentationPullQuotePanel({
           {`— ${attribution}`}
         </Text>
       )}
-      <mesh
-        position={[-width / 2 + 0.18, 0, 0.012]}
-        renderOrder={2}
-        raycast={() => null}
-      >
-        <planeGeometry args={[0.045, height - 0.7]} />
-        <meshBasicMaterial
-          color={accentColour || "#eee111"}
-          side={THREE.DoubleSide}
-          depthTest
-          depthWrite={false}
-          toneMapped={false}
-        />
-      </mesh>
     </group>
   );
+}
+
+function displayQuoteLength(quote: string) {
+  return quote.replace(/^[“\"]|[”\"]$/g, "").trim().length + 2;
 }

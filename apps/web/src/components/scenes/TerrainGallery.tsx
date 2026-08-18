@@ -889,8 +889,11 @@ export default function TerrainGallery({
     const terrainHeight = Math.max(1, maxY - minY);
     const width = THREE.MathUtils.clamp(terrainWidth * 0.38, 3.8, 4.8);
     const height = THREE.MathUtils.clamp(terrainHeight * 0.78, 5.2, 9.2);
-    const overlap = width * 0.42;
-    const x = maxX - overlap + width / 2;
+    const outerOrbitRadius = activityOrbitRings.length > 0
+      ? Math.max(...activityOrbitRings.map((ring) => ring.radius))
+      : 1;
+    const panelLeft = focusedPlacementCenter[0] + outerOrbitRadius + width * 0.2;
+    const x = panelLeft + width / 2;
     const y = (minY + maxY) / 2;
 
     return {
@@ -904,12 +907,13 @@ export default function TerrainGallery({
       ] as [number, number, number],
       fitBounds: {
         minX,
-        maxX: x + width / 2,
+        maxX: Math.max(maxX, x + width / 2),
         minY: Math.min(minY, y - height / 2),
         maxY: Math.max(maxY, y + height / 2),
       },
     };
   }, [
+    activityOrbitRings,
     focusedPlacement,
     focusedPlacementCenter,
     orbitHeight,
@@ -2031,7 +2035,6 @@ export default function TerrainGallery({
           width={documentationQuoteLayout.width}
           height={documentationQuoteLayout.height}
           attribution={focusedPlacement.documentation_attribution}
-          accentColour={focusedPlacement.partner_brand_color_two}
         />
       )}
       {sceneReadyForMarkers && focusedPlacement &&
