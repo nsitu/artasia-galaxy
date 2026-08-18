@@ -7,7 +7,6 @@ interface DocumentationPullQuotePanelProps {
   position: [number, number, number];
   width: number;
   height: number;
-  backgroundColour?: string;
   accentColour?: string;
 }
 
@@ -23,7 +22,6 @@ export default function DocumentationPullQuotePanel({
   position,
   width,
   height,
-  backgroundColour,
   accentColour,
 }: DocumentationPullQuotePanelProps) {
   const fontSize = getQuoteFontSize(quote);
@@ -34,18 +32,6 @@ export default function DocumentationPullQuotePanel({
 
   return (
     <group position={position}>
-      <mesh renderOrder={1} raycast={() => null}>
-        <planeGeometry args={[width, height]} />
-        <meshBasicMaterial
-          color={backgroundColour || "#8e1d58"}
-          transparent
-          opacity={0.86}
-          side={THREE.DoubleSide}
-          depthTest
-          depthWrite
-          toneMapped={false}
-        />
-      </mesh>
       <Text
         position={[-width / 2 + 0.42, 0, 0.018]}
         renderOrder={2}

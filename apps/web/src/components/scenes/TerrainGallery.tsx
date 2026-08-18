@@ -2030,7 +2030,6 @@ export default function TerrainGallery({
           position={documentationQuoteLayout.position}
           width={documentationQuoteLayout.width}
           height={documentationQuoteLayout.height}
-          backgroundColour={focusedPlacement.partner_brand_color_one}
           accentColour={focusedPlacement.partner_brand_color_two}
         />
       )}
