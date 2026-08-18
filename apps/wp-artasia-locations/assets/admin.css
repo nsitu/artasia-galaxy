@@ -4,6 +4,13 @@
   min-height: 0;
 }
 
+.artasia-google-drive-folder-link {
+  display: inline-block;
+  margin-left: 0.5em;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
 .artasia-logo-preview img,
 .artasia-image-preview img {
   display: block;

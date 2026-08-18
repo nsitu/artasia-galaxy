@@ -1,5 +1,39 @@
 jQuery(function ($) {
-  if (!window.wp || !wp.media) {
+  function normalizeGoogleDriveFolderId(value) {
+    var rawValue = String(value || '').trim();
+    var urlMatch = rawValue.match(/\/folders\/([A-Za-z0-9_-]+)/);
+    if (urlMatch) {
+      return urlMatch[1];
+    }
+    return /^[A-Za-z0-9_-]+$/.test(rawValue) ? rawValue : '';
+  }
+
+  function setupGoogleDriveFolderLink() {
+    var $input = $('#artasia_google_drive_folder_id');
+    var $link = $('#artasia_google_drive_folder_link');
+
+    if (!$input.length || !$link.length) {
+      return;
+    }
+
+    function updateLink() {
+      var folderId = normalizeGoogleDriveFolderId($input.val());
+      $link.attr(
+        'href',
+        folderId
+          ? 'https://drive.google.com/drive/folders/' + encodeURIComponent(folderId)
+          : 'https://drive.google.com/'
+      );
+      $link.text(folderId ? 'Open in Google Drive' : 'Open Google Drive');
+    }
+
+    $input.on('input change', updateLink);
+    updateLink();
+  }
+
+  setupGoogleDriveFolderLink();
+
+  if (!window.wp || !window.wp.media) {
     return;
   }
 

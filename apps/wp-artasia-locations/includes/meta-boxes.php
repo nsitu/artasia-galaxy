@@ -304,9 +304,20 @@ function artasia_placement_meta_box_html(WP_Post $post): void
     $delivery_end_time = get_post_meta($post->ID, 'artasia_delivery_end_time', true);
     $weekday_options = artasia_placement_weekday_options();
     $time_options = artasia_placement_time_options();
+    $atlas_url = artasia_get_placement_atlas_url($post->ID);
 
     wp_nonce_field('artasia_placement_meta', 'artasia_placement_meta_nonce');
 ?>
+    <?php if ($atlas_url) : ?>
+        <p>
+            <a
+                class="button button-secondary"
+                href="<?php echo esc_url($atlas_url); ?>"
+                target="_blank"
+                rel="noopener noreferrer"
+            >View placement in Atlas</a>
+        </p>
+    <?php endif; ?>
     <table class="form-table">
         <tr>
             <th><label for="artasia_project_id">Project</label></th>
@@ -482,7 +493,16 @@ function artasia_placement_meta_box_html(WP_Post $post): void
             </td>
         </tr>
         <tr>
-            <th><label for="artasia_google_drive_folder_id">Google Drive Documentation Folder</label></th>
+            <th>
+                <label for="artasia_google_drive_folder_id">Google Drive Documentation Folder</label>
+                <a
+                    id="artasia_google_drive_folder_link"
+                    class="artasia-google-drive-folder-link"
+                    href="<?php echo esc_url($google_drive_folder_id ? 'https://drive.google.com/drive/folders/' . rawurlencode($google_drive_folder_id) : 'https://drive.google.com/'); ?>"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                ><?php echo esc_html($google_drive_folder_id ? 'Open in Google Drive' : 'Open Google Drive'); ?></a>
+            </th>
             <td>
                 <input type="text" id="artasia_google_drive_folder_id" name="artasia_google_drive_folder_id" value="<?php echo esc_attr($google_drive_folder_id); ?>" class="widefat" placeholder="Folder ID or Google Drive folder URL" />
                 <p class="description"><a href="https://atlas.artsforall.co/admin" target="_blank" rel="noopener noreferrer">Atlas Admin</a> will open this folder first when importing files for this placement. The folder is assumed to store images, videos, and other assets documenting the placement. Paste either the folder ID or its full Google Drive URL.</p>

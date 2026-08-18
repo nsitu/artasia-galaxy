@@ -163,6 +163,7 @@ export interface MapPlacement {
 export interface ActivityOption {
   id: number;
   label: string;
+  customActivity?: string;
   week?: number;
   description?: string;
   colour?: string;

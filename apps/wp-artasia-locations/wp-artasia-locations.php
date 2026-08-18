@@ -46,8 +46,10 @@ function artasia_admin_enqueue_assets(string $hook_suffix): void
         filemtime(ARTASIA_LOCATIONS_PATH . 'assets/admin.css')
     );
 
-    if (in_array($screen->post_type, ['artasia_partner', 'artasia_people', 'artasia_document'], true) && in_array($hook_suffix, ['post.php', 'post-new.php'], true)) {
-        wp_enqueue_media();
+    if (in_array($screen->post_type, ['artasia_partner', 'artasia_people', 'artasia_document', 'artasia_placement'], true) && in_array($hook_suffix, ['post.php', 'post-new.php'], true)) {
+        if (in_array($screen->post_type, ['artasia_partner', 'artasia_people', 'artasia_document'], true)) {
+            wp_enqueue_media();
+        }
         wp_enqueue_script(
             'artasia-locations-admin',
             ARTASIA_LOCATIONS_URL . 'assets/admin.js',

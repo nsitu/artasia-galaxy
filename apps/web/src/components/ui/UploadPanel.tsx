@@ -109,6 +109,22 @@ type PlacementMetaLine = {
   variant?: "location";
 };
 
+function getKnownCustomActivities(
+  assets: PlacementAsset[],
+  placementId: number | null,
+): string[] {
+  const activities = new Map<string, string>();
+  for (const asset of assets) {
+    if (placementId != null && asset.placement_id !== placementId) continue;
+    const value = asset.custom_activity?.trim();
+    if (!value) continue;
+    const key = value.toLocaleLowerCase();
+    if (!activities.has(key)) activities.set(key, value);
+  }
+
+  return [...activities.values()].sort((a, b) => a.localeCompare(b));
+}
+
 function ClearFilterButton({
   label,
   onClick,
@@ -730,8 +746,7 @@ export default function UploadPanel({
   useEffect(() => {
     if (
       workspaceMode !== "edit" ||
-      selectedAsset?.type !== "IMAGE" ||
-      !selectedAsset.placement_id
+      !selectedAsset?.placement_id
     ) {
       setEditNavigationAssets([]);
       return;
@@ -752,7 +767,7 @@ export default function UploadPanel({
     return () => {
       cancelled = true;
     };
-  }, [selectedAsset?.placement_id, selectedAsset?.type, workspaceMode]);
+  }, [selectedAsset?.placement_id, workspaceMode]);
 
   function formatBytes(bytes: number) {
     if (bytes < 1024) return `${bytes} B`;
@@ -4922,9 +4937,14 @@ export default function UploadPanel({
     const assignedPlacement = options?.placements.find(
       (placement) => placement.placement_id === selectedAsset.placement_id,
     );
+    const editPlacementId = Number.parseInt(managePlacementKey, 10);
     const navigationSource = editNavigationAssets.length > 0
       ? editNavigationAssets
       : placementAssets;
+    const knownCustomActivities = getKnownCustomActivities(
+      navigationSource,
+      Number.isFinite(editPlacementId) ? editPlacementId : null,
+    );
     const editableImages = navigationSource.filter(
       (asset) =>
         asset.type === "IMAGE" &&
@@ -5480,10 +5500,32 @@ export default function UploadPanel({
             </select>
           </label>
           {manageActivityTag === CUSTOM_ACTIVITY_OPTION && (
-            <label style={labelStyle}>
-              Custom Activity
+            <div style={labelStyle}>
+              <div style={customActivityLabelRowStyle}>
+                <span>Custom Activity</span>
+                {knownCustomActivities.length > 0 && (
+                  <div
+                    style={customActivitySuggestionsStyle}
+                    aria-label="Known custom activities for this placement"
+                  >
+                    {knownCustomActivities.map((activity) => (
+                      <button
+                        key={activity}
+                        type="button"
+                        style={customActivitySuggestionStyle}
+                        onClick={() => setManageCustomActivity(activity)}
+                        disabled={savingAsset}
+                        title={`Use custom activity: ${activity}`}
+                      >
+                        {activity}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <input
                 type="text"
+                aria-label="Custom Activity"
                 value={manageCustomActivity}
                 onChange={(event) => setManageCustomActivity(event.target.value)}
                 placeholder="e.g. One-off texture exploration"
@@ -5495,7 +5537,7 @@ export default function UploadPanel({
                 Assets with the same custom activity name will share an orbit in
                 the Atlas viewer.
               </span>
-            </label>
+            </div>
           )}
           {selectedAsset.mediaKind === "audio" && (
             <div style={labelStyle}>
@@ -7265,6 +7307,33 @@ const labelStyle: React.CSSProperties = {
   fontSize: 13,
   color: "#aaa",
   minWidth: 0,
+};
+
+const customActivityLabelRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  flexWrap: "wrap",
+};
+
+const customActivitySuggestionsStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 4,
+  flexWrap: "wrap",
+};
+
+const customActivitySuggestionStyle: React.CSSProperties = {
+  border: "1px solid rgba(216, 231, 255, 0.42)",
+  borderRadius: 999,
+  padding: "3px 8px",
+  background: "rgba(216, 231, 255, 0.12)",
+  color: "#d8e7ff",
+  font: "inherit",
+  fontSize: 11,
+  lineHeight: 1.2,
+  cursor: "pointer",
+  textAlign: "left",
 };
 
 const filterLabelWithIconStyle: React.CSSProperties = {

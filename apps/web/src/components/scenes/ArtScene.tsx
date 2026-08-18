@@ -37,6 +37,13 @@ const TERRAIN_GL_OPTIONS = {
   powerPreference: "default" as WebGLPowerPreference,
   failIfMajorPerformanceCaveat: false,
 };
+const CUSTOM_ACTIVITY_COLOURS = [
+  "#8e1d58",
+  "#c45b2c",
+  "#367b76",
+  "#6b5aa8",
+  "#9a7b1f",
+];
 type IntroPhase = "loading" | "ready" | "exiting" | "complete";
 const PARTNER_PATH_PREFIX = "/partners/";
 
@@ -82,6 +89,25 @@ function getPhotoActivityColour(
     ?.colour;
 }
 
+function getUniqueCustomActivities(values?: string[]): string[] {
+  const activities = new Map<string, string>();
+  for (const value of values ?? []) {
+    const normalized = value.trim();
+    if (!normalized) continue;
+    const key = normalized.toLocaleLowerCase();
+    if (!activities.has(key)) activities.set(key, normalized);
+  }
+  return [...activities.values()];
+}
+
+function customActivityFilterId(value: string): number {
+  let hash = 0;
+  for (const character of value.trim().toLocaleLowerCase()) {
+    hash = (hash * 31 + character.charCodeAt(0)) | 0;
+  }
+  return -Math.max(1, Math.abs(hash % 1000000000));
+}
+
 function getWordPressPostEditUrl(postId?: number): string | undefined {
   if (postId == null || !Number.isFinite(postId)) return undefined;
   return `https://artsforall.co/wp-admin/post.php?post=${encodeURIComponent(String(postId))}&action=edit`;
@@ -111,6 +137,7 @@ function LightboxMedia({
   onClick: React.MouseEventHandler<HTMLElement>;
 }) {
   const [loading, setLoading] = useState(active);
+  const customActivities = getUniqueCustomActivities(photo.customActivities);
   const mediaStyle: React.CSSProperties = {
     ...style,
     transform: active
@@ -146,6 +173,18 @@ function LightboxMedia({
         >
           format_quote
         </span>
+        {customActivities.length > 0 && (
+          <div style={anecdoteLightboxCustomActivityListStyle}>
+            {customActivities.map((activity) => (
+              <span
+                key={activity}
+                style={photoLightboxCustomActivityBadgeStyle}
+              >
+                {activity}
+              </span>
+            ))}
+          </div>
+        )}
         <div
           className="atlas-anecdote-lightbox-content"
           style={anecdoteLightboxContentStyle}
@@ -287,6 +326,7 @@ export default function ArtScene() {
   const fetchPhotos = useGalleryStore((s) => s.fetchPhotos);
   const photos = useGalleryStore((s) => s.photos);
   const photoScope = useGalleryStore((s) => s.photoScope);
+  const galleryLoading = useGalleryStore((s) => s.loading);
   const selectedPhotoIndex = useGalleryStore((s) => s.selectedPhotoIndex);
   const selectPhoto = useGalleryStore((s) => s.selectPhoto);
   const error = useGalleryStore((s) => s.error);
@@ -418,19 +458,86 @@ export default function ArtScene() {
   );
 
   const selectedPhoto = selectedPhotoIndex !== null ? photos[selectedPhotoIndex] : null;
-  const selectedActivityId = selectedActivityFilter
-    ? Number.parseInt(selectedActivityFilter, 10)
-    : undefined;
-  const lightboxPhotos = useMemo(() => {
+  const availableActivityFilterOptions = useMemo<ActivityOption[]>(() => {
     if (
+      !focusedPlacementDetails ||
       photoScope.mode !== "placement" ||
-      selectedActivityId == null ||
-      !Number.isFinite(selectedActivityId)
+      photoScope.placementId !== focusedPlacementDetails.placement_id ||
+      galleryLoading
     ) {
+      return [];
+    }
+
+    const activityCounts = new Map<number, number>();
+    const customActivities = new Map<string, { label: string; count: number }>();
+    for (const photo of photos) {
+      for (const activityId of new Set(photo.activityIds ?? [])) {
+        activityCounts.set(activityId, (activityCounts.get(activityId) ?? 0) + 1);
+      }
+      for (const activity of getUniqueCustomActivities(photo.customActivities)) {
+        const key = activity.toLocaleLowerCase();
+        const existing = customActivities.get(key);
+        if (existing) {
+          existing.count += 1;
+        } else {
+          customActivities.set(key, { label: activity, count: 1 });
+        }
+      }
+    }
+
+    const standardActivities = activityFilterOptions.flatMap((activity) => {
+      const count = activityCounts.get(activity.id) ?? 0;
+      return count > 0 ? [{ ...activity, count }] : [];
+    });
+    const customActivityOptions = [...customActivities.values()]
+      .sort((a, b) => a.label.localeCompare(b.label))
+      .map(({ label, count }, index) => ({
+        id: customActivityFilterId(label),
+        label,
+        count,
+        customActivity: label,
+        colour: CUSTOM_ACTIVITY_COLOURS[index % CUSTOM_ACTIVITY_COLOURS.length],
+      }));
+
+    return [...standardActivities, ...customActivityOptions];
+  }, [
+    activityFilterOptions,
+    focusedPlacementDetails,
+    galleryLoading,
+    photoScope,
+    photos,
+  ]);
+  const selectedActivityOption = availableActivityFilterOptions.find(
+    (activity) => String(activity.id) === selectedActivityFilter,
+  );
+  const selectedActivityId = selectedActivityOption?.customActivity
+    ? undefined
+    : selectedActivityOption?.id;
+  const selectedCustomActivity = selectedActivityOption?.customActivity
+    ?.trim()
+    .toLocaleLowerCase();
+  const lightboxPhotos = useMemo(() => {
+    if (photoScope.mode !== "placement" || selectedActivityOption == null) {
+      return photos;
+    }
+    if (selectedCustomActivity) {
+      return photos.filter((photo) =>
+        photo.customActivities?.some(
+          (activity) => activity.trim().toLocaleLowerCase() === selectedCustomActivity,
+        ),
+      );
+    }
+    if (selectedActivityId == null || !Number.isFinite(selectedActivityId)) {
       return photos;
     }
     return photos.filter((photo) => photo.activityIds?.includes(selectedActivityId));
-  }, [photoScope.mode, photos, selectedActivityId]);
+  }, [
+    photoScope.mode,
+    photos,
+    selectedActivityId,
+    selectedActivityOption,
+    selectedCustomActivity,
+  ]);
   const selectedLightboxIndex = selectedPhoto
     ? lightboxPhotos.findIndex((photo) => photo.id === selectedPhoto.id)
     : -1;
@@ -460,6 +567,11 @@ export default function ArtScene() {
       activityFilterOptions.find((activity) => activity.id === activityId),
     )
     .filter((activity): activity is ActivityOption => Boolean(activity)) ?? [];
+  const selectedCustomActivities = getUniqueCustomActivities(
+    selectedPhoto?.customActivities,
+  );
+  const selectedPhotoHasActivityBadges =
+    selectedPhotoActivities.length > 0 || selectedCustomActivities.length > 0;
   const selectedActivityDescriptions = selectedPhotoActivities.flatMap((activity) => {
     const description = activity.description?.trim();
     return description ? [{ id: activity.id, description }] : [];
@@ -500,17 +612,14 @@ export default function ArtScene() {
     };
   }, [selectedPhoto?.id]);
   const selectedActivityColour =
-    activityFilterOptions.find(
-      (activity) => String(activity.id) === selectedActivityFilter,
-    )?.colour;
+    selectedActivityOption?.colour;
 
   useEffect(() => {
     if (
       selectedPhotoIndex === null ||
       !selectedPhoto ||
       photoScope.mode !== "placement" ||
-      selectedActivityId == null ||
-      !Number.isFinite(selectedActivityId) ||
+      selectedActivityOption == null ||
       selectedLightboxIndex >= 0
     ) {
       return;
@@ -529,6 +638,7 @@ export default function ArtScene() {
     selectedLightboxIndex,
     selectedPhoto,
     selectedPhotoIndex,
+    selectedActivityOption,
   ]);
 
   useEffect(() => {
@@ -822,33 +932,10 @@ export default function ArtScene() {
 
   useEffect(() => {
     if (!selectedActivityFilter) return;
-    if (!activityFilterOptions.some((option) => String(option.id) === selectedActivityFilter)) {
+    if (!availableActivityFilterOptions.some((option) => String(option.id) === selectedActivityFilter)) {
       setSelectedActivityFilter("");
     }
-  }, [activityFilterOptions, selectedActivityFilter]);
-
-  useEffect(() => {
-    if (!focusedPlacementDetails) return;
-    if (
-      photoScope.mode !== "placement" ||
-      photoScope.placementId !== focusedPlacementDetails.placement_id
-    ) return;
-    if (!activityFilterOptions.length) return;
-
-    const counts = new Map<number, number>();
-    for (const photo of photos) {
-      for (const activityId of photo.activityIds ?? []) {
-        counts.set(activityId, (counts.get(activityId) ?? 0) + 1);
-      }
-    }
-
-    setActivityFilterOptions((prev) =>
-      prev.map((option) => ({
-        ...option,
-        count: counts.get(option.id) ?? 0,
-      })),
-    );
-  }, [focusedPlacementDetails, photoScope, photos, activityFilterOptions.length]);
+  }, [availableActivityFilterOptions, selectedActivityFilter]);
 
   useEffect(() => {
     if (!focusedPlacementDetails) setSelectedActivityFilter("");
@@ -929,7 +1016,7 @@ export default function ArtScene() {
             </div>
           )}
 
-          {focusedPlacementDetails && activityFilterOptions.length > 0 && (
+          {focusedPlacementDetails && availableActivityFilterOptions.length > 0 && (
             <div style={filterControlStyle}>
               <button
                 type="button"
@@ -949,7 +1036,7 @@ export default function ArtScene() {
                       }}
                     />
                   )}
-                  {activityFilterOptions.find((option) => String(option.id) === selectedActivityFilter)?.label || "Activities"}
+                  {selectedActivityOption?.label || "Activities"}
                 </span>
                 <ChevronIcon expanded={openFilter === "activity"} />
               </button>
@@ -958,23 +1045,19 @@ export default function ArtScene() {
                   <FilterOption active={!selectedActivityFilter} onSelect={() => {
                     setSelectedActivityFilter(""); setOpenFilter(null);
                   }}>All Activities ({photos.length})</FilterOption>
-                  {activityFilterOptions.map((option) => {
-                    const disabled = option.count === 0;
-                    return (
-                      <FilterOption
-                        key={option.id}
-                        active={selectedActivityFilter === String(option.id)}
-                        colour={option.colour}
-                        disabled={disabled}
-                        onSelect={() => {
-                          setSelectedActivityFilter(String(option.id));
-                          setOpenFilter(null);
-                        }}
-                      >
-                        {option.label} ({option.count ?? 0})
-                      </FilterOption>
-                    );
-                  })}
+                  {availableActivityFilterOptions.map((option) => (
+                    <FilterOption
+                      key={option.id}
+                      active={selectedActivityFilter === String(option.id)}
+                      colour={option.colour}
+                      onSelect={() => {
+                        setSelectedActivityFilter(String(option.id));
+                        setOpenFilter(null);
+                      }}
+                    >
+                      {option.label} ({option.count ?? 0})
+                    </FilterOption>
+                  ))}
                 </div>
               )}
             </div>
@@ -1264,7 +1347,7 @@ export default function ArtScene() {
                 className="atlas-lightbox-caption-header-content"
                 style={photoLightboxCaptionHeaderContentStyle}
               >
-                {selectedPhotoActivities.length > 0 ? (
+                {selectedPhotoHasActivityBadges ? (
                   <>
                     <div style={photoLightboxHeaderBadgeListStyle}>
                       {selectedPhotoActivities.map((activity) => (
@@ -1276,6 +1359,14 @@ export default function ArtScene() {
                           }}
                         >
                           {activity.label}
+                        </span>
+                      ))}
+                      {selectedCustomActivities.map((activity) => (
+                        <span
+                          key={`custom:${activity}`}
+                          style={photoLightboxCustomActivityBadgeStyle}
+                        >
+                          {activity}
                         </span>
                       ))}
                     </div>
@@ -1474,7 +1565,7 @@ export default function ArtScene() {
               selectedPartnerFilter={selectedPartnerFilter}
               selectedActivityFilter={selectedActivityFilter}
               selectedActivityColour={selectedActivityColour}
-              activityOptions={activityFilterOptions}
+              activityOptions={availableActivityFilterOptions}
             />
             <MapControls
               makeDefault
@@ -2436,6 +2527,13 @@ const anecdoteLightboxIconStyle: React.CSSProperties = {
   lineHeight: 0.72,
 };
 
+const anecdoteLightboxCustomActivityListStyle: React.CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 6,
+  marginBottom: 24,
+};
+
 const anecdoteLightboxContentStyle: React.CSSProperties = {
   fontSize: "clamp(18px, 2.4vw, 26px)",
   lineHeight: 1.55,
@@ -2707,6 +2805,13 @@ const photoLightboxActivityBadgeStyle: React.CSSProperties = {
   fontSize: 11,
   fontWeight: 700,
   lineHeight: 1.2,
+};
+
+const photoLightboxCustomActivityBadgeStyle: React.CSSProperties = {
+  ...photoLightboxActivityBadgeStyle,
+  background: "rgba(216, 231, 255, 0.14)",
+  border: "1px solid rgba(216, 231, 255, 0.5)",
+  color: "#d8e7ff",
 };
 
 const photoLightboxAudioStyle: React.CSSProperties = {

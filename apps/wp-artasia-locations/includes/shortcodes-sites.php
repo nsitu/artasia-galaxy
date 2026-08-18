@@ -82,13 +82,9 @@ function artasia_get_gallery_availability(): ?array
     return is_array($stale) ? $stale : null;
 }
 
-function artasia_get_placement_gallery_url(int $placement_id, ?array $gallery_availability): string
+function artasia_get_placement_atlas_url(int $placement_id): string
 {
     if (get_post_type($placement_id) !== 'artasia_placement' || get_post_status($placement_id) !== 'publish') {
-        return '';
-    }
-
-    if (is_array($gallery_availability) && empty($gallery_availability[(string) $placement_id])) {
         return '';
     }
 
@@ -98,6 +94,20 @@ function artasia_get_placement_gallery_url(int $placement_id, ?array $gallery_av
     }
 
     return artasia_atlas_base_url() . '/sites/' . rawurlencode($placement_slug);
+}
+
+function artasia_get_placement_gallery_url(int $placement_id, ?array $gallery_availability): string
+{
+    $atlas_url = artasia_get_placement_atlas_url($placement_id);
+    if ($atlas_url === '') {
+        return '';
+    }
+
+    if (is_array($gallery_availability) && empty($gallery_availability[(string) $placement_id])) {
+        return '';
+    }
+
+    return $atlas_url;
 }
 
 function artasia_render_sites(int $project_id): string

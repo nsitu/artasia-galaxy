@@ -697,21 +697,35 @@ export default function TerrainGallery({
       (placement) => placement.partner_name?.trim() === selectedPartnerFilter,
     );
   }, [placements, selectedPartnerFilter]);
-  const selectedActivityId = useMemo(() => {
-    if (!selectedActivityFilter) return undefined;
-    const value = parseInt(selectedActivityFilter, 10);
-    return Number.isFinite(value) ? value : undefined;
-  }, [selectedActivityFilter]);
+  const selectedActivityOption = useMemo(
+    () => activityOptions.find(
+      (option) => String(option.id) === selectedActivityFilter,
+    ),
+    [activityOptions, selectedActivityFilter],
+  );
+  const selectedActivityId = selectedActivityOption?.customActivity
+    ? undefined
+    : selectedActivityOption?.id;
+  const selectedCustomActivity = selectedActivityOption?.customActivity
+    ?.trim()
+    .toLocaleLowerCase();
   const photosForCurrentView = useMemo(() => {
     if (focusedPlacement) {
       if (!isMatchingPlacementPhotoScope(photoScope, focusedPlacement.placement_id)) {
         return [];
       }
+      if (selectedCustomActivity) {
+        return photos.filter((photo) =>
+          photo.customActivities?.some(
+            (activity) => activity.trim().toLocaleLowerCase() === selectedCustomActivity,
+          ),
+        );
+      }
       if (selectedActivityId == null) return photos;
       return photos.filter((photo) => photo.activityIds?.includes(selectedActivityId));
     }
     return photoScope.mode === "regional" ? photos : [];
-  }, [focusedPlacement, photoScope, photos, selectedActivityId]);
+  }, [focusedPlacement, photoScope, photos, selectedActivityId, selectedCustomActivity]);
   const photoIndexById = useMemo(
     () => new Map(photos.map((photo, index) => [photo.id, index])),
     [photos],
@@ -820,18 +834,26 @@ export default function TerrainGallery({
   }, [focusedPlacement, projection, projectionMatchesRequest, terrain]);
   const localPhotoLayout = useMemo<LocalPhotoLayoutItem[]>(() => {
     if (!focusedPlacementCenter) return [];
+    const standardActivityOptions = activityOptions.filter(
+      (option) => !option.customActivity,
+    );
     const customActivityNames = [
       ...new Set(
-        photosForCurrentView.flatMap((photo) =>
-          (photo.customActivities ?? [])
-            .map((activity) => activity.trim().toLocaleLowerCase())
-            .filter(Boolean),
-        ),
+        [
+          ...activityOptions
+            .filter((option) => option.customActivity)
+            .map((option) => option.customActivity!.trim().toLocaleLowerCase()),
+          ...photosForCurrentView.flatMap((photo) =>
+            (photo.customActivities ?? [])
+              .map((activity) => activity.trim().toLocaleLowerCase())
+              .filter(Boolean),
+          ),
+        ],
       ),
     ].sort((a, b) => a.localeCompare(b));
-    const activityGroupCount = activityOptions.length + customActivityNames.length;
+    const activityGroupCount = standardActivityOptions.length + customActivityNames.length;
     const orbitForPhoto = (photo: Photo) => {
-      const activity = activityOptions.find((option) =>
+      const activity = standardActivityOptions.find((option) =>
         photo.activityIds?.includes(option.id),
       );
       const customActivity = (photo.customActivities ?? [])
@@ -841,9 +863,9 @@ export default function TerrainGallery({
         ? customActivityNames.indexOf(customActivity)
         : -1;
       const rank = customActivityIndex >= 0
-        ? activityOptions.length + customActivityIndex
+        ? standardActivityOptions.length + customActivityIndex
         : activity
-        ? activityOptions.findIndex((option) => option.id === activity.id)
+        ? standardActivityOptions.findIndex((option) => option.id === activity.id)
         : -1;
       const outerRank = Math.max(0, activityGroupCount - 1);
       const currentOuterRadius = 0.78 + outerRank * 0.3;
@@ -2641,14 +2663,14 @@ function PlacementInfoPanel({
                 <a
                   href={adminHref}
                   className="atlas-control-surface atlas-placement-action-link"
-                  aria-label="Open Atlas Admin"
-                  title="Open Atlas Admin"
+                  aria-label="Manage assets in Atlas"
+                  title="Manage assets in Atlas"
                   style={siteDetailsActionLinkStyle}
                 >
                   <span aria-hidden="true" style={siteDetailsActionIconStyle}>
                     settings
                   </span>
-                  <span className="atlas-placement-action-label">Admin</span>
+                  <span className="atlas-placement-action-label">Manage Assets</span>
                 </a>
               )}
               {wordpressHref && (
@@ -2657,14 +2679,14 @@ function PlacementInfoPanel({
                   className="atlas-control-surface atlas-placement-action-link"
                   target="_blank"
                   rel="noopener noreferrer"
-                  aria-label="Edit placement in WordPress"
-                  title="Edit placement in WordPress"
+                  aria-label="Edit site metadata in WordPress"
+                  title="Edit site metadata in WordPress"
                   style={siteDetailsActionLinkStyle}
                 >
                   <span aria-hidden="true" style={siteDetailsActionIconStyle}>
                     page_info
                   </span>
-                  <span className="atlas-placement-action-label">WordPress</span>
+                  <span className="atlas-placement-action-label">Site Metadata</span>
                 </a>
               )}
               {onView && (
