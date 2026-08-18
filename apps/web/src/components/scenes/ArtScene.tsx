@@ -1040,15 +1040,15 @@ export default function ArtScene() {
                 <span>
                   {educatorFilterOptions.find(
                     (option) => option.value === selectedEducatorFilter,
-                  )?.label || "Educators"}
+                  )?.label || "Artist Educators"}
                 </span>
                 <ChevronIcon expanded={openFilter === "educator"} />
               </button>
               {openFilter === "educator" && (
-                <div className="atlas-educator-filter-menu" role="listbox" aria-label="Filter placements by educator" style={filterMenuStyle}>
+                <div className="atlas-educator-filter-menu" role="listbox" aria-label="Filter placements by artist educator" style={filterMenuStyle}>
                   <FilterOption active={!selectedEducatorFilter} onSelect={() => {
                     setSelectedEducatorFilter(""); setOpenFilter(null);
-                  }}>All educators</FilterOption>
+                  }}>All artist educators</FilterOption>
                   {educatorFilterOptions.map((option) => (
                     <FilterOption key={option.value} active={selectedEducatorFilter === option.value} onSelect={() => {
                       setSelectedEducatorFilter(option.value); setOpenFilter(null);
