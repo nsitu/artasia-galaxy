@@ -26,6 +26,7 @@ const DEFAULT_TERRAIN_CAMERA_POSITION: [number, number, number] = [0, -12, 10];
 const TERRAIN_MAP_HEADING = 0;
 const TERRAIN_MIN_TILT = 2.1;
 const TERRAIN_MAX_TILT = 2.75;
+const PEOPLE_PATH_PREFIX = "/people/";
 const TERRAIN_MAP_MOUSE_BUTTONS = {
   LEFT: THREE.MOUSE.PAN,
   MIDDLE: THREE.MOUSE.DOLLY,
@@ -344,6 +345,9 @@ export default function ArtScene() {
   const [selectedEducatorFilter, setSelectedEducatorFilter] = useState("");
   const [requestedPartnerSlug, setRequestedPartnerSlug] = useState(() =>
     getPartnerSlugFromPath(window.location.pathname),
+  );
+  const [requestedEducatorSlug, setRequestedEducatorSlug] = useState(() =>
+    getEducatorSlugFromPath(window.location.pathname),
   );
   const [activityFilterOptions, setActivityFilterOptions] = useState<ActivityOption[]>([]);
   const [selectedActivityFilter, setSelectedActivityFilter] = useState("");
@@ -881,9 +885,30 @@ export default function ArtScene() {
     setFocusedPlacementDetails(placement);
   }, []);
   const handlePartnerNavigation = useCallback((partner: string) => {
+    setSelectedEducatorFilter("");
     setSelectedPartnerFilter(partner);
     updatePartnerPath(partner);
   }, []);
+  const handleEducatorFilterSelection = useCallback((educator: string) => {
+    const normalizedEducator = educator.trim().replace(/\s+/g, " ");
+    setSelectedEducatorFilter(normalizedEducator.toLocaleLowerCase());
+    updateEducatorPath(normalizedEducator);
+  }, []);
+  const handleEducatorNavigation = useCallback((educator: string) => {
+    const hasFocusedPlacement = Boolean(backAction);
+    const normalizedEducator = educator.trim().replace(/\s+/g, " ");
+    setSelectedPartnerFilter("");
+    setSelectedEducatorFilter(normalizedEducator.toLocaleLowerCase());
+    if (hasFocusedPlacement) {
+      backAction?.();
+      // Returning from a placement first restores the regional route. Replace
+      // that intermediate route so the educator URL is the only new history
+      // entry for this navigation.
+      updateEducatorPath(normalizedEducator, true);
+    } else {
+      updateEducatorPath(normalizedEducator);
+    }
+  }, [backAction]);
   const handleTopPartnerLogoClick = useCallback((
     event: React.MouseEvent<HTMLAnchorElement>,
     partner: string,
@@ -904,6 +929,7 @@ export default function ArtScene() {
   useEffect(() => {
     if (!selectedPartnerFilter) return;
     if (!partnerFilterOptions.some((option) => option.value === selectedPartnerFilter)) {
+      setSelectedEducatorFilter("");
       setSelectedPartnerFilter("");
     }
   }, [partnerFilterOptions, selectedPartnerFilter]);
@@ -919,6 +945,9 @@ export default function ArtScene() {
     const onPopState = () => {
       setRequestedPartnerSlug(
         getPartnerSlugFromPath(window.location.pathname),
+      );
+      setRequestedEducatorSlug(
+        getEducatorSlugFromPath(window.location.pathname),
       );
     };
     window.addEventListener("popstate", onPopState);
@@ -937,8 +966,24 @@ export default function ArtScene() {
         normalizePartnerSlug(slugifyPartnerName(option.value)) ===
         normalizePartnerSlug(requestedPartnerSlug),
     );
+    setSelectedEducatorFilter("");
     setSelectedPartnerFilter(partner?.value ?? "");
   }, [partnerFilterOptions, requestedPartnerSlug]);
+
+  useEffect(() => {
+    if (educatorFilterOptions.length === 0) return;
+    if (!requestedEducatorSlug) {
+      setSelectedEducatorFilter("");
+      return;
+    }
+
+    const educator = educatorFilterOptions.find(
+      (option) =>
+        normalizePartnerSlug(slugifyPartnerName(option.label)) ===
+        normalizePartnerSlug(requestedEducatorSlug),
+    );
+    setSelectedEducatorFilter(educator?.value ?? "");
+  }, [educatorFilterOptions, requestedEducatorSlug]);
 
   useEffect(() => {
     if (!selectedActivityFilter) return;
@@ -1015,11 +1060,11 @@ export default function ArtScene() {
               {openFilter === "partner" && (
                 <div className="atlas-partner-filter-menu" role="listbox" aria-label="Filter placements by partner" style={filterMenuStyle}>
                   <FilterOption active={!selectedPartnerFilter} onSelect={() => {
-                    setSelectedPartnerFilter(""); updatePartnerPath(""); setOpenFilter(null);
+                    setSelectedEducatorFilter(""); setSelectedPartnerFilter(""); updatePartnerPath(""); setOpenFilter(null);
                   }}>All partners</FilterOption>
                   {partnerFilterOptions.map((option) => (
                     <FilterOption key={option.value} active={selectedPartnerFilter === option.value} onSelect={() => {
-                      setSelectedPartnerFilter(option.value); updatePartnerPath(option.value); setOpenFilter(null);
+                      setSelectedEducatorFilter(""); setSelectedPartnerFilter(option.value); updatePartnerPath(option.value); setOpenFilter(null);
                     }}>{option.label} ({option.count})</FilterOption>
                   ))}
                 </div>
@@ -1047,11 +1092,11 @@ export default function ArtScene() {
               {openFilter === "educator" && (
                 <div className="atlas-educator-filter-menu" role="listbox" aria-label="Filter placements by artist educator" style={filterMenuStyle}>
                   <FilterOption active={!selectedEducatorFilter} onSelect={() => {
-                    setSelectedEducatorFilter(""); setOpenFilter(null);
+                    setSelectedEducatorFilter(""); updateEducatorPath(""); setOpenFilter(null);
                   }}>All artist educators</FilterOption>
                   {educatorFilterOptions.map((option) => (
                     <FilterOption key={option.value} active={selectedEducatorFilter === option.value} onSelect={() => {
-                      setSelectedEducatorFilter(option.value); setOpenFilter(null);
+                      handleEducatorFilterSelection(option.label); setOpenFilter(null);
                     }}>{option.label} ({option.count})</FilterOption>
                   ))}
                 </div>
@@ -1195,6 +1240,8 @@ export default function ArtScene() {
           placement={focusedPlacementDetails}
           partnerHref={getPartnerPath(focusedPlacementDetails.partner_name || "")}
           onPartnerSelect={handlePartnerNavigation}
+          educatorHref={getEducatorPath}
+          onEducatorSelect={handleEducatorNavigation}
           previousAction={placementNavigation?.previous}
           nextAction={placementNavigation?.next}
           adminHref={
@@ -1215,6 +1262,8 @@ export default function ArtScene() {
           onOpen={previewPlacementAction}
           partnerHref={getPartnerPath(previewPlacementDetails.partner_name || "")}
           onPartnerSelect={handlePartnerNavigation}
+          educatorHref={getEducatorPath}
+          onEducatorSelect={handleEducatorNavigation}
           previousAction={placementNavigation?.previous}
           nextAction={placementNavigation?.next}
           adminHref={
@@ -1729,6 +1778,12 @@ function getPartnerSlugFromPath(pathname: string) {
   return slug ? decodeURIComponent(slug) : null;
 }
 
+function getEducatorSlugFromPath(pathname: string) {
+  if (!pathname.startsWith(PEOPLE_PATH_PREFIX)) return null;
+  const slug = pathname.slice(PEOPLE_PATH_PREFIX.length).split("/")[0] ?? "";
+  return slug ? decodeURIComponent(slug) : null;
+}
+
 function normalizePartnerSlug(value: string) {
   return value.trim().toLowerCase();
 }
@@ -1749,10 +1804,25 @@ function updatePartnerPath(partner: string) {
   window.dispatchEvent(new PopStateEvent("popstate"));
 }
 
+function updateEducatorPath(educator: string, replace = false) {
+  const path = getEducatorPath(educator);
+  if (window.location.pathname === path) return;
+  if (replace) window.history.replaceState(null, "", path);
+  else window.history.pushState(null, "", path);
+  window.dispatchEvent(new PopStateEvent("popstate"));
+}
+
 function getPartnerPath(partner: string) {
   const slug = slugifyPartnerName(partner);
   return slug
     ? `${PARTNER_PATH_PREFIX}${encodeURIComponent(slug)}`
+    : "/";
+}
+
+function getEducatorPath(educator: string) {
+  const slug = slugifyPartnerName(educator);
+  return slug
+    ? `${PEOPLE_PATH_PREFIX}${encodeURIComponent(slug)}`
     : "/";
 }
 
@@ -2038,6 +2108,15 @@ const responsiveTopNavStyles = `
   .atlas-control-surface:focus-visible {
     background-color: rgba(142, 29, 88, 0.3);
       background-image: linear-gradient(45deg, rgba(142, 29, 88, 0.3) 0%, rgba(242, 139, 32, 0.3) 100%) !important;
+  }
+
+  .atlas-placement-gallery-action,
+  .atlas-placement-gallery-action:hover,
+  .atlas-placement-gallery-action:focus-visible {
+    background-color: #c7ec9d !important;
+    background-image: none !important;
+    border-color: #c7ec9d !important;
+    color: #172015 !important;
   }
 
   @container placement-actions (max-width: 650px) {

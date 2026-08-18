@@ -162,7 +162,7 @@ const buttonStyle: React.CSSProperties = {
   marginTop: 8,
   padding: "12px 22px",
   border: "1px solid #c7ec9d",
-  borderRadius: 999,
+  borderRadius: 0,
   background: "#c7ec9d",
   color: "#172015",
   fontFamily: "inherit",

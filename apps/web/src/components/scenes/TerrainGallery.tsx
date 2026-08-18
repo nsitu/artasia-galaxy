@@ -2461,6 +2461,8 @@ export function FocusedPlacementOverlay({
   wordpressHref,
   partnerHref,
   onPartnerSelect,
+  educatorHref,
+  onEducatorSelect,
   previousAction,
   nextAction,
 }: {
@@ -2469,6 +2471,8 @@ export function FocusedPlacementOverlay({
   wordpressHref?: string;
   partnerHref?: string;
   onPartnerSelect?: (partner: string) => void;
+  educatorHref?: (educator: string) => string;
+  onEducatorSelect?: (educator: string) => void;
   previousAction?: () => void;
   nextAction?: () => void;
 }) {
@@ -2479,6 +2483,8 @@ export function FocusedPlacementOverlay({
       wordpressHref={wordpressHref}
       partnerHref={partnerHref}
       onPartnerSelect={onPartnerSelect}
+      educatorHref={educatorHref}
+      onEducatorSelect={onEducatorSelect}
       previousAction={previousAction}
       nextAction={nextAction}
     />
@@ -2491,6 +2497,8 @@ function PlacementInfoPanel({
   wordpressHref,
   partnerHref,
   onPartnerSelect,
+  educatorHref,
+  onEducatorSelect,
   onView,
   previousAction,
   nextAction,
@@ -2501,6 +2509,8 @@ function PlacementInfoPanel({
   wordpressHref?: string;
   partnerHref?: string;
   onPartnerSelect?: (partner: string) => void;
+  educatorHref?: (educator: string) => string;
+  onEducatorSelect?: (educator: string) => void;
   onView?: () => void;
   previousAction?: () => void;
   nextAction?: () => void;
@@ -2525,6 +2535,7 @@ function PlacementInfoPanel({
   const partnerLinkEnabled = Boolean(
     partnerName && partnerHref && onPartnerSelect,
   );
+  const educatorLinkEnabled = Boolean(educatorHref && onEducatorSelect);
   const handlePartnerLinkClick = (
     event: MouseEvent<HTMLAnchorElement>,
   ) => {
@@ -2540,6 +2551,23 @@ function PlacementInfoPanel({
     }
     event.preventDefault();
     onPartnerSelect?.(partnerName!);
+  };
+  const handleEducatorLinkClick = (
+    event: MouseEvent<HTMLAnchorElement>,
+    educator: string,
+  ) => {
+    if (
+      !educatorLinkEnabled ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return;
+    }
+    event.preventDefault();
+    onEducatorSelect?.(educator);
   };
 
   useEffect(() => {
@@ -2685,7 +2713,30 @@ function PlacementInfoPanel({
               label={peopleLabel}
               icon="person"
               value={
-                people.map((person) => person.name).join(", ") || "Unassigned"
+                people.length > 0
+                  ? people.map((person, index) => {
+                      const educatorName = person.name.trim();
+                      return (
+                        <span key={`${educatorName}-${index}`}>
+                          {index > 0 ? ", " : null}
+                          {educatorLinkEnabled ? (
+                            <a
+                              href={educatorHref?.(educatorName)}
+                              onClick={(event) =>
+                                handleEducatorLinkClick(event, educatorName)
+                              }
+                              aria-label={`View ${educatorName} placements`}
+                              style={siteDetailsPartnerNameLinkStyle}
+                            >
+                              {educatorName}
+                            </a>
+                          ) : (
+                            educatorName
+                          )}
+                        </span>
+                      );
+                    })
+                  : "Unassigned"
               }
               separated={Boolean(participantDetails)}
             />
@@ -2754,11 +2805,11 @@ function PlacementInfoPanel({
               {onView && (
                 <button
                   type="button"
-                  className="atlas-control-surface atlas-placement-action-link"
+                  className="atlas-control-surface atlas-placement-action-link atlas-placement-gallery-action"
                   onClick={onView}
                   aria-label="View gallery"
                   title="View gallery"
-                  style={siteDetailsActionLinkStyle}
+                  style={siteDetailsGalleryActionLinkStyle}
                 >
                   <span aria-hidden="true" style={siteDetailsActionIconStyle}>
                     photo_prints
@@ -2837,6 +2888,8 @@ export function PlacementPreviewPanel({
   wordpressHref,
   partnerHref,
   onPartnerSelect,
+  educatorHref,
+  onEducatorSelect,
   previousAction,
   nextAction,
 }: {
@@ -2846,6 +2899,8 @@ export function PlacementPreviewPanel({
   wordpressHref?: string;
   partnerHref?: string;
   onPartnerSelect?: (partner: string) => void;
+  educatorHref?: (educator: string) => string;
+  onEducatorSelect?: (educator: string) => void;
   previousAction?: () => void;
   nextAction?: () => void;
 }) {
@@ -2856,6 +2911,8 @@ export function PlacementPreviewPanel({
       wordpressHref={wordpressHref}
       partnerHref={partnerHref}
       onPartnerSelect={onPartnerSelect}
+      educatorHref={educatorHref}
+      onEducatorSelect={onEducatorSelect}
       onView={onOpen}
       previousAction={previousAction}
       nextAction={nextAction}
@@ -2899,7 +2956,7 @@ function SiteDetail({
 }: {
   label: string;
   icon: string;
-  value: string;
+  value: React.ReactNode;
   separated?: boolean;
 }) {
   return (
@@ -3271,6 +3328,13 @@ const siteDetailsActionLinkStyle: React.CSSProperties = {
   cursor: "pointer",
   pointerEvents: "auto",
   whiteSpace: "nowrap",
+};
+
+const siteDetailsGalleryActionLinkStyle: React.CSSProperties = {
+  ...siteDetailsActionLinkStyle,
+  borderColor: "#c7ec9d",
+  background: "#c7ec9d",
+  color: "#172015",
 };
 
 const siteDetailsActionIconStyle: React.CSSProperties = {
