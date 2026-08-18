@@ -56,6 +56,7 @@ import {
   getActivityTagNames,
   getUploadConfig,
   customActivityTag,
+  getCustomActivityFromValues,
   getCustomActivityTagValue,
   isCustomActivityTagName,
   placementAnchorTag,
@@ -1216,6 +1217,14 @@ function mapEmbeddedAssetMetadata(
     const assignment: AssetManagementAssignment = {};
     const assetAdjustments = { ...DEFAULT_ASSET_ADJUSTMENTS };
     let hasAdjustments = false;
+    const customActivity = getCustomActivityFromValues(
+      (asset.tags ?? []).flatMap((tag) => [tag.name, tag.value]),
+    );
+    if (customActivity) {
+      assignment.customActivity = customActivity;
+      assignment.activityId = undefined;
+      assignment.activityLabel = undefined;
+    }
 
     for (const key of keys) {
       const placement = placementsByTag.get(key);
@@ -1232,12 +1241,6 @@ function mapEmbeddedAssetMetadata(
       if (activity && !assignment.customActivity) {
         assignment.activityId = activity.id;
         assignment.activityLabel = activity.label;
-      }
-      const customActivity = getCustomActivityTagValue(key);
-      if (customActivity) {
-        assignment.customActivity = customActivity;
-        assignment.activityId = undefined;
-        assignment.activityLabel = undefined;
       }
       if (/^icon:[a-z0-9_]+$/.test(key)) {
         assignment.iconName = key.slice("icon:".length);

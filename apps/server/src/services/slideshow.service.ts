@@ -2,6 +2,7 @@ import { getPublishedAlbum, listTags, searchAssetIdsByTag, searchAssetIdsByTags,
 import { DEFAULT_ASSET_ADJUSTMENTS, getAssetAdjustmentMap, type AssetAdjustments } from "./assetAdjustments.service.js";
 import {
   activityAnchorTag,
+  getCustomActivityFromValues,
   getCustomActivityTagValue,
   displayPlacementTag,
   getUploadConfig,
@@ -237,6 +238,15 @@ async function mapEmbeddedFocusedMetadata(assets: ImmichAsset[]) {
   for (const asset of assets) {
     const adjustments = { ...DEFAULT_ASSET_ADJUSTMENTS };
     let hasAdjustments = false;
+    const customActivity = getCustomActivityFromValues(
+      (asset.tags ?? []).flatMap((tag) => [tag.name, tag.value]),
+    );
+    if (customActivity) {
+      const customActivities =
+        customActivitiesByAssetId.get(asset.id) ?? new Set<string>();
+      customActivities.add(customActivity);
+      customActivitiesByAssetId.set(asset.id, customActivities);
+    }
     for (const key of embeddedTagKeys(asset)) {
       if (key === "media:audio") audioAssetIds.add(asset.id);
       if (key === "artasia:gps:disabled") gpsDisabledAssetIds.add(asset.id);
@@ -256,13 +266,6 @@ async function mapEmbeddedFocusedMetadata(assets: ImmichAsset[]) {
           activityIdsByAssetId.get(asset.id) ?? new Set<number>();
         activityIds.add(activityId);
         activityIdsByAssetId.set(asset.id, activityIds);
-      }
-      const customActivity = getCustomActivityTagValue(key);
-      if (customActivity) {
-        const customActivities =
-          customActivitiesByAssetId.get(asset.id) ?? new Set<string>();
-        customActivities.add(customActivity);
-        customActivitiesByAssetId.set(asset.id, customActivities);
       }
 
       const adjustmentMatch = key.match(

@@ -26,6 +26,14 @@ export function getCustomActivityTagValue(value: string): string | null {
   return customActivity || null;
 }
 
+export function getCustomActivityFromValues(values: Iterable<string>): string | null {
+  for (const value of values) {
+    const customActivity = getCustomActivityTagValue(value);
+    if (customActivity) return customActivity;
+  }
+  return null;
+}
+
 export function isCustomActivityTagName(value: string): boolean {
   return getCustomActivityTagValue(value) !== null;
 }
