@@ -60,6 +60,27 @@ function getContrastingTextColour(backgroundColour: string): string | undefined 
   return whiteContrast >= blackContrast ? "#fff" : "#000";
 }
 
+function getTranslucentActivityColour(colour?: string): string {
+  const hex = colour?.trim().replace(/^#/, "") ?? "";
+  const expandedHex = /^[0-9a-f]{3}$/i.test(hex)
+    ? hex.split("").map((character) => character.repeat(2)).join("")
+    : hex;
+
+  return /^[0-9a-f]{6}$/i.test(expandedHex)
+    ? `#${expandedHex}66`
+    : "#8e1d5866";
+}
+
+function getPhotoActivityColour(
+  photo: Photo | null,
+  activities: ActivityOption[],
+): string | undefined {
+  return photo?.activityIds
+    ?.map((activityId) => activities.find((activity) => activity.id === activityId))
+    .find((activity) => activity?.colour?.trim())
+    ?.colour;
+}
+
 function LightboxMedia({
   photo,
   active,
@@ -94,6 +115,7 @@ function LightboxMedia({
         aria-hidden={!active}
         style={{
           ...anecdoteLightboxStyle,
+          background: getTranslucentActivityColour(activityColour),
           transform: mediaStyle.transform,
           transformOrigin: mediaStyle.transformOrigin,
         }}
@@ -364,9 +386,18 @@ export default function ArtScene() {
     return description ? [{ id: activity.id, description }] : [];
   });
   const selectedActivityPreview = selectedActivityDescriptions[0]?.description;
-  const selectedAudioActivityColour = selectedPhotoActivities.find(
-    (activity) => activity.colour?.trim(),
-  )?.colour;
+  const selectedPhotoActivityColour = getPhotoActivityColour(
+    selectedPhoto,
+    activityFilterOptions,
+  );
+  const previousActivityColour = getPhotoActivityColour(
+    lightboxPreviousPhoto,
+    activityFilterOptions,
+  );
+  const nextActivityColour = getPhotoActivityColour(
+    lightboxNextPhoto,
+    activityFilterOptions,
+  );
   useEffect(() => {
     if (lightboxSwipeTimerRef.current !== null) {
       window.clearTimeout(lightboxSwipeTimerRef.current);
@@ -993,6 +1024,7 @@ export default function ArtScene() {
                     key={`${lightboxPreviousPhoto.id}-adjacent`}
                     photo={lightboxPreviousPhoto}
                     active={false}
+                    activityColour={previousActivityColour}
                     style={{
                       ...photoLightboxImageStyle,
                       ...photoAdjustmentFilterStyle(lightboxPreviousPhoto.adjustments),
@@ -1008,7 +1040,7 @@ export default function ArtScene() {
                   active
                   zoom={lightboxZoom}
                   pan={lightboxPan}
-                  activityColour={selectedAudioActivityColour}
+                  activityColour={selectedPhotoActivityColour}
                   style={{
                     ...photoLightboxImageStyle,
                     ...photoAdjustmentFilterStyle(selectedPhoto.adjustments),
@@ -1022,6 +1054,7 @@ export default function ArtScene() {
                     key={`${lightboxNextPhoto.id}-adjacent`}
                     photo={lightboxNextPhoto}
                     active={false}
+                    activityColour={nextActivityColour}
                     style={{
                       ...photoLightboxImageStyle,
                       ...photoAdjustmentFilterStyle(lightboxNextPhoto.adjustments),
@@ -2220,14 +2253,14 @@ const photoLightboxImageStyle: React.CSSProperties = {
 };
 
 const anecdoteLightboxStyle: React.CSSProperties = {
-  width: "min(680px, calc(100vw - 64px))",
+  width: "min(1000px, calc(100vw - 64px))",
   maxHeight: "calc(100% - 32px)",
   boxSizing: "border-box",
   overflowY: "auto",
   padding: "clamp(28px, 6vw, 64px)",
-  border: "1px solid rgba(255,255,255,0.14)",
-  borderRadius: 24,
-  background: "rgba(20, 24, 32, 0.94)",
+  border: 0,
+  borderRadius: 0,
+  background: "#8e1d5866",
   boxShadow: "0 18px 60px rgba(0,0,0,0.5)",
   color: "#eef2f8",
   cursor: "default",
