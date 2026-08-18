@@ -26,6 +26,14 @@
       );
     }
 
+    function scrollToPageTop() {
+      window.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: 'auto'
+      });
+    }
+
     function setCurrentLink(slug) {
       viewer.querySelectorAll('[data-documentation-slug]').forEach(function (link) {
         if (link.dataset.documentationSlug === slug) {
@@ -75,6 +83,8 @@
         requestController = null;
       }
 
+      scrollToPageTop();
+
       detail.hidden = true;
       directory.hidden = false;
       viewer.classList.remove('is-loading');
@@ -96,6 +106,7 @@
       if (requestController) {
         requestController.abort();
       }
+      scrollToPageTop();
       requestController = new AbortController();
       var activeController = requestController;
       viewer.classList.add('is-loading');
@@ -198,6 +209,7 @@
       return link.getAttribute('aria-current') === 'page';
     });
     if (initial) {
+      scrollToPageTop();
       updateRelated(initial.dataset.documentationSlug);
     } else if (related) {
       related.hidden = true;

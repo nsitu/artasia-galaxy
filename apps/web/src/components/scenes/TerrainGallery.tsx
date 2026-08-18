@@ -853,6 +853,11 @@ export default function TerrainGallery({
         width: item.photo.width,
         height: item.photo.height,
         isDenseOrbit: item.orbitAssetCount >= 5,
+        isEngaged: item.sourceIndex === hoveredIndex || (
+          item.photo.mediaKind !== "audio" &&
+          item.photo.mediaKind !== "anecdote" &&
+          item.sourceIndex === selectedIndex
+        ),
       });
       const existingRing = rings.get(item.activityId);
       if (existingRing) {
@@ -867,7 +872,7 @@ export default function TerrainGallery({
       });
     }
     return [...rings.values()];
-  }, [localPhotoLayout]);
+  }, [hoveredIndex, localPhotoLayout, selectedIndex]);
 
   useEffect(() => {
     const placementId = focusedPlacement?.placement_id ?? null;

@@ -716,11 +716,37 @@ const AUDIO_ICON_RING_OUTER_RADIUS = 0.41;
 const AUDIO_ICON_SIZE = 0.82;
 const AUDIO_ICON_BACKGROUND_OPACITY = 0.46;
 
-export interface OrbitGapMotion {
+interface OrbitWakeCycle {
+  phase: number;
+  period: number;
+  visibleRatio: number;
+  indicatorScale: number;
+  indicatorShade: number;
+}
+
+interface OrbitIconPulse {
   phase: number;
   speed: number;
-  coreHalfAngle: number;
-  outerHalfAngle: number;
+}
+
+export interface OrbitGapMotion {
+  id: string;
+  phase: number;
+  speed: number;
+  visualHalfWidth: number;
+  scaleMotion:
+    | {
+        kind: "banner";
+        isDenseOrbit: boolean;
+        isEngaged: boolean;
+        wakeCycle: OrbitWakeCycle;
+      }
+    | {
+        kind: "icon";
+        isDenseOrbit: boolean;
+        isEngaged: boolean;
+        pulse: OrbitIconPulse;
+      };
 }
 
 export function getOrbitMotion(id: string, radius?: number) {
@@ -731,6 +757,92 @@ export function getOrbitMotion(id: string, radius?: number) {
   };
 }
 
+function getOrbitWakeCycle(id: string): OrbitWakeCycle {
+  return {
+    phase: stableRange(`${id}:wake:phase`, 0, 10),
+    period: stableRange(`${id}:wake:period`, 7.5, 11.5),
+    visibleRatio: stableRange(`${id}:wake:visible-ratio`, 0.28, 0.38),
+    indicatorScale: stableRange(
+      `${id}:wake:indicator-scale`,
+      ORBIT_INDICATOR_SCALE * 0.5,
+      ORBIT_INDICATOR_SCALE,
+    ),
+    indicatorShade: stableRange(`${id}:wake:indicator-shade`, 0.12, 0.42),
+  };
+}
+
+function getOrbitIconPulse(id: string): OrbitIconPulse {
+  return {
+    phase: stableRange(`${id}:pulse:phase`, 0, Math.PI * 2),
+    speed: stableRange(`${id}:pulse:speed`, 0.52, 0.78),
+  };
+}
+
+function getDenseOrbitIndicatorMix(
+  elapsedTime: number,
+  wakeCycle: OrbitWakeCycle,
+): number {
+  const cycleTime = (elapsedTime + wakeCycle.phase) % wakeCycle.period;
+  const visibleDuration = wakeCycle.period * wakeCycle.visibleRatio;
+  const transitionDuration = Math.min(1.15, wakeCycle.period * 0.12);
+  const collapseStart = visibleDuration - transitionDuration;
+  const wakeStart = wakeCycle.period - transitionDuration;
+
+  if (cycleTime < collapseStart) return 0;
+  if (cycleTime < visibleDuration) {
+    return THREE.MathUtils.smoothstep(cycleTime, collapseStart, visibleDuration);
+  }
+  if (cycleTime < wakeStart) return 1;
+  return 1 - THREE.MathUtils.smoothstep(cycleTime, wakeStart, wakeCycle.period);
+}
+
+function getOrbitBannerTargetScale(
+  elapsedTime: number,
+  wakeCycle: OrbitWakeCycle,
+  isDenseOrbit: boolean,
+  isEngaged: boolean,
+): { scale: number; indicatorMix: number } {
+  const indicatorMix = isDenseOrbit && !isEngaged
+    ? getDenseOrbitIndicatorMix(elapsedTime, wakeCycle)
+    : 0;
+  const orbitScale = THREE.MathUtils.lerp(1, wakeCycle.indicatorScale, indicatorMix);
+
+  return {
+    scale: orbitScale * (isEngaged ? 1.14 : 1),
+    indicatorMix,
+  };
+}
+
+function getOrbitIconTargetScale(
+  elapsedTime: number,
+  pulse: OrbitIconPulse,
+  isDenseOrbit: boolean,
+  isEngaged: boolean,
+): number {
+  const pulseScale = isDenseOrbit
+    ? 0.82 + (Math.sin(elapsedTime * pulse.speed + pulse.phase) + 1) * 0.11
+    : 1;
+  return pulseScale * (isEngaged ? 1.16 : 1);
+}
+
+function getOrbitGapTargetScale(gap: OrbitGapMotion, elapsedTime: number): number {
+  if (gap.scaleMotion.kind === "banner") {
+    return getOrbitBannerTargetScale(
+      elapsedTime,
+      gap.scaleMotion.wakeCycle,
+      gap.scaleMotion.isDenseOrbit,
+      gap.scaleMotion.isEngaged,
+    ).scale;
+  }
+
+  return getOrbitIconTargetScale(
+    elapsedTime,
+    gap.scaleMotion.pulse,
+    gap.scaleMotion.isDenseOrbit,
+    gap.scaleMotion.isEngaged,
+  );
+}
+
 export function createOrbitGapMotion({
   id,
   radius,
@@ -738,6 +850,7 @@ export function createOrbitGapMotion({
   width,
   height,
   isDenseOrbit,
+  isEngaged,
 }: {
   id: string;
   radius: number;
@@ -745,29 +858,41 @@ export function createOrbitGapMotion({
   width: number;
   height: number;
   isDenseOrbit: boolean;
+  isEngaged: boolean;
 }): OrbitGapMotion {
+  const isIcon = mediaKind === "audio" || mediaKind === "anecdote";
   let visualHalfWidth: number;
-  if (mediaKind === "audio" || mediaKind === "anecdote") {
-    visualHalfWidth = AUDIO_ICON_RING_OUTER_RADIUS * 1.22;
+  if (isIcon) {
+    visualHalfWidth = AUDIO_ICON_RING_OUTER_RADIUS;
   } else if (isDenseOrbit) {
-    visualHalfWidth = CIRCLE_FRAME_SIZE * 0.5 * 1.14;
+    visualHalfWidth = CIRCLE_FRAME_SIZE * 0.5;
   } else {
     const aspect = width > 0 && height > 0 ? width / height : 1;
     const markerWidth = aspect >= 1
       ? BANNER_MAX_WIDTH
       : BANNER_MAX_HEIGHT * aspect;
-    visualHalfWidth = markerWidth * 0.5 * 1.14;
+    visualHalfWidth = markerWidth * 0.5;
   }
 
   const motion = getOrbitMotion(id, radius);
-  const toHalfAngle = (halfWidth: number) => Math.asin(
-    THREE.MathUtils.clamp(halfWidth / Math.max(radius, 0.001), 0, 0.94),
-  );
   return {
+    id,
     phase: motion.phase,
     speed: motion.speed,
-    coreHalfAngle: toHalfAngle(visualHalfWidth),
-    outerHalfAngle: toHalfAngle(visualHalfWidth + ORBIT_GAP_PADDING),
+    visualHalfWidth,
+    scaleMotion: isIcon
+      ? {
+          kind: "icon",
+          isDenseOrbit,
+          isEngaged,
+          pulse: getOrbitIconPulse(id),
+        }
+      : {
+          kind: "banner",
+          isDenseOrbit,
+          isEngaged,
+          wakeCycle: getOrbitWakeCycle(id),
+        },
   };
 }
 
@@ -989,17 +1114,7 @@ export function OrbitingPhotoBanner({
     [id, orbitRadius],
   );
   const cutout = useMemo(() => createCutoutCorners(id), [id]);
-  const wakeCycle = useMemo(() => ({
-    phase: stableRange(`${id}:wake:phase`, 0, 10),
-    period: stableRange(`${id}:wake:period`, 7.5, 11.5),
-    visibleRatio: stableRange(`${id}:wake:visible-ratio`, 0.28, 0.38),
-    indicatorScale: stableRange(
-      `${id}:wake:indicator-scale`,
-      ORBIT_INDICATOR_SCALE * 0.5,
-      ORBIT_INDICATOR_SCALE,
-    ),
-    indicatorShade: stableRange(`${id}:wake:indicator-shade`, 0.12, 0.42),
-  }), [id]);
+  const wakeCycle = useMemo(() => getOrbitWakeCycle(id), [id]);
   const fallbackBorderColor = useMemo(() => {
     const index = Math.min(
       CUTOUT_BORDER_COLORS.length - 1,
@@ -1031,27 +1146,14 @@ export function OrbitingPhotoBanner({
       cz + orbitZ
     );
     const isEngaged = isHighlighted || isSelected;
-    let indicatorMix = 0;
-    if (isDenseOrbit && !isEngaged) {
-      const cycleTime = (state.clock.elapsedTime + wakeCycle.phase) % wakeCycle.period;
-      const visibleDuration = wakeCycle.period * wakeCycle.visibleRatio;
-      const transitionDuration = Math.min(1.15, wakeCycle.period * 0.12);
-      const collapseStart = visibleDuration - transitionDuration;
-      const wakeStart = wakeCycle.period - transitionDuration;
-      if (cycleTime < collapseStart) {
-        indicatorMix = 0;
-      } else if (cycleTime < visibleDuration) {
-        indicatorMix = THREE.MathUtils.smoothstep(cycleTime, collapseStart, visibleDuration);
-      } else if (cycleTime < wakeStart) {
-        indicatorMix = 1;
-      } else {
-        indicatorMix = 1 - THREE.MathUtils.smoothstep(cycleTime, wakeStart, wakeCycle.period);
-      }
-    }
-    const orbitScale = THREE.MathUtils.lerp(1, wakeCycle.indicatorScale, indicatorMix);
-    const targetScale = orbitScale * (isEngaged ? 1.14 : 1);
-    image.scale.lerp(tempVector.set(targetScale, targetScale, 1), 0.15);
-    if (materialRef.current) materialRef.current.indicatorMix = indicatorMix;
+    const scaleState = getOrbitBannerTargetScale(
+      state.clock.elapsedTime,
+      wakeCycle,
+      isDenseOrbit,
+      isEngaged,
+    );
+    image.scale.lerp(tempVector.set(scaleState.scale, scaleState.scale, 1), 0.15);
+    if (materialRef.current) materialRef.current.indicatorMix = scaleState.indicatorMix;
   });
 
   return (
@@ -1152,6 +1254,7 @@ export function OrbitingActivityRing({
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const materialRef = useRef<OrbitingActivityRingMaterial>(null);
+  const gapScalesRef = useRef(new Map<string, number>());
   const gapMask = useMemo(() => {
     const data = new Uint8Array(ORBIT_GAP_MASK_RESOLUTION * 4);
     data.fill(255);
@@ -1189,7 +1292,21 @@ export function OrbitingActivityRing({
         localAngle + Math.PI,
         Math.PI * 2,
       ) / (Math.PI * 2);
-      const outerUv = gap.outerHalfAngle / (Math.PI * 2);
+      const targetScale = getOrbitGapTargetScale(gap, elapsedTime);
+      const currentScale = THREE.MathUtils.lerp(
+        gapScalesRef.current.get(gap.id) ?? 1,
+        targetScale,
+        0.15,
+      );
+      gapScalesRef.current.set(gap.id, currentScale);
+      const toHalfAngle = (halfWidth: number) => Math.asin(
+        THREE.MathUtils.clamp(halfWidth / Math.max(radius, 0.001), 0, 0.94),
+      );
+      const coreHalfAngle = toHalfAngle(gap.visualHalfWidth * currentScale);
+      const outerHalfAngle = toHalfAngle(
+        gap.visualHalfWidth * currentScale + ORBIT_GAP_PADDING,
+      );
+      const outerUv = outerHalfAngle / (Math.PI * 2);
       const firstSample = Math.floor(
         (centerUv - outerUv) * ORBIT_GAP_MASK_RESOLUTION,
       );
@@ -1210,8 +1327,8 @@ export function OrbitingActivityRing({
         ) * Math.PI * 2;
         const thicknessRatio = THREE.MathUtils.smoothstep(
           angularDistance,
-          gap.coreHalfAngle,
-          gap.outerHalfAngle,
+          coreHalfAngle,
+          outerHalfAngle,
         );
         const offset = wrappedSample * 4;
         const encodedRatio = Math.round(thicknessRatio * 255);
@@ -1271,10 +1388,7 @@ export function OrbitingIconMarker({
     () => getOrbitMotion(id, orbitRadius),
     [id, orbitRadius],
   );
-  const pulse = useMemo(() => ({
-    phase: stableRange(`${id}:pulse:phase`, 0, Math.PI * 2),
-    speed: stableRange(`${id}:pulse:speed`, 0.52, 0.78),
-  }), [id]);
+  const pulse = useMemo(() => getOrbitIconPulse(id), [id]);
   const triangle = useMemo(() => {
     const shape = new THREE.Shape();
     shape.moveTo(-0.11, -0.18);
@@ -1297,10 +1411,12 @@ export function OrbitingIconMarker({
       cy + Math.sin(angle) * orbit.radius,
       cz + orbitZ,
     );
-    const pulseScale = isDenseOrbit
-      ? 0.82 + (Math.sin(state.clock.elapsedTime * pulse.speed + pulse.phase) + 1) * 0.11
-      : 1;
-    const targetScale = pulseScale * (isHighlighted ? 1.16 : 1);
+    const targetScale = getOrbitIconTargetScale(
+      state.clock.elapsedTime,
+      pulse,
+      isDenseOrbit,
+      isHighlighted,
+    );
     icon.scale.lerp(tempVector.set(targetScale, targetScale, 1), 0.15);
   });
 
