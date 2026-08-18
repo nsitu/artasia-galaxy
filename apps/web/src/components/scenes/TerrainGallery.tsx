@@ -2403,75 +2403,24 @@ export function PlacementPreviewPanel({
   placement,
   onOpen,
   adminHref,
+  partnerHref,
+  onPartnerSelect,
 }: {
   placement: MapPlacement;
   onOpen: () => void;
   adminHref?: string;
+  partnerHref?: string;
+  onPartnerSelect?: (partner: string) => void;
 }) {
-  const isMobile = useIsMobileBreakpoint();
-  if (isMobile) {
-    return (
-      <PlacementInfoPanel
-        placement={placement}
-        adminHref={adminHref}
-        onView={onOpen}
-        preview
-      />
-    );
-  }
-  const siteDetails = formatSiteDetails(placement);
-  const participantDetails = formatParticipantDetails(placement);
-  const artistEducatorDetails = formatArtistEducatorDetails(placement);
-  const partnerLogo = placement.partner_white_logo?.url
-    ? placement.partner_white_logo
-    : placement.partner_logo;
-
   return (
-    <section
-      style={{
-        ...placementPreviewPanelStyle,
-      }}
-      aria-label="Placement preview"
-    >
-      <button
-        type="button"
-        onClick={onOpen}
-        style={{
-          ...placementPreviewButtonStyle,
-        }}
-      >
-        {partnerLogo?.url && (
-          <span style={placementPreviewDesktopLogoRowStyle}>
-            {partnerLogo?.url && (
-              <img
-                src={partnerLogo.url}
-                alt={
-                  partnerLogo.alt ||
-                  placement.partner_name ||
-                  "Partner logo"
-                }
-                style={{
-                  ...(placement.partner_white_logo?.url ? placementPreviewWhiteLogoStyle : placementPreviewLogoStyle),
-                }}
-              />
-            )}
-          </span>
-        )}
-        <span style={placementPreviewContentStyle}>
-          <span style={placementPreviewNameStyle}>
-            {formatPlacementDisplayName(placement)}
-          </span>
-          {siteDetails && (
-            <span style={placementPreviewMetaStyle}>{siteDetails}</span>
-          )}
-          {participantDetails && (
-            <span style={placementPreviewMetaStyle}>{participantDetails}</span>
-          )}
-          <span style={placementPreviewMetaStyle}>{artistEducatorDetails}</span>
-        </span>
-        <span style={placementPreviewActionStyle}>Gallery</span>
-      </button>
-    </section>
+    <PlacementInfoPanel
+      placement={placement}
+      adminHref={adminHref}
+      partnerHref={partnerHref}
+      onPartnerSelect={onPartnerSelect}
+      onView={onOpen}
+      preview
+    />
   );
 }
 
@@ -2667,7 +2616,6 @@ const siteDetailsStyle: React.CSSProperties = {
   borderRadius: 0,
   padding: 0,
   color: "#d8dde7",
-  fontFamily: "monospace",
   boxShadow: "none",
 };
 
@@ -2705,7 +2653,6 @@ const placementHoverLabelStyle: React.CSSProperties = {
   borderRadius: 6,
   padding: "10px 14px",
   color: "#eef2f8",
-  fontFamily: "monospace",
   boxShadow: "0 12px 32px rgba(0,0,0,0.28)",
   textAlign: "center",
   zIndex: 14,
@@ -2731,82 +2678,6 @@ const placementHoverMetaStyle: React.CSSProperties = {
   ...placementHoverPartnerStyle,
   marginTop: 4,
   marginBottom: 0,
-};
-
-const placementPreviewPanelStyle: React.CSSProperties = {
-  position: "fixed",
-  left: 12,
-  right: 12,
-  bottom: 44,
-  zIndex: 15,
-  pointerEvents: "auto",
-  fontFamily: "monospace",
-};
-
-const placementPreviewButtonStyle: React.CSSProperties = {
-  ...atlasPanelSurfaceStyle,
-  width: "100%",
-  minHeight: 82,
-  display: "flex",
-  alignItems: "center",
-  gap: 10,
-  padding: 12,
-  borderRadius: 14,
-  border: "1px solid rgba(255,255,255,0.18)",
-  color: "#eef2f8",
-  boxShadow: "0 12px 32px rgba(0,0,0,0.32)",
-  textAlign: "left",
-  cursor: "pointer",
-};
-
-const placementPreviewLogoStyle: React.CSSProperties = {
-  flex: "0 0 auto",
-  width: 56,
-  height: 42,
-  objectFit: "contain",
-  background: "rgba(255,255,255,0.92)",
-  borderRadius: 4,
-  padding: 5,
-};
-
-const placementPreviewDesktopLogoRowStyle: React.CSSProperties = {
-  display: "contents",
-};
-
-const placementPreviewWhiteLogoStyle: React.CSSProperties = {
-  ...placementPreviewLogoStyle,
-  background: "transparent",
-  padding: 0,
-};
-
-const placementPreviewContentStyle: React.CSSProperties = {
-  minWidth: 0,
-  flex: "1 1 auto",
-  display: "grid",
-  gap: 3,
-};
-
-const placementPreviewNameStyle: React.CSSProperties = {
-  color: "#f4f7fb",
-  fontSize: 14,
-  fontWeight: 700,
-  lineHeight: 1.3,
-  overflowWrap: "anywhere",
-};
-
-const placementPreviewMetaStyle: React.CSSProperties = {
-  color: "#8f9bad",
-  fontSize: 10,
-  lineHeight: 1.25,
-  overflowWrap: "anywhere",
-};
-
-const placementPreviewActionStyle: React.CSSProperties = {
-  flex: "0 0 auto",
-  color: "#ffffff",
-  fontSize: 12,
-  fontWeight: 700,
-  paddingLeft: 6,
 };
 
 const siteDetailsHeaderStyle: React.CSSProperties = {
@@ -2949,9 +2820,8 @@ const siteDetailsActionLinkStyle: React.CSSProperties = {
   border: "1px solid rgba(255,255,255,0.22)",
   borderRadius: 0,
   color: "#ffffff",
-  fontFamily: "monospace",
   fontSize: "clamp(10px, 2.5vw, 12px)",
-  fontWeight: 700,
+  fontWeight: 600,
   lineHeight: 1,
   textAlign: "center",
   textDecoration: "none",
@@ -3030,8 +2900,8 @@ const tileStatusStyle: React.CSSProperties = {
   borderRadius: 6,
   padding: "10px 12px",
   color: "#b8bfcb",
-  fontFamily: "monospace",
   fontSize: 11,
+  fontVariantNumeric: "tabular-nums",
   lineHeight: 1.35,
 };
 

@@ -258,8 +258,8 @@ const audioLightboxPlayIconStyle: CSSProperties = {
 
 const audioLightboxTimeStyle: CSSProperties = {
   gridArea: "time",
-  fontFamily: "monospace",
   fontSize: 12,
+  fontVariantNumeric: "tabular-nums",
   color: "#c7ccd6",
   whiteSpace: "nowrap",
 };
@@ -275,7 +275,6 @@ const audioLightboxMessageStyle: CSSProperties = {
   display: "block",
   marginTop: 10,
   color: "#aeb8c9",
-  fontFamily: "monospace",
   fontSize: 11,
 };
 

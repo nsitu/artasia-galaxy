@@ -51,7 +51,6 @@ const panelStyle: CSSProperties = {
   borderRadius: 8,
   boxShadow: "0 8px 24px rgba(0,0,0,0.28)",
   backdropFilter: "blur(5px)",
-  fontFamily: "monospace",
   textAlign: "center",
 };
 
@@ -80,7 +79,7 @@ const spinnerStyle: CSSProperties = {
 const labelStyle: CSSProperties = {
   color: "#f5f7fb",
   fontSize: 12,
-  fontWeight: 700,
+  fontWeight: 600,
   lineHeight: 1.25,
 };
 

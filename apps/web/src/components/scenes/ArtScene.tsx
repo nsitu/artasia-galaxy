@@ -929,6 +929,8 @@ export default function ArtScene() {
         <PlacementPreviewPanel
           placement={previewPlacementDetails}
           onOpen={previewPlacementAction}
+          partnerHref={getPartnerPath(previewPlacementDetails.partner_name || "")}
+          onPartnerSelect={handlePartnerNavigation}
           adminHref={
             authUser?.authenticated
               ? `/admin/browse?site=${encodeURIComponent(String(previewPlacementDetails.placement_id))}`
@@ -1701,7 +1703,7 @@ const topNavStyle: React.CSSProperties = {
   minHeight: "5rem",
   padding: 0,
   boxSizing: "border-box",
-  fontFamily: "monospace",
+  fontWeight: 500,
   color: "#aaa",
   pointerEvents: "none",
 };
@@ -1934,7 +1936,6 @@ const webglFallbackStyle: React.CSSProperties = {
   color: "#eef2f8",
   background: "#0a0a14",
   textAlign: "center",
-  fontFamily: "monospace",
 };
 
 const webglFallbackLogoStyle: React.CSSProperties = {
@@ -2011,7 +2012,7 @@ const menuItemStyle: React.CSSProperties = {
   textDecoration: "none",
   color: "#eef3fb",
   fontSize: 13,
-  fontFamily: "monospace",
+  fontWeight: 500,
   background: "transparent",
   borderBottom: "1px solid rgba(255,255,255,0.12)",
 };
@@ -2084,8 +2085,8 @@ const filterTriggerStyle: React.CSSProperties = {
   border: "1px solid rgba(255,255,255,0.18)",
   borderRadius: 0,
   padding: "0 14px",
-  fontFamily: "monospace",
   fontSize: 12,
+  fontWeight: 500,
   outline: "none",
   boxShadow: "none",
   cursor: "pointer",
@@ -2124,8 +2125,8 @@ const filterMenuOptionStyle: React.CSSProperties = {
   borderRadius: 0,
   background: "transparent",
   color: "#f4f7fb",
-  fontFamily: "monospace",
   fontSize: 12,
+  fontWeight: 500,
   textAlign: "left",
   cursor: "pointer",
 };
@@ -2165,8 +2166,8 @@ const errorStyle: React.CSSProperties = {
   transform: "translateX(-50%)",
   zIndex: 10,
   color: "#f66",
-  fontFamily: "monospace",
   fontSize: 13,
+  fontWeight: 500,
   background: "rgba(0,0,0,0.7)",
   padding: "8px 16px",
   borderRadius: 4,
@@ -2179,8 +2180,8 @@ const buildStampStyle: React.CSSProperties = {
   zIndex: 9,
   pointerEvents: "none",
   color: "rgba(238,242,248,0.62)",
-  fontFamily: "monospace",
   fontSize: 10,
+  fontVariantNumeric: "tabular-nums",
   lineHeight: 1,
   textShadow: "0 1px 3px rgba(0,0,0,0.7)",
 };
@@ -2315,7 +2316,6 @@ const photoLightboxMetadataStyle: React.CSSProperties = {
   overflow: "hidden",
   padding: 0,
   color: "#ddd",
-  fontFamily: "monospace",
   fontSize: 13,
   lineHeight: 1.45,
   cursor: "default",
@@ -2525,7 +2525,6 @@ const photoLightboxPlacementStyle: React.CSSProperties = {
   zIndex: 2,
   maxWidth: "calc(100vw - 96px)",
   color: "#fff",
-  fontFamily: "monospace",
   fontSize: 14,
   fontWeight: 700,
   lineHeight: 1.3,
@@ -2541,7 +2540,6 @@ const aboutCardStyle: React.CSSProperties = {
   position: "relative", width: "min(420px, 100%)", padding: "42px 28px 30px",
   borderRadius: 18, background: "rgba(16, 19, 31, 0.96)", border: "1px solid rgba(255,255,255,0.16)",
   color: "#eef3fb", textAlign: "center", boxShadow: "0 24px 70px rgba(0,0,0,0.45)",
-  fontFamily: "monospace",
 };
 const aboutCloseStyle: React.CSSProperties = { position: "absolute", top: 10, right: 14, border: 0, background: "transparent", color: "#cfd6e2", fontSize: 28, cursor: "pointer" };
 const aboutPresenterStyle: React.CSSProperties = {
@@ -2569,7 +2567,7 @@ const aboutPresenterTextStyle: React.CSSProperties = {
 };
 const aboutLogoStyle: React.CSSProperties = { display: "block", width: "min(260px, 80%)", height: "auto", margin: "18px auto" };
 const aboutTextStyle: React.CSSProperties = { margin: "0 auto 22px", maxWidth: 320, color: "#c1c9d7", lineHeight: 1.55, fontSize: 14 };
-const aboutLinkStyle: React.CSSProperties = { color: "#fff", fontFamily: "monospace", fontSize: 12, textDecoration: "underline" };
+const aboutLinkStyle: React.CSSProperties = { color: "#fff", fontSize: 12, fontWeight: 600, textDecoration: "underline" };
 
 const photoLightboxNavStyle: React.CSSProperties = {
   ...atlasControlSurfaceStyle,

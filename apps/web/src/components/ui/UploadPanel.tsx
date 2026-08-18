@@ -6624,7 +6624,6 @@ const pageStyle: React.CSSProperties = {
   color: "#ddd",
   padding: "22px 24px 28px",
   boxSizing: "border-box",
-  fontFamily: "system-ui, sans-serif",
 };
 
 const panelStyle: React.CSSProperties = {

@@ -70,7 +70,6 @@ const overlayStyle: React.CSSProperties = {
   background:
     "linear-gradient(130deg, #8E1D58 0%, #F28B20DD 100%)",
   color: "#eef2f8",
-  fontFamily: "monospace",
   opacity: 1,
   transition: "opacity 300ms ease-out",
 };
@@ -127,6 +126,7 @@ const presenterTextStyle: React.CSSProperties = {
   marginBottom: "clamp(0.35rem, 1.1vw, 0.5rem)",
   color: "#ffffff",
   fontSize: 10,
+  fontWeight: 600,
   fontVariant: "small-caps",
   letterSpacing: "0.16em",
   lineHeight: 1,
@@ -152,6 +152,7 @@ const descriptionStyle: React.CSSProperties = {
   margin: 0,
   color: "#ffffff",
   fontSize: 15,
+  fontWeight: 400,
   lineHeight: 1.6,
 };
 
