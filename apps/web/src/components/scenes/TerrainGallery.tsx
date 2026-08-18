@@ -876,9 +876,20 @@ export default function TerrainGallery({
     }
     return [...rings.values()];
   }, [hoveredIndex, localPhotoLayout, selectedIndex]);
+  const focusedPlacementGalleryReady = Boolean(
+    focusedPlacement &&
+    photoScope.mode === "placement" &&
+    photoScope.placementId === focusedPlacement.placement_id &&
+    !galleryLoading
+  );
   const documentationQuoteLayout = useMemo(() => {
     const quote = focusedPlacement?.documentation_pull_quote?.trim();
-    if (!quote || !focusedPlacementCenter || !request) return null;
+    if (
+      !quote ||
+      !focusedPlacementGalleryReady ||
+      !focusedPlacementCenter ||
+      !request
+    ) return null;
 
     const halfTerrain = request.unitsSide / 2;
     const minX = terrainBounds?.min.x ?? -halfTerrain;
@@ -915,6 +926,7 @@ export default function TerrainGallery({
   }, [
     activityOrbitRings,
     focusedPlacement,
+    focusedPlacementGalleryReady,
     focusedPlacementCenter,
     orbitHeight,
     request,
@@ -1715,6 +1727,13 @@ export default function TerrainGallery({
       return;
     }
     if (
+      focusedPlacement.documentation_pull_quote?.trim() &&
+      !focusedPlacementGalleryReady
+    ) {
+      placementOrbitFitPlacementRef.current = null;
+      return;
+    }
+    if (
       placementOrbitFitPlacementRef.current === focusedPlacement.placement_id ||
       !sceneReadyForMarkers ||
       galleryLoading ||
@@ -1815,6 +1834,7 @@ export default function TerrainGallery({
     documentationQuoteLayout,
     focusedPlacement,
     focusedPlacementCenter,
+    focusedPlacementGalleryReady,
     galleryLoading,
     placementSigns,
     placementLayout,
@@ -2028,15 +2048,6 @@ export default function TerrainGallery({
     >
       {!focusedPlacement && <FlowerLayoutCoordinator />}
       {terrain && terrainMatchesRequest && <primitive object={terrain} />}
-      {sceneReadyForMarkers && focusedPlacement && documentationQuoteLayout && (
-        <DocumentationPullQuotePanel
-          quote={documentationQuoteLayout.quote}
-          position={documentationQuoteLayout.position}
-          width={documentationQuoteLayout.width}
-          height={documentationQuoteLayout.height}
-          attribution={focusedPlacement.documentation_attribution}
-        />
-      )}
       {sceneReadyForMarkers && focusedPlacement &&
         activityOrbitRings.map((ring) => (
           <OrbitingActivityRing
@@ -2160,6 +2171,15 @@ export default function TerrainGallery({
             }
           />
         ))}
+      {sceneReadyForMarkers && focusedPlacement && documentationQuoteLayout && (
+        <DocumentationPullQuotePanel
+          quote={documentationQuoteLayout.quote}
+          position={documentationQuoteLayout.position}
+          width={documentationQuoteLayout.width}
+          height={documentationQuoteLayout.height}
+          attribution={focusedPlacement.documentation_attribution}
+        />
+      )}
     </group>
   );
 }

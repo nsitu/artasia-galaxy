@@ -75,11 +75,15 @@ export default function DocumentationPullQuotePanel({
         anchorY="top"
         textAlign="left"
         color="#ffffff"
+        fillOpacity={1}
         outlineWidth={fontSize * 0.018}
         outlineColor="#000000"
         outlineOpacity={0.42}
         depthOffset={-3}
         material-transparent
+        material-color="#ffffff"
+        material-opacity={1}
+        material-fog={false}
         material-depthTest
         material-depthWrite={false}
         material-toneMapped={false}
@@ -99,12 +103,15 @@ export default function DocumentationPullQuotePanel({
           anchorY="middle"
           textAlign="right"
           color="#ffffff"
-          fillOpacity={0.9}
+          fillOpacity={1}
           outlineWidth={fontSize * 0.012}
           outlineColor="#000000"
           outlineOpacity={0.38}
           depthOffset={-3}
           material-transparent
+          material-color="#ffffff"
+          material-opacity={1}
+          material-fog={false}
           material-depthTest
           material-depthWrite={false}
           material-toneMapped={false}
