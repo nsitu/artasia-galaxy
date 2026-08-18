@@ -583,7 +583,9 @@ export default function ArtScene() {
     const description = activity.description?.trim();
     return description ? [{ id: activity.id, description }] : [];
   });
-  const selectedActivityPreview = selectedActivityDescriptions[0]?.description;
+  const selectedActivityPreview =
+    selectedActivityDescriptions[0]?.description ||
+    (selectedCustomActivities.length > 0 ? selectedDescription : undefined);
   const selectedPhotoActivityColour = getPhotoActivityColour(
     selectedPhoto,
     activityFilterOptions,
@@ -1243,7 +1245,9 @@ export default function ArtScene() {
           educatorHref={getEducatorPath}
           onEducatorSelect={handleEducatorNavigation}
           previousAction={placementNavigation?.previous}
+          previousLabel={placementNavigation?.previousLabel}
           nextAction={placementNavigation?.next}
+          nextLabel={placementNavigation?.nextLabel}
           adminHref={
             authUser?.authenticated
               ? `/admin/browse?site=${encodeURIComponent(String(focusedPlacementDetails.placement_id))}`
@@ -1265,7 +1269,9 @@ export default function ArtScene() {
           educatorHref={getEducatorPath}
           onEducatorSelect={handleEducatorNavigation}
           previousAction={placementNavigation?.previous}
+          previousLabel={placementNavigation?.previousLabel}
           nextAction={placementNavigation?.next}
+          nextLabel={placementNavigation?.nextLabel}
           adminHref={
             authUser?.authenticated
               ? `/admin/browse?site=${encodeURIComponent(String(previewPlacementDetails.placement_id))}`
@@ -1510,7 +1516,7 @@ export default function ArtScene() {
                 ))}
               </div>
             )}
-            {selectedDescription && selectedPhotoActivities.length > 0 && (
+            {selectedDescription && selectedPhotoHasActivityBadges && (
               <div
                 style={{
                   ...photoLightboxAssetCaptionStyle,

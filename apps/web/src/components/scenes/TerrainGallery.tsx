@@ -537,7 +537,9 @@ export type EducatorFilterOption = {
 };
 export type PlacementNavigationActions = {
   previous?: () => void;
+  previousLabel?: string;
   next?: () => void;
+  nextLabel?: string;
 };
 
 const SITE_PATH_PREFIX = "/sites/";
@@ -1455,9 +1457,23 @@ export default function TerrainGallery({
     ) {
       return null;
     }
+    const currentIndex = candidates.findIndex(
+      (candidate) => candidate.placement_id === currentPlacement.placement_id,
+    );
+    if (currentIndex < 0) return null;
+    const previousPlacement = candidates[
+      (currentIndex - 1 + candidates.length) % candidates.length
+    ];
+    const nextPlacement = candidates[(currentIndex + 1) % candidates.length];
     return {
       previous: () => navigatePlacement(-1),
+      previousLabel: previousPlacement
+        ? formatPlacementDisplayName(previousPlacement)
+        : undefined,
       next: () => navigatePlacement(1),
+      nextLabel: nextPlacement
+        ? formatPlacementDisplayName(nextPlacement)
+        : undefined,
     };
   }, [
     filteredRegionalPlacements,
@@ -2463,6 +2479,8 @@ export function FocusedPlacementOverlay({
   onPartnerSelect,
   educatorHref,
   onEducatorSelect,
+  previousLabel,
+  nextLabel,
   previousAction,
   nextAction,
 }: {
@@ -2473,6 +2491,8 @@ export function FocusedPlacementOverlay({
   onPartnerSelect?: (partner: string) => void;
   educatorHref?: (educator: string) => string;
   onEducatorSelect?: (educator: string) => void;
+  previousLabel?: string;
+  nextLabel?: string;
   previousAction?: () => void;
   nextAction?: () => void;
 }) {
@@ -2485,6 +2505,8 @@ export function FocusedPlacementOverlay({
       onPartnerSelect={onPartnerSelect}
       educatorHref={educatorHref}
       onEducatorSelect={onEducatorSelect}
+      previousLabel={previousLabel}
+      nextLabel={nextLabel}
       previousAction={previousAction}
       nextAction={nextAction}
     />
@@ -2499,6 +2521,8 @@ function PlacementInfoPanel({
   onPartnerSelect,
   educatorHref,
   onEducatorSelect,
+  previousLabel,
+  nextLabel,
   onView,
   previousAction,
   nextAction,
@@ -2511,6 +2535,8 @@ function PlacementInfoPanel({
   onPartnerSelect?: (partner: string) => void;
   educatorHref?: (educator: string) => string;
   onEducatorSelect?: (educator: string) => void;
+  previousLabel?: string;
+  nextLabel?: string;
   onView?: () => void;
   previousAction?: () => void;
   nextAction?: () => void;
@@ -2754,6 +2780,7 @@ function PlacementInfoPanel({
                 <PlacementNavigationButton
                   direction="previous"
                   onClick={previousAction}
+                  placementName={previousLabel}
                 />
               )}
               {placement.documentation_url && (
@@ -2821,6 +2848,7 @@ function PlacementInfoPanel({
                 <PlacementNavigationButton
                   direction="next"
                   onClick={nextAction}
+                  placementName={nextLabel}
                 />
               )}
             </div>
@@ -2834,9 +2862,11 @@ function PlacementInfoPanel({
 function PlacementNavigationButton({
   direction,
   onClick,
+  placementName,
 }: {
   direction: "previous" | "next";
   onClick: () => void;
+  placementName?: string;
 }) {
   const label = direction === "previous" ? "Previous placement" : "Next placement";
   return (
@@ -2844,6 +2874,7 @@ function PlacementNavigationButton({
       type="button"
       className="atlas-control-surface"
       aria-label={label}
+      title={placementName || label}
       onClick={onClick}
       style={siteDetailsNavigationButtonStyle}
     >
@@ -2890,6 +2921,8 @@ export function PlacementPreviewPanel({
   onPartnerSelect,
   educatorHref,
   onEducatorSelect,
+  previousLabel,
+  nextLabel,
   previousAction,
   nextAction,
 }: {
@@ -2901,6 +2934,8 @@ export function PlacementPreviewPanel({
   onPartnerSelect?: (partner: string) => void;
   educatorHref?: (educator: string) => string;
   onEducatorSelect?: (educator: string) => void;
+  previousLabel?: string;
+  nextLabel?: string;
   previousAction?: () => void;
   nextAction?: () => void;
 }) {
@@ -2913,6 +2948,8 @@ export function PlacementPreviewPanel({
       onPartnerSelect={onPartnerSelect}
       educatorHref={educatorHref}
       onEducatorSelect={onEducatorSelect}
+      previousLabel={previousLabel}
+      nextLabel={nextLabel}
       onView={onOpen}
       previousAction={previousAction}
       nextAction={nextAction}
