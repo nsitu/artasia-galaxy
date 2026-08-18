@@ -2071,6 +2071,20 @@ const responsiveTopNavStyles = `
     line-height: 1.35;
   }
 
+  .atlas-partner-filter-menu,
+  .atlas-educator-filter-menu {
+    width: min(42rem, calc(100vw - 1rem));
+    max-width: calc(100vw - 1rem);
+  }
+
+  .atlas-partner-filter-menu {
+    right: auto !important;
+  }
+
+  .atlas-educator-filter-menu {
+    left: auto !important;
+  }
+
   .atlas-top-nav::before {
     content: "";
     position: absolute;
@@ -2250,6 +2264,12 @@ const responsiveTopNavStyles = `
     .atlas-partner-filter-control,
     .atlas-educator-filter-control {
       width: clamp(220px, 22vw, 360px) !important;
+    }
+
+    .atlas-partner-filter-menu,
+    .atlas-educator-filter-menu {
+      width: max(100%, min(42rem, 48vw));
+      max-width: min(42rem, calc(100vw - 1rem));
     }
 
     .atlas-partner-filter-trigger > span,
