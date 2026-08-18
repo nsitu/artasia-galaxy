@@ -29,6 +29,7 @@ import PlacementSignpost, {
   type PlacementSign,
 } from "./PlacementSignpost";
 import PlaceMarker, { FlowerLayoutCoordinator } from "./PlaceMarker";
+import DocumentationPullQuotePanel from "./DocumentationPullQuotePanel";
 import {
   createMaxDetailTerrainRequest,
   createTerrainRequest,
@@ -751,12 +752,13 @@ export default function TerrainGallery({
   const terrainDemZoomOffset = focusedPlacement
     ? LOCAL_DEM_ZOOM_OFFSET
     : REGIONAL_DEM_ZOOM_OFFSET;
-  const terrainMaxZ = useMemo(() => {
+  const terrainBounds = useMemo(() => {
     if (!terrain) return null;
     terrain.updateMatrixWorld(true);
-    const terrainBounds = new THREE.Box3().setFromObject(terrain);
-    return Number.isFinite(terrainBounds.max.z) ? terrainBounds.max.z : null;
+    const bounds = new THREE.Box3().setFromObject(terrain);
+    return Number.isFinite(bounds.max.z) ? bounds : null;
   }, [terrain]);
+  const terrainMaxZ = terrainBounds?.max.z ?? null;
   const orbitHeight = useMemo(() => {
     if (!focusedPlacement || !projection || !terrain || terrainMaxZ == null) return ORBIT_HEIGHT;
 
@@ -771,19 +773,22 @@ export default function TerrainGallery({
       terrainMaxZ - placementTerrainZ + ORBIT_VISUAL_HALF_HEIGHT + ORBIT_TERRAIN_CLEARANCE,
     );
   }, [focusedPlacement, projection, terrain, terrainMaxZ]);
-  const localPhotoLayout = useMemo<LocalPhotoLayoutItem[]>(() => {
-    if (!focusedPlacement || !projection) return [];
+  const focusedPlacementCenter = useMemo<[number, number, number] | null>(() => {
+    if (!focusedPlacement || !projection) return null;
     const [placementX, placementY, placementZ = 0] = projection.proj([
       focusedPlacement.lat,
       focusedPlacement.lng,
     ]);
-    const placementCenter = [
+    return [
       placementX,
       placementY,
       terrain
         ? (sampleTerrainZ(terrain, placementX, placementY) ?? placementZ)
         : placementZ,
-    ] as [number, number, number];
+    ];
+  }, [focusedPlacement, projection, terrain]);
+  const localPhotoLayout = useMemo<LocalPhotoLayoutItem[]>(() => {
+    if (!focusedPlacementCenter) return [];
     const orbitForPhoto = (photo: Photo) => {
       const activity = activityOptions.find((option) =>
         photo.activityIds?.includes(option.id),
@@ -816,7 +821,7 @@ export default function TerrainGallery({
             kind: "orbit",
             photo,
             sourceIndex,
-            center: placementCenter,
+            center: focusedPlacementCenter,
             ...orbitForPhoto(photo),
           },
         ];
@@ -832,11 +837,9 @@ export default function TerrainGallery({
     }));
   }, [
     activityOptions,
-    focusedPlacement,
+    focusedPlacementCenter,
     photoIndexById,
     photosForCurrentView,
-    projection,
-    terrain,
   ]);
   const activityOrbitRings = useMemo(() => {
     const rings = new Map<number, {
@@ -873,6 +876,46 @@ export default function TerrainGallery({
     }
     return [...rings.values()];
   }, [hoveredIndex, localPhotoLayout, selectedIndex]);
+  const documentationQuoteLayout = useMemo(() => {
+    const quote = focusedPlacement?.documentation_pull_quote?.trim();
+    if (!quote || !focusedPlacementCenter || !request) return null;
+
+    const halfTerrain = request.unitsSide / 2;
+    const minX = terrainBounds?.min.x ?? -halfTerrain;
+    const maxX = terrainBounds?.max.x ?? halfTerrain;
+    const minY = terrainBounds?.min.y ?? -halfTerrain;
+    const maxY = terrainBounds?.max.y ?? halfTerrain;
+    const terrainWidth = Math.max(1, maxX - minX);
+    const terrainHeight = Math.max(1, maxY - minY);
+    const width = THREE.MathUtils.clamp(terrainWidth * 0.38, 3.8, 4.8);
+    const height = THREE.MathUtils.clamp(terrainHeight * 0.78, 5.2, 9.2);
+    const gap = Math.max(0.38, terrainWidth * 0.035);
+    const x = maxX + gap + width / 2;
+    const y = (minY + maxY) / 2;
+
+    return {
+      quote,
+      width,
+      height,
+      position: [
+        x,
+        y,
+        focusedPlacementCenter[2] + orbitHeight,
+      ] as [number, number, number],
+      fitBounds: {
+        minX,
+        maxX: x + width / 2,
+        minY: Math.min(minY, y - height / 2),
+        maxY: Math.max(maxY, y + height / 2),
+      },
+    };
+  }, [
+    focusedPlacement,
+    focusedPlacementCenter,
+    orbitHeight,
+    request,
+    terrainBounds,
+  ]);
 
   useEffect(() => {
     const placementId = focusedPlacement?.placement_id ?? null;
@@ -888,6 +931,11 @@ export default function TerrainGallery({
       galleryLoading ||
       !controls?.target
     ) return;
+
+    if (documentationQuoteLayout) {
+      lastFramedActivityFilterRef.current = selectedActivityFilter;
+      return;
+    }
 
     const center = new THREE.Vector3(...activityOrbitRings[0].center);
     center.z += 0.72;
@@ -931,7 +979,15 @@ export default function TerrainGallery({
         activityFitAnimationRef.current = null;
       }
     };
-  }, [activityOrbitRings, camera, controls, focusedPlacement, galleryLoading, selectedActivityFilter]);
+  }, [
+    activityOrbitRings,
+    camera,
+    controls,
+    documentationQuoteLayout,
+    focusedPlacement,
+    galleryLoading,
+    selectedActivityFilter,
+  ]);
 
   const placementLayout = useMemo(() => {
     if (!projection) return [];
@@ -1658,11 +1714,17 @@ export default function TerrainGallery({
       placementOrbitFitPlacementRef.current === focusedPlacement.placement_id ||
       !sceneReadyForMarkers ||
       galleryLoading ||
-      (activityOrbitRings.length === 0 && placementLayout.length === 0) ||
+      (
+        activityOrbitRings.length === 0 &&
+        placementLayout.length === 0 &&
+        !focusedPlacementCenter
+      ) ||
       !controls?.target
     ) return;
 
-    const placementCenter = activityOrbitRings[0]?.center ?? placementLayout[0].position;
+    const placementCenter = activityOrbitRings[0]?.center
+      ?? focusedPlacementCenter
+      ?? placementLayout[0].position;
     const center = new THREE.Vector3(...placementCenter);
     const signpostHeight = getPlacementSignpostHeight(
       center.z,
@@ -1680,18 +1742,36 @@ export default function TerrainGallery({
       Math.abs(signpostTopZ - center.z),
       Math.abs(signpostBaseZ + ORBIT_HEIGHT - center.z),
     ) + 0.35;
-    const contentRadius = Math.max(1, outerRadius + 0.75, verticalContentRadius);
     const verticalFov = camera instanceof THREE.PerspectiveCamera
       ? THREE.MathUtils.degToRad(camera.fov)
       : THREE.MathUtils.degToRad(50);
     const aspect = camera instanceof THREE.PerspectiveCamera ? camera.aspect : 1;
     const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * aspect);
-    const limitingFov = Math.min(verticalFov, horizontalFov);
-    const distance = THREE.MathUtils.clamp(
-      contentRadius * 1.35 / Math.tan(limitingFov / 2),
-      2.4,
-      70,
-    );
+    let distance: number;
+    if (documentationQuoteLayout) {
+      const { fitBounds } = documentationQuoteLayout;
+      center.x = (fitBounds.minX + fitBounds.maxX) / 2;
+      center.y = (fitBounds.minY + fitBounds.maxY) / 2;
+      const halfWidth = (fitBounds.maxX - fitBounds.minX) / 2;
+      const halfHeight = (fitBounds.maxY - fitBounds.minY) / 2;
+      distance = THREE.MathUtils.clamp(
+        Math.max(
+          halfWidth * 1.18 / Math.tan(horizontalFov / 2),
+          Math.max(halfHeight, verticalContentRadius) * 1.25
+            / Math.tan(verticalFov / 2),
+        ),
+        2.4,
+        70,
+      );
+    } else {
+      const contentRadius = Math.max(1, outerRadius + 0.75, verticalContentRadius);
+      const limitingFov = Math.min(verticalFov, horizontalFov);
+      distance = THREE.MathUtils.clamp(
+        contentRadius * 1.35 / Math.tan(limitingFov / 2),
+        2.4,
+        70,
+      );
+    }
     const startTarget = controls.target.clone();
     const startPosition = camera.position.clone();
     const direction = startPosition.clone().sub(startTarget).normalize();
@@ -1728,7 +1808,9 @@ export default function TerrainGallery({
     activityOrbitRings,
     camera,
     controls,
+    documentationQuoteLayout,
     focusedPlacement,
+    focusedPlacementCenter,
     galleryLoading,
     placementSigns,
     placementLayout,
@@ -1942,6 +2024,16 @@ export default function TerrainGallery({
     >
       {!focusedPlacement && <FlowerLayoutCoordinator />}
       {terrain && terrainMatchesRequest && <primitive object={terrain} />}
+      {sceneReadyForMarkers && focusedPlacement && documentationQuoteLayout && (
+        <DocumentationPullQuotePanel
+          quote={documentationQuoteLayout.quote}
+          position={documentationQuoteLayout.position}
+          width={documentationQuoteLayout.width}
+          height={documentationQuoteLayout.height}
+          backgroundColour={focusedPlacement.partner_brand_color_one}
+          accentColour={focusedPlacement.partner_brand_color_two}
+        />
+      )}
       {sceneReadyForMarkers && focusedPlacement &&
         activityOrbitRings.map((ring) => (
           <OrbitingActivityRing

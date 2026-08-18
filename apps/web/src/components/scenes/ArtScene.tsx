@@ -87,6 +87,7 @@ function LightboxMedia({
   zoom = 1,
   pan = { x: 0, y: 0 },
   activityColour,
+  hasNavigation,
   style,
   onClick,
 }: {
@@ -95,6 +96,7 @@ function LightboxMedia({
   zoom?: number;
   pan?: { x: number; y: number };
   activityColour?: string;
+  hasNavigation: boolean;
   style: React.CSSProperties;
   onClick: React.MouseEventHandler<HTMLElement>;
 }) {
@@ -115,6 +117,9 @@ function LightboxMedia({
         aria-hidden={!active}
         style={{
           ...anecdoteLightboxStyle,
+          width: hasNavigation
+            ? "min(100%, calc(100vw - 13rem))"
+            : "100%",
           background: getTranslucentActivityColour(activityColour),
           transform: mediaStyle.transform,
           transformOrigin: mediaStyle.transformOrigin,
@@ -1025,6 +1030,7 @@ export default function ArtScene() {
                     photo={lightboxPreviousPhoto}
                     active={false}
                     activityColour={previousActivityColour}
+                    hasNavigation={photos.length > 1}
                     style={{
                       ...photoLightboxImageStyle,
                       ...photoAdjustmentFilterStyle(lightboxPreviousPhoto.adjustments),
@@ -1041,6 +1047,7 @@ export default function ArtScene() {
                   zoom={lightboxZoom}
                   pan={lightboxPan}
                   activityColour={selectedPhotoActivityColour}
+                  hasNavigation={photos.length > 1}
                   style={{
                     ...photoLightboxImageStyle,
                     ...photoAdjustmentFilterStyle(selectedPhoto.adjustments),
@@ -1055,6 +1062,7 @@ export default function ArtScene() {
                     photo={lightboxNextPhoto}
                     active={false}
                     activityColour={nextActivityColour}
+                    hasNavigation={photos.length > 1}
                     style={{
                       ...photoLightboxImageStyle,
                       ...photoAdjustmentFilterStyle(lightboxNextPhoto.adjustments),
@@ -1810,6 +1818,7 @@ const responsiveTopNavStyles = `
       flex: 1 1 auto;
     }
     .atlas-anecdote-lightbox {
+      width: 100% !important;
       height: 100%;
       max-height: 100% !important;
       overflow-y: auto;
