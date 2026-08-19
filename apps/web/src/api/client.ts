@@ -659,16 +659,18 @@ export async function flattenUploadAsset(params: {
   rotationDegrees: RotationDegrees;
   straightenDegrees: number;
   cropNormalized?: CropParameters;
+  redactRegionsNormalized?: CropParameters[];
 }): Promise<FlattenAssetResponse> {
   const res = await fetch(`/api/v1/uploads/assets/${params.assetId}/flatten`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      version: 1,
+      version: 2,
       rotationDegrees: params.rotationDegrees,
       straightenDegrees: params.straightenDegrees,
       cropNormalized: params.cropNormalized,
-      cropSpace: "auto-oriented-rotated",
+      redactRegionsNormalized: params.redactRegionsNormalized ?? [],
+      editSpace: "auto-oriented-rotated",
       output: { format: "jpeg", quality: 92 },
     }),
   });

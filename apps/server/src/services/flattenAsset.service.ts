@@ -25,6 +25,11 @@ const DATA_DIR = process.env.DATA_DIR ?? join(process.cwd(), "data");
 const FLATTEN_DIR = join(DATA_DIR, "flatten-jobs");
 const MAX_STRAIGHTEN_DEGREES = 45;
 const RIGHT_ANGLE_ROTATIONS = [0, 90, 180, 270] as const;
+export const MAX_REDACT_REGIONS = 10;
+export const REDACT_BLUR_ALGORITHM = "gaussian-patch-v1" as const;
+const REDACT_BLUR_MIN_SIGMA = 8;
+const REDACT_BLUR_MAX_SIGMA = 32;
+const NORMALIZED_RECT_TOLERANCE = 0.000001;
 const execFile = promisify(execFileCallback);
 
 async function convertHeifToJpeg(inputPath: string) {
@@ -55,7 +60,9 @@ export interface FlattenCrop {
   height: number;
 }
 
-export interface FlattenRecipe {
+export interface NormalizedRect extends FlattenCrop {}
+
+export interface FlattenRecipeV1 {
   version: 1;
   rotationDegrees: (typeof RIGHT_ANGLE_ROTATIONS)[number];
   straightenDegrees: number;
@@ -63,6 +70,26 @@ export interface FlattenRecipe {
   cropNormalized?: FlattenCrop;
   cropSpace: "auto-oriented-rotated";
   output?: { format: "jpeg"; quality?: number };
+}
+
+export interface FlattenRecipeV2 {
+  version: 2;
+  rotationDegrees: (typeof RIGHT_ANGLE_ROTATIONS)[number];
+  straightenDegrees: number;
+  crop?: FlattenCrop;
+  cropNormalized?: NormalizedRect;
+  redactRegionsNormalized: NormalizedRect[];
+  editSpace: "auto-oriented-rotated";
+  output?: { format: "jpeg"; quality?: number };
+}
+
+export type FlattenRecipe = FlattenRecipeV1 | FlattenRecipeV2;
+
+export class FlattenValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "FlattenValidationError";
+  }
 }
 
 type JobState = "prepared" | "rendered" | "uploaded" | "relationships_copied" | "verified" | "source_archived" | "complete" | "failed";
@@ -78,7 +105,7 @@ interface FlattenJob {
   error?: string;
 }
 
-function rotatedDimensions(width: number, height: number, degrees: number) {
+export function rotatedDimensions(width: number, height: number, degrees: number) {
   const radians = Math.abs(degrees) * Math.PI / 180;
   return {
     width: Math.max(1, Math.round(Math.abs(width * Math.cos(radians)) + Math.abs(height * Math.sin(radians)))),
@@ -123,55 +150,192 @@ function largestInnerRectangle(width: number, height: number, degrees: number): 
   };
 }
 
-function validateRecipe(value: unknown): FlattenRecipe {
-  const recipe = value && typeof value === "object" ? value as Partial<FlattenRecipe> : {};
-  const rotationDegrees = Number(recipe.rotationDegrees ?? 0);
-  if (!RIGHT_ANGLE_ROTATIONS.includes(rotationDegrees as (typeof RIGHT_ANGLE_ROTATIONS)[number])) {
-    throw new Error("Rotation must be one of 0, 90, 180, or 270 degrees.");
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function requireFiniteNumber(value: unknown, message: string) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new FlattenValidationError(message);
   }
-  const straightenDegrees = Number(recipe.straightenDegrees ?? 0);
+  return value;
+}
+
+export function normalizeNormalizedRect(value: unknown, label: string): NormalizedRect {
+  if (!isRecord(value)) {
+    throw new FlattenValidationError(`Choose a valid normalized ${label} area.`);
+  }
+  const rect = {
+    x: requireFiniteNumber(value.x, `The normalized ${label} x coordinate must be finite.`),
+    y: requireFiniteNumber(value.y, `The normalized ${label} y coordinate must be finite.`),
+    width: requireFiniteNumber(value.width, `The normalized ${label} width must be finite.`),
+    height: requireFiniteNumber(value.height, `The normalized ${label} height must be finite.`),
+  };
+  if (
+    rect.x < -NORMALIZED_RECT_TOLERANCE ||
+    rect.y < -NORMALIZED_RECT_TOLERANCE ||
+    rect.width <= 0 ||
+    rect.height <= 0 ||
+    rect.x + rect.width > 1 + NORMALIZED_RECT_TOLERANCE ||
+    rect.y + rect.height > 1 + NORMALIZED_RECT_TOLERANCE
+  ) {
+    throw new FlattenValidationError(`Choose a valid normalized ${label} area.`);
+  }
+
+  const x = Math.max(0, rect.x);
+  const y = Math.max(0, rect.y);
+  if (x >= 1 || y >= 1) {
+    throw new FlattenValidationError(`Choose a valid normalized ${label} area.`);
+  }
+  return {
+    x,
+    y,
+    width: Math.min(rect.width, 1 - x),
+    height: Math.min(rect.height, 1 - y),
+  };
+}
+
+export function normalizedRectToPixelRect(
+  rect: NormalizedRect,
+  dimensions: { width: number; height: number },
+): FlattenCrop {
+  const width = Math.max(1, Math.floor(dimensions.width));
+  const height = Math.max(1, Math.floor(dimensions.height));
+  const x = Math.max(0, Math.min(width - 1, Math.round(rect.x * width)));
+  const y = Math.max(0, Math.min(height - 1, Math.round(rect.y * height)));
+  const right = Math.max(x + 1, Math.min(width, Math.round((rect.x + rect.width) * width)));
+  const bottom = Math.max(y + 1, Math.min(height, Math.round((rect.y + rect.height) * height)));
+  return { x, y, width: right - x, height: bottom - y };
+}
+
+export function redactBlurSigma(dimensions: { width: number; height: number }) {
+  return Math.max(
+    REDACT_BLUR_MIN_SIGMA,
+    Math.min(REDACT_BLUR_MAX_SIGMA, Math.max(dimensions.width, dimensions.height) / 80),
+  );
+}
+
+export async function applyRedactRegions(
+  inputPath: string,
+  outputPath: string,
+  regions: NormalizedRect[],
+  dimensions: { width: number; height: number },
+) {
+  const blurSigma = redactBlurSigma(dimensions);
+  const composites = await Promise.all(regions.map(async (normalizedRegion) => {
+    const region = normalizedRectToPixelRect(normalizedRegion, dimensions);
+    const padding = Math.max(8, Math.ceil(blurSigma * 3));
+    const paddedLeft = Math.max(0, region.x - padding);
+    const paddedTop = Math.max(0, region.y - padding);
+    const paddedRight = Math.min(dimensions.width, region.x + region.width + padding);
+    const paddedBottom = Math.min(dimensions.height, region.y + region.height + padding);
+    const patch = await sharp(inputPath, { limitInputPixels: 268_402_689 } as any)
+      .extract({
+        left: paddedLeft,
+        top: paddedTop,
+        width: paddedRight - paddedLeft,
+        height: paddedBottom - paddedTop,
+      })
+      .blur(blurSigma)
+      .extract({
+        left: region.x - paddedLeft,
+        top: region.y - paddedTop,
+        width: region.width,
+        height: region.height,
+      })
+      .png()
+      .toBuffer();
+    return { input: patch, left: region.x, top: region.y };
+  }));
+
+  let image = sharp(inputPath, { limitInputPixels: 268_402_689 } as any);
+  if (composites.length > 0) image = image.composite(composites);
+  return image.png().toFile(outputPath);
+}
+
+function validatePixelCrop(value: unknown): FlattenCrop {
+  if (!isRecord(value)) throw new FlattenValidationError("Choose a valid crop area.");
+  const crop = {
+    x: requireFiniteNumber(value.x, "Choose a valid crop area."),
+    y: requireFiniteNumber(value.y, "Choose a valid crop area."),
+    width: requireFiniteNumber(value.width, "Choose a valid crop area."),
+    height: requireFiniteNumber(value.height, "Choose a valid crop area."),
+  };
+  const rounded = {
+    x: Math.round(crop.x),
+    y: Math.round(crop.y),
+    width: Math.round(crop.width),
+    height: Math.round(crop.height),
+  };
+  if (rounded.x < 0 || rounded.y < 0 || rounded.width < 1 || rounded.height < 1) {
+    throw new FlattenValidationError("Choose a valid crop area.");
+  }
+  return rounded;
+}
+
+export function validateFlattenRecipe(value: unknown): FlattenRecipe {
+  const recipe = isRecord(value) ? value : {};
+  const version = recipe.version === 2 ? 2 : recipe.version === 1 || recipe.version == null ? 1 : null;
+  if (version == null) throw new FlattenValidationError("Unsupported flatten recipe version.");
+
+  const rotationDegrees = requireFiniteNumber(recipe.rotationDegrees ?? 0, "Rotation must be one of 0, 90, 180, or 270 degrees.");
+  if (!RIGHT_ANGLE_ROTATIONS.includes(rotationDegrees as (typeof RIGHT_ANGLE_ROTATIONS)[number])) {
+    throw new FlattenValidationError("Rotation must be one of 0, 90, 180, or 270 degrees.");
+  }
+  const straightenDegrees = requireFiniteNumber(recipe.straightenDegrees ?? 0, "Straightening must be finite.");
   if (!Number.isFinite(straightenDegrees) || Math.abs(straightenDegrees) > MAX_STRAIGHTEN_DEGREES) {
-    throw new Error(`Straightening must be between -${MAX_STRAIGHTEN_DEGREES} and ${MAX_STRAIGHTEN_DEGREES} degrees.`);
+    throw new FlattenValidationError(`Straightening must be between -${MAX_STRAIGHTEN_DEGREES} and ${MAX_STRAIGHTEN_DEGREES} degrees.`);
   }
   let crop: FlattenCrop | undefined;
   if (recipe.crop) {
-    crop = {
-      x: Math.round(Number(recipe.crop.x)),
-      y: Math.round(Number(recipe.crop.y)),
-      width: Math.round(Number(recipe.crop.width)),
-      height: Math.round(Number(recipe.crop.height)),
-    };
-    if (Object.values(crop).some((part) => !Number.isFinite(part)) || crop.x < 0 || crop.y < 0 || crop.width < 1 || crop.height < 1) {
-      throw new Error("Choose a valid crop area.");
-    }
+    crop = validatePixelCrop(recipe.crop);
   }
   let cropNormalized: FlattenCrop | undefined;
   if (recipe.cropNormalized) {
-    cropNormalized = {
-      x: Number(recipe.cropNormalized.x),
-      y: Number(recipe.cropNormalized.y),
-      width: Number(recipe.cropNormalized.width),
-      height: Number(recipe.cropNormalized.height),
-    };
-    if (
-      Object.values(cropNormalized).some((part) => !Number.isFinite(part)) ||
-      cropNormalized.x < 0 || cropNormalized.y < 0 ||
-      cropNormalized.width <= 0 || cropNormalized.height <= 0 ||
-      cropNormalized.x + cropNormalized.width > 1.000001 ||
-      cropNormalized.y + cropNormalized.height > 1.000001
-    ) {
-      throw new Error("Choose a valid normalized crop area.");
-    }
+    cropNormalized = normalizeNormalizedRect(recipe.cropNormalized, "crop");
   }
-  const quality = Math.max(75, Math.min(100, Math.round(Number(recipe.output?.quality ?? 92))));
+  if (recipe.output != null && !isRecord(recipe.output)) {
+    throw new FlattenValidationError("Output settings are invalid.");
+  }
+  if (recipe.output?.format != null && recipe.output.format !== "jpeg") {
+    throw new FlattenValidationError("Only JPEG flatten output is supported.");
+  }
+  const requestedQuality = recipe.output?.quality ?? 92;
+  const quality = requireFiniteNumber(requestedQuality, "Output quality must be finite.");
+  const output = { format: "jpeg" as const, quality: Math.max(75, Math.min(100, Math.round(quality))) };
+  if (version === 1) {
+    return {
+      version: 1,
+      rotationDegrees: rotationDegrees as (typeof RIGHT_ANGLE_ROTATIONS)[number],
+      straightenDegrees,
+      crop,
+      cropNormalized,
+      cropSpace: "auto-oriented-rotated",
+      output,
+    };
+  }
+
+  if (recipe.editSpace !== "auto-oriented-rotated") {
+    throw new FlattenValidationError("Flatten edit space must be auto-oriented-rotated.");
+  }
+  if (recipe.redactRegionsNormalized != null && !Array.isArray(recipe.redactRegionsNormalized)) {
+    throw new FlattenValidationError("Redact regions must be an array.");
+  }
+  const redactRegionsNormalized = (recipe.redactRegionsNormalized ?? []).map((region, index) =>
+    normalizeNormalizedRect(region, `redact region ${index + 1}`),
+  );
+  if (redactRegionsNormalized.length > MAX_REDACT_REGIONS) {
+    throw new FlattenValidationError(`A maximum of ${MAX_REDACT_REGIONS} redact regions is supported.`);
+  }
   return {
-    version: 1,
+    version: 2,
     rotationDegrees: rotationDegrees as (typeof RIGHT_ANGLE_ROTATIONS)[number],
     straightenDegrees,
     crop,
     cropNormalized,
-    cropSpace: "auto-oriented-rotated",
-    output: { format: "jpeg", quality },
+    redactRegionsNormalized,
+    editSpace: "auto-oriented-rotated",
+    output,
   };
 }
 
@@ -207,7 +371,7 @@ async function waitForReplacement(assetId: string, width: number, height: number
 }
 
 export async function flattenAsset(sourceAssetId: string, requestedRecipe: unknown) {
-  const recipe = validateRecipe(requestedRecipe);
+  const recipe = validateFlattenRecipe(requestedRecipe);
   const source = await getAsset(sourceAssetId);
   if (source.type !== "IMAGE") throw new Error("Only image assets can be flattened.");
 
@@ -223,6 +387,8 @@ export async function flattenAsset(sourceAssetId: string, requestedRecipe: unkno
   const tempDir = await mkdtemp(join(FLATTEN_DIR, "work-"));
   const sourceExtension = extname(source.originalFileName) || ".heic";
   const inputPath = join(tempDir, `source${sourceExtension}`);
+  const transformedPath = join(tempDir, "transformed.png");
+  const redactedPath = join(tempDir, "redacted.png");
   const outputPath = join(tempDir, "rendered.jpg");
 
   try {
@@ -244,22 +410,23 @@ export async function flattenAsset(sourceAssetId: string, requestedRecipe: unkno
     const totalRotationDegrees = recipe.rotationDegrees + recipe.straightenDegrees;
     const rotated = rotatedDimensions(oriented.width, oriented.height, totalRotationDegrees);
     const crop = recipe.cropNormalized
-      ? {
-          x: Math.max(0, Math.round(recipe.cropNormalized.x * rotated.width)),
-          y: Math.max(0, Math.round(recipe.cropNormalized.y * rotated.height)),
-          width: Math.max(1, Math.round(recipe.cropNormalized.width * rotated.width)),
-          height: Math.max(1, Math.round(recipe.cropNormalized.height * rotated.height)),
-        }
-      : recipe.crop ?? largestInnerRectangle(oriented.width, oriented.height, recipe.straightenDegrees);
+      ? normalizedRectToPixelRect(recipe.cropNormalized, rotated)
+      : recipe.crop ?? largestInnerRectangle(oriented.width, oriented.height, totalRotationDegrees);
     crop.width = Math.min(crop.width, rotated.width - crop.x);
     crop.height = Math.min(crop.height, rotated.height - crop.y);
     if (crop.x + crop.width > rotated.width || crop.y + crop.height > rotated.height) {
       throw new Error("The crop area is outside the straightened image bounds.");
     }
 
-    const result = await sharp(inputPath, { limitInputPixels: 268_402_689, failOnError: false } as any)
+    await sharp(inputPath, { limitInputPixels: 268_402_689, failOnError: false } as any)
       .autoOrient()
       .rotate(totalRotationDegrees, { background: { r: 0, g: 0, b: 0, alpha: 1 } })
+      .png()
+      .toFile(transformedPath);
+
+    const redactRegions = recipe.version === 2 ? recipe.redactRegionsNormalized : [];
+    await applyRedactRegions(transformedPath, redactedPath, redactRegions, rotated);
+    const result = await sharp(redactedPath, { limitInputPixels: 268_402_689 } as any)
       .extract({ left: crop.x, top: crop.y, width: crop.width, height: crop.height })
       .jpeg({ quality: recipe.output?.quality ?? 92, chromaSubsampling: "4:4:4" })
       .withMetadata({ orientation: 1 })

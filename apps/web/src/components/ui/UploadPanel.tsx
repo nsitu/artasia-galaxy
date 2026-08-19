@@ -164,6 +164,7 @@ interface UploadPanelProps {
 
 type CropRect = CropParameters;
 type CropHandle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
+type ImageEditTool = "crop" | "redact";
 const MEDIA_REFRESH_DELAYS_MS = [1500, 3000, 6000, 10000, 15000];
 const DEFAULT_ADJUSTMENTS: AssetAdjustments = {
   brightness: 100,
@@ -371,7 +372,9 @@ export default function UploadPanel({
   >(null);
   const [driveBulkLookupRunning, setDriveBulkLookupRunning] = useState(false);
   const [cropEditing, setCropEditing] = useState(false);
+  const [activeImageEditTool, setActiveImageEditTool] = useState<ImageEditTool>("crop");
   const [cropRect, setCropRect] = useState<CropRect | null>(null);
+  const [redactRect, setRedactRect] = useState<CropRect | null>(null);
   const [cropSourceDimensions, setCropSourceDimensions] = useState<{
     width: number;
     height: number;
@@ -2319,7 +2322,9 @@ export default function UploadPanel({
     setManageContrast(adjustments.contrast);
     setManageSaturation(adjustments.saturation);
     setCropEditing(asset.type === "IMAGE");
+    setActiveImageEditTool("crop");
     setCropRect(null);
+    setRedactRect(null);
     setCropSourceDimensions(null);
     setStraightenDegrees(0);
     setRotationDegrees(0);
@@ -2369,7 +2374,9 @@ export default function UploadPanel({
     setManageContrast(DEFAULT_ADJUSTMENTS.contrast);
     setManageSaturation(DEFAULT_ADJUSTMENTS.saturation);
     setCropEditing(false);
+    setActiveImageEditTool("crop");
     setCropRect(null);
+    setRedactRect(null);
     setStraightenDegrees(0);
     setRotationDegrees(0);
     setAudioDuration(0);
@@ -2729,8 +2736,8 @@ export default function UploadPanel({
       setError("There are no changes to save.");
       return;
     }
-    if (pixelEditsChanged && !cropRect) {
-      setError("Choose a crop area before saving.");
+    if (pixelEditsChanged && selectedAsset.type === "IMAGE" && !cropRect) {
+      setError("Choose an image area before saving.");
       return;
     }
     if (
@@ -2858,8 +2865,19 @@ export default function UploadPanel({
             width: crop.width / dimensions.width,
             height: crop.height / dimensions.height,
           },
+          redactRegionsNormalized: redactRect
+            ? [(() => {
+                const redact = normalizeCropRect(selectedAsset, redactRect);
+                return {
+                  x: redact.x / dimensions.width,
+                  y: redact.y / dimensions.height,
+                  width: redact.width / dimensions.width,
+                  height: redact.height / dimensions.height,
+                };
+              })()]
+            : [],
         });
-        message = `Upload changes saved. Created ${result.width}×${result.height} edited copy and archived the original.`;
+        message = `Upload changes saved. Created ${result.width}×${result.height} edited copy${redactRect ? " with the selected area obscured" : ""} and archived the original.`;
       }
       if (videoRotationChanged) {
         setVideoRotationStatus("Preparing video rotation...");
@@ -3230,6 +3248,17 @@ export default function UploadPanel({
     return rotatedImageDimensions(asset);
   }
 
+  function activeEditRect() {
+    return activeImageEditTool === "crop" ? cropRect : redactRect;
+  }
+
+  function setActiveEditRect(
+    next: CropRect | null | ((current: CropRect | null) => CropRect | null),
+  ) {
+    if (activeImageEditTool === "crop") setCropRect(next);
+    else setRedactRect(next);
+  }
+
   function normalizeCropRect(asset: PlacementAsset, rect: CropRect): CropRect {
     const dimensions = imageDimensionsForCrop(asset);
     if (dimensions.width <= 0 || dimensions.height <= 0) return rect;
@@ -3351,7 +3380,7 @@ export default function UploadPanel({
     const point = pointerToImagePoint(event, selectedAsset);
     if (!point) return;
     cropStartRef.current = point;
-    setCropRect(
+    setActiveEditRect(
       normalizeCropRect(selectedAsset, {
         x: Math.round(point.x),
         y: Math.round(point.y),
@@ -3385,7 +3414,7 @@ export default function UploadPanel({
         height = bottom - y;
       }
       if (handle.includes("s")) height = Math.max(1, point.y - rect.y);
-      setCropRect(normalizeCropRect(selectedAsset, { x, y, width, height }));
+      setActiveEditRect(normalizeCropRect(selectedAsset, { x, y, width, height }));
       return;
     }
     const move = cropMoveRef.current;
@@ -3395,7 +3424,7 @@ export default function UploadPanel({
         x: move.rect.x + point.x - move.start.x,
         y: move.rect.y + point.y - move.start.y,
       };
-      setCropRect(
+      setActiveEditRect(
         preserveCropAcrossRotation(
           selectedAsset,
           desired,
@@ -3411,7 +3440,7 @@ export default function UploadPanel({
     const y = Math.min(start.y, point.y);
     const width = Math.abs(point.x - start.x);
     const height = Math.abs(point.y - start.y);
-    setCropRect(
+    setActiveEditRect(
       normalizeCropRect(selectedAsset, {
         x: Math.round(x),
         y: Math.round(y),
@@ -3434,7 +3463,8 @@ export default function UploadPanel({
     handle: CropHandle,
     event: React.PointerEvent<HTMLSpanElement>,
   ) {
-    if (!selectedAsset || !cropRect || cropSaving) return;
+    const rect = activeEditRect();
+    if (!selectedAsset || !rect || cropSaving) return;
     event.preventDefault();
     event.stopPropagation();
     const point = pointerToImagePoint(event, selectedAsset);
@@ -3442,34 +3472,35 @@ export default function UploadPanel({
     cropResizeRef.current = {
       handle,
       start: point,
-      rect: normalizeCropRect(selectedAsset, cropRect),
+      rect: normalizeCropRect(selectedAsset, rect),
     };
     event.currentTarget.setPointerCapture(event.pointerId);
   }
 
   function beginCropMove(event: React.PointerEvent<HTMLDivElement>) {
-    if (!selectedAsset || !cropRect || cropSaving) return;
+    const rect = activeEditRect();
+    if (!selectedAsset || !rect || cropSaving) return;
     event.preventDefault();
     event.stopPropagation();
     const point = pointerToImagePoint(event, selectedAsset);
     if (!point) return;
     cropMoveRef.current = {
       start: point,
-      rect: normalizeCropRect(selectedAsset, cropRect),
+      rect: normalizeCropRect(selectedAsset, rect),
     };
     event.currentTarget.setPointerCapture(event.pointerId);
   }
 
-  function cropOverlayStyle(asset: PlacementAsset): React.CSSProperties {
+  function cropOverlayStyle(asset: PlacementAsset, rect = activeEditRect()): React.CSSProperties {
     const dimensions = imageDimensionsForCrop(asset);
-    if (!cropRect || dimensions.width <= 0 || dimensions.height <= 0)
+    if (!rect || dimensions.width <= 0 || dimensions.height <= 0)
       return { display: "none" };
-    const rect = normalizeCropRect(asset, cropRect);
+    const normalized = normalizeCropRect(asset, rect);
     return {
-      left: `${(rect.x / dimensions.width) * 100}%`,
-      top: `${(rect.y / dimensions.height) * 100}%`,
-      width: `${(rect.width / dimensions.width) * 100}%`,
-      height: `${(rect.height / dimensions.height) * 100}%`,
+      left: `${(normalized.x / dimensions.width) * 100}%`,
+      top: `${(normalized.y / dimensions.height) * 100}%`,
+      width: `${(normalized.width / dimensions.width) * 100}%`,
+      height: `${(normalized.height / dimensions.height) * 100}%`,
     };
   }
 
@@ -3478,6 +3509,7 @@ export default function UploadPanel({
     if (rotationDegrees !== 0 || Math.abs(straightenDegrees) > 0.0001) {
       return true;
     }
+    if (redactRect && isCropParameters(redactRect)) return true;
     if (!cropRect) return false;
     const dimensions = imageDimensionsForCrop(asset);
     const rect = normalizeCropRect(asset, cropRect);
@@ -3508,6 +3540,18 @@ export default function UploadPanel({
             height: crop.height / dimensions.height,
           };
         })(),
+        redactRegionsNormalized: redactRect
+          ? [(() => {
+              const redact = normalizeCropRect(selectedAsset, redactRect);
+              const dimensions = imageDimensionsForCrop(selectedAsset);
+              return {
+                x: redact.x / dimensions.width,
+                y: redact.y / dimensions.height,
+                width: redact.width / dimensions.width,
+                height: redact.height / dimensions.height,
+              };
+            })()]
+          : [],
       });
       setNotice({
         tone: "success",
@@ -3528,13 +3572,13 @@ export default function UploadPanel({
     const nextDegrees = effectiveRotationDegrees(value);
     setCropRect((current) =>
       current
-        ? preserveCropAcrossRotation(
-            selectedAsset,
-            current,
-            previousDegrees,
-            nextDegrees,
-          )
+        ? preserveCropAcrossRotation(selectedAsset, current, previousDegrees, nextDegrees)
         : defaultCropForAsset(selectedAsset, nextDegrees),
+    );
+    setRedactRect((current) =>
+      current
+        ? preserveCropAcrossRotation(selectedAsset, current, previousDegrees, nextDegrees)
+        : current,
     );
     setStraightenDegrees(value);
   }
@@ -3550,13 +3594,13 @@ export default function UploadPanel({
     const nextDegrees = effectiveRotationDegrees(straightenDegrees, nextRotation);
     setCropRect((current) =>
       current
-        ? preserveCropAcrossRotation(
-            selectedAsset,
-            current,
-            previousDegrees,
-            nextDegrees,
-          )
+        ? preserveCropAcrossRotation(selectedAsset, current, previousDegrees, nextDegrees)
         : defaultCropForAsset(selectedAsset, nextDegrees),
+    );
+    setRedactRect((current) =>
+      current
+        ? preserveCropAcrossRotation(selectedAsset, current, previousDegrees, nextDegrees)
+        : current,
     );
     setRotationDegrees(nextRotation);
   }
@@ -3592,8 +3636,8 @@ export default function UploadPanel({
     const sin = Math.sin(radians);
     const absCos = Math.abs(cos);
     const absSin = Math.abs(sin);
-    const safeSourceHalfWidth = Math.max(0.5, source.width / 2 - 1);
-    const safeSourceHalfHeight = Math.max(0.5, source.height / 2 - 1);
+    const safeSourceHalfWidth = Math.max(0.5, source.width / 2);
+    const safeSourceHalfHeight = Math.max(0.5, source.height / 2);
 
     const horizontalExtent = halfWidth * absCos + halfHeight * absSin;
     const verticalExtent = halfWidth * absSin + halfHeight * absCos;
@@ -3647,6 +3691,8 @@ export default function UploadPanel({
       setStraightenDegrees(0);
       setRotationDegrees(0);
       setCropRect(defaultCropForAsset(selectedAsset, 0));
+      setRedactRect(null);
+      setActiveImageEditTool("crop");
       setCropEditing(true);
       queueMediaRefresh(selectedAsset.id);
       refreshVisibleAssets();
@@ -5021,6 +5067,7 @@ export default function UploadPanel({
     const gpsUsageChanged =
       manageUseGpsLocation !== (selectedAsset.useGpsLocation !== false);
     const pixelEditsChanged = hasPendingPixelEdits(selectedAsset);
+    const redactionPending = pixelEditsChanged && Boolean(redactRect);
     const videoRotationChanged =
       selectedAsset.mediaKind === "video" && rotationDegrees !== 0;
     const audioTrimChanged =
@@ -5053,6 +5100,16 @@ export default function UploadPanel({
     )}`;
     const cropCanvasDimensions = rotatedImageDimensions(selectedAsset);
     const cropSourceSize = sourceImageDimensions(selectedAsset);
+    const activeOverlay = cropOverlayStyle(selectedAsset);
+    const redactOverlayBounds = redactRect
+      ? normalizeCropRect(selectedAsset, redactRect)
+      : null;
+    const redactRight = redactOverlayBounds
+      ? ((redactOverlayBounds.x + redactOverlayBounds.width) / cropCanvasDimensions.width) * 100
+      : 0;
+    const redactBottom = redactOverlayBounds
+      ? ((redactOverlayBounds.y + redactOverlayBounds.height) / cropCanvasDimensions.height) * 100
+      : 0;
     const videoPreviewDimensions = rotatedImageDimensions(
       selectedAsset,
       rotationDegrees,
@@ -5171,6 +5228,23 @@ export default function UploadPanel({
             </div>
           ) : cropEditing ? (
             <div style={cropEditorStyle}>
+              <div style={imageEditToolSwitchStyle} role="group" aria-label="Image editing tool">
+                {(["crop", "redact"] as ImageEditTool[]).map((tool) => (
+                  <button
+                    key={tool}
+                    type="button"
+                    aria-pressed={activeImageEditTool === tool}
+                    onClick={() => setActiveImageEditTool(tool)}
+                    disabled={cropSaving || savingAsset}
+                    style={{
+                      ...imageEditToolButtonStyle,
+                      ...(activeImageEditTool === tool ? imageEditToolButtonActiveStyle : {}),
+                    }}
+                  >
+                    {tool === "crop" ? "Crop & Straighten" : "Redact"}
+                  </button>
+                ))}
+              </div>
               <div
                 style={{
                   ...cropStageStyle,
@@ -5181,8 +5255,8 @@ export default function UploadPanel({
                 onPointerMove={updateCropDrag}
                 onPointerUp={endCropDrag}
                 onPointerCancel={endCropDrag}
-              >
-                <img
+                >
+                  <img
                   ref={cropImageRef}
                   src={cropSourceUrl}
                   alt=""
@@ -5212,11 +5286,38 @@ export default function UploadPanel({
                       height: image.naturalHeight,
                     });
                   }}
-                />
+                    />
+                  {activeImageEditTool === "redact" && redactOverlayBounds && (
+                    <div
+                      aria-hidden="true"
+                      style={{
+                        ...redactPreviewClipStyle,
+                        clipPath: `inset(${(redactOverlayBounds.y / cropCanvasDimensions.height) * 100}% ${100 - redactRight}% ${100 - redactBottom}% ${(redactOverlayBounds.x / cropCanvasDimensions.width) * 100}%)`,
+                      }}
+                    >
+                      <img
+                        src={cropSourceUrl}
+                        alt=""
+                        style={{
+                          ...cropMediaStyle,
+                          ...adjustmentFilterStyle({
+                            brightness: manageBrightness,
+                            contrast: manageContrast,
+                            saturation: manageSaturation,
+                          }),
+                          width: `${(cropSourceSize.width / cropCanvasDimensions.width) * 100}%`,
+                          height: `${(cropSourceSize.height / cropCanvasDimensions.height) * 100}%`,
+                          transform: `translate(-50%, -50%) rotate(${effectiveRotationDegrees()}deg)`,
+                          filter: "blur(10px)",
+                        }}
+                        draggable={false}
+                      />
+                    </div>
+                  )}
                 <div
                   style={{
-                    ...cropBoxStyle,
-                    ...cropOverlayStyle(selectedAsset),
+                    ...(activeImageEditTool === "redact" ? redactBoxStyle : cropBoxStyle),
+                    ...activeOverlay,
                   }}
                   onPointerDown={beginCropMove}
                 >
@@ -5235,7 +5336,7 @@ export default function UploadPanel({
                   ))}
                 </div>
               </div>
-              <div style={rotationControlStyle}>
+              {activeImageEditTool === "crop" && <div style={rotationControlStyle}>
                 <span>Rotate</span>
                 <button
                   type="button"
@@ -5266,8 +5367,8 @@ export default function UploadPanel({
                 <span style={rotationValueStyle}>
                   {rotationDegrees === 270 ? -90 : rotationDegrees}&deg;
                 </span>
-              </div>
-              <label style={adjustmentLabelStyle}>
+              </div>}
+              {activeImageEditTool === "crop" && <label style={adjustmentLabelStyle}>
                 <span>
                   Straighten {straightenDegrees.toFixed(1)}&deg;
                 </span>
@@ -5283,12 +5384,30 @@ export default function UploadPanel({
                   }
                   style={rangeInputStyle}
                 />
-              </label>
-              <div style={cropHintStyle}>
-                Use the rotation buttons for right-angle changes, then use
-                straighten for fine adjustments. Drag over the preview to
-                choose a crop.
-              </div>
+              </label>}
+              {activeImageEditTool === "redact" ? (
+                <>
+                  <div style={cropHintStyle}>
+                    Drag over the image to choose content to obscure. The browser blur is an approximate preview; the saved copy uses a stronger server-side blur. This archives the source for authorized administrators; it does not securely delete it, and a Google Drive reimport can restore the unredacted file.
+                  </div>
+                  {redactRect && (
+                    <button
+                      type="button"
+                      onClick={() => setRedactRect(null)}
+                      disabled={cropSaving || savingAsset}
+                      style={secondaryButtonStyle}
+                    >
+                      Clear redact area
+                    </button>
+                  )}
+                </>
+              ) : (
+                <div style={cropHintStyle}>
+                  Use the rotation buttons for right-angle changes, then use
+                  straighten for fine adjustments. Drag over the preview to
+                  choose a crop.
+                </div>
+              )}
             </div>
           ) : (
             <img
@@ -5839,7 +5958,9 @@ export default function UploadPanel({
                   : videoRotationChanged
                     ? "Saving & Rotating Video..."
                   : pixelEditsChanged
-                  ? "Saving & Creating Edited Copy..."
+                  ? redactionPending
+                    ? "Saving & Creating Redacted Copy..."
+                    : "Saving & Creating Edited Copy..."
                   : "Saving..."
                 : "Save Changes"}
             </button>
@@ -5856,7 +5977,7 @@ export default function UploadPanel({
                 }
                 style={secondaryButtonStyle}
               >
-                Reset Edits
+                Reset Pending Immich Edits
               </button>
             )}
             {authUser?.authenticated && (
@@ -7547,6 +7668,32 @@ const cropEditorStyle: React.CSSProperties = {
   gap: 10,
 };
 
+const imageEditToolSwitchStyle: React.CSSProperties = {
+  display: "inline-flex",
+  width: "fit-content",
+  padding: 3,
+  gap: 3,
+  background: "rgba(255,255,255,0.08)",
+  border: "1px solid rgba(255,255,255,0.14)",
+  borderRadius: 6,
+};
+
+const imageEditToolButtonStyle: React.CSSProperties = {
+  border: 0,
+  borderRadius: 4,
+  padding: "7px 10px",
+  background: "transparent",
+  color: "#aeb7c8",
+  cursor: "pointer",
+  font: "inherit",
+  fontSize: 12,
+};
+
+const imageEditToolButtonActiveStyle: React.CSSProperties = {
+  background: "#d8e7ff",
+  color: "#162033",
+};
+
 const rotationControlStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
@@ -7732,6 +7879,20 @@ const browseStatusTabsStyle: React.CSSProperties = {
   gap: 4,
   marginBottom: 16,
   borderBottom: "1px solid rgba(255,255,255,0.14)",
+};
+
+const redactBoxStyle: React.CSSProperties = {
+  ...cropBoxStyle,
+  borderColor: "#ffcf70",
+  background: "rgba(255, 176, 64, 0.08)",
+  boxShadow: "0 0 0 9999px rgba(22, 12, 0, 0.34)",
+};
+
+const redactPreviewClipStyle: React.CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  overflow: "hidden",
+  pointerEvents: "none",
 };
 
 const browseStatusTabStyle: React.CSSProperties = {

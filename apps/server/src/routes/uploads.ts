@@ -43,7 +43,7 @@ import {
   parseAssetTypeTagValue,
   type AssetType,
 } from "../services/assetType.service.js";
-import { flattenAsset } from "../services/flattenAsset.service.js";
+import { flattenAsset, FlattenValidationError } from "../services/flattenAsset.service.js";
 import { isAudioAsset, parseImmichDuration } from "../services/audioAsset.service.js";
 import { getAudioWaveform } from "../services/audioWaveform.service.js";
 import {
@@ -2405,7 +2405,7 @@ router.post("/assets/:assetId/flatten", async (req, res) => {
   try {
     const auth = await getAuthContext(req);
     if (!auth.authenticated) {
-      res.status(401).json({ error: "Sign in to straighten or crop uploads." });
+      res.status(401).json({ error: "Sign in to crop or redact uploads." });
       return;
     }
 
@@ -2420,7 +2420,7 @@ router.post("/assets/:assetId/flatten", async (req, res) => {
     res.json({ ok: true, ...result, asset_id: result.assetId, source_asset_id: result.sourceAssetId });
   } catch (err) {
     const message = (err as Error).message;
-    const status = /valid|between|outside|rotation|Only image|dimensions/i.test(message) ? 400 : 502;
+    const status = err instanceof FlattenValidationError || /valid|between|outside|rotation|Only image|dimensions/i.test(message) ? 400 : 502;
     res.status(status).json({ error: message });
   }
 });
