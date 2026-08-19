@@ -895,7 +895,8 @@ export default function TerrainGallery({
       terrainMaxZ ?? 0,
     );
   }, [focusedPlacement, projectStatistics, regionalTerrainBounds, terrainMaxZ]);
-  const showRegionalStatistics = !introEnabled || introPhase === "complete";
+  const showRegionalStatistics =
+    !introEnabled || introPhase === "exiting" || introPhase === "complete";
   const focusedPlacementCenter = useMemo<[number, number, number] | null>(() => {
     if (!focusedPlacement || !projection || !projectionMatchesRequest) return null;
     const [placementX, placementY, placementZ = 0] = projection.proj([
@@ -2244,8 +2245,8 @@ export default function TerrainGallery({
   }, [onNoticeChange]);
 
   useEffect(() => {
-    onBackActionChange?.(focusedPlacement ? returnToRegional : null);
-  }, [focusedPlacement, onBackActionChange, returnToRegional]);
+    onBackActionChange?.(returnToRegional);
+  }, [onBackActionChange, returnToRegional]);
 
   useEffect(() => {
     return () => onBackActionChange?.(null);
@@ -2517,6 +2518,7 @@ export function ProjectInfoPanel({
   const [expanded, setExpanded] = useState(!isMobile);
   const description = project.description?.trim() ?? "";
   const hasDescription = Boolean(description);
+  const projectHeading = `Artasia ${project.year} - ${project.name}`;
 
   useEffect(() => {
     setExpanded(!isMobile);
@@ -2555,7 +2557,7 @@ export function ProjectInfoPanel({
           onClick={toggleExpanded}
           style={siteDetailsTitleWrapStyle}
         >
-          <div style={siteNameStyle}>{project.name}</div>
+          <div style={siteNameStyle}>{projectHeading}</div>
         </button>
         {hasDescription && (
           <button

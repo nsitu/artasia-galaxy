@@ -1079,7 +1079,7 @@ export default function ArtScene() {
     setRequestedPartnerSlug(null);
     setRequestedEducatorSlug(null);
     setSelectedActivityFilter("");
-    if (backAction) backAction();
+    if (focusedPlacementDetails) backAction?.();
     try {
       window.localStorage.setItem(PROJECT_STORAGE_KEY, project.slug);
     } catch {
@@ -1090,7 +1090,7 @@ export default function ArtScene() {
     const nextPath = `${target.pathname}${target.search}${target.hash}`;
     window.history.pushState(null, "", nextPath);
     window.dispatchEvent(new PopStateEvent("popstate"));
-  }, [backAction, projectOptions]);
+  }, [backAction, focusedPlacementDetails, projectOptions]);
   const handleProjectInferred = useCallback((projectSlug: string) => {
     const project = projectOptions.find(
       (candidate) => candidate.slug.toLocaleLowerCase() === projectSlug.toLocaleLowerCase(),
@@ -1119,7 +1119,7 @@ export default function ArtScene() {
     updateEducatorPath(normalizedEducator);
   }, []);
   const handleEducatorNavigation = useCallback((educator: string) => {
-    const hasFocusedPlacement = Boolean(backAction);
+    const hasFocusedPlacement = Boolean(focusedPlacementDetails);
     const normalizedEducator = educator.trim().replace(/\s+/g, " ");
     setSelectedPartnerFilter("");
     setSelectedEducatorFilter(normalizedEducator.toLocaleLowerCase());
@@ -1132,7 +1132,7 @@ export default function ArtScene() {
     } else {
       updateEducatorPath(normalizedEducator);
     }
-  }, [backAction]);
+  }, [backAction, focusedPlacementDetails]);
   const handleTopPartnerLogoClick = useCallback((
     event: React.MouseEvent<HTMLAnchorElement>,
     partner: string,
@@ -1242,7 +1242,7 @@ export default function ArtScene() {
           <a
             className="atlas-home-logo-link"
             href="/"
-            aria-label={backAction ? "Back to regional view" : "Artasia home"}
+            aria-label={focusedPlacementDetails ? "Back to regional view" : "Reset regional view"}
             onClick={handleHomeLogoClick}
             style={homeLogoLinkStyle}
           >
@@ -1491,7 +1491,7 @@ export default function ArtScene() {
       {selectedProject &&
         !focusedPlacementDetails &&
         !previewPlacementDetails &&
-        (!showWelcomeIntro || introPhase === "complete") && (
+        (!showWelcomeIntro || introPhase === "exiting" || introPhase === "complete") && (
           <ProjectInfoPanel project={selectedProject} />
         )}
       {focusedPlacementDetails && (

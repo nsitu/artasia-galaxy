@@ -379,6 +379,7 @@ function SignBoard({
             polygonOffsetFactor={-2}
             polygonOffsetUnits={-2}
             depthTest
+            toneMapped={false}
           />
         </mesh>
         <Text
