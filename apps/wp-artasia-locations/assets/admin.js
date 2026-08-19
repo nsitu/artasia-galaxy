@@ -249,5 +249,132 @@ jQuery(function ($) {
     });
   }
 
+  function setupDocumentationGallerySource() {
+    var $source = $('#artasia_documentation_gallery_source');
+    var $panels = $('[data-artasia-gallery-source-panel]');
+
+    if (!$source.length || !$panels.length) {
+      return;
+    }
+
+    function updatePanels() {
+      var source = $source.val() === 'atlas' ? 'atlas' : 'wordpress';
+
+      $panels.each(function () {
+        var isActive = $(this).attr('data-artasia-gallery-source-panel') === source;
+        $(this).prop('hidden', !isActive).attr('aria-hidden', isActive ? 'false' : 'true');
+      });
+    }
+
+    $source.on('change', updatePanels);
+    updatePanels();
+  }
+
+  function setupDocumentationAtlasPreview() {
+    var $source = $('#artasia_documentation_gallery_source');
+    var $placement = $('#artasia_documentation_placement_ids');
+    var $preview = $('[data-artasia-atlas-preview]');
+
+    if (!$source.length || !$placement.length || !$preview.length || !window.fetch) {
+      return;
+    }
+
+    var endpoint = $preview.attr('data-artasia-atlas-preview-endpoint');
+    var nonce = $preview.attr('data-artasia-atlas-preview-nonce');
+    var $status = $preview.find('[data-artasia-atlas-preview-status]');
+    var $items = $preview.find('[data-artasia-atlas-preview-items]');
+    var requestNumber = 0;
+
+    function setStatus(message) {
+      $status.text(message);
+    }
+
+    function renderAssets(assets) {
+      $items.empty();
+
+      assets.forEach(function (asset) {
+        var thumbnailUrl = asset.thumbnailUrl || asset.previewUrl;
+        if (!thumbnailUrl) {
+          return;
+        }
+
+        var caption = String(asset.caption || '').trim();
+        var $item = $('<li>', { class: 'artasia-documentation-atlas-preview-item' });
+        $item.append($('<img>', {
+          class: 'artasia-documentation-atlas-preview-thumbnail',
+          src: thumbnailUrl,
+          alt: asset.alt || caption || 'Process image',
+          loading: 'lazy'
+        }));
+        if (caption) {
+          $item.append($('<p>', {
+            class: 'artasia-documentation-atlas-preview-caption',
+            text: caption
+          }));
+        }
+        $items.append($item);
+      });
+
+      return $items.children().length;
+    }
+
+    function loadPreview() {
+      if ($source.val() !== 'atlas') {
+        return;
+      }
+
+      var placementId = String($placement.val() || '').trim();
+      $items.empty();
+
+      if (!placementId) {
+        setStatus('Select a placement to preview its published Atlas process images.');
+        return;
+      }
+
+      if (!endpoint) {
+        setStatus('Save this documentation before previewing its Atlas process images.');
+        return;
+      }
+
+      var currentRequest = ++requestNumber;
+      var separator = endpoint.indexOf('?') === -1 ? '?' : '&';
+      var previewUrl = endpoint + separator + 'preview=1&placement_id=' + encodeURIComponent(placementId);
+      setStatus('Loading Atlas process images…');
+
+      fetch(previewUrl, {
+        credentials: 'same-origin',
+        headers: {
+          Accept: 'application/json',
+          'X-WP-Nonce': nonce || ''
+        }
+      })
+        .then(function (response) {
+          if (!response.ok) {
+            throw new Error('Unable to load process gallery.');
+          }
+          return response.json();
+        })
+        .then(function (result) {
+          if (currentRequest !== requestNumber || $source.val() !== 'atlas') {
+            return;
+          }
+
+          var count = renderAssets(Array.isArray(result.assets) ? result.assets : []);
+          setStatus(count ? count + ' published process image' + (count === 1 ? '' : 's') + ' available from Atlas.' : 'No published Atlas process images are currently available for this placement.');
+        })
+        .catch(function () {
+          if (currentRequest === requestNumber) {
+            setStatus('Atlas process images could not be loaded.');
+          }
+        });
+    }
+
+    $source.on('change', loadPreview);
+    $placement.on('change', loadPreview);
+    loadPreview();
+  }
+
+  setupDocumentationGallerySource();
+  setupDocumentationAtlasPreview();
   setupDocumentationGallery();
 });

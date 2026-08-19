@@ -144,7 +144,18 @@ function artasia_documentation_gallery_rest_routes(): void
                 'required'          => true,
                 'sanitize_callback' => 'absint',
                 'validate_callback' => static function ($value): bool {
-                    return intval($value) > 0;
+                    return intval($value) >= 0;
+                },
+            ],
+            'placement_id' => [
+                'required'          => false,
+                'sanitize_callback' => 'absint',
+            ],
+            'preview' => [
+                'required'          => false,
+                'sanitize_callback' => 'absint',
+                'validate_callback' => static function ($value): bool {
+                    return in_array(intval($value), [0, 1], true);
                 },
             ],
         ],
@@ -227,22 +238,38 @@ function artasia_rest_get_documentation_process_gallery(WP_REST_Request $request
 {
     $document_id = intval($request->get_param('document_id'));
     $document = get_post($document_id);
-    if (!$document instanceof WP_Post || $document->post_type !== 'artasia_document' || $document->post_status !== 'publish') {
+    $is_preview = intval($request->get_param('preview')) === 1;
+    $can_preview = $is_preview
+        && current_user_can('edit_posts')
+        && (!$document_id || current_user_can('edit_post', $document_id));
+
+    if ($document_id && (!$document instanceof WP_Post || $document->post_type !== 'artasia_document')) {
         return new WP_Error('artasia_documentation_not_found', 'Documentation not found.', ['status' => 404]);
     }
 
-    $source = get_post_meta($document_id, 'artasia_documentation_gallery_source', true);
-    if ($source !== 'atlas') {
+    if (!$can_preview && (!$document instanceof WP_Post || $document->post_status !== 'publish')) {
+        return new WP_Error('artasia_documentation_not_found', 'Documentation not found.', ['status' => 404]);
+    }
+
+    $source = $document_id ? get_post_meta($document_id, 'artasia_documentation_gallery_source', true) : '';
+    if (!$can_preview && $source !== 'atlas') {
         return new WP_Error('artasia_atlas_gallery_not_selected', 'Atlas gallery is not selected for this documentation.', ['status' => 404]);
     }
 
-    $placement_ids = artasia_validate_related_post_ids(
-        get_post_meta($document_id, 'artasia_documentation_placement_ids', true),
-        'artasia_placement'
-    );
-    $placement_id = intval($placement_ids[0] ?? 0);
+    $placement_id = $can_preview ? absint($request->get_param('placement_id')) : 0;
+    if (!$placement_id && $document_id) {
+        $placement_ids = artasia_validate_related_post_ids(
+            get_post_meta($document_id, 'artasia_documentation_placement_ids', true),
+            'artasia_placement'
+        );
+        $placement_id = intval($placement_ids[0] ?? 0);
+    }
     if (!$placement_id) {
         return new WP_Error('artasia_placement_not_found', 'Documentation has no placement.', ['status' => 404]);
+    }
+
+    if ($can_preview && get_post_type($placement_id) !== 'artasia_placement') {
+        return new WP_Error('artasia_placement_not_found', 'Placement not found.', ['status' => 404]);
     }
 
     $gallery = artasia_get_atlas_process_gallery($placement_id);

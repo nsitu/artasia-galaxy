@@ -178,3 +178,35 @@
   box-sizing: border-box;
   overflow-wrap: anywhere;
 }
+
+.artasia-documentation-atlas-preview {
+  margin-top: 16px;
+}
+
+.artasia-documentation-atlas-preview-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.artasia-documentation-atlas-preview-item {
+  margin: 0;
+  padding: 8px;
+  border: 1px solid #c3c4c7;
+  background: #fff;
+}
+
+.artasia-documentation-atlas-preview-thumbnail {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.artasia-documentation-atlas-preview-caption {
+  margin: 8px 0 0;
+  overflow-wrap: anywhere;
+}
