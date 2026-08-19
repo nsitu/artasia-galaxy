@@ -53,6 +53,7 @@ const REGIONAL_DEM_ZOOM_OFFSET = 5;
 const LOCAL_DEM_ZOOM_OFFSET = 3;
 const ORBIT_TERRAIN_CLEARANCE = 0.12;
 const ORBIT_VISUAL_HALF_HEIGHT = 0.5;
+const DOCUMENTATION_QUOTE_TERRAIN_OFFSET = 0.6;
 const SIGNPOST_TERRAIN_CLEARANCE = 0.35;
 const SIGNPOST_MIN_HEIGHT = 2.8;
 const SIGNPOST_MAX_DIRECTION_ANGLE = THREE.MathUtils.degToRad(30);
@@ -1042,12 +1043,8 @@ export default function TerrainGallery({
     const terrainHeight = Math.max(1, maxY - minY);
     const width = THREE.MathUtils.clamp(terrainWidth * 0.38, 3.8, 4.8);
     const height = THREE.MathUtils.clamp(terrainHeight * 0.78, 5.2, 9.2);
-    const outerOrbitRadius = activityOrbitRings.length > 0
-      ? Math.max(...activityOrbitRings.map((ring) => ring.radius))
-      : 1;
-    const panelLeft = focusedPlacementCenter[0] + outerOrbitRadius + width * 0.2;
-    const x = panelLeft + width / 2;
-    const y = (minY + maxY) / 2;
+    const x = maxX + DOCUMENTATION_QUOTE_TERRAIN_OFFSET;
+    const y = maxY;
 
     return {
       quote,
@@ -1056,23 +1053,22 @@ export default function TerrainGallery({
       position: [
         x,
         y,
-        focusedPlacementCenter[2] + orbitHeight,
+        terrainMaxZ ?? focusedPlacementCenter[2],
       ] as [number, number, number],
       fitBounds: {
         minX,
-        maxX: Math.max(maxX, x + width / 2),
-        minY: Math.min(minY, y - height / 2),
-        maxY: Math.max(maxY, y + height / 2),
+        maxX: x + width,
+        minY: Math.min(minY, y - height),
+        maxY,
       },
     };
   }, [
-    activityOrbitRings,
     focusedPlacement,
     focusedPlacementGalleryReady,
     focusedPlacementCenter,
-    orbitHeight,
     request,
     terrainBounds,
+    terrainMaxZ,
   ]);
 
   useEffect(() => {
@@ -2455,7 +2451,6 @@ export default function TerrainGallery({
           quote={documentationQuoteLayout.quote}
           position={documentationQuoteLayout.position}
           width={documentationQuoteLayout.width}
-          height={documentationQuoteLayout.height}
           attribution={focusedPlacement.documentation_attribution}
         />
       )}
