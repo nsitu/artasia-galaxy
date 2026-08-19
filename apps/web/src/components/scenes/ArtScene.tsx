@@ -11,6 +11,7 @@ import DocumentationOverlay from "./DocumentationOverlay";
 import { loadMaterialSymbols } from "../../modules/iconLoader";
 import TerrainGallery, {
   FocusedPlacementOverlay,
+  ProjectInfoPanel,
   type EducatorFilterOption,
   type PartnerFilterOption,
   PlacementHoverLabel,
@@ -1022,10 +1023,30 @@ export default function ArtScene() {
     setBackAction(action ? () => action : null);
   }, []);
   const handleHomeLogoClick = useCallback((event: React.MouseEvent<HTMLAnchorElement>) => {
-    if (!backAction) return;
+    if (backAction) {
+      event.preventDefault();
+      backAction();
+      return;
+    }
+
     event.preventDefault();
-    backAction();
-  }, [backAction]);
+    setSelectedPartnerFilter("");
+    setSelectedEducatorFilter("");
+    setRequestedPartnerSlug(null);
+    setRequestedEducatorSlug(null);
+    setSelectedActivityFilter("");
+
+    const target = new URL("/", window.location.origin);
+    if (selectedProjectSlug) {
+      target.searchParams.set(PROJECT_QUERY_KEY, selectedProjectSlug);
+    }
+    const nextPath = `${target.pathname}${target.search}${target.hash}`;
+    const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (currentPath !== nextPath) {
+      window.history.pushState(null, "", nextPath);
+    }
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  }, [backAction, selectedProjectSlug]);
   const handlePreviewPlacementChange = useCallback((placement: MapPlacement | null, action?: (() => void) | null) => {
     setPreviewPlacementDetails(placement);
     setPreviewPlacementAction(action ? () => action : null);
@@ -1467,6 +1488,12 @@ export default function ArtScene() {
       {terrainNotice && (!showWelcomeIntro || introPhase === "complete") && (
         <LoadingIndicator {...terrainNotice} />
       )}
+      {selectedProject &&
+        !focusedPlacementDetails &&
+        !previewPlacementDetails &&
+        (!showWelcomeIntro || introPhase === "complete") && (
+          <ProjectInfoPanel project={selectedProject} />
+        )}
       {focusedPlacementDetails && (
         <FocusedPlacementOverlay
           placement={focusedPlacementDetails}
@@ -1907,7 +1934,6 @@ export default function ArtScene() {
               onPartnerFilterOptionsChange={setPartnerFilterOptions}
               onEducatorFilterOptionsChange={setEducatorFilterOptions}
               projectSlug={selectedProject?.slug}
-              projectLabel={selectedProject ? `Artasia ${selectedProject.year} - ${selectedProject.name}` : undefined}
               projectStatistics={selectedProject?.statistics}
               onProjectInferred={handleProjectInferred}
               selectedPartnerFilter={selectedPartnerFilter}

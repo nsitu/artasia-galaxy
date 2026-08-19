@@ -13,13 +13,8 @@ export interface ProjectStatisticsWidgetLayout {
 
 export const PROJECT_STATISTICS_WIDGET_WIDTH = 3.1;
 export const PROJECT_STATISTICS_WIDGET_HEIGHT = 1.25;
-export const PROJECT_STATISTICS_TITLE_WIDTH = 6.5;
-export const PROJECT_STATISTICS_TITLE_HEIGHT = 0.8;
 
 const STATISTICS_HTML_DISTANCE_FACTOR = 10;
-const STATISTICS_HTML_WORLD_UNITS_PER_PIXEL = STATISTICS_HTML_DISTANCE_FACTOR / 400;
-const PROJECT_STATISTICS_TITLE_RENDERED_WIDTH =
-  PROJECT_STATISTICS_TITLE_WIDTH * 100 * STATISTICS_HTML_WORLD_UNITS_PER_PIXEL;
 
 const STATISTICS_WIDGETS: Array<{
   key: keyof ProjectStatistics;
@@ -68,40 +63,13 @@ export function createProjectStatisticsWidgetLayout(
   }));
 }
 
-export function getProjectStatisticsTitlePosition(
-  bounds: { minX: number; maxX: number; minY: number; maxY: number },
-  z: number,
-): [number, number, number] {
-  return [
-    bounds.minX + PROJECT_STATISTICS_TITLE_RENDERED_WIDTH / 2,
-    bounds.maxY + STATISTICS_WIDGET_GAP + PROJECT_STATISTICS_TITLE_HEIGHT / 2,
-    z + STATISTICS_WIDGET_Z_OFFSET,
-  ];
-}
-
 export default function ProjectStatisticsWidgets({
   layout,
-  projectLabel,
-  titlePosition,
 }: {
   layout: ProjectStatisticsWidgetLayout[];
-  projectLabel?: string;
-  titlePosition?: [number, number, number] | null;
 }) {
   return (
     <group>
-      {projectLabel && titlePosition && (
-        <Html
-          position={titlePosition}
-          transform
-          distanceFactor={STATISTICS_HTML_DISTANCE_FACTOR}
-          zIndexRange={STATISTICS_WIDGET_Z_INDEX_RANGE}
-          pointerEvents="none"
-          style={titleStyle}
-        >
-          {projectLabel}
-        </Html>
-      )}
       {layout.map((widget) => (
         <Html
           key={widget.key}
@@ -128,21 +96,6 @@ const widgetStyle: CSSProperties = {
   color: "#ffffff",
   fontFamily: '"Montserrat", Arial, sans-serif',
   textAlign: "center",
-  pointerEvents: "none",
-  userSelect: "none",
-  textShadow: "0 2px 8px rgba(23, 32, 21, 0.65)",
-};
-
-const titleStyle: CSSProperties = {
-  width: `${PROJECT_STATISTICS_TITLE_WIDTH * 100}px`,
-  height: `${PROJECT_STATISTICS_TITLE_HEIGHT * 100}px`,
-  color: "#ffffff",
-  fontFamily: '"Montserrat", Arial, sans-serif',
-  fontSize: "1.2rem",
-  fontWeight: 800,
-  letterSpacing: "0.02em",
-  lineHeight: 1,
-  textAlign: "left",
   pointerEvents: "none",
   userSelect: "none",
   textShadow: "0 2px 8px rgba(23, 32, 21, 0.65)",

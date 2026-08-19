@@ -36,7 +36,6 @@ import DocumentationPullQuotePanel, {
 } from "./DocumentationPullQuotePanel";
 import ProjectStatisticsWidgets, {
   createProjectStatisticsWidgetLayout,
-  getProjectStatisticsTitlePosition,
 } from "./ProjectStatisticsWidgets";
 import {
   createMaxDetailTerrainRequest,
@@ -587,7 +586,6 @@ interface TerrainGalleryProps {
   onPartnerFilterOptionsChange?: (options: PartnerFilterOption[]) => void;
   onEducatorFilterOptionsChange?: (options: EducatorFilterOption[]) => void;
   projectSlug?: string;
-  projectLabel?: string;
   projectStatistics?: ProjectOption["statistics"];
   onProjectInferred?: (projectSlug: string) => void;
   selectedPartnerFilter?: string;
@@ -617,7 +615,6 @@ export default function TerrainGallery({
   onPartnerFilterOptionsChange,
   onEducatorFilterOptionsChange,
   projectSlug,
-  projectLabel,
   projectStatistics,
   onProjectInferred,
   selectedPartnerFilter = "",
@@ -898,12 +895,6 @@ export default function TerrainGallery({
       terrainMaxZ ?? 0,
     );
   }, [focusedPlacement, projectStatistics, regionalTerrainBounds, terrainMaxZ]);
-  const regionalStatisticsTitlePosition = useMemo(
-    () => regionalTerrainBounds && !focusedPlacement
-      ? getProjectStatisticsTitlePosition(regionalTerrainBounds, terrainMaxZ ?? 0)
-      : null,
-    [focusedPlacement, regionalTerrainBounds, terrainMaxZ],
-  );
   const showRegionalStatistics = !introEnabled || introPhase === "complete";
   const focusedPlacementCenter = useMemo<[number, number, number] | null>(() => {
     if (!focusedPlacement || !projection || !projectionMatchesRequest) return null;
@@ -2362,8 +2353,6 @@ export default function TerrainGallery({
       {sceneReadyForMarkers && showRegionalStatistics && !focusedPlacement && (
         <ProjectStatisticsWidgets
           layout={regionalStatisticsLayout}
-          projectLabel={projectLabel}
-          titlePosition={regionalStatisticsTitlePosition}
         />
       )}
       {sceneReadyForMarkers && focusedPlacement &&
@@ -2517,6 +2506,87 @@ function resetTerrainCamera(
   camera.lookAt(target);
   controls?.target?.copy(target);
   controls?.update?.();
+}
+
+export function ProjectInfoPanel({
+  project,
+}: {
+  project: ProjectOption;
+}) {
+  const isMobile = useIsMobileBreakpoint();
+  const [expanded, setExpanded] = useState(!isMobile);
+  const description = project.description?.trim() ?? "";
+  const hasDescription = Boolean(description);
+
+  useEffect(() => {
+    setExpanded(!isMobile);
+  }, [isMobile, project.slug]);
+
+  const toggleExpanded = () => {
+    if (hasDescription) setExpanded((current) => !current);
+  };
+
+  return (
+    <section
+      style={{
+        ...siteDetailsStyle,
+        ...(isMobile ? mobileSiteDetailsStyle : {}),
+        ...(isMobile && !expanded ? mobileSiteDetailsCollapsedStyle : {}),
+      }}
+      aria-label="Project details"
+    >
+      <div
+        style={{
+          ...siteDetailsHeaderStyle,
+          ...(isMobile ? mobileSiteDetailsHeaderStyle : {}),
+          ...(!expanded ? siteDetailsHeaderCollapsedStyle : {}),
+        }}
+      >
+        <button
+          type="button"
+          aria-expanded={hasDescription ? expanded : undefined}
+          aria-label={
+            hasDescription
+              ? expanded
+                ? "Collapse project description"
+                : "Expand project description"
+              : undefined
+          }
+          onClick={toggleExpanded}
+          style={siteDetailsTitleWrapStyle}
+        >
+          <div style={siteNameStyle}>{project.name}</div>
+        </button>
+        {hasDescription && (
+          <button
+            type="button"
+            className="atlas-control-surface"
+            aria-expanded={expanded}
+            aria-label={
+              expanded
+                ? "Collapse project description"
+                : "Expand project description"
+            }
+            onClick={toggleExpanded}
+            style={siteDetailsToggleStyle}
+          >
+            <ChevronIcon direction={expanded ? "down" : "up"} />
+          </button>
+        )}
+      </div>
+
+      {expanded && hasDescription && (
+        <div
+          style={{
+            ...siteDetailsBodyStyle,
+            ...(isMobile ? mobileSiteDetailsBodyStyle : {}),
+          }}
+        >
+          <p style={projectDescriptionStyle}>{description}</p>
+        </div>
+      )}
+    </section>
+  );
 }
 
 function getTerrainCameraFrame(
@@ -3417,6 +3487,16 @@ const siteNameStyle: React.CSSProperties = {
   fontWeight: 700,
   lineHeight: 1.35,
   marginTop: 3,
+};
+
+const projectDescriptionStyle: React.CSSProperties = {
+  margin: 0,
+  color: "#d8dde7",
+  fontFamily: '"Montserrat", Arial, sans-serif',
+  fontSize: 14,
+  fontWeight: 400,
+  lineHeight: 1.6,
+  whiteSpace: "pre-line",
 };
 
 const siteDetailsGridStyle: React.CSSProperties = {
