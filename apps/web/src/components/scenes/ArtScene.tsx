@@ -56,15 +56,14 @@ type MapStyleId =
 type MapStyleOption = {
   id: MapStyleId;
   label: string;
-  detail: string;
 };
 const MAP_STYLE_OPTIONS: readonly MapStyleOption[] = [
-  { id: "satellite-v9", label: "Satellite", detail: "Aerial imagery" },
-  { id: "satellite-streets-v12", label: "Satellite streets", detail: "Aerial imagery with labels" },
-  { id: "streets-v12", label: "Streets", detail: "Roads and places" },
-  { id: "outdoors-v12", label: "Outdoors", detail: "Natural features and contours" },
-  { id: "light-v11", label: "Light", detail: "Minimal light basemap" },
-  { id: "dark-v11", label: "Dark", detail: "High-contrast dark basemap" },
+  { id: "satellite-v9", label: "Satellite" },
+  { id: "satellite-streets-v12", label: "Satellite streets" },
+  { id: "streets-v12", label: "Streets" },
+  { id: "outdoors-v12", label: "Outdoors" },
+  { id: "light-v11", label: "Light" },
+  { id: "dark-v11", label: "Dark" },
 ];
 const MAP_STYLE_STORAGE_KEY = "artasia-map-style";
 type MenuItem = {
@@ -1271,7 +1270,6 @@ export default function ArtScene() {
                       onClick={() => handleMapStyleChange(option.id)}
                     >
                       <span>{option.label}</span>
-                      <span style={mapOptionsDetailStyle}>{option.detail}</span>
                     </button>
                   ))}
                 </div>
@@ -2559,24 +2557,19 @@ const mapOptionsHeadingStyle: React.CSSProperties = {
 };
 
 const mapOptionsChoiceStyle: React.CSSProperties = {
-  display: "grid",
-  gap: 3,
+  ...menuItemStyle,
   width: "100%",
-  padding: "9px 14px 9px 24px",
   border: 0,
+  borderBottom: 0,
   textAlign: "left",
   cursor: "pointer",
+  background: "transparent",
+  color: "#eef3fb",
 };
 
 const mapOptionsChoiceActiveStyle: React.CSSProperties = {
-  background: "rgba(236,0,140,0.3)",
+  background: "rgba(142,29,88,0.72)",
   color: "#ffffff",
-};
-
-const mapOptionsDetailStyle: React.CSSProperties = {
-  color: "#aeb7c6",
-  fontSize: 10,
-  fontWeight: 400,
 };
 
 const homeLogoLinkStyle: React.CSSProperties = {
