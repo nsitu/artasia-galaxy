@@ -1881,6 +1881,7 @@ export default function ArtScene() {
               onPartnerFilterOptionsChange={setPartnerFilterOptions}
               onEducatorFilterOptionsChange={setEducatorFilterOptions}
               projectSlug={selectedProject?.slug}
+              projectLabel={selectedProject ? `Artasia ${selectedProject.year} - ${selectedProject.name}` : undefined}
               projectStatistics={selectedProject?.statistics}
               onProjectInferred={handleProjectInferred}
               selectedPartnerFilter={selectedPartnerFilter}
