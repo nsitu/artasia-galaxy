@@ -52,7 +52,9 @@ export interface ArtasiaPlacement {
   section?: string;
   placement_slug?: string;
   documentation_url?: string;
+  documentation_title?: string;
   documentation_pull_quote?: string;
+  documentation_content_html?: string;
   documentation_attribution?: string;
   google_drive_folder_id?: string;
   team_member_id?: number;
@@ -96,7 +98,9 @@ export interface ArtasiaMapPlacement {
   section?: string;
   placement_slug?: string;
   documentation_url?: string;
+  documentation_title?: string;
   documentation_pull_quote?: string;
+  documentation_content_html?: string;
   documentation_attribution?: string;
   is_earlyon: boolean;
   partner_name?: string;
@@ -209,7 +213,9 @@ function mapWpPlacement(wp: WpArtasiaPlacement): ArtasiaPlacement {
     ...(wp.section ? { section: wp.section } : {}),
     ...(wp.placement_slug ? { placement_slug: wp.placement_slug } : {}),
     ...(wp.documentation_url ? { documentation_url: wp.documentation_url } : {}),
+    ...(wp.documentation_title ? { documentation_title: wp.documentation_title } : {}),
     ...(wp.documentation_pull_quote ? { documentation_pull_quote: wp.documentation_pull_quote } : {}),
+    ...(wp.documentation_content_html ? { documentation_content_html: wp.documentation_content_html } : {}),
     ...(wp.documentation_attribution ? { documentation_attribution: wp.documentation_attribution } : {}),
     ...(wp.google_drive_folder_id ? { google_drive_folder_id: wp.google_drive_folder_id } : {}),
     ...(wp.team_member?.id ? { team_member_id: wp.team_member.id } : {}),
@@ -285,7 +291,9 @@ export async function getMapPlacements(): Promise<ArtasiaMapPlacement[]> {
       is_earlyon: Boolean(wp.is_earlyon),
       ...(wp.placement_slug ? { placement_slug: wp.placement_slug } : {}),
       ...(wp.documentation_url ? { documentation_url: wp.documentation_url } : {}),
+      ...(wp.documentation_title ? { documentation_title: wp.documentation_title } : {}),
       ...(wp.documentation_pull_quote ? { documentation_pull_quote: wp.documentation_pull_quote } : {}),
+      ...(wp.documentation_content_html ? { documentation_content_html: wp.documentation_content_html } : {}),
       ...(wp.documentation_attribution ? { documentation_attribution: wp.documentation_attribution } : {}),
       ...(wp.partner?.name ? { partner_name: wp.partner.name } : {}),
       ...(wp.partner?.acronym ? { partner_acronym: wp.partner.acronym } : {}),

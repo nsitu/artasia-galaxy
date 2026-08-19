@@ -363,13 +363,18 @@ function artasia_get_expanded_placements(): WP_REST_Response
         $documentation_pull_quote = $documentation
             ? trim((string) get_post_meta($documentation->ID, 'artasia_documentation_pull_quote', true))
             : '';
+        $documentation_content_html = $documentation
+            ? wp_kses_post(apply_filters('the_content', $documentation->post_content))
+            : '';
 
         $results[] = [
             'placement_id' => $placement->ID,
             'placement_name' => $placement->post_title,
             'placement_slug' => $placement->post_name,
             'documentation_url' => $documentation_url,
+            'documentation_title' => $documentation ? $documentation->post_title : '',
             'documentation_pull_quote' => $documentation_pull_quote,
+            'documentation_content_html' => $documentation_content_html,
             'documentation_attribution' => $documentation_attribution_lookup[$placement->ID] ?? '',
             'project' => $project_lookup[$project_id] ?? null,
             'description' => get_post_meta($placement->ID, 'artasia_placement_description', true) ?: '',

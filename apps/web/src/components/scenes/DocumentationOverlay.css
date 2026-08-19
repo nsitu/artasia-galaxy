@@ -1,0 +1,165 @@
+.atlas-documentation-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
+  background: rgba(5, 7, 14, 0.78);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.atlas-documentation-overlay__card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(900px, 100%);
+  max-height: min(900px, calc(100dvh - 48px));
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(16, 19, 31, 0.97);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
+  color: #eef3fb;
+}
+
+.atlas-documentation-overlay__header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: clamp(24px, 4vw, 48px) clamp(24px, 5vw, 64px) 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.atlas-documentation-overlay__eyebrow {
+  margin-bottom: 10px;
+  color: #c1c9d7;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.atlas-documentation-overlay__header h2 {
+  color: #fff;
+  font-size: clamp(24px, 3vw, 38px);
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.atlas-documentation-overlay__attribution {
+  margin-top: 10px;
+  color: #c7ccd6;
+  font-size: 14px;
+  font-style: italic;
+  line-height: 1.4;
+}
+
+.atlas-documentation-overlay__placement {
+  margin-top: 8px;
+  color: #c1c9d7;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.atlas-documentation-overlay__close {
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 0;
+  color: #eef3fb;
+  cursor: pointer;
+  font-size: 30px;
+  line-height: 1;
+}
+
+.atlas-documentation-overlay__close:hover,
+.atlas-documentation-overlay__close:focus-visible {
+  background-color: rgba(255, 255, 255, 0.14);
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 2px;
+}
+
+.atlas-documentation-overlay__content {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 28px clamp(24px, 5vw, 64px) clamp(32px, 5vw, 64px);
+  color: #e3e7ef;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(17px, 1.35vw, 21px);
+  line-height: 1.75;
+  scrollbar-width: thin;
+}
+
+.atlas-documentation-overlay__content p + p,
+.atlas-documentation-overlay__content ul + p,
+.atlas-documentation-overlay__content ol + p,
+.atlas-documentation-overlay__content p + ul,
+.atlas-documentation-overlay__content p + ol {
+  margin-top: 1.15em;
+}
+
+.atlas-documentation-overlay__content h1,
+.atlas-documentation-overlay__content h2,
+.atlas-documentation-overlay__content h3,
+.atlas-documentation-overlay__content h4,
+.atlas-documentation-overlay__content h5,
+.atlas-documentation-overlay__content h6 {
+  margin: 1.5em 0 0.55em;
+  color: #fff;
+  font-family: Montserrat, Arial, sans-serif;
+  line-height: 1.25;
+}
+
+.atlas-documentation-overlay__content h1:first-child,
+.atlas-documentation-overlay__content h2:first-child,
+.atlas-documentation-overlay__content h3:first-child,
+.atlas-documentation-overlay__content h4:first-child,
+.atlas-documentation-overlay__content h5:first-child,
+.atlas-documentation-overlay__content h6:first-child {
+  margin-top: 0;
+}
+
+.atlas-documentation-overlay__content ul,
+.atlas-documentation-overlay__content ol {
+  padding-left: 1.4em;
+}
+
+.atlas-documentation-overlay__content a {
+  color: #f3b6d3;
+  text-decoration: underline;
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.16em;
+}
+
+.atlas-documentation-overlay__content blockquote {
+  margin: 1.4em 0;
+  padding-left: 1.2em;
+  border-left: 3px solid rgba(242, 139, 32, 0.75);
+  color: #f0d9e4;
+}
+
+@media (max-width: 600px) {
+  .atlas-documentation-overlay {
+    align-items: stretch;
+    padding: 0;
+  }
+
+  .atlas-documentation-overlay__card {
+    width: 100%;
+    max-height: 100dvh;
+    border-width: 0;
+  }
+
+  .atlas-documentation-overlay__header {
+    padding-top: max(24px, env(safe-area-inset-top));
+  }
+}

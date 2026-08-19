@@ -7,6 +7,7 @@ import { useGalleryStore } from "../../stores/galleryStore";
 import LoadingIndicator from "../ui/LoadingIndicator";
 import AudioLightboxPlayer from "../ui/AudioLightboxPlayer";
 import WelcomeOverlay from "../ui/WelcomeOverlay";
+import DocumentationOverlay from "./DocumentationOverlay";
 import { loadMaterialSymbols } from "../../modules/iconLoader";
 import TerrainGallery, {
   FocusedPlacementOverlay,
@@ -404,6 +405,7 @@ export default function ArtScene() {
   const [terrainNotice, setTerrainNotice] = useState<TerrainNotice | null>(null);
   const [backAction, setBackAction] = useState<(() => void) | null>(null);
   const [focusedPlacementDetails, setFocusedPlacementDetails] = useState<MapPlacement | null>(null);
+  const [documentationOverlayPlacement, setDocumentationOverlayPlacement] = useState<MapPlacement | null>(null);
   const [hoveredPlacementDetails, setHoveredPlacementDetails] = useState<MapPlacement | null>(null);
   const [previewPlacementDetails, setPreviewPlacementDetails] = useState<MapPlacement | null>(null);
   const [previewPlacementAction, setPreviewPlacementAction] = useState<(() => void) | null>(null);
@@ -1034,6 +1036,14 @@ export default function ArtScene() {
   const handleFocusedPlacementChange = useCallback((placement: MapPlacement | null) => {
     setSelectedActivityFilter("");
     setFocusedPlacementDetails(placement);
+    setDocumentationOverlayPlacement(null);
+  }, []);
+  const handleDocumentationOpen = useCallback((placement: MapPlacement) => {
+    if (!placement.documentation_content_html?.trim()) return;
+    setDocumentationOverlayPlacement(placement);
+  }, []);
+  const handleDocumentationClose = useCallback(() => {
+    setDocumentationOverlayPlacement(null);
   }, []);
   const handleProjectChange = useCallback((projectSlug: string) => {
     const project = projectOptions.find(
@@ -1508,6 +1518,13 @@ export default function ArtScene() {
         <PlacementHoverLabel placement={hoveredPlacementDetails} />
       )}
 
+      {documentationOverlayPlacement && (
+        <DocumentationOverlay
+          placement={documentationOverlayPlacement}
+          onClose={handleDocumentationClose}
+        />
+      )}
+
       {selectedPhoto && (
         <div
           className="atlas-photo-lightbox"
@@ -1883,6 +1900,7 @@ export default function ArtScene() {
               onNoticeChange={setTerrainNotice}
               onBackActionChange={handleBackActionChange}
               onFocusedPlacementChange={handleFocusedPlacementChange}
+              onDocumentationOpen={handleDocumentationOpen}
               onHoveredPlacementChange={setHoveredPlacementDetails}
               onPreviewPlacementChange={handlePreviewPlacementChange}
               onPlacementNavigationChange={handlePlacementNavigationChange}

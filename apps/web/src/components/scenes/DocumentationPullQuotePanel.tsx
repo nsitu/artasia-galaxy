@@ -8,6 +8,7 @@ interface DocumentationPullQuotePanelProps {
   width: number;
   height: number;
   attribution?: string;
+  onClick?: () => void;
 }
 
 export const DOCUMENTATION_QUOTE_DISTANCE_FACTOR = 10;
@@ -27,6 +28,7 @@ export default function DocumentationPullQuotePanel({
   width,
   height,
   attribution,
+  onClick,
 }: DocumentationPullQuotePanelProps) {
   const quoteFontSize = getQuoteFontSize(quote);
   const textFontSize = Math.max(0.19, quoteFontSize * 0.62);
@@ -42,21 +44,40 @@ export default function DocumentationPullQuotePanel({
         transform
         distanceFactor={DOCUMENTATION_QUOTE_DISTANCE_FACTOR}
         zIndexRange={[12, 0]}
-        pointerEvents="none"
-        style={panelStyle(width, height)}
+        pointerEvents={onClick ? "auto" : "none"}
+        style={panelStyle(width, height, Boolean(onClick))}
       >
-        <div style={quoteStyle(textFontSize)}>{displayQuote}</div>
-        {attribution && (
-          <div style={attributionStyle(textFontSize)}>
-            {`— ${attribution}`}
-          </div>
+        {onClick ? (
+          <button
+            type="button"
+            onClick={onClick}
+            aria-label="Read full documentation"
+            title="Read full documentation"
+            style={quoteButtonStyle}
+          >
+            <div style={quoteStyle(textFontSize)}>{displayQuote}</div>
+            {attribution && (
+              <div style={attributionStyle(textFontSize)}>
+                {`— ${attribution}`}
+              </div>
+            )}
+          </button>
+        ) : (
+          <>
+            <div style={quoteStyle(textFontSize)}>{displayQuote}</div>
+            {attribution && (
+              <div style={attributionStyle(textFontSize)}>
+                {`— ${attribution}`}
+              </div>
+            )}
+          </>
         )}
       </Html>
     </group>
   );
 }
 
-function panelStyle(width: number, height: number): CSSProperties {
+function panelStyle(width: number, height: number, interactive: boolean): CSSProperties {
   return {
     width: `${width * 100}px`,
     height: `${height * 100}px`,
@@ -65,10 +86,25 @@ function panelStyle(width: number, height: number): CSSProperties {
     alignItems: "stretch",
     justifyContent: "flex-start",
     overflow: "visible",
-    pointerEvents: "none",
+    pointerEvents: interactive ? "auto" : "none",
     userSelect: "none",
   };
 }
+
+const quoteButtonStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "stretch",
+  width: "100%",
+  minHeight: "100%",
+  padding: 0,
+  border: 0,
+  background: "transparent",
+  color: "inherit",
+  font: "inherit",
+  textAlign: "left",
+  cursor: "pointer",
+};
 
 function quoteStyle(fontSize: number): CSSProperties {
   return {

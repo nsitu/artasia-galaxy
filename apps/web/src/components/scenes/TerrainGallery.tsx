@@ -575,6 +575,7 @@ interface TerrainGalleryProps {
   onNoticeChange?: (notice: TerrainNotice | null) => void;
   onBackActionChange?: (action: (() => void) | null) => void;
   onFocusedPlacementChange?: (placement: MapPlacement | null) => void;
+  onDocumentationOpen?: (placement: MapPlacement) => void;
   onHoveredPlacementChange?: (placement: MapPlacement | null) => void;
   onPreviewPlacementChange?: (
     placement: MapPlacement | null,
@@ -609,6 +610,7 @@ export default function TerrainGallery({
   onNoticeChange,
   onBackActionChange,
   onFocusedPlacementChange,
+  onDocumentationOpen,
   onHoveredPlacementChange,
   onPreviewPlacementChange,
   onPlacementNavigationChange,
@@ -2525,6 +2527,11 @@ export default function TerrainGallery({
           width={documentationQuoteLayout.width}
           height={documentationQuoteLayout.height}
           attribution={focusedPlacement.documentation_attribution}
+          onClick={
+            focusedPlacement.documentation_content_html?.trim()
+              ? () => onDocumentationOpen?.(focusedPlacement)
+              : undefined
+          }
         />
       )}
     </group>

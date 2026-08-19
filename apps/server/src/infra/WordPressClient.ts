@@ -65,7 +65,9 @@ export interface WpArtasiaPlacement {
   placement_name: string;
   placement_slug?: string;
   documentation_url?: string;
+  documentation_title?: string;
   documentation_pull_quote?: string;
+  documentation_content_html?: string;
   documentation_attribution?: string;
   project: WpProject | null;
   program_context: string;
