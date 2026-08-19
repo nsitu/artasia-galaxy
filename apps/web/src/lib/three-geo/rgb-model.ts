@@ -346,7 +346,12 @@ export class RgbModel {
   }
 
   private async resolveSatellite(zoompos: Zoompos, plane: THREE.Mesh): Promise<void> {
-    const texture = await fetchSatelliteTexture(this.token, zoompos, this.signal);
+    const texture = await fetchSatelliteTexture(
+      this.token,
+      zoompos,
+      this.signal,
+      this.apiSatellite,
+    );
     this.throwIfAborted();
     if (texture) {
       await this.beforeTextureApply();

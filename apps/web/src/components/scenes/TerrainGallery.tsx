@@ -123,8 +123,8 @@ function summarizeTerrainBenchmark(bench: TerrainBenchmark) {
 }
 
 const MAPBOX_TILE_PATTERN =
-  /api\.mapbox\.com\/(v4\/mapbox\.terrain-rgb|styles\/v1\/mapbox\/satellite-v9)/;
-const MAPBOX_SAT_PATTERN = /api\.mapbox\.com\/styles\/v1\/mapbox\/satellite-v9/;
+  /api\.mapbox\.com\/(v4\/mapbox\.terrain-rgb|styles\/v1\/mapbox\/[^/]+\/tiles)/;
+const MAPBOX_SAT_PATTERN = /api\.mapbox\.com\/styles\/v1\/mapbox\/[^/]+\/tiles/;
 const MAPBOX_DEM_PATTERN = /api\.mapbox\.com\/v4\/mapbox\.terrain-rgb/;
 
 type TileTimings = {
@@ -554,6 +554,7 @@ const CUSTOM_ACTIVITY_COLOURS = [
 
 interface TerrainGalleryProps {
   authenticated?: boolean | null;
+  mapStyle?: string;
   introEnabled?: boolean;
   introPhase?: IntroPhase;
   introPanOffsetRef?: { current: boolean };
@@ -581,6 +582,7 @@ interface TerrainGalleryProps {
 
 export default function TerrainGallery({
   authenticated = null,
+  mapStyle = "satellite-v9",
   introEnabled = false,
   introPhase = "complete",
   introPanOffsetRef,
@@ -824,8 +826,9 @@ export default function TerrainGallery({
       request.zoom,
       request.unitsSide,
       `dem${demZoomOffset}`,
+      `style${mapStyle}`,
     ].join(":");
-  }, [focusedPlacement, request]);
+  }, [focusedPlacement, mapStyle, request]);
   const projectionMatchesRequest = Boolean(
     request && requestKey && projectionRequestKey === requestKey,
   );
@@ -1654,6 +1657,7 @@ export default function TerrainGallery({
         const tgeo = new ThreeGeo({
           tokenMapbox: MAPBOX_TOKEN,
           unitsSide: request.unitsSide,
+          apiSatellite: `mapbox-style:${mapStyle}`,
         });
         logTerrainBenchmark("request", bench, {
           radiusKm: request.radiusKm,
@@ -1813,7 +1817,7 @@ export default function TerrainGallery({
         terrainRun.releaseTimer = window.setTimeout(terrainRun.release, 0);
       }
     };
-  }, [request, requestKey, terrainElevationScale, terrainDemZoomOffset]);
+  }, [mapStyle, request, requestKey, terrainElevationScale, terrainDemZoomOffset]);
 
   useEffect(() => {
     return () => {

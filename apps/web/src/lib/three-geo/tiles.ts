@@ -27,6 +27,7 @@ const MAPBOX_API_TYPES = new Set([
   "mapbox-satellite",
   "mapbox-terrain-vector",
 ]);
+const MAPBOX_STYLE_API_PREFIX = "mapbox-style:";
 
 // Keep the decoded source bytes in a session cache. Terrain loads can be
 // replayed in development (React StrictMode) or canceled when the focused
@@ -103,10 +104,18 @@ export function buildMapboxUri(
   api: string,
   zoompos: Zoompos,
 ): string {
-  if (!MAPBOX_API_TYPES.has(api)) {
+  const isMapboxStyle = api.startsWith(MAPBOX_STYLE_API_PREFIX);
+  if (!MAPBOX_API_TYPES.has(api) && !isMapboxStyle) {
     throw new Error(`buildMapboxUri: unsupported api: ${api}`);
   }
   const [z, x, y] = zoompos;
+  if (isMapboxStyle) {
+    const styleId = api.slice(MAPBOX_STYLE_API_PREFIX.length).trim();
+    if (!styleId || styleId.includes("/")) {
+      throw new Error(`buildMapboxUri: invalid Mapbox style: ${styleId}`);
+    }
+    return `https://api.mapbox.com/styles/v1/mapbox/${styleId}/tiles/${z}/${x}/${y}?access_token=${token}`;
+  }
   switch (api) {
     case "mapbox-terrain-rgb":
       return `https://api.mapbox.com/v4/mapbox.terrain-rgb/${z}/${x}/${y}@2x.pngraw?access_token=${token}`;
@@ -211,8 +220,9 @@ export function fetchSatelliteTexture(
   token: string,
   zoompos: Zoompos,
   signal?: AbortSignal,
+  api = "mapbox-satellite",
 ): Promise<THREE.Texture | null> {
-  return decodeToTexture(buildMapboxUri(token, "mapbox-satellite", zoompos), signal);
+  return decodeToTexture(buildMapboxUri(token, api, zoompos), signal);
 }
 
 /**

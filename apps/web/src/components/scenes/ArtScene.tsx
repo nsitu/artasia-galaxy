@@ -46,6 +46,32 @@ const CUSTOM_ACTIVITY_COLOURS = [
   "#6b5aa8",
   "#9a7b1f",
 ];
+type MapStyleId =
+  | "satellite-v9"
+  | "satellite-streets-v12"
+  | "streets-v12"
+  | "outdoors-v12"
+  | "light-v11"
+  | "dark-v11";
+type MapStyleOption = {
+  id: MapStyleId;
+  label: string;
+  detail: string;
+};
+const MAP_STYLE_OPTIONS: readonly MapStyleOption[] = [
+  { id: "satellite-v9", label: "Satellite", detail: "Aerial imagery" },
+  { id: "satellite-streets-v12", label: "Satellite streets", detail: "Aerial imagery with labels" },
+  { id: "streets-v12", label: "Streets", detail: "Roads and places" },
+  { id: "outdoors-v12", label: "Outdoors", detail: "Natural features and contours" },
+  { id: "light-v11", label: "Light", detail: "Minimal light basemap" },
+  { id: "dark-v11", label: "Dark", detail: "High-contrast dark basemap" },
+];
+const MAP_STYLE_STORAGE_KEY = "artasia-map-style";
+type MenuItem = {
+  href: string;
+  label: string;
+  action?: "about" | "map-options";
+};
 type IntroPhase = "loading" | "ready" | "exiting" | "complete";
 const PARTNER_PATH_PREFIX = "/partners/";
 
@@ -79,6 +105,18 @@ function getTranslucentActivityColour(colour?: string): string {
   return /^[0-9a-f]{6}$/i.test(expandedHex)
     ? `#${expandedHex}66`
     : "#8e1d5866";
+}
+
+function getInitialMapStyle(): MapStyleId {
+  try {
+    const storedStyle = window.localStorage.getItem(MAP_STYLE_STORAGE_KEY);
+    if (storedStyle && MAP_STYLE_OPTIONS.some((option) => option.id === storedStyle)) {
+      return storedStyle as MapStyleId;
+    }
+  } catch {
+    // Storage can be unavailable in privacy-restricted browsers.
+  }
+  return "satellite-v9";
 }
 
 function getPhotoActivityColour(
@@ -352,6 +390,8 @@ export default function ArtScene() {
   const [activityFilterOptions, setActivityFilterOptions] = useState<ActivityOption[]>([]);
   const [selectedActivityFilter, setSelectedActivityFilter] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [mapOptionsOpen, setMapOptionsOpen] = useState(false);
+  const [mapStyle, setMapStyle] = useState<MapStyleId>(getInitialMapStyle);
   const [openFilter, setOpenFilter] = useState<"partner" | "educator" | "activity" | null>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
@@ -456,13 +496,25 @@ export default function ArtScene() {
   }, []);
 
   const menuItems = useMemo(
-    () => [
+    (): MenuItem[] => [
       { href: "#about", label: "About", action: "about" as const },
+      { href: "#map-options", label: "Map Options", action: "map-options" as const },
       { href: "/admin", label: "Admin" },
       { href: "/partners", label: "Partners" },
     ],
     []
   );
+  const selectedMapStyle = MAP_STYLE_OPTIONS.find((option) => option.id === mapStyle) ?? MAP_STYLE_OPTIONS[0];
+  const handleMapStyleChange = useCallback((nextStyle: MapStyleId) => {
+    setMapStyle(nextStyle);
+    try {
+      window.localStorage.setItem(MAP_STYLE_STORAGE_KEY, nextStyle);
+    } catch {
+      // Storage can be unavailable in privacy-restricted browsers.
+    }
+    setMapOptionsOpen(false);
+    setMenuOpen(false);
+  }, []);
 
   const selectedPhoto = selectedPhotoIndex !== null ? photos[selectedPhotoIndex] : null;
   const availableActivityFilterOptions = useMemo<ActivityOption[]>(() => {
@@ -1173,33 +1225,83 @@ export default function ArtScene() {
 
           {menuOpen && (
             <div className="atlas-menu-panel" role="menu" style={menuPanelStyle}>
-                {menuItems.map((item) => item.action === "about" ? (
-                  <button
-                    key={item.href}
-                    type="button"
-                    className="atlas-control-surface"
-                    role="menuitem"
-                    style={{
-                      ...menuItemStyle,
-                      textAlign: "left",
-                      border: 0,
-                      borderBottom: "1px solid rgba(255,255,255,0.12)",
-                      cursor: "pointer",
-                    }}
-                    onClick={() => { setMenuOpen(false); setAboutOpen(true); }}
-                  >
-                    {item.label}
-                  </button>
-                ) : <a
-                  key={item.href}
-                  className="atlas-control-surface"
-                  role="menuitem"
-                  href={item.href}
-                  style={menuItemStyle}
-                  onClick={() => setMenuOpen(false)}
-                >
-                  {item.label}
-                </a>)}
+                {menuItems.map((item) => {
+                  if (item.action === "about") {
+                    return (
+                      <button
+                        key={item.href}
+                        type="button"
+                        className="atlas-control-surface"
+                        role="menuitem"
+                        style={{
+                          ...menuItemStyle,
+                          textAlign: "left",
+                          border: 0,
+                          borderBottom: "1px solid rgba(255,255,255,0.12)",
+                          cursor: "pointer",
+                        }}
+                        onClick={() => { setMenuOpen(false); setAboutOpen(true); }}
+                      >
+                        {item.label}
+                      </button>
+                    );
+                  }
+                  if (item.action === "map-options") {
+                    return (
+                      <div key={item.href} style={mapOptionsMenuStyle}>
+                        <button
+                          type="button"
+                          className="atlas-control-surface"
+                          role="menuitem"
+                          aria-expanded={mapOptionsOpen}
+                          aria-haspopup="true"
+                          style={{
+                            ...menuItemStyle,
+                            ...mapOptionsTriggerStyle,
+                          }}
+                          onClick={() => setMapOptionsOpen((current) => !current)}
+                        >
+                          <span>{item.label}</span>
+                          <span style={mapOptionsCurrentStyle}>{selectedMapStyle.label}</span>
+                        </button>
+                        {mapOptionsOpen && (
+                          <div role="group" aria-label="Map styles" style={mapOptionsListStyle}>
+                            {MAP_STYLE_OPTIONS.map((option) => (
+                              <button
+                                key={option.id}
+                                type="button"
+                                className="atlas-control-surface"
+                                role="menuitemradio"
+                                aria-checked={option.id === mapStyle}
+                                style={{
+                                  ...menuItemStyle,
+                                  ...mapOptionsChoiceStyle,
+                                  ...(option.id === mapStyle ? mapOptionsChoiceActiveStyle : {}),
+                                }}
+                                onClick={() => handleMapStyleChange(option.id)}
+                              >
+                                <span>{option.label}</span>
+                                <span style={mapOptionsDetailStyle}>{option.detail}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                  return (
+                    <a
+                      key={item.href}
+                      className="atlas-control-surface"
+                      role="menuitem"
+                      href={item.href}
+                      style={menuItemStyle}
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      {item.label}
+                    </a>
+                  );
+                })}
             </div>
           )}
         </div>
@@ -1648,6 +1750,7 @@ export default function ArtScene() {
           <Suspense fallback={null}>
             <TerrainGallery
               authenticated={authUser?.authenticated ?? null}
+              mapStyle={mapStyle}
               introEnabled={showWelcomeIntro}
               introPhase={introPhase}
               onIntroReady={handleIntroReady}
@@ -2465,6 +2568,54 @@ const menuItemStyle: React.CSSProperties = {
   fontWeight: 500,
   background: "transparent",
   borderBottom: "1px solid rgba(255,255,255,0.12)",
+};
+
+const mapOptionsMenuStyle: React.CSSProperties = {
+  display: "grid",
+};
+
+const mapOptionsTriggerStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+  width: "100%",
+  textAlign: "left",
+  cursor: "pointer",
+};
+
+const mapOptionsCurrentStyle: React.CSSProperties = {
+  color: "#b9c2d0",
+  fontSize: 11,
+  textAlign: "right",
+};
+
+const mapOptionsListStyle: React.CSSProperties = {
+  display: "grid",
+  padding: "4px 0",
+  borderBottom: "1px solid rgba(255,255,255,0.12)",
+  background: "rgba(0,0,0,0.18)",
+};
+
+const mapOptionsChoiceStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 3,
+  width: "100%",
+  padding: "9px 14px 9px 24px",
+  border: 0,
+  textAlign: "left",
+  cursor: "pointer",
+};
+
+const mapOptionsChoiceActiveStyle: React.CSSProperties = {
+  background: "rgba(236,0,140,0.3)",
+  color: "#ffffff",
+};
+
+const mapOptionsDetailStyle: React.CSSProperties = {
+  color: "#aeb7c6",
+  fontSize: 10,
+  fontWeight: 400,
 };
 
 const homeLogoLinkStyle: React.CSSProperties = {
