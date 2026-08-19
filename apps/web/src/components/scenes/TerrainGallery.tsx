@@ -14,6 +14,7 @@ import {
   type ActivityOption,
   type MapPlacement,
   type Photo,
+  type ProjectOption,
 } from "../../api/client";
 import { useGalleryStore } from "../../stores/galleryStore";
 import {
@@ -30,6 +31,10 @@ import PlacementSignpost, {
 } from "./PlacementSignpost";
 import PlaceMarker, { FlowerLayoutCoordinator } from "./PlaceMarker";
 import DocumentationPullQuotePanel from "./DocumentationPullQuotePanel";
+import ProjectStatisticsWidgets, {
+  createProjectStatisticsWidgetLayout,
+  getProjectStatisticsWidgetBounds,
+} from "./ProjectStatisticsWidgets";
 import {
   createMaxDetailTerrainRequest,
   createTerrainRequest,
@@ -576,6 +581,7 @@ interface TerrainGalleryProps {
   onPartnerFilterOptionsChange?: (options: PartnerFilterOption[]) => void;
   onEducatorFilterOptionsChange?: (options: EducatorFilterOption[]) => void;
   projectSlug?: string;
+  projectStatistics?: ProjectOption["statistics"];
   onProjectInferred?: (projectSlug: string) => void;
   selectedPartnerFilter?: string;
   selectedEducatorFilter?: string;
@@ -603,6 +609,7 @@ export default function TerrainGallery({
   onPartnerFilterOptionsChange,
   onEducatorFilterOptionsChange,
   projectSlug,
+  projectStatistics,
   onProjectInferred,
   selectedPartnerFilter = "",
   selectedEducatorFilter = "",
@@ -862,6 +869,26 @@ export default function TerrainGallery({
     return Number.isFinite(bounds.max.z) ? bounds : null;
   }, [terrain]);
   const terrainMaxZ = terrainBounds?.max.z ?? null;
+  const regionalStatisticsLayout = useMemo(() => {
+    if (focusedPlacement || !projectStatistics || !request) return [];
+
+    const halfTerrain = request.unitsSide / 2;
+    const bounds = {
+      minX: terrainBounds?.min.x ?? -halfTerrain,
+      maxX: terrainBounds?.max.x ?? halfTerrain,
+      minY: terrainBounds?.min.y ?? -halfTerrain,
+      maxY: terrainBounds?.max.y ?? halfTerrain,
+    };
+    return createProjectStatisticsWidgetLayout(
+      projectStatistics,
+      bounds,
+      terrainMaxZ ?? 0,
+    );
+  }, [focusedPlacement, projectStatistics, request, terrainBounds, terrainMaxZ]);
+  const regionalStatisticsWidgetBounds = useMemo(
+    () => getProjectStatisticsWidgetBounds(regionalStatisticsLayout),
+    [regionalStatisticsLayout],
+  );
   const orbitHeight = useMemo(() => {
     if (
       !focusedPlacement ||
@@ -1874,6 +1901,7 @@ export default function TerrainGallery({
       camera,
       terrain,
       focusedPlacement ? LOCAL_CAMERA_FIT_SCALE : REGIONAL_CAMERA_FIT_SCALE,
+      focusedPlacement ? undefined : regionalStatisticsWidgetBounds,
     );
     if (!finalFrame) {
       resetTerrainCamera(camera, controls);
@@ -1972,6 +2000,7 @@ export default function TerrainGallery({
     onIntroComplete,
     onIntroReady,
     placementsResolved,
+    regionalStatisticsWidgetBounds,
     terrain,
     terrainMatchesRequest,
   ]);
@@ -2323,6 +2352,9 @@ export default function TerrainGallery({
     >
       {!focusedPlacement && <FlowerLayoutCoordinator />}
       {terrain && terrainMatchesRequest && <primitive object={terrain} />}
+      {sceneReadyForMarkers && !focusedPlacement && regionalStatisticsLayout.length > 0 && (
+        <ProjectStatisticsWidgets layout={regionalStatisticsLayout} />
+      )}
       {sceneReadyForMarkers && focusedPlacement &&
         activityOrbitRings.map((ring) => (
           <OrbitingActivityRing
@@ -2474,20 +2506,33 @@ function getTerrainCameraFrame(
   camera: THREE.Camera,
   terrain: THREE.Group,
   fitScale = 0.72,
+  extraBounds?: {
+    minX: number;
+    maxX: number;
+    minY: number;
+    maxY: number;
+  } | null,
 ): TerrainCameraFrame | null {
   terrain.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(terrain);
   if (!Number.isFinite(box.min.x) || !Number.isFinite(box.max.x)) return null;
 
-  const center = box.getCenter(new THREE.Vector3());
-  const size = box.getSize(new THREE.Vector3());
+  const minX = Math.min(box.min.x, extraBounds?.minX ?? box.min.x);
+  const maxX = Math.max(box.max.x, extraBounds?.maxX ?? box.max.x);
+  const minY = Math.min(box.min.y, extraBounds?.minY ?? box.min.y);
+  const maxY = Math.max(box.max.y, extraBounds?.maxY ?? box.max.y);
+  const center = new THREE.Vector3(
+    (minX + maxX) / 2,
+    (minY + maxY) / 2,
+    box.getCenter(new THREE.Vector3()).z,
+  );
   const target = new THREE.Vector3(
     center.x,
     center.y,
     Math.max(center.z, box.min.z),
   );
   const direction = DEFAULT_TERRAIN_CAMERA_POSITION.clone().normalize();
-  const fitSize = Math.max(size.x, size.y, 1);
+  const fitSize = Math.max(maxX - minX, maxY - minY, 1);
   const fov = camera instanceof THREE.PerspectiveCamera ? camera.fov : 50;
   const fitDistance =
     (fitSize * fitScale) / Math.tan(THREE.MathUtils.degToRad(fov / 2));

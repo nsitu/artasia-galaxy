@@ -53,8 +53,7 @@ export default function WelcomeOverlay({
           and communities across the Greater Hamilton Area.
         </p>
         {projects.length > 0 && (
-          <label style={projectSelectorStyle}>
-            <span style={projectSelectorLabelStyle}>Choose a project</span>
+          <div style={projectSelectorStyle}>
             <select
               value={selectedProjectSlug}
               onChange={(event) => onProjectChange(event.target.value)}
@@ -63,11 +62,11 @@ export default function WelcomeOverlay({
             >
               {projects.map((project) => (
                 <option key={project.slug} value={project.slug}>
-                  {project.name || `Artasia ${project.year}`}
+                  {formatProjectLabel(project)}
                 </option>
               ))}
             </select>
-          </label>
+          </div>
         )}
         {ready && <button
           ref={startButtonRef}
@@ -82,6 +81,13 @@ export default function WelcomeOverlay({
       </div>
     </div>
   );
+}
+
+function formatProjectLabel(project: ProjectOption) {
+  const projectName = project.name.trim();
+  return projectName
+    ? `Artasia ${project.year} - ${projectName}`
+    : `Artasia ${project.year}`;
 }
 
 const overlayStyle: React.CSSProperties = {
@@ -216,14 +222,6 @@ const projectSelectorStyle: React.CSSProperties = {
   gap: 6,
   width: "min(360px, 100%)",
   textAlign: "left",
-};
-
-const projectSelectorLabelStyle: React.CSSProperties = {
-  color: "#ffffff",
-  fontSize: 12,
-  fontWeight: 700,
-  letterSpacing: "0.08em",
-  textTransform: "uppercase",
 };
 
 const projectSelectorInputStyle: React.CSSProperties = {

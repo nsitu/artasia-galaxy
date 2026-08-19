@@ -1881,6 +1881,7 @@ export default function ArtScene() {
               onPartnerFilterOptionsChange={setPartnerFilterOptions}
               onEducatorFilterOptionsChange={setEducatorFilterOptions}
               projectSlug={selectedProject?.slug}
+              projectStatistics={selectedProject?.statistics}
               onProjectInferred={handleProjectInferred}
               selectedPartnerFilter={selectedPartnerFilter}
               selectedEducatorFilter={selectedEducatorFilter}
