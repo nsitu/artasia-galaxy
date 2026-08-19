@@ -578,6 +578,7 @@ interface TerrainGalleryProps {
   selectedActivityFilter?: string;
   selectedActivityColour?: string;
   activityOptions?: ActivityOption[];
+  activityOptionsReady?: boolean;
 }
 
 export default function TerrainGallery({
@@ -601,6 +602,7 @@ export default function TerrainGallery({
   selectedActivityFilter = "",
   selectedActivityColour,
   activityOptions = [],
+  activityOptionsReady = true,
 }: TerrainGalleryProps = {}) {
   const camera = useThree((state) => state.camera);
   const controls = useThree(
@@ -1005,7 +1007,8 @@ export default function TerrainGallery({
     focusedPlacement &&
     photoScope.mode === "placement" &&
     photoScope.placementId === focusedPlacement.placement_id &&
-    !galleryLoading
+    !galleryLoading &&
+    activityOptionsReady
   );
   const documentationQuoteLayout = useMemo(() => {
     const quote = focusedPlacement?.documentation_pull_quote?.trim();
@@ -1833,7 +1836,9 @@ export default function TerrainGallery({
     request && requestKey && renderedTerrainKey === requestKey,
   );
   const sceneReadyForMarkers =
-    projectionMatchesRequest && (terrainMatchesRequest || phase === "flat");
+    projectionMatchesRequest &&
+    (terrainMatchesRequest || phase === "flat") &&
+    (!focusedPlacement || focusedPlacementGalleryReady);
   const showPhotoPins = Boolean(focusedPlacement);
 
   useEffect(() => {
@@ -1949,10 +1954,11 @@ export default function TerrainGallery({
       placementOrbitFitPlacementRef.current = null;
       return;
     }
-    if (
-      focusedPlacement.documentation_pull_quote?.trim() &&
-      !focusedPlacementGalleryReady
-    ) {
+    // Wait for the placement gallery before fitting the orbit camera. If the
+    // fit runs while the artwork request is still in flight, it can lock in a
+    // fallback center/radius and leave the newly loaded orbits outside the
+    // initial view until an activity filter causes another fit.
+    if (!focusedPlacementGalleryReady) {
       placementOrbitFitPlacementRef.current = null;
       return;
     }
@@ -2118,7 +2124,7 @@ export default function TerrainGallery({
     !isPreparingTerrain && geoPhotos.length === 0 && geoPlacements.length === 0;
 
   const notice = useMemo<TerrainNotice | null>(() => {
-    if (focusedPlacement && galleryLoading) {
+    if (focusedPlacement && (galleryLoading || !activityOptionsReady)) {
       return {
         label: "Loading artworks",
       };
@@ -2155,6 +2161,7 @@ export default function TerrainGallery({
   }, [
     error,
     focusedPlacement,
+    activityOptionsReady,
     galleryLoading,
     hasNoTerrainLocations,
     isPreparingTerrain,

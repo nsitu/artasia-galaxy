@@ -387,6 +387,7 @@ export default function ArtScene() {
     getEducatorSlugFromPath(window.location.pathname),
   );
   const [activityFilterOptions, setActivityFilterOptions] = useState<ActivityOption[]>([]);
+  const [activityFilterOptionsReady, setActivityFilterOptionsReady] = useState(false);
   const [selectedActivityFilter, setSelectedActivityFilter] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [mapStyle, setMapStyle] = useState<MapStyleId>(getInitialMapStyle);
@@ -471,6 +472,9 @@ export default function ArtScene() {
       .catch((err) => {
         console.warn(`[viewer] failed to load activity filters: ${(err as Error).message}`);
         if (!cancelled) setActivityFilterOptions([]);
+      })
+      .finally(() => {
+        if (!cancelled) setActivityFilterOptionsReady(true);
       });
 
     return () => {
@@ -1740,6 +1744,7 @@ export default function ArtScene() {
               selectedActivityFilter={selectedActivityFilter}
               selectedActivityColour={selectedActivityColour}
               activityOptions={availableActivityFilterOptions}
+              activityOptionsReady={activityFilterOptionsReady}
             />
             <MapControls
               makeDefault
