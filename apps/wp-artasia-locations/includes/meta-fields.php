@@ -82,6 +82,48 @@ function artasia_register_meta_fields(): void
         'show_in_rest' => true,
         'sanitize_callback' => 'sanitize_textarea_field',
     ]);
+    register_post_meta('artasia_project', 'artasia_project_children_count', [
+        'type'         => 'integer',
+        'single'       => true,
+        'default'      => 0,
+        'show_in_rest' => true,
+        'sanitize_callback' => 'absint',
+    ]);
+    register_post_meta('artasia_project', 'artasia_project_caregivers_count', [
+        'type'         => 'integer',
+        'single'       => true,
+        'default'      => 0,
+        'show_in_rest' => true,
+        'sanitize_callback' => 'absint',
+    ]);
+    register_post_meta('artasia_project', 'artasia_project_educators_count', [
+        'type'         => 'integer',
+        'single'       => true,
+        'default'      => 0,
+        'show_in_rest' => true,
+        'sanitize_callback' => 'absint',
+    ]);
+    register_post_meta('artasia_project', 'artasia_project_artist_educators_count', [
+        'type'         => 'integer',
+        'single'       => true,
+        'default'      => 0,
+        'show_in_rest' => true,
+        'sanitize_callback' => 'absint',
+    ]);
+    register_post_meta('artasia_project', 'artasia_project_partners_count', [
+        'type'         => 'integer',
+        'single'       => true,
+        'default'      => 0,
+        'show_in_rest' => true,
+        'sanitize_callback' => 'absint',
+    ]);
+    register_post_meta('artasia_project', 'artasia_project_neighbourhoods_count', [
+        'type'         => 'integer',
+        'single'       => true,
+        'default'      => 0,
+        'show_in_rest' => true,
+        'sanitize_callback' => 'absint',
+    ]);
 
     // --- Activity meta ---
     register_post_meta('artasia_activity', 'artasia_project_id', [

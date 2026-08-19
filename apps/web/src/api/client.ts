@@ -167,6 +167,14 @@ export interface ProjectOption {
   name: string;
   year: number;
   description?: string;
+  statistics?: {
+    children: number;
+    caregivers: number;
+    educators: number;
+    artist_educators: number;
+    partners: number;
+    neighbourhoods: number;
+  };
 }
 
 export interface ActivityOption {

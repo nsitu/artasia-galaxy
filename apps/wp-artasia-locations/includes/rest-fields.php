@@ -70,6 +70,7 @@ function artasia_get_projects(): WP_REST_Response
             'name'        => $project->post_title,
             'year'        => intval(get_post_meta($project->ID, 'artasia_project_year', true)),
             'description' => get_post_meta($project->ID, 'artasia_project_description', true) ?: '',
+            'statistics'  => artasia_get_project_statistics($project->ID),
         ];
     }
 
@@ -235,6 +236,7 @@ function artasia_get_expanded_placements(): WP_REST_Response
                 'name'        => $project->post_title,
                 'year'        => intval(get_post_meta($project->ID, 'artasia_project_year', true)),
                 'description' => get_post_meta($project->ID, 'artasia_project_description', true) ?: '',
+                'statistics'  => artasia_get_project_statistics($project->ID),
             ];
         }
     }
@@ -389,6 +391,18 @@ function artasia_get_expanded_placements(): WP_REST_Response
     }
 
     return rest_ensure_response($results);
+}
+
+function artasia_get_project_statistics(int $project_id): array
+{
+    return [
+        'children'          => intval(get_post_meta($project_id, 'artasia_project_children_count', true)),
+        'caregivers'        => intval(get_post_meta($project_id, 'artasia_project_caregivers_count', true)),
+        'educators'         => intval(get_post_meta($project_id, 'artasia_project_educators_count', true)),
+        'artist_educators'  => intval(get_post_meta($project_id, 'artasia_project_artist_educators_count', true)),
+        'partners'          => intval(get_post_meta($project_id, 'artasia_project_partners_count', true)),
+        'neighbourhoods'    => intval(get_post_meta($project_id, 'artasia_project_neighbourhoods_count', true)),
+    ];
 }
 
 function artasia_get_partner_logo_response(int $attachment_id): ?array

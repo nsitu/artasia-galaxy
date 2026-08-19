@@ -601,6 +601,36 @@ function artasia_project_meta_box_html(WP_Post $post): void
         $project_year = date('Y');
     }
     $description = get_post_meta($post->ID, 'artasia_project_description', true);
+    $impact_statistics = [
+        'children' => [
+            'label' => 'Children',
+            'meta_key' => 'artasia_project_children_count',
+        ],
+        'caregivers' => [
+            'label' => 'Caregivers',
+            'meta_key' => 'artasia_project_caregivers_count',
+        ],
+        'educators' => [
+            'label' => 'Educators',
+            'meta_key' => 'artasia_project_educators_count',
+        ],
+        'artist_educators' => [
+            'label' => 'Artist educators',
+            'meta_key' => 'artasia_project_artist_educators_count',
+        ],
+        'partners' => [
+            'label' => 'Partners',
+            'meta_key' => 'artasia_project_partners_count',
+        ],
+        'neighbourhoods' => [
+            'label' => 'Neighbourhoods',
+            'meta_key' => 'artasia_project_neighbourhoods_count',
+        ],
+    ];
+    foreach ($impact_statistics as $key => &$statistic) {
+        $statistic['value'] = get_post_meta($post->ID, $statistic['meta_key'], true);
+    }
+    unset($statistic);
     $documentation_page_id = intval(get_post_meta($post->ID, 'artasia_documentation_page_id', true));
     $documentation_page_url = '';
     if ($documentation_page_id && get_post_type($documentation_page_id) === 'page') {
@@ -621,6 +651,28 @@ function artasia_project_meta_box_html(WP_Post $post): void
         <tr>
             <th><label for="artasia_project_description">Description</label></th>
             <td><textarea id="artasia_project_description" name="artasia_project_description" rows="5" class="widefat"><?php echo esc_textarea($description); ?></textarea></td>
+        </tr>
+        <tr>
+            <th scope="row"><label>Impact statistics</label></th>
+            <td>
+                <p class="description">Optional manually entered totals. These values can be used as overrides when reporting project impact.</p>
+                <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;max-width:640px;">
+                    <?php foreach ($impact_statistics as $key => $statistic) : ?>
+                        <label for="<?php echo esc_attr($statistic['meta_key']); ?>">
+                            <span style="display:block;margin-bottom:4px;font-weight:600;"><?php echo esc_html($statistic['label']); ?></span>
+                            <input
+                                type="number"
+                                id="<?php echo esc_attr($statistic['meta_key']); ?>"
+                                name="<?php echo esc_attr($statistic['meta_key']); ?>"
+                                value="<?php echo esc_attr($statistic['value']); ?>"
+                                min="0"
+                                step="1"
+                                class="small-text"
+                            />
+                        </label>
+                    <?php endforeach; ?>
+                </div>
+            </td>
         </tr>
         <tr>
             <th><label for="artasia_documentation_page_id">Documentation Landing Page</label></th>
@@ -696,6 +748,16 @@ function artasia_save_project_meta(int $post_id): void
 
     update_post_meta($post_id, 'artasia_project_year', intval($_POST['artasia_project_year'] ?? 0));
     update_post_meta($post_id, 'artasia_project_description', sanitize_textarea_field($_POST['artasia_project_description'] ?? ''));
+    foreach ([
+        'artasia_project_children_count',
+        'artasia_project_caregivers_count',
+        'artasia_project_educators_count',
+        'artasia_project_artist_educators_count',
+        'artasia_project_partners_count',
+        'artasia_project_neighbourhoods_count',
+    ] as $meta_key) {
+        update_post_meta($post_id, $meta_key, max(0, intval($_POST[$meta_key] ?? 0)));
+    }
     $documentation_page_id = intval($_POST['artasia_documentation_page_id'] ?? 0);
     update_post_meta(
         $post_id,
