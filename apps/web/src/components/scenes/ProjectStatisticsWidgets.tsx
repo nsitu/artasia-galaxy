@@ -16,6 +16,7 @@ export const PROJECT_STATISTICS_WIDGET_HEIGHT = 1.25;
 export const PROJECT_STATISTICS_TITLE_WIDTH = 6.5;
 export const PROJECT_STATISTICS_TITLE_HEIGHT = 0.8;
 
+const STATISTICS_WIDGET_X_OFFSET = 3;
 const STATISTICS_WIDGETS: Array<{
   key: keyof ProjectStatistics;
   label: string;
@@ -83,7 +84,7 @@ export default function ProjectStatisticsWidgets({
   titlePosition?: [number, number, number] | null;
 }) {
   return (
-    <group>
+    <group position={[STATISTICS_WIDGET_X_OFFSET, 0, 0]}>
       {projectLabel && titlePosition && (
         <Html
           position={titlePosition}
