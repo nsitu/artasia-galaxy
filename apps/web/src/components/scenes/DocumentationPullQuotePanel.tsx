@@ -28,8 +28,8 @@ export default function DocumentationPullQuotePanel({
   height,
   attribution,
 }: DocumentationPullQuotePanelProps) {
-  const fontSize = getQuoteFontSize(quote);
-  const attributionFontSize = Math.max(0.19, fontSize * 0.62);
+  const quoteFontSize = getQuoteFontSize(quote);
+  const textFontSize = Math.max(0.19, quoteFontSize * 0.62);
   const displayQuote = useMemo(
     () => `“${quote.replace(/^[“\"]|[”\"]$/g, "").trim()}”`,
     [quote],
@@ -45,9 +45,9 @@ export default function DocumentationPullQuotePanel({
         pointerEvents="none"
         style={panelStyle(width, height)}
       >
-        <div style={quoteStyle(fontSize)}>{displayQuote}</div>
+        <div style={quoteStyle(textFontSize)}>{displayQuote}</div>
         {attribution && (
-          <div style={attributionStyle(attributionFontSize)}>
+          <div style={attributionStyle(textFontSize)}>
             {`— ${attribution}`}
           </div>
         )}
@@ -89,7 +89,7 @@ function attributionStyle(fontSize: number): CSSProperties {
     color: "#ffffff",
     fontFamily: '"Montserrat", Arial, sans-serif',
     fontSize: `${fontSize * 100}px`,
-    fontWeight: 400,
+    fontWeight: 700,
     lineHeight: 1.2,
     textAlign: "left",
     whiteSpace: "normal",
