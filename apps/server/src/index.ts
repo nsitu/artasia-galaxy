@@ -8,6 +8,7 @@ import albumRoutes from "./routes/albums.js";
 import authRoutes from "./routes/auth.js";
 import uploadRoutes, { getSiteActivityStats } from "./routes/uploads.js";
 import placementRoutes from "./routes/placements.js";
+import projectRoutes from "./routes/projects.js";
 import reconcileRoutes from "./routes/reconcile.js";
 import settingsRoutes, { mountSSE } from "./routes/settings.js";
 import driveRoutes from "./routes/drive.js";
@@ -57,6 +58,7 @@ app.get("/api/v1/placements/gallery-availability", async (_req, res) => {
   }
 });
 app.use("/api/v1/placements", placementRoutes);
+app.use("/api/v1/projects", projectRoutes);
 app.use("/api/v1/reconcile", reconcileRoutes);
 app.use("/api/v1/settings", settingsRoutes);
 app.use("/api/v1/drive", driveRoutes);

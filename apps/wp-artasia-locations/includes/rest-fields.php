@@ -11,6 +11,12 @@ add_action('rest_api_init', function () {
         'permission_callback' => '__return_true',
     ]);
 
+    register_rest_route('artasia/v1', '/projects', [
+        'methods'             => 'GET',
+        'callback'            => 'artasia_get_projects',
+        'permission_callback' => '__return_true',
+    ]);
+
     register_rest_route('artasia/v1', '/uploaders', [
         'methods'             => 'GET',
         'callback'            => 'artasia_get_uploaders',
@@ -36,6 +42,39 @@ add_action('rest_api_init', function () {
         ],
     ]);
 });
+
+/**
+ * Return the annual Artasia projects that can be selected by the public Atlas
+ * viewer. Project visibility is intentionally independent of the placement
+ * `artasia_publish_site` flag; that flag is used by WordPress site listings.
+ */
+function artasia_get_projects(): WP_REST_Response
+{
+    $projects_query = new WP_Query([
+        'post_type'      => 'artasia_project',
+        'posts_per_page' => -1,
+        'post_status'    => 'publish',
+        'orderby'        => [
+            'meta_value_num' => 'DESC',
+            'title'          => 'ASC',
+        ],
+        'meta_key'        => 'artasia_project_year',
+        'no_found_rows'   => true,
+    ]);
+
+    $results = [];
+    foreach ($projects_query->posts as $project) {
+        $results[] = [
+            'id'          => $project->ID,
+            'slug'        => $project->post_name,
+            'name'        => $project->post_title,
+            'year'        => intval(get_post_meta($project->ID, 'artasia_project_year', true)),
+            'description' => get_post_meta($project->ID, 'artasia_project_description', true) ?: '',
+        ];
+    }
+
+    return rest_ensure_response($results);
+}
 
 function artasia_get_anecdotes(WP_REST_Request $request): WP_REST_Response
 {
@@ -192,6 +231,7 @@ function artasia_get_expanded_placements(): WP_REST_Response
         foreach ($project_query->posts as $project) {
             $project_lookup[$project->ID] = [
                 'id'          => $project->ID,
+                'slug'        => $project->post_name,
                 'name'        => $project->post_title,
                 'year'        => intval(get_post_meta($project->ID, 'artasia_project_year', true)),
                 'description' => get_post_meta($project->ID, 'artasia_project_description', true) ?: '',

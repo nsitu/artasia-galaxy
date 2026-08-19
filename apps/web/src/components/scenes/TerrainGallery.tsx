@@ -557,6 +557,7 @@ interface TerrainGalleryProps {
   mapStyle?: string;
   introEnabled?: boolean;
   introPhase?: IntroPhase;
+  projectScopeReady?: boolean;
   introPanOffsetRef?: { current: boolean };
   onIntroReady?: () => void;
   onIntroComplete?: () => void;
@@ -573,6 +574,8 @@ interface TerrainGalleryProps {
   ) => void;
   onPartnerFilterOptionsChange?: (options: PartnerFilterOption[]) => void;
   onEducatorFilterOptionsChange?: (options: EducatorFilterOption[]) => void;
+  projectSlug?: string;
+  onProjectInferred?: (projectSlug: string) => void;
   selectedPartnerFilter?: string;
   selectedEducatorFilter?: string;
   selectedActivityFilter?: string;
@@ -586,6 +589,7 @@ export default function TerrainGallery({
   mapStyle = "satellite-v9",
   introEnabled = false,
   introPhase = "complete",
+  projectScopeReady = true,
   introPanOffsetRef,
   onIntroReady,
   onIntroComplete,
@@ -597,6 +601,8 @@ export default function TerrainGallery({
   onPlacementNavigationChange,
   onPartnerFilterOptionsChange,
   onEducatorFilterOptionsChange,
+  projectSlug,
+  onProjectInferred,
   selectedPartnerFilter = "",
   selectedEducatorFilter = "",
   selectedActivityFilter = "",
@@ -664,12 +670,20 @@ export default function TerrainGallery({
   const placementOrbitFitPlacementRef = useRef<number | null>(null);
   const placementOrbitFitAnimationRef = useRef<number | null>(null);
 
+  const projectPlacements = useMemo(() => {
+    const normalizedProjectSlug = projectSlug?.trim().toLocaleLowerCase();
+    if (!normalizedProjectSlug) return placements;
+    return placements.filter(
+      (placement) => placement.project?.slug?.trim().toLocaleLowerCase() === normalizedProjectSlug,
+    );
+  }, [placements, projectSlug]);
+
   const partnerFilterOptions = useMemo<PartnerFilterOption[]>(() => {
     const partners = new Map<
       string,
       { count: number; whiteLogo?: PartnerFilterOption["whiteLogo"] }
     >();
-    for (const placement of placements) {
+    for (const placement of projectPlacements) {
       const partner = placement.partner_name?.trim();
       if (!partner) continue;
       const current = partners.get(partner);
@@ -693,7 +707,7 @@ export default function TerrainGallery({
         count,
         whiteLogo,
       }));
-    const earlyOnCount = placements.filter((placement) => placement.is_earlyon).length;
+    const earlyOnCount = projectPlacements.filter((placement) => placement.is_earlyon).length;
     if (earlyOnCount > 0) {
       options.push({
         value: EARLY_ON_PARTNER_FILTER,
@@ -706,10 +720,10 @@ export default function TerrainGallery({
       });
     }
     return options;
-  }, [placements]);
+  }, [projectPlacements]);
   const educatorFilterOptions = useMemo<EducatorFilterOption[]>(() => {
     const educators = new Map<string, { label: string; count: number }>();
-    for (const placement of placements) {
+    for (const placement of projectPlacements) {
       const names = new Map<string, string>();
       for (const person of [placement.team_member, placement.secondary_team_member]) {
         const label = person?.name?.trim().replace(/\s+/g, " ");
@@ -728,9 +742,9 @@ export default function TerrainGallery({
     return [...educators.entries()]
       .sort(([, a], [, b]) => a.label.localeCompare(b.label))
       .map(([value, { label, count }]) => ({ value, label, count }));
-  }, [placements]);
+  }, [projectPlacements]);
   const filteredRegionalPlacements = useMemo(() => {
-    let filtered = placements;
+    let filtered = projectPlacements;
     if (selectedPartnerFilter === EARLY_ON_PARTNER_FILTER) {
       filtered = filtered.filter((placement) => placement.is_earlyon);
     } else if (selectedPartnerFilter) {
@@ -744,7 +758,7 @@ export default function TerrainGallery({
         .map((name) => name?.trim().replace(/\s+/g, " ").toLocaleLowerCase())
         .some((name) => name === selectedEducatorFilter),
     );
-  }, [placements, selectedEducatorFilter, selectedPartnerFilter]);
+  }, [projectPlacements, selectedEducatorFilter, selectedPartnerFilter]);
   const selectedActivityOption = useMemo(
     () => activityOptions.find(
       (option) => String(option.id) === selectedActivityFilter,
@@ -785,13 +799,13 @@ export default function TerrainGallery({
   }, [photosForCurrentView]);
   const geoPlacements = useMemo(
     () =>
-      (focusedPlacement ? [focusedPlacement] : placements)
+      (focusedPlacement ? [focusedPlacement] : projectPlacements)
         .filter(
           (placement) =>
             Number.isFinite(placement.lat) && Number.isFinite(placement.lng),
         )
         .map((placement) => ({ lat: placement.lat, lng: placement.lng })),
-    [focusedPlacement, placements],
+    [focusedPlacement, projectPlacements],
   );
   const visiblePlacements = useMemo(
     () => (focusedPlacement ? [focusedPlacement] : filteredRegionalPlacements),
@@ -809,9 +823,9 @@ export default function TerrainGallery({
     // get evicted a moment later when placements arrive, and re-fetch with a
     // different region (the double map-load issue).
     if (geoPlacements.length > 0) return createTerrainRequest(geoPlacements);
-    if (placementsResolved) return createTerrainRequest(geoPhotos);
+    if (placementsResolved && !projectSlug) return createTerrainRequest(geoPhotos);
     return null;
-  }, [focusedPlacement, geoPhotos, geoPlacements, placementsResolved]);
+  }, [focusedPlacement, geoPhotos, geoPlacements, placementsResolved, projectSlug]);
   const requestKey = useMemo(() => {
     if (!request) return null;
     const mode = focusedPlacement
@@ -1191,7 +1205,7 @@ export default function TerrainGallery({
   const placementSigns = useMemo(() => {
     const signsByPlacementId = new Map<number, PlacementSign[]>();
     const signTargets = focusedPlacement && projection
-      ? placements
+      ? projectPlacements
         .filter((placement) => Number.isFinite(placement.lat) && Number.isFinite(placement.lng))
         .map((placement) => {
           const [x, y, z = 0] = projection.proj([placement.lat, placement.lng]);
@@ -1263,7 +1277,7 @@ export default function TerrainGallery({
       signsByPlacementId.set(current.placement.placement_id, signs);
     }
     return signsByPlacementId;
-  }, [focusedPlacement, placementLayout, placements, projection, projectionMatchesRequest]);
+  }, [focusedPlacement, placementLayout, projectPlacements, projection, projectionMatchesRequest]);
 
   useEffect(() => {
     const filterChanged =
@@ -1415,7 +1429,7 @@ export default function TerrainGallery({
   const navigatePlacement = useCallback(
     (direction: -1 | 1) => {
       const currentPlacement = focusedPlacement ?? previewPlacement;
-      const candidates = focusedPlacement ? placements : filteredRegionalPlacements;
+      const candidates = focusedPlacement ? projectPlacements : filteredRegionalPlacements;
       if (!currentPlacement || candidates.length < 2) return;
 
       const currentIndex = candidates.findIndex(
@@ -1446,14 +1460,14 @@ export default function TerrainGallery({
       focusedPlacement,
       panToPlacement,
       placementLayout,
-      placements,
+      projectPlacements,
       previewPlacement,
     ],
   );
 
   const placementNavigation = useMemo<PlacementNavigationActions | null>(() => {
     const currentPlacement = focusedPlacement ?? previewPlacement;
-    const candidates = focusedPlacement ? placements : filteredRegionalPlacements;
+    const candidates = focusedPlacement ? projectPlacements : filteredRegionalPlacements;
     if (
       !currentPlacement ||
       candidates.length < 2 ||
@@ -1485,7 +1499,7 @@ export default function TerrainGallery({
     filteredRegionalPlacements,
     focusedPlacement,
     navigatePlacement,
-    placements,
+    projectPlacements,
     previewPlacement,
   ]);
 
@@ -1529,21 +1543,38 @@ export default function TerrainGallery({
       return;
     }
 
-    const placement = placements.find(
+    const requestedPlacement = placements.find(
       (candidate) =>
         normalizeRouteSlug(siteRouteSlug(candidate)) ===
         normalizeRouteSlug(requestedSiteSlug),
     );
-    if (!placement) {
+    if (!requestedPlacement) {
       setPlacementError(`No site found for "${requestedSiteSlug}".`);
       return;
     }
+    const requestedProjectSlug = requestedPlacement.project?.slug?.trim();
+    if (
+      projectSlug &&
+      requestedProjectSlug &&
+      requestedProjectSlug.toLocaleLowerCase() !== projectSlug.toLocaleLowerCase()
+    ) {
+      if (focusedPlacement) returnToRegional({ skipUrlUpdate: true });
+      onProjectInferred?.(requestedProjectSlug);
+      return;
+    }
+    const placement = projectPlacements.find(
+      (candidate) => candidate.placement_id === requestedPlacement.placement_id,
+    );
+    if (!placement) return;
     if (focusedPlacement?.placement_id === placement.placement_id) return;
     focusPlacement(placement, { skipUrlUpdate: true });
   }, [
     focusPlacement,
     focusedPlacement,
     placements,
+    onProjectInferred,
+    projectPlacements,
+    projectSlug,
     placementsResolved,
     requestedSiteSlug,
     returnToRegional,
@@ -2095,6 +2126,7 @@ export default function TerrainGallery({
       introStartSetRef.current ||
       galleryLoading ||
       loading ||
+      !projectScopeReady ||
       !placementsResolved
     ) return;
     if (
@@ -2113,12 +2145,13 @@ export default function TerrainGallery({
     onIntroReady,
     phase,
     placementsResolved,
+    projectScopeReady,
     request,
   ]);
 
   const isPreparingTerrain =
     photosForCurrentView.length === 0 &&
-    placements.length === 0 &&
+    projectPlacements.length === 0 &&
     !placementError;
   const hasNoTerrainLocations =
     !isPreparingTerrain && geoPhotos.length === 0 && geoPlacements.length === 0;
@@ -3125,9 +3158,16 @@ function updatePlacementPath(placement: MapPlacement, replace = false) {
 }
 
 function updateViewerPath(path: string, replace = false) {
-  if (window.location.pathname === path) return;
-  if (replace) window.history.replaceState(null, "", path);
-  else window.history.pushState(null, "", path);
+  const target = new URL(path, window.location.origin);
+  const currentProject = new URLSearchParams(window.location.search).get("project");
+  if (currentProject && !target.searchParams.has("project")) {
+    target.searchParams.set("project", currentProject);
+  }
+  const nextPath = `${target.pathname}${target.search}${target.hash}`;
+  const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (currentPath === nextPath) return;
+  if (replace) window.history.replaceState(null, "", nextPath);
+  else window.history.pushState(null, "", nextPath);
   window.dispatchEvent(new PopStateEvent("popstate"));
 }
 

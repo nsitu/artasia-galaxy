@@ -46,6 +46,7 @@ export interface WpPerson {
 
 export interface WpProject {
   id: number;
+  slug?: string;
   name: string;
   year: number;
   description: string;
@@ -93,6 +94,9 @@ const CACHE_TTL_MS = 60_000;
 
 let cache: { data: WpArtasiaPlacement[]; timestamp: number } | null = null;
 let lastKnownGood: WpArtasiaPlacement[] | null = null;
+
+let projectCache: { data: WpProject[]; timestamp: number } | null = null;
+let projectLastKnownGood: WpProject[] | null = null;
 
 let uploadTagCache: { data: WpActivityInfo[]; timestamp: number } | null = null;
 let uploadTagLastKnownGood: WpActivityInfo[] | null = null;
@@ -162,6 +166,29 @@ interface WpActivity {
   week?: number;
   description?: string;
   colour?: string;
+}
+
+export async function getArtasiaProjects({
+  forceFresh = false,
+}: { forceFresh?: boolean } = {}): Promise<WpProject[]> {
+  if (!forceFresh && projectCache && Date.now() - projectCache.timestamp < CACHE_TTL_MS) {
+    return projectCache.data;
+  }
+
+  try {
+    const res = await wpRequest("/wp-json/artasia/v1/projects");
+    const data = (await res.json()) as WpProject[];
+    projectCache = { data, timestamp: Date.now() };
+    projectLastKnownGood = data;
+    return data;
+  } catch (err) {
+    console.warn(`[WordPress] failed to fetch projects: ${(err as Error).message}`);
+    if (!forceFresh && projectLastKnownGood) {
+      console.warn("[WordPress] serving last-known-good projects");
+      return projectLastKnownGood;
+    }
+    throw err;
+  }
 }
 
 export async function getArtasiaAnecdotes({

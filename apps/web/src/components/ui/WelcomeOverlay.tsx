@@ -1,15 +1,22 @@
 import { useEffect, useRef } from "react";
+import type { ProjectOption } from "../../api/client";
 
 interface WelcomeOverlayProps {
   exiting: boolean;
   ready: boolean;
   onStart: () => void;
+  projects: ProjectOption[];
+  selectedProjectSlug: string;
+  onProjectChange: (projectSlug: string) => void;
 }
 
 export default function WelcomeOverlay({
   exiting,
   ready,
   onStart,
+  projects,
+  selectedProjectSlug,
+  onProjectChange,
 }: WelcomeOverlayProps) {
   const startButtonRef = useRef<HTMLButtonElement | null>(null);
 
@@ -45,6 +52,23 @@ export default function WelcomeOverlay({
           Welcome to Artasia Atlas! Explore creative projects made by children
           and communities across the Greater Hamilton Area.
         </p>
+        {projects.length > 0 && (
+          <label style={projectSelectorStyle}>
+            <span style={projectSelectorLabelStyle}>Choose a project</span>
+            <select
+              value={selectedProjectSlug}
+              onChange={(event) => onProjectChange(event.target.value)}
+              style={projectSelectorInputStyle}
+              aria-label="Choose an Artasia project"
+            >
+              {projects.map((project) => (
+                <option key={project.slug} value={project.slug}>
+                  {project.name || `Artasia ${project.year}`}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         {ready && <button
           ref={startButtonRef}
           type="button"
@@ -183,6 +207,35 @@ const loadingStyle: React.CSSProperties = {
   margin: 0,
   color: "#ffffff",
   fontSize: 11,
+};
+
+const projectSelectorStyle: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "stretch",
+  gap: 6,
+  width: "min(360px, 100%)",
+  textAlign: "left",
+};
+
+const projectSelectorLabelStyle: React.CSSProperties = {
+  color: "#ffffff",
+  fontSize: 12,
+  fontWeight: 700,
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+};
+
+const projectSelectorInputStyle: React.CSSProperties = {
+  minHeight: 44,
+  padding: "9px 12px",
+  border: "1px solid rgba(255,255,255,0.7)",
+  borderRadius: 0,
+  background: "rgba(23, 32, 21, 0.35)",
+  color: "#ffffff",
+  fontFamily: "inherit",
+  fontSize: 15,
+  fontWeight: 600,
 };
 
 const spinnerStyle: React.CSSProperties = {

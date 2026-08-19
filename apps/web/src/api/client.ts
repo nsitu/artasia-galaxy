@@ -127,6 +127,7 @@ export interface UploadUploader {
 export interface MapPlacement {
   placement_id: number;
   placement_name: string;
+  project?: ProjectOption | null;
   section?: string;
   placement_slug?: string;
   documentation_url?: string;
@@ -158,6 +159,14 @@ export interface MapPlacement {
   address?: string;
   lat: number;
   lng: number;
+}
+
+export interface ProjectOption {
+  id: number;
+  slug: string;
+  name: string;
+  year: number;
+  description?: string;
 }
 
 export interface ActivityOption {
@@ -952,6 +961,15 @@ export async function fetchDriveFolders(
     if (res.status === 401) {
       throw new Error("Please sign in with Google to access Drive");
     }
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function fetchProjects(): Promise<ProjectOption[]> {
+  const res = await fetch("/api/v1/projects");
+  if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(body.error ?? `HTTP ${res.status}`);
   }

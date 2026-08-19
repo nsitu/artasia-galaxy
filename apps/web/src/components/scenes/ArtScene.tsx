@@ -2,7 +2,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { Canvas, useThree } from "@react-three/fiber";
 import { MapControls, Preload } from "@react-three/drei";
 import * as THREE from "three";
-import { fetchAuthUser, fetchUploadOptions, type ActivityOption, type AuthUser, type MapPlacement, type Photo } from "../../api/client";
+import { fetchAuthUser, fetchProjects, fetchUploadOptions, type ActivityOption, type AuthUser, type MapPlacement, type Photo, type ProjectOption } from "../../api/client";
 import { useGalleryStore } from "../../stores/galleryStore";
 import LoadingIndicator from "../ui/LoadingIndicator";
 import AudioLightboxPlayer from "../ui/AudioLightboxPlayer";
@@ -73,6 +73,29 @@ type MenuItem = {
 };
 type IntroPhase = "loading" | "ready" | "exiting" | "complete";
 const PARTNER_PATH_PREFIX = "/partners/";
+const PROJECT_QUERY_KEY = "project";
+const PROJECT_STORAGE_KEY = "artasia-project";
+
+function getProjectSlugFromSearch(search: string): string | null {
+  const value = new URLSearchParams(search).get(PROJECT_QUERY_KEY)?.trim();
+  return value || null;
+}
+
+function getStoredProjectSlug(): string | null {
+  try {
+    const value = window.localStorage.getItem(PROJECT_STORAGE_KEY)?.trim();
+    return value || null;
+  } catch {
+    return null;
+  }
+}
+
+function withProjectQuery(path: string, projectSlug?: string | null): string {
+  const target = new URL(path, window.location.origin);
+  const slug = projectSlug ?? getProjectSlugFromSearch(window.location.search);
+  if (slug) target.searchParams.set(PROJECT_QUERY_KEY, slug);
+  return `${target.pathname}${target.search}${target.hash}`;
+}
 
 function getContrastingTextColour(backgroundColour: string): string | undefined {
   const hex = backgroundColour.trim().replace(/^#/, "");
@@ -362,6 +385,15 @@ export default function ArtScene() {
   const [introPhase, setIntroPhase] = useState<IntroPhase>(() =>
     showWelcomeIntro ? "loading" : "complete",
   );
+  const [introTerrainReady, setIntroTerrainReady] = useState(false);
+  const [projectOptions, setProjectOptions] = useState<ProjectOption[]>([]);
+  const [projectOptionsReady, setProjectOptionsReady] = useState(false);
+  const [requestedProjectSlug, setRequestedProjectSlug] = useState(() =>
+    getProjectSlugFromSearch(window.location.search),
+  );
+  const [selectedProjectSlug, setSelectedProjectSlug] = useState(() =>
+    getProjectSlugFromSearch(window.location.search) ?? getStoredProjectSlug() ?? "",
+  );
   const fetchPhotos = useGalleryStore((s) => s.fetchPhotos);
   const photos = useGalleryStore((s) => s.photos);
   const photoScope = useGalleryStore((s) => s.photoScope);
@@ -421,7 +453,7 @@ export default function ArtScene() {
   const introPanOffsetRef = useRef(false);
 
   const handleIntroReady = useCallback(() => {
-    setIntroPhase((current) => current === "loading" ? "ready" : current);
+    setIntroTerrainReady(true);
   }, []);
 
   const handleStartExploring = useCallback(() => {
@@ -432,6 +464,13 @@ export default function ArtScene() {
   const handleIntroComplete = useCallback(() => {
     setIntroPhase((current) => current === "exiting" ? "complete" : current);
   }, []);
+
+  useEffect(() => {
+    if (!showWelcomeIntro || introPhase !== "loading") return;
+    if (introTerrainReady && projectOptionsReady && (selectedProjectSlug || projectOptions.length === 0)) {
+      setIntroPhase("ready");
+    }
+  }, [introPhase, introTerrainReady, projectOptions, projectOptionsReady, selectedProjectSlug, showWelcomeIntro]);
 
   useEffect(() => {
     if (window.location.pathname.startsWith("/sites/")) return;
@@ -461,6 +500,62 @@ export default function ArtScene() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchProjects()
+      .then((projects) => {
+        if (cancelled) return;
+        const sorted = [...projects].sort(
+          (a, b) => (b.year - a.year) || a.name.localeCompare(b.name),
+        );
+        setProjectOptions(sorted);
+      })
+      .catch((err) => {
+        console.warn(`[viewer] failed to load projects: ${(err as Error).message}`);
+        if (!cancelled) setProjectOptions([]);
+      })
+      .finally(() => {
+        if (!cancelled) setProjectOptionsReady(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!projectOptionsReady) return;
+    const requested = requestedProjectSlug?.toLocaleLowerCase();
+    const stored = getStoredProjectSlug()?.toLocaleLowerCase();
+    const selected = projectOptions.find((project) => {
+      const slug = project.slug.trim().toLocaleLowerCase();
+      return slug === requested || (!requested && slug === stored);
+    }) ?? projectOptions[0];
+    const nextSlug = selected?.slug ?? "";
+    setSelectedProjectSlug((current) => current === nextSlug ? current : nextSlug);
+    if (nextSlug) {
+      try {
+        window.localStorage.setItem(PROJECT_STORAGE_KEY, nextSlug);
+      } catch {
+        // Storage can be unavailable in privacy-restricted browsers.
+      }
+      const currentProject = getProjectSlugFromSearch(window.location.search);
+      if (currentProject !== nextSlug) {
+        const target = new URL(window.location.href);
+        target.searchParams.set(PROJECT_QUERY_KEY, nextSlug);
+        window.history.replaceState(null, "", `${target.pathname}${target.search}${target.hash}`);
+      }
+    }
+  }, [projectOptions, projectOptionsReady, requestedProjectSlug]);
+
+  useEffect(() => {
+    const onPopState = () => {
+      setRequestedProjectSlug(getProjectSlugFromSearch(window.location.search));
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
   useEffect(() => {
@@ -937,6 +1032,48 @@ export default function ArtScene() {
     setSelectedActivityFilter("");
     setFocusedPlacementDetails(placement);
   }, []);
+  const handleProjectChange = useCallback((projectSlug: string) => {
+    const project = projectOptions.find(
+      (candidate) => candidate.slug.toLocaleLowerCase() === projectSlug.toLocaleLowerCase(),
+    );
+    if (!project) return;
+
+    setSelectedProjectSlug(project.slug);
+    setRequestedProjectSlug(project.slug);
+    setSelectedPartnerFilter("");
+    setSelectedEducatorFilter("");
+    setRequestedPartnerSlug(null);
+    setRequestedEducatorSlug(null);
+    setSelectedActivityFilter("");
+    if (backAction) backAction();
+    try {
+      window.localStorage.setItem(PROJECT_STORAGE_KEY, project.slug);
+    } catch {
+      // Storage can be unavailable in privacy-restricted browsers.
+    }
+    const target = new URL("/", window.location.origin);
+    target.searchParams.set(PROJECT_QUERY_KEY, project.slug);
+    const nextPath = `${target.pathname}${target.search}${target.hash}`;
+    window.history.pushState(null, "", nextPath);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  }, [backAction, projectOptions]);
+  const handleProjectInferred = useCallback((projectSlug: string) => {
+    const project = projectOptions.find(
+      (candidate) => candidate.slug.toLocaleLowerCase() === projectSlug.toLocaleLowerCase(),
+    );
+    if (!project) return;
+    setSelectedProjectSlug(project.slug);
+    setRequestedProjectSlug(project.slug);
+    try {
+      window.localStorage.setItem(PROJECT_STORAGE_KEY, project.slug);
+    } catch {
+      // Storage can be unavailable in privacy-restricted browsers.
+    }
+    const target = new URL(window.location.href);
+    target.searchParams.set(PROJECT_QUERY_KEY, project.slug);
+    window.history.replaceState(null, "", `${target.pathname}${target.search}${target.hash}`);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  }, [projectOptions]);
   const handlePartnerNavigation = useCallback((partner: string) => {
     setSelectedEducatorFilter("");
     setSelectedPartnerFilter(partner);
@@ -1059,6 +1196,9 @@ export default function ArtScene() {
         whiteLogo: focusedPlacementDetails.partner_white_logo,
       }
     : selectedPartnerOption;
+  const selectedProject = projectOptions.find(
+    (project) => project.slug.toLocaleLowerCase() === selectedProjectSlug.toLocaleLowerCase(),
+  );
 
   return (
     <div className={window.location.pathname.startsWith("/sites/") ? "atlas-site-view" : undefined} style={{ width: "100vw", height: "100vh", position: "relative" }}>
@@ -1728,6 +1868,7 @@ export default function ArtScene() {
               mapStyle={mapStyle}
               introEnabled={showWelcomeIntro}
               introPhase={introPhase}
+              projectScopeReady={projectOptionsReady && (Boolean(selectedProject?.slug) || projectOptions.length === 0)}
               onIntroReady={handleIntroReady}
               onIntroComplete={handleIntroComplete}
               introPanOffsetRef={introPanOffsetRef}
@@ -1739,6 +1880,8 @@ export default function ArtScene() {
               onPlacementNavigationChange={handlePlacementNavigationChange}
               onPartnerFilterOptionsChange={setPartnerFilterOptions}
               onEducatorFilterOptionsChange={setEducatorFilterOptions}
+              projectSlug={selectedProject?.slug}
+              onProjectInferred={handleProjectInferred}
               selectedPartnerFilter={selectedPartnerFilter}
               selectedEducatorFilter={selectedEducatorFilter}
               selectedActivityFilter={selectedActivityFilter}
@@ -1786,6 +1929,9 @@ export default function ArtScene() {
           exiting={introPhase === "exiting"}
           ready={introPhase === "ready"}
           onStart={handleStartExploring}
+          projects={projectOptions}
+          selectedProjectSlug={selectedProject?.slug ?? ""}
+          onProjectChange={handleProjectChange}
         />
       )}
     </div>
@@ -1884,14 +2030,16 @@ function slugifyPartnerName(value: string) {
 
 function updatePartnerPath(partner: string) {
   const path = getPartnerPath(partner);
-  if (window.location.pathname === path) return;
+  const currentPath = `${window.location.pathname}${window.location.search}`;
+  if (currentPath === path) return;
   window.history.pushState(null, "", path);
   window.dispatchEvent(new PopStateEvent("popstate"));
 }
 
 function updateEducatorPath(educator: string, replace = false) {
   const path = getEducatorPath(educator);
-  if (window.location.pathname === path) return;
+  const currentPath = `${window.location.pathname}${window.location.search}`;
+  if (currentPath === path) return;
   if (replace) window.history.replaceState(null, "", path);
   else window.history.pushState(null, "", path);
   window.dispatchEvent(new PopStateEvent("popstate"));
@@ -1899,16 +2047,16 @@ function updateEducatorPath(educator: string, replace = false) {
 
 function getPartnerPath(partner: string) {
   const slug = slugifyPartnerName(partner);
-  return slug
-    ? `${PARTNER_PATH_PREFIX}${encodeURIComponent(slug)}`
-    : "/";
+  return withProjectQuery(
+    slug ? `${PARTNER_PATH_PREFIX}${encodeURIComponent(slug)}` : "/",
+  );
 }
 
 function getEducatorPath(educator: string) {
   const slug = slugifyPartnerName(educator);
-  return slug
-    ? `${PEOPLE_PATH_PREFIX}${encodeURIComponent(slug)}`
-    : "/";
+  return withProjectQuery(
+    slug ? `${PEOPLE_PATH_PREFIX}${encodeURIComponent(slug)}` : "/",
+  );
 }
 
 function getWebGL2SupportError() {
