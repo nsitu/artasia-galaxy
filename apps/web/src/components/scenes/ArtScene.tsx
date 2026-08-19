@@ -70,7 +70,7 @@ const MAP_STYLE_STORAGE_KEY = "artasia-map-style";
 type MenuItem = {
   href: string;
   label: string;
-  action?: "about" | "map-options";
+  action?: "about";
 };
 type IntroPhase = "loading" | "ready" | "exiting" | "complete";
 const PARTNER_PATH_PREFIX = "/partners/";
@@ -390,7 +390,6 @@ export default function ArtScene() {
   const [activityFilterOptions, setActivityFilterOptions] = useState<ActivityOption[]>([]);
   const [selectedActivityFilter, setSelectedActivityFilter] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [mapOptionsOpen, setMapOptionsOpen] = useState(false);
   const [mapStyle, setMapStyle] = useState<MapStyleId>(getInitialMapStyle);
   const [openFilter, setOpenFilter] = useState<"partner" | "educator" | "activity" | null>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -498,13 +497,11 @@ export default function ArtScene() {
   const menuItems = useMemo(
     (): MenuItem[] => [
       { href: "#about", label: "About", action: "about" as const },
-      { href: "#map-options", label: "Map Options", action: "map-options" as const },
       { href: "/admin", label: "Admin" },
       { href: "/partners", label: "Partners" },
     ],
     []
   );
-  const selectedMapStyle = MAP_STYLE_OPTIONS.find((option) => option.id === mapStyle) ?? MAP_STYLE_OPTIONS[0];
   const handleMapStyleChange = useCallback((nextStyle: MapStyleId) => {
     setMapStyle(nextStyle);
     try {
@@ -512,7 +509,6 @@ export default function ArtScene() {
     } catch {
       // Storage can be unavailable in privacy-restricted browsers.
     }
-    setMapOptionsOpen(false);
     setMenuOpen(false);
   }, []);
 
@@ -1246,49 +1242,6 @@ export default function ArtScene() {
                       </button>
                     );
                   }
-                  if (item.action === "map-options") {
-                    return (
-                      <div key={item.href} style={mapOptionsMenuStyle}>
-                        <button
-                          type="button"
-                          className="atlas-control-surface"
-                          role="menuitem"
-                          aria-expanded={mapOptionsOpen}
-                          aria-haspopup="true"
-                          style={{
-                            ...menuItemStyle,
-                            ...mapOptionsTriggerStyle,
-                          }}
-                          onClick={() => setMapOptionsOpen((current) => !current)}
-                        >
-                          <span>{item.label}</span>
-                          <span style={mapOptionsCurrentStyle}>{selectedMapStyle.label}</span>
-                        </button>
-                        {mapOptionsOpen && (
-                          <div role="group" aria-label="Map styles" style={mapOptionsListStyle}>
-                            {MAP_STYLE_OPTIONS.map((option) => (
-                              <button
-                                key={option.id}
-                                type="button"
-                                className="atlas-control-surface"
-                                role="menuitemradio"
-                                aria-checked={option.id === mapStyle}
-                                style={{
-                                  ...menuItemStyle,
-                                  ...mapOptionsChoiceStyle,
-                                  ...(option.id === mapStyle ? mapOptionsChoiceActiveStyle : {}),
-                                }}
-                                onClick={() => handleMapStyleChange(option.id)}
-                              >
-                                <span>{option.label}</span>
-                                <span style={mapOptionsDetailStyle}>{option.detail}</span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  }
                   return (
                     <a
                       key={item.href}
@@ -1302,6 +1255,26 @@ export default function ArtScene() {
                     </a>
                   );
                 })}
+                <div role="group" aria-label="Map styles" style={mapOptionsListStyle}>
+                  <div style={mapOptionsHeadingStyle}>Map styles</div>
+                  {MAP_STYLE_OPTIONS.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      className="atlas-control-surface"
+                      role="menuitemradio"
+                      aria-checked={option.id === mapStyle}
+                      style={{
+                        ...mapOptionsChoiceStyle,
+                        ...(option.id === mapStyle ? mapOptionsChoiceActiveStyle : {}),
+                      }}
+                      onClick={() => handleMapStyleChange(option.id)}
+                    >
+                      <span>{option.label}</span>
+                      <span style={mapOptionsDetailStyle}>{option.detail}</span>
+                    </button>
+                  ))}
+                </div>
             </div>
           )}
         </div>
@@ -2570,31 +2543,19 @@ const menuItemStyle: React.CSSProperties = {
   borderBottom: "1px solid rgba(255,255,255,0.12)",
 };
 
-const mapOptionsMenuStyle: React.CSSProperties = {
-  display: "grid",
-};
-
-const mapOptionsTriggerStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 12,
-  width: "100%",
-  textAlign: "left",
-  cursor: "pointer",
-};
-
-const mapOptionsCurrentStyle: React.CSSProperties = {
-  color: "#b9c2d0",
-  fontSize: 11,
-  textAlign: "right",
-};
-
 const mapOptionsListStyle: React.CSSProperties = {
   display: "grid",
   padding: "4px 0",
-  borderBottom: "1px solid rgba(255,255,255,0.12)",
   background: "rgba(0,0,0,0.18)",
+};
+
+const mapOptionsHeadingStyle: React.CSSProperties = {
+  padding: "10px 14px 6px",
+  color: "#b9c2d0",
+  fontSize: 11,
+  fontWeight: 700,
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
 };
 
 const mapOptionsChoiceStyle: React.CSSProperties = {
