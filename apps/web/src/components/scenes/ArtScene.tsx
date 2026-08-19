@@ -1510,6 +1510,7 @@ export default function ArtScene() {
               ? `/admin/browse?site=${encodeURIComponent(String(focusedPlacementDetails.placement_id))}`
               : undefined
           }
+          onDocumentationOpen={handleDocumentationOpen}
           wordpressHref={
             authUser?.authenticated
               ? getWordPressPostEditUrl(focusedPlacementDetails.placement_id)
@@ -1521,6 +1522,7 @@ export default function ArtScene() {
         <PlacementPreviewPanel
           placement={previewPlacementDetails}
           onOpen={previewPlacementAction}
+          onDocumentationOpen={handleDocumentationOpen}
           partnerHref={getPartnerPath(previewPlacementDetails.partner_name || "")}
           onPartnerSelect={handlePartnerNavigation}
           educatorHref={getEducatorPath}

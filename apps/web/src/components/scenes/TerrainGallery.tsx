@@ -2635,6 +2635,7 @@ export function FocusedPlacementOverlay({
   placement,
   adminHref,
   wordpressHref,
+  onDocumentationOpen,
   partnerHref,
   onPartnerSelect,
   educatorHref,
@@ -2647,6 +2648,7 @@ export function FocusedPlacementOverlay({
   placement: MapPlacement;
   adminHref?: string;
   wordpressHref?: string;
+  onDocumentationOpen?: (placement: MapPlacement) => void;
   partnerHref?: string;
   onPartnerSelect?: (partner: string) => void;
   educatorHref?: (educator: string) => string;
@@ -2661,6 +2663,7 @@ export function FocusedPlacementOverlay({
       placement={placement}
       adminHref={adminHref}
       wordpressHref={wordpressHref}
+      onDocumentationOpen={onDocumentationOpen}
       partnerHref={partnerHref}
       onPartnerSelect={onPartnerSelect}
       educatorHref={educatorHref}
@@ -2677,6 +2680,7 @@ function PlacementInfoPanel({
   placement,
   adminHref,
   wordpressHref,
+  onDocumentationOpen,
   partnerHref,
   onPartnerSelect,
   educatorHref,
@@ -2691,6 +2695,7 @@ function PlacementInfoPanel({
   placement: MapPlacement;
   adminHref?: string;
   wordpressHref?: string;
+  onDocumentationOpen?: (placement: MapPlacement) => void;
   partnerHref?: string;
   onPartnerSelect?: (partner: string) => void;
   educatorHref?: (educator: string) => string;
@@ -2722,6 +2727,12 @@ function PlacementInfoPanel({
     partnerName && partnerHref && onPartnerSelect,
   );
   const educatorLinkEnabled = Boolean(educatorHref && onEducatorSelect);
+  const useAtlasDocumentation = Boolean(
+    onDocumentationOpen && placement.documentation_content_html?.trim(),
+  );
+  const hasDocumentationAction = onDocumentationOpen
+    ? useAtlasDocumentation
+    : Boolean(placement.documentation_url);
   const handlePartnerLinkClick = (
     event: MouseEvent<HTMLAnchorElement>,
   ) => {
@@ -2934,7 +2945,7 @@ function PlacementInfoPanel({
               />
             )}
           </div>
-          {(previousAction || placement.documentation_url || adminHref || wordpressHref || onView || nextAction) && (
+          {(previousAction || hasDocumentationAction || adminHref || wordpressHref || onView || nextAction) && (
             <div className="atlas-placement-actions" style={siteDetailsActionsStyle}>
               {previousAction && (
                 <PlacementNavigationButton
@@ -2943,21 +2954,37 @@ function PlacementInfoPanel({
                   placementName={previousLabel}
                 />
               )}
-              {placement.documentation_url && (
-                <a
-                  href={placement.documentation_url}
-                  className="atlas-control-surface atlas-placement-action-link"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="View documentation"
-                  title="View documentation"
-                  style={siteDetailsActionLinkStyle}
-                >
-                  <span aria-hidden="true" style={siteDetailsActionIconStyle}>
-                    open_in_new
-                  </span>
-                  <span className="atlas-placement-action-label">Documentation</span>
-                </a>
+              {hasDocumentationAction && (
+                useAtlasDocumentation ? (
+                  <button
+                    type="button"
+                    className="atlas-control-surface atlas-placement-action-link"
+                    onClick={() => onDocumentationOpen?.(placement)}
+                    aria-label="View documentation"
+                    title="View documentation"
+                    style={siteDetailsActionLinkStyle}
+                  >
+                    <span aria-hidden="true" style={siteDetailsActionIconStyle}>
+                      menu_book
+                    </span>
+                    <span className="atlas-placement-action-label">Documentation</span>
+                  </button>
+                ) : (
+                  <a
+                    href={placement.documentation_url}
+                    className="atlas-control-surface atlas-placement-action-link"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="View documentation"
+                    title="View documentation"
+                    style={siteDetailsActionLinkStyle}
+                  >
+                    <span aria-hidden="true" style={siteDetailsActionIconStyle}>
+                      open_in_new
+                    </span>
+                    <span className="atlas-placement-action-label">Documentation</span>
+                  </a>
+                )
               )}
               {adminHref && (
                 <a
@@ -3077,6 +3104,7 @@ export function PlacementPreviewPanel({
   onOpen,
   adminHref,
   wordpressHref,
+  onDocumentationOpen,
   partnerHref,
   onPartnerSelect,
   educatorHref,
@@ -3090,6 +3118,7 @@ export function PlacementPreviewPanel({
   onOpen: () => void;
   adminHref?: string;
   wordpressHref?: string;
+  onDocumentationOpen?: (placement: MapPlacement) => void;
   partnerHref?: string;
   onPartnerSelect?: (partner: string) => void;
   educatorHref?: (educator: string) => string;
@@ -3104,6 +3133,7 @@ export function PlacementPreviewPanel({
       placement={placement}
       adminHref={adminHref}
       wordpressHref={wordpressHref}
+      onDocumentationOpen={onDocumentationOpen}
       partnerHref={partnerHref}
       onPartnerSelect={onPartnerSelect}
       educatorHref={educatorHref}
