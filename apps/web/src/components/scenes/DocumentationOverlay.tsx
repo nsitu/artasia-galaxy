@@ -28,7 +28,9 @@ export default function DocumentationOverlay({
 
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
-      previousActiveElement?.focus();
+      if (previousActiveElement?.isConnected) {
+        previousActiveElement.focus({ preventScroll: true });
+      }
     };
   }, [onClose]);
 

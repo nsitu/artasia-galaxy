@@ -50,7 +50,11 @@ export default function DocumentationPullQuotePanel({
         {onClick ? (
           <button
             type="button"
-            onClick={onClick}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              onClick();
+            }}
             aria-label="Read full documentation"
             title="Read full documentation"
             style={quoteButtonStyle}

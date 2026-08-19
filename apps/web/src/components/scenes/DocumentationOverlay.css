@@ -20,7 +20,7 @@
   max-height: min(900px, calc(100dvh - 48px));
   overflow: hidden;
   border: 0;
-  background: rgba(16, 19, 31, 0.97);
+  background: #10131f66;
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
   color: #eef3fb;
 }
@@ -77,7 +77,7 @@
   top: 0;
   right: 0;
   z-index: 2;
-  border: 0;
+  border: 0 !important;
   border-radius: 0;
   background-color: rgba(0, 0, 0, 0.1);
   background-image: linear-gradient(45deg, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.2) 100%);
@@ -88,9 +88,14 @@
   box-shadow: none;
 }
 
-.atlas-documentation-overlay__close:hover,
-.atlas-documentation-overlay__close:focus-visible {
+.atlas-documentation-overlay__close:hover {
   background-color: rgba(255, 255, 255, 0.14);
+  border: 0 !important;
+  outline: none;
+}
+
+.atlas-documentation-overlay__close:focus-visible {
+  border: 0 !important;
   outline: 2px solid rgba(255, 255, 255, 0.85);
   outline-offset: 2px;
 }
