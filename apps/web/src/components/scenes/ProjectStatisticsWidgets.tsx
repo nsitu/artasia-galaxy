@@ -16,6 +16,11 @@ export const PROJECT_STATISTICS_WIDGET_HEIGHT = 1.25;
 export const PROJECT_STATISTICS_TITLE_WIDTH = 6.5;
 export const PROJECT_STATISTICS_TITLE_HEIGHT = 0.8;
 
+const STATISTICS_HTML_DISTANCE_FACTOR = 10;
+const STATISTICS_HTML_WORLD_UNITS_PER_PIXEL = STATISTICS_HTML_DISTANCE_FACTOR / 400;
+const PROJECT_STATISTICS_TITLE_RENDERED_WIDTH =
+  PROJECT_STATISTICS_TITLE_WIDTH * 100 * STATISTICS_HTML_WORLD_UNITS_PER_PIXEL;
+
 const STATISTICS_WIDGETS: Array<{
   key: keyof ProjectStatistics;
   label: string;
@@ -68,7 +73,7 @@ export function getProjectStatisticsTitlePosition(
   z: number,
 ): [number, number, number] {
   return [
-    bounds.minX + PROJECT_STATISTICS_TITLE_WIDTH / 2,
+    bounds.minX + PROJECT_STATISTICS_TITLE_RENDERED_WIDTH / 2,
     bounds.maxY + STATISTICS_WIDGET_GAP + PROJECT_STATISTICS_TITLE_HEIGHT / 2,
     z + STATISTICS_WIDGET_Z_OFFSET,
   ];
@@ -89,7 +94,7 @@ export default function ProjectStatisticsWidgets({
         <Html
           position={titlePosition}
           transform
-          distanceFactor={10}
+          distanceFactor={STATISTICS_HTML_DISTANCE_FACTOR}
           zIndexRange={STATISTICS_WIDGET_Z_INDEX_RANGE}
           pointerEvents="none"
           style={titleStyle}
@@ -102,7 +107,7 @@ export default function ProjectStatisticsWidgets({
           key={widget.key}
           position={widget.position}
           transform
-          distanceFactor={10}
+          distanceFactor={STATISTICS_HTML_DISTANCE_FACTOR}
           zIndexRange={STATISTICS_WIDGET_Z_INDEX_RANGE}
           pointerEvents="none"
           style={widgetStyle}

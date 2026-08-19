@@ -31,7 +31,9 @@ import PlacementSignpost, {
   type PlacementSign,
 } from "./PlacementSignpost";
 import PlaceMarker, { FlowerLayoutCoordinator } from "./PlaceMarker";
-import DocumentationPullQuotePanel from "./DocumentationPullQuotePanel";
+import DocumentationPullQuotePanel, {
+  DOCUMENTATION_QUOTE_WORLD_UNITS_PER_PIXEL,
+} from "./DocumentationPullQuotePanel";
 import ProjectStatisticsWidgets, {
   createProjectStatisticsWidgetLayout,
   getProjectStatisticsTitlePosition,
@@ -1100,6 +1102,10 @@ export default function TerrainGallery({
     const terrainHeight = Math.max(1, maxY - minY);
     const width = THREE.MathUtils.clamp(terrainWidth * 0.38, 3.8, 4.8);
     const height = THREE.MathUtils.clamp(terrainHeight * 0.78, 5.2, 9.2);
+    const renderedWidth =
+      width * 100 * DOCUMENTATION_QUOTE_WORLD_UNITS_PER_PIXEL;
+    const renderedHeight =
+      height * 100 * DOCUMENTATION_QUOTE_WORLD_UNITS_PER_PIXEL;
     const quoteLeftX = maxX + DOCUMENTATION_QUOTE_TERRAIN_OFFSET;
     const quoteTopY = maxY;
 
@@ -1108,14 +1114,14 @@ export default function TerrainGallery({
       width,
       height,
       position: [
-        quoteLeftX + width / 2,
-        quoteTopY - height / 2,
+        quoteLeftX + renderedWidth / 2,
+        quoteTopY - renderedHeight / 2,
         terrainMaxZ ?? focusedPlacementCenter[2],
       ] as [number, number, number],
       fitBounds: {
         minX,
-        maxX: quoteLeftX + width,
-        minY: Math.min(minY, quoteTopY - height),
+        maxX: quoteLeftX + renderedWidth,
+        minY: Math.min(minY, quoteTopY - renderedHeight),
         maxY,
       },
     };

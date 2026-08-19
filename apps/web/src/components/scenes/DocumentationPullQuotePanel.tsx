@@ -10,6 +10,10 @@ interface DocumentationPullQuotePanelProps {
   attribution?: string;
 }
 
+export const DOCUMENTATION_QUOTE_DISTANCE_FACTOR = 10;
+export const DOCUMENTATION_QUOTE_WORLD_UNITS_PER_PIXEL =
+  DOCUMENTATION_QUOTE_DISTANCE_FACTOR / 400;
+
 function getQuoteFontSize(quote: string) {
   if (quote.length <= 160) return 0.4;
   if (quote.length <= 280) return 0.34;
@@ -36,7 +40,7 @@ export default function DocumentationPullQuotePanel({
       <Html
         position={[0, 0, 0.018]}
         transform
-        distanceFactor={10}
+        distanceFactor={DOCUMENTATION_QUOTE_DISTANCE_FACTOR}
         zIndexRange={[12, 0]}
         pointerEvents="none"
         style={panelStyle(width, height)}
