@@ -37,6 +37,12 @@ import {
   saveAssetGpsUsage,
 } from "../services/assetGpsUsage.service.js";
 import { getAuthContext } from "../services/auth.service.js";
+import {
+  assetTypeTag,
+  getAssetTypeFromTagValues,
+  parseAssetTypeTagValue,
+  type AssetType,
+} from "../services/assetType.service.js";
 import { flattenAsset } from "../services/flattenAsset.service.js";
 import { isAudioAsset, parseImmichDuration } from "../services/audioAsset.service.js";
 import { getAudioWaveform } from "../services/audioWaveform.service.js";
@@ -452,6 +458,7 @@ interface AssetManagementAssignment {
   activityId?: number;
   activityLabel?: string;
   customActivity?: string;
+  assetType?: AssetType;
   iconName?: string;
   linkedAudioAssetId?: string;
   driveFileId?: string;
@@ -508,6 +515,9 @@ function mapAdminAsset(
     .find((value) => value.toLocaleLowerCase().startsWith(DRIVE_SOURCE_TAG_PREFIX))
     ?.slice(DRIVE_SOURCE_TAG_PREFIX.length);
   const driveFileId = assignment?.driveFileId ?? embeddedDriveFileId;
+  const assetType = assignment?.assetType ?? getAssetTypeFromTagValues(
+    (asset.tags ?? []).flatMap((tag) => [tag.name, tag.value]),
+  );
   return {
     id: asset.id,
     type: asset.type,
@@ -527,6 +537,7 @@ function mapAdminAsset(
     archived: asset.isArchived,
     trashed: Boolean(asset.isTrashed),
     published: assignment?.published ?? false,
+    assetType,
     placement_id: assignment?.placementId ?? null,
     placement_name: assignment?.placementName ?? null,
     display_placement_id: assignment?.displayPlacementId ?? null,
@@ -1048,6 +1059,31 @@ async function getManagementAssignments(
     }
   }
 
+  const assetTypeTags = tags.flatMap((tag) => {
+    const assetType = [tag.name, tag.value]
+      .map(parseAssetTypeTagValue)
+      .find((value): value is AssetType => value !== null);
+    return assetType ? [{ tagId: tag.id, assetType }] : [];
+  });
+  const assetTypeMemberships = await processWithConcurrency(
+    assetTypeTags,
+    8,
+    async ({ tagId, assetType }) => ({
+      assetType,
+      assetIds: await searchAdminAssetIdsByTag(tagId),
+    }),
+  );
+  for (const { assetType, assetIds: taggedAssetIds } of assetTypeMemberships) {
+    for (const assetId of taggedAssetIds) {
+      if (!assetIdSet.has(assetId)) continue;
+      const current = assignments.get(assetId) ?? {};
+      if (assetType === "process" || !current.assetType) {
+        current.assetType = assetType;
+      }
+      assignments.set(assetId, current);
+    }
+  }
+
   const displayPlacementMemberships = await processWithConcurrency(
     Array.from(displayPlacementByTagId.entries()),
     8,
@@ -1214,7 +1250,9 @@ function mapEmbeddedAssetMetadata(
 
   for (const asset of assets) {
     const keys = embeddedTagKeys(asset);
-    const assignment: AssetManagementAssignment = {};
+    const assignment: AssetManagementAssignment = {
+      assetType: getAssetTypeFromTagValues([...keys]),
+    };
     const assetAdjustments = { ...DEFAULT_ASSET_ADJUSTMENTS };
     let hasAdjustments = false;
     const customActivity = getCustomActivityFromValues(
@@ -1815,6 +1853,45 @@ router.post("/assets/:assetId/activity-tag", async (req, res) => {
       activity_id: customActivity ? null : activityId,
       custom_activity: customActivity || null,
     });
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
+});
+
+router.post("/assets/:assetId/asset-type", async (req, res) => {
+  try {
+    const auth = await getAuthContext(req);
+    if (!auth.authenticated) {
+      res.status(401).json({ error: "Sign in to assign an asset type." });
+      return;
+    }
+
+    const assetId = req.params.assetId.trim();
+    if (!assetId) {
+      res.status(400).json({ error: "Asset ID is required." });
+      return;
+    }
+
+    const assetType = String(req.body?.asset_type ?? "").trim().toLowerCase();
+    if (assetType !== "artwork" && assetType !== "process") {
+      res.status(400).json({ error: "Select a valid asset type." });
+      return;
+    }
+
+    await getAsset(assetId);
+    const tags = await listTags();
+    const existingAssetTypeTagIds = tags
+      .filter((tag) =>
+        [tag.name, tag.value].some((value) => parseAssetTypeTagValue(value) !== null),
+      )
+      .map((tag) => tag.id);
+    if (existingAssetTypeTagIds.length > 0) {
+      await untagAssets([assetId], existingAssetTypeTagIds);
+    }
+    await tagAsset(assetId, [assetTypeTag(assetType)]);
+    invalidateAdminBrowseIndexes();
+
+    res.json({ ok: true, asset_id: assetId, asset_type: assetType });
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });
   }

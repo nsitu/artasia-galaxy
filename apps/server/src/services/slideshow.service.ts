@@ -11,6 +11,11 @@ import {
 import { isAudioAsset } from "./audioAsset.service.js";
 import { getGpsDisabledAssetIds } from "./assetGpsUsage.service.js";
 import { getArtasiaAnecdotes, type WpArtasiaAnecdote } from "../infra/WordPressClient.js";
+import {
+  getAssetTypeFromTagValues,
+  parseAssetTypeTagValue,
+  type AssetType,
+} from "./assetType.service.js";
 
 export interface Photo {
   id: string;
@@ -40,6 +45,7 @@ export interface Photo {
   }>;
   fileName: string;
   isFavorite: boolean;
+  assetType: AssetType;
   useGpsLocation: boolean;
   adjustments: AssetAdjustments;
   iconName?: string;
@@ -103,6 +109,7 @@ function assetToPhoto(
   activityIds?: number[],
   customActivities?: string[],
   linkedAudioAssetId?: string,
+  assetType: AssetType = "artwork",
 ): Photo {
   const audio = forceAudio || isAudioAsset(asset);
   const video = !audio && asset.type === "VIDEO";
@@ -152,6 +159,7 @@ function assetToPhoto(
       .map(() => ({ x: 0.5, y: 0.5, width: 0.15, height: 0.2 })),
     fileName: asset.originalFileName,
     isFavorite: asset.isFavorite ?? false,
+    assetType,
     useGpsLocation,
     adjustments: adjustments ?? { ...DEFAULT_ASSET_ADJUSTMENTS },
     ...(iconName ? { iconName } : {}),
@@ -177,6 +185,7 @@ function anecdoteToPhoto(anecdote: WpArtasiaAnecdote): Photo {
     createdAt: anecdote.created_at,
     fileName: anecdote.title || "Learning anecdote",
     isFavorite: false,
+    assetType: "artwork",
     useGpsLocation: false,
     adjustments: { ...DEFAULT_ASSET_ADJUSTMENTS },
     iconName: "format_quote",
@@ -234,8 +243,15 @@ async function mapEmbeddedFocusedMetadata(assets: ImmichAsset[]) {
   const gpsDisabledAssetIds = new Set<string>();
   const iconNameByAssetId = new Map<string, string>();
   const linkedAudioAssetIdByAssetId = new Map<string, string>();
+  const assetTypeByAssetId = new Map<string, AssetType>();
 
   for (const asset of assets) {
+    assetTypeByAssetId.set(
+      asset.id,
+      getAssetTypeFromTagValues(
+        (asset.tags ?? []).flatMap((tag) => [tag.name, tag.value]),
+      ),
+    );
     const adjustments = { ...DEFAULT_ASSET_ADJUSTMENTS };
     let hasAdjustments = false;
     const customActivity = getCustomActivityFromValues(
@@ -290,6 +306,7 @@ async function mapEmbeddedFocusedMetadata(assets: ImmichAsset[]) {
     gpsDisabledAssetIds,
     iconNameByAssetId,
     linkedAudioAssetIdByAssetId,
+    assetTypeByAssetId,
   };
 }
 
@@ -328,6 +345,7 @@ export async function querySlideshow(
   let gpsDisabledAssetIds = new Set<string>();
   let iconNameByAssetId = new Map<string, string>();
   let linkedAudioAssetIdByAssetId = new Map<string, string>();
+  let assetTypeByAssetId = new Map<string, AssetType>();
   let usesEmbeddedMetadata = false;
 
   if (query.placementFocus) {
@@ -371,6 +389,7 @@ export async function querySlideshow(
       gpsDisabledAssetIds = metadata.gpsDisabledAssetIds;
       iconNameByAssetId = metadata.iconNameByAssetId;
       linkedAudioAssetIdByAssetId = metadata.linkedAudioAssetIdByAssetId;
+      assetTypeByAssetId = metadata.assetTypeByAssetId;
     } else {
       const audioAssetIds = audioTag
         ? await searchAssetIdsByTag(audioTag.id)
@@ -499,6 +518,12 @@ export async function querySlideshow(
           }]
         : [];
     });
+    const assetTypeTags = allTags.flatMap((tag) => {
+      const assetType = [tag.name, tag.value]
+        .map(parseAssetTypeTagValue)
+        .find((value): value is AssetType => value !== null);
+      return assetType ? [{ tagId: tag.id, assetType }] : [];
+    });
     const enrichment = await Promise.all([
       getAssetAdjustmentMap(assetIds),
       getGpsDisabledAssetIds(assetIds),
@@ -518,6 +543,15 @@ export async function querySlideshow(
         return linkedAudioTags.map((linkedAudioTag) => ({
           ...linkedAudioTag,
           assetIds: assetIdsByTag.get(linkedAudioTag.tagId) ?? [],
+        }));
+      })(),
+      (async () => {
+        const assetIdsByTag = await searchAssetIdsByTags(
+          assetTypeTags.map((assetTypeTag) => assetTypeTag.tagId),
+        );
+        return assetTypeTags.map((assetTypeTag) => ({
+          ...assetTypeTag,
+          assetIds: assetIdsByTag.get(assetTypeTag.tagId) ?? [],
         }));
       })(),
     ]);
@@ -540,6 +574,16 @@ export async function querySlideshow(
         }
       }
     }
+    for (const assignment of enrichment[4]) {
+      for (const assetId of assignment.assetIds) {
+        if (
+          assetIdSet.has(assetId) &&
+          (assignment.assetType === "process" || !assetTypeByAssetId.has(assetId))
+        ) {
+          assetTypeByAssetId.set(assetId, assignment.assetType);
+        }
+      }
+    }
   }
   let photos = assets.map((asset) =>
     assetToPhoto(
@@ -551,6 +595,7 @@ export async function querySlideshow(
       Array.from(activityIdsByAssetId.get(asset.id) ?? []),
       Array.from(customActivitiesByAssetId.get(asset.id) ?? []),
       linkedAudioAssetIdByAssetId.get(asset.id),
+      assetTypeByAssetId.get(asset.id) ?? "artwork",
     ),
   );
 

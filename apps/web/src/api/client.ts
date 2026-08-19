@@ -4,6 +4,8 @@ export interface AssetAdjustments {
   saturation: number;
 }
 
+export type AssetType = "artwork" | "process";
+
 export interface Photo {
   id: string;
   mediaKind: "image" | "video" | "audio" | "anecdote";
@@ -18,6 +20,7 @@ export interface Photo {
   createdAt: string;
   fileName: string;
   isFavorite: boolean;
+  assetType: AssetType;
   iconName?: string;
   activityIds?: number[];
   customActivities?: string[];
@@ -249,6 +252,7 @@ export interface PlacementAsset {
   archived?: boolean;
   trashed?: boolean;
   published?: boolean;
+  assetType?: AssetType;
   width?: number | null;
   height?: number | null;
   placement_id?: number | null;
@@ -445,6 +449,21 @@ export async function assignAssetActivityTag(params: {
       activity_id: params.activityId,
       custom_activity: params.customActivity ?? null,
     }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+}
+
+export async function setAssetType(params: {
+  assetId: string;
+  assetType: "artwork" | "process";
+}): Promise<void> {
+  const res = await fetch(`/api/v1/uploads/assets/${params.assetId}/asset-type`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ asset_type: params.assetType }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));

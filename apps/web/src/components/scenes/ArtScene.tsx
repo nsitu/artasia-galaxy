@@ -725,6 +725,9 @@ export default function ArtScene() {
   );
   const selectedPhotoHasActivityBadges =
     selectedPhotoActivities.length > 0 || selectedCustomActivities.length > 0;
+  const selectedPhotoHasProcessBadge = selectedPhoto?.assetType === "process";
+  const selectedPhotoHasBadges =
+    selectedPhotoHasActivityBadges || selectedPhotoHasProcessBadge;
   const selectedActivityDescriptions = selectedPhotoActivities.flatMap((activity) => {
     const description = activity.description?.trim();
     return description ? [{ id: activity.id, description }] : [];
@@ -1662,9 +1665,14 @@ export default function ArtScene() {
                 className="atlas-lightbox-caption-header-content"
                 style={photoLightboxCaptionHeaderContentStyle}
               >
-                {selectedPhotoHasActivityBadges ? (
+                {selectedPhotoHasBadges ? (
                   <>
                     <div style={photoLightboxHeaderBadgeListStyle}>
+                      {selectedPhotoHasProcessBadge && (
+                        <span style={photoLightboxProcessBadgeStyle}>
+                          Process
+                        </span>
+                      )}
                       {selectedPhotoActivities.map((activity) => (
                         <span
                           key={activity.id}
@@ -1733,7 +1741,7 @@ export default function ArtScene() {
                 ))}
               </div>
             )}
-            {selectedDescription && selectedPhotoHasActivityBadges && (
+            {selectedDescription && selectedPhotoHasBadges && (
               <div
                 style={{
                   ...photoLightboxAssetCaptionStyle,
@@ -3239,6 +3247,13 @@ const photoLightboxCustomActivityBadgeStyle: React.CSSProperties = {
   background: "rgba(216, 231, 255, 0.14)",
   border: "1px solid rgba(216, 231, 255, 0.5)",
   color: "#d8e7ff",
+};
+
+const photoLightboxProcessBadgeStyle: React.CSSProperties = {
+  ...photoLightboxActivityBadgeStyle,
+  background: "rgba(199, 236, 157, 0.16)",
+  border: "1px solid rgba(199, 236, 157, 0.64)",
+  color: "#d9f5b7",
 };
 
 const photoLightboxAudioStyle: React.CSSProperties = {

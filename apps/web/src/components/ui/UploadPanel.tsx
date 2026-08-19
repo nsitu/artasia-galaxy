@@ -33,6 +33,7 @@ import {
   resetUploadAssetEdits,
   setAssetArchived,
   setAssetsArchived,
+  setAssetType,
   setAssetIcon,
   setAssetLinkedAudio,
   setAssetPublished,
@@ -44,6 +45,7 @@ import {
   updateUploadAssetAdjustments,
   uploadFiles,
   type AssetAdjustments,
+  type AssetType,
   type ActivityOption,
   type AudioTrimJob,
   type AuthUser,
@@ -325,6 +327,7 @@ export default function UploadPanel({
   const [manageUploaderKey, setManageUploaderKey] = useState("");
   const [manageActivityTag, setManageActivityTag] = useState("");
   const [manageCustomActivity, setManageCustomActivity] = useState("");
+  const [manageAssetType, setManageAssetType] = useState<AssetType>("artwork");
   const [manageIconName, setManageIconName] = useState<string | null>(null);
   const [manageLinkedAudioAssetId, setManageLinkedAudioAssetId] = useState("");
   const [linkedAudioOptions, setLinkedAudioOptions] = useState<LinkedAudioOption[]>(
@@ -2301,6 +2304,7 @@ export default function UploadPanel({
           : "",
     );
     setManageCustomActivity(asset.custom_activity?.trim() ?? "");
+    setManageAssetType(asset.assetType ?? "artwork");
     setManageIconName(asset.iconName ?? null);
     setManageLinkedAudioAssetId(asset.linkedAudioAssetId ?? "");
     setManagePublished(Boolean(asset.published) && !asset.archived);
@@ -2346,6 +2350,7 @@ export default function UploadPanel({
     setManageUploaderKey("");
     setManageActivityTag("");
     setManageCustomActivity("");
+    setManageAssetType("artwork");
     setManageIconName(null);
     setManageLinkedAudioAssetId("");
     setLinkedAudioOptions([]);
@@ -2672,6 +2677,8 @@ export default function UploadPanel({
       manageActivityTag !== selectedActivityMode ||
       (manageActivityTag === CUSTOM_ACTIVITY_OPTION &&
         customActivityValue !== (selectedAsset.custom_activity?.trim() ?? ""));
+    const assetTypeChanged =
+      manageAssetType !== (selectedAsset.assetType ?? "artwork");
     const iconChanged = manageIconName !== (selectedAsset.iconName ?? null);
     const linkedAudioChanged =
       selectedAsset.type === "IMAGE" &&
@@ -2706,6 +2713,7 @@ export default function UploadPanel({
       !displayPlacementChanged &&
       !uploaderChanged &&
       !activityChanged &&
+      !assetTypeChanged &&
       !iconChanged &&
       !linkedAudioChanged &&
       !publishedChanged &&
@@ -2801,6 +2809,9 @@ export default function UploadPanel({
             : null,
           customActivity: customActivityValue || null,
         });
+      }
+      if (assetTypeChanged) {
+        await setAssetType({ assetId, assetType: manageAssetType });
       }
       if (iconChanged)
         await setAssetIcon({ assetId, iconName: manageIconName });
@@ -5498,6 +5509,24 @@ export default function UploadPanel({
                 </option>
               ))}
             </select>
+          </label>
+          <label style={labelStyle}>
+            Asset Type
+            <select
+              value={manageAssetType}
+              onChange={(event) =>
+                setManageAssetType(event.target.value as AssetType)
+              }
+              disabled={!authUser?.authenticated || savingAsset}
+              style={inputStyle}
+            >
+              <option value="artwork">Artwork</option>
+              <option value="process">Process</option>
+            </select>
+            <span style={fieldHelpStyle}>
+              Stored in Immich as an <code>asset_type:…</code> tag. Assets
+              without a tag are treated as artwork.
+            </span>
           </label>
           {manageActivityTag === CUSTOM_ACTIVITY_OPTION && (
             <div style={labelStyle}>
