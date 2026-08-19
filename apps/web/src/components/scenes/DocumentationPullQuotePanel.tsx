@@ -1,4 +1,5 @@
-import { Text } from "@react-three/drei";
+import { Html } from "@react-three/drei";
+import type { CSSProperties } from "react";
 import { useMemo } from "react";
 
 interface DocumentationPullQuotePanelProps {
@@ -35,6 +36,16 @@ export default function DocumentationPullQuotePanel({
   const estimatedQuoteHeight = estimatedQuoteLines * fontSize * 1.35;
   const attributionGap = 0.3;
   const attributionY = -estimatedQuoteHeight - attributionGap - attributionFontSize / 2;
+  const quotePosition: [number, number, number] = [
+    width / 2,
+    -estimatedQuoteHeight / 2,
+    0.018,
+  ];
+  const attributionPosition: [number, number, number] = [
+    width / 2,
+    attributionY,
+    0.018,
+  ];
   const displayQuote = useMemo(
     () => `“${quote.replace(/^[“\"]|[”\"]$/g, "").trim()}”`,
     [quote],
@@ -42,58 +53,64 @@ export default function DocumentationPullQuotePanel({
 
   return (
     <group position={position}>
-      <Text
-        position={[0, 0, 0.018]}
-        renderOrder={1}
-        raycast={() => null}
-        fontSize={fontSize}
-        sdfGlyphSize={128}
-        lineHeight={1.35}
-        maxWidth={width}
-        anchorX="left"
-        anchorY="top"
-        textAlign="left"
-        color="#ffffff"
-        fillOpacity={1}
-        depthOffset={-3}
-        material-transparent
-        material-color="#ffffff"
-        material-opacity={1}
-        material-fog={false}
-        material-depthTest
-        material-depthWrite={false}
-        material-toneMapped={false}
+      <Html
+        position={quotePosition}
+        transform
+        distanceFactor={10}
+        zIndexRange={[12, 0]}
+        pointerEvents="none"
+        style={quoteStyle(width, estimatedQuoteHeight, fontSize)}
       >
         {displayQuote}
-      </Text>
+      </Html>
       {attribution && (
-        <Text
-          position={[width, attributionY, 0.018]}
-          renderOrder={1}
-          raycast={() => null}
-          fontSize={attributionFontSize}
-          sdfGlyphSize={128}
-          lineHeight={1.2}
-          maxWidth={width}
-          anchorX="right"
-          anchorY="middle"
-          textAlign="right"
-          color="#ffffff"
-          fillOpacity={1}
-          depthOffset={-3}
-          material-transparent
-          material-color="#ffffff"
-          material-opacity={1}
-          material-fog={false}
-          material-depthTest
-          material-depthWrite={false}
-          material-toneMapped={false}
+        <Html
+          position={attributionPosition}
+          transform
+          distanceFactor={10}
+          zIndexRange={[12, 0]}
+          pointerEvents="none"
+          style={attributionStyle(width, attributionFontSize)}
         >
           {`— ${attribution}`}
-        </Text>
+        </Html>
       )}
     </group>
   );
+}
+
+function quoteStyle(width: number, height: number, fontSize: number): CSSProperties {
+  return {
+    width: `${width * 100}px`,
+    height: `${height * 100}px`,
+    color: "#ffffff",
+    fontFamily: '"Montserrat", Arial, sans-serif',
+    fontSize: `${fontSize * 100}px`,
+    fontWeight: 400,
+    lineHeight: 1.35,
+    textAlign: "left",
+    whiteSpace: "normal",
+    pointerEvents: "none",
+    userSelect: "none",
+    textShadow: "0 2px 8px rgba(23, 32, 21, 0.65)",
+  };
+}
+
+function attributionStyle(width: number, fontSize: number): CSSProperties {
+  return {
+    width: `${width * 100}px`,
+    height: `${fontSize * 120}px`,
+    color: "#ffffff",
+    fontFamily: '"Montserrat", Arial, sans-serif',
+    fontSize: `${fontSize * 100}px`,
+    fontWeight: 400,
+    lineHeight: 1.2,
+    textAlign: "left",
+    whiteSpace: "normal",
+    pointerEvents: "none",
+    userSelect: "none",
+    textShadow: "0 2px 8px rgba(23, 32, 21, 0.65)",
+  };
 }
 
 function displayQuoteLength(quote: string) {

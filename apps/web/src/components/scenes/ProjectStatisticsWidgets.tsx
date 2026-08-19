@@ -16,7 +16,6 @@ export const PROJECT_STATISTICS_WIDGET_HEIGHT = 1.25;
 export const PROJECT_STATISTICS_TITLE_WIDTH = 6.5;
 export const PROJECT_STATISTICS_TITLE_HEIGHT = 0.8;
 
-const STATISTICS_WIDGET_X_OFFSET = 3;
 const STATISTICS_WIDGETS: Array<{
   key: keyof ProjectStatistics;
   label: string;
@@ -31,6 +30,7 @@ const STATISTICS_WIDGETS: Array<{
 
 const STATISTICS_WIDGET_GAP = 0.9;
 const STATISTICS_WIDGET_Z_OFFSET = 0.08;
+const STATISTICS_WIDGET_Z_INDEX_RANGE: [number, number] = [12, 0];
 
 export function createProjectStatisticsWidgetLayout(
   statistics: ProjectStatistics | undefined,
@@ -84,12 +84,13 @@ export default function ProjectStatisticsWidgets({
   titlePosition?: [number, number, number] | null;
 }) {
   return (
-    <group position={[STATISTICS_WIDGET_X_OFFSET, 0, 0]}>
+    <group>
       {projectLabel && titlePosition && (
         <Html
           position={titlePosition}
           transform
           distanceFactor={10}
+          zIndexRange={STATISTICS_WIDGET_Z_INDEX_RANGE}
           pointerEvents="none"
           style={titleStyle}
         >
@@ -102,6 +103,7 @@ export default function ProjectStatisticsWidgets({
           position={widget.position}
           transform
           distanceFactor={10}
+          zIndexRange={STATISTICS_WIDGET_Z_INDEX_RANGE}
           pointerEvents="none"
           style={widgetStyle}
         >
@@ -118,7 +120,6 @@ export default function ProjectStatisticsWidgets({
 const widgetStyle: CSSProperties = {
   width: `${PROJECT_STATISTICS_WIDGET_WIDTH * 100}px`,
   height: `${PROJECT_STATISTICS_WIDGET_HEIGHT * 100}px`,
-  transform: "translate(-50%, -50%)",
   color: "#ffffff",
   fontFamily: '"Montserrat", Arial, sans-serif',
   textAlign: "center",
@@ -130,7 +131,6 @@ const widgetStyle: CSSProperties = {
 const titleStyle: CSSProperties = {
   width: `${PROJECT_STATISTICS_TITLE_WIDTH * 100}px`,
   height: `${PROJECT_STATISTICS_TITLE_HEIGHT * 100}px`,
-  transform: "translate(-50%, -50%)",
   color: "#ffffff",
   fontFamily: '"Montserrat", Arial, sans-serif',
   fontSize: "1.2rem",
