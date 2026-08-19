@@ -2620,9 +2620,22 @@ const responsiveTopNavStyles = `
     }
 
     .atlas-partner-filter-trigger,
-    .atlas-educator-filter-trigger,
+    .atlas-educator-filter-trigger {
+      height: auto !important;
+      min-height: 40px;
+      padding-top: 8px !important;
+      padding-bottom: 8px !important;
+    }
+
     .atlas-activity-filter-trigger {
       height: 40px !important;
+    }
+
+    .atlas-partner-filter-trigger > span,
+    .atlas-educator-filter-trigger > span {
+      white-space: normal;
+      overflow-wrap: anywhere;
+      line-height: 1.35;
     }
   }
 
