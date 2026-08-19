@@ -1120,12 +1120,6 @@ export default function TerrainGallery({
         quoteTopY - renderedHeight / 2,
         terrainMaxZ ?? focusedPlacementCenter[2],
       ] as [number, number, number],
-      fitBounds: {
-        minX,
-        maxX: quoteLeftX + renderedWidth,
-        minY: Math.min(minY, quoteTopY - renderedHeight),
-        maxY,
-      },
     };
   }, [
     focusedPlacement,
@@ -1150,11 +1144,6 @@ export default function TerrainGallery({
       galleryLoading ||
       !controls?.target
     ) return;
-
-    if (documentationQuoteLayout) {
-      lastFramedActivityFilterRef.current = selectedActivityFilter;
-      return;
-    }
 
     const center = new THREE.Vector3(...activityOrbitRings[0].center);
     center.z += 0.72;
@@ -1202,7 +1191,6 @@ export default function TerrainGallery({
     activityOrbitRings,
     camera,
     controls,
-    documentationQuoteLayout,
     focusedPlacement,
     galleryLoading,
     selectedActivityFilter,
@@ -2092,31 +2080,13 @@ export default function TerrainGallery({
       : THREE.MathUtils.degToRad(50);
     const aspect = camera instanceof THREE.PerspectiveCamera ? camera.aspect : 1;
     const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * aspect);
-    let distance: number;
-    if (documentationQuoteLayout) {
-      const { fitBounds } = documentationQuoteLayout;
-      center.x = (fitBounds.minX + fitBounds.maxX) / 2;
-      center.y = (fitBounds.minY + fitBounds.maxY) / 2;
-      const halfWidth = (fitBounds.maxX - fitBounds.minX) / 2;
-      const halfHeight = (fitBounds.maxY - fitBounds.minY) / 2;
-      distance = THREE.MathUtils.clamp(
-        Math.max(
-          halfWidth * 1.18 / Math.tan(horizontalFov / 2),
-          Math.max(halfHeight, verticalContentRadius) * 1.25
-            / Math.tan(verticalFov / 2),
-        ),
-        2.4,
-        70,
-      );
-    } else {
-      const contentRadius = Math.max(1, outerRadius + 0.75, verticalContentRadius);
-      const limitingFov = Math.min(verticalFov, horizontalFov);
-      distance = THREE.MathUtils.clamp(
-        contentRadius * 1.35 / Math.tan(limitingFov / 2),
-        2.4,
-        70,
-      );
-    }
+    const contentRadius = Math.max(1, outerRadius + 0.75, verticalContentRadius);
+    const limitingFov = Math.min(verticalFov, horizontalFov);
+    const distance = THREE.MathUtils.clamp(
+      contentRadius * 1.35 / Math.tan(limitingFov / 2),
+      2.4,
+      70,
+    );
     const startTarget = controls.target.clone();
     const startPosition = camera.position.clone();
     const direction = startPosition.clone().sub(startTarget).normalize();
@@ -2153,7 +2123,6 @@ export default function TerrainGallery({
     activityOrbitRings,
     camera,
     controls,
-    documentationQuoteLayout,
     focusedPlacement,
     focusedPlacementCenter,
     focusedPlacementGalleryReady,
