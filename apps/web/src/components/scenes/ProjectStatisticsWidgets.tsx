@@ -39,12 +39,12 @@ export function createProjectStatisticsWidgetLayout(
 ): ProjectStatisticsWidgetLayout[] {
   if (!statistics) return [];
 
-  const centerY = (bounds.minY + bounds.maxY) / 2;
   const terrainHeight = Math.max(1, bounds.maxY - bounds.minY);
   const westX = bounds.minX - STATISTICS_WIDGET_GAP - PROJECT_STATISTICS_WIDGET_WIDTH / 2;
   const eastX = bounds.maxX + STATISTICS_WIDGET_GAP + PROJECT_STATISTICS_WIDGET_WIDTH / 2;
-  const upperY = bounds.minY + terrainHeight * 0.7;
-  const lowerY = bounds.minY + terrainHeight * 0.3;
+  const upperY = bounds.maxY - PROJECT_STATISTICS_WIDGET_HEIGHT / 2;
+  const centerY = upperY - terrainHeight * 0.2;
+  const lowerY = upperY - terrainHeight * 0.4;
 
   const positions: Array<[number, number]> = [
     [westX, upperY],
@@ -68,7 +68,7 @@ export function getProjectStatisticsTitlePosition(
   z: number,
 ): [number, number, number] {
   return [
-    (bounds.minX + bounds.maxX) / 2,
+    bounds.minX + PROJECT_STATISTICS_TITLE_WIDTH / 2,
     bounds.maxY + STATISTICS_WIDGET_GAP + PROJECT_STATISTICS_TITLE_HEIGHT / 2,
     z + STATISTICS_WIDGET_Z_OFFSET,
   ];
@@ -137,7 +137,7 @@ const titleStyle: CSSProperties = {
   fontWeight: 800,
   letterSpacing: "0.02em",
   lineHeight: 1,
-  textAlign: "center",
+  textAlign: "left",
   pointerEvents: "none",
   userSelect: "none",
   textShadow: "0 2px 8px rgba(23, 32, 21, 0.65)",

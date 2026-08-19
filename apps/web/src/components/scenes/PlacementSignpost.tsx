@@ -453,6 +453,13 @@ export function getPlacementSignStackHeight(signs: PlacementSign[]) {
   return 1.2 + finalOffset + PLACEMENT_SIGN_SPACING;
 }
 
+export function getPlacementSignStackBottomOffset(signs: PlacementSign[]) {
+  const orderedSigns = orderPlacementSigns(signs);
+  const offsets = getPlacementSignOffsets(orderedSigns);
+  const finalOffset = offsets.at(-1) ?? 0;
+  return SIGN_TOP_OFFSET + finalOffset + SIGN_TIP_LENGTH;
+}
+
 function orderPlacementSigns(signs: PlacementSign[]) {
   const nearbySigns = signs.filter((sign) => sign.direction !== "down");
   const sharedLocationSigns = signs.filter((sign) => sign.direction === "down");

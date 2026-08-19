@@ -6,6 +6,7 @@ interface DocumentationPullQuotePanelProps {
   quote: string;
   position: [number, number, number];
   width: number;
+  height: number;
   attribution?: string;
 }
 
@@ -20,32 +21,11 @@ export default function DocumentationPullQuotePanel({
   quote,
   position,
   width,
+  height,
   attribution,
 }: DocumentationPullQuotePanelProps) {
   const fontSize = getQuoteFontSize(quote);
   const attributionFontSize = Math.max(0.19, fontSize * 0.62);
-  const contentWidth = width;
-  const estimatedCharactersPerLine = Math.max(
-    10,
-    Math.floor(contentWidth / (fontSize * 0.54)),
-  );
-  const estimatedQuoteLines = Math.max(
-    1,
-    Math.ceil(displayQuoteLength(quote) / estimatedCharactersPerLine),
-  );
-  const estimatedQuoteHeight = estimatedQuoteLines * fontSize * 1.35;
-  const attributionGap = 0.3;
-  const attributionY = -estimatedQuoteHeight - attributionGap - attributionFontSize / 2;
-  const quotePosition: [number, number, number] = [
-    width / 2,
-    -estimatedQuoteHeight / 2,
-    0.018,
-  ];
-  const attributionPosition: [number, number, number] = [
-    width / 2,
-    attributionY,
-    0.018,
-  ];
   const displayQuote = useMemo(
     () => `“${quote.replace(/^[“\"]|[”\"]$/g, "").trim()}”`,
     [quote],
@@ -54,35 +34,40 @@ export default function DocumentationPullQuotePanel({
   return (
     <group position={position}>
       <Html
-        position={quotePosition}
+        position={[0, 0, 0.018]}
         transform
         distanceFactor={10}
         zIndexRange={[12, 0]}
         pointerEvents="none"
-        style={quoteStyle(width, estimatedQuoteHeight, fontSize)}
+        style={panelStyle(width, height)}
       >
-        {displayQuote}
+        <div style={quoteStyle(fontSize)}>{displayQuote}</div>
+        {attribution && (
+          <div style={attributionStyle(attributionFontSize)}>
+            {`— ${attribution}`}
+          </div>
+        )}
       </Html>
-      {attribution && (
-        <Html
-          position={attributionPosition}
-          transform
-          distanceFactor={10}
-          zIndexRange={[12, 0]}
-          pointerEvents="none"
-          style={attributionStyle(width, attributionFontSize)}
-        >
-          {`— ${attribution}`}
-        </Html>
-      )}
     </group>
   );
 }
 
-function quoteStyle(width: number, height: number, fontSize: number): CSSProperties {
+function panelStyle(width: number, height: number): CSSProperties {
   return {
     width: `${width * 100}px`,
     height: `${height * 100}px`,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "stretch",
+    justifyContent: "flex-start",
+    overflow: "visible",
+    pointerEvents: "none",
+    userSelect: "none",
+  };
+}
+
+function quoteStyle(fontSize: number): CSSProperties {
+  return {
     color: "#ffffff",
     fontFamily: '"Montserrat", Arial, sans-serif',
     fontSize: `${fontSize * 100}px`,
@@ -90,16 +75,13 @@ function quoteStyle(width: number, height: number, fontSize: number): CSSPropert
     lineHeight: 1.35,
     textAlign: "left",
     whiteSpace: "normal",
-    pointerEvents: "none",
-    userSelect: "none",
     textShadow: "0 2px 8px rgba(23, 32, 21, 0.65)",
   };
 }
 
-function attributionStyle(width: number, fontSize: number): CSSProperties {
+function attributionStyle(fontSize: number): CSSProperties {
   return {
-    width: `${width * 100}px`,
-    height: `${fontSize * 120}px`,
+    marginTop: "0.3rem",
     color: "#ffffff",
     fontFamily: '"Montserrat", Arial, sans-serif',
     fontSize: `${fontSize * 100}px`,
@@ -107,12 +89,6 @@ function attributionStyle(width: number, fontSize: number): CSSProperties {
     lineHeight: 1.2,
     textAlign: "left",
     whiteSpace: "normal",
-    pointerEvents: "none",
-    userSelect: "none",
     textShadow: "0 2px 8px rgba(23, 32, 21, 0.65)",
   };
-}
-
-function displayQuoteLength(quote: string) {
-  return quote.replace(/^[“\"]|[”\"]$/g, "").trim().length + 2;
 }
