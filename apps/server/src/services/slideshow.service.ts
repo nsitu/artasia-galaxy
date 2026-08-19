@@ -66,6 +66,7 @@ export interface SlideshowQuery {
   shuffle?: boolean;
   seed?: number;
   limit?: number;
+  assetType?: AssetType;
   placementFocus?: {
     placementId: number;
     lat: number;
@@ -323,7 +324,7 @@ export async function querySlideshow(
   const [publishedAlbum, allTags, anecdotes] = await Promise.all([
     getPublishedAlbum(),
     listTags(),
-    query.placementFocus
+    query.placementFocus && !query.assetType
       ? getArtasiaAnecdotes({ placementId: query.placementFocus.placementId })
           .catch((err) => {
             console.warn(`[slideshow] continuing without anecdotes: ${(err as Error).message}`);
@@ -599,7 +600,11 @@ export async function querySlideshow(
     ),
   );
 
-  if (query.placementFocus) {
+  if (query.assetType) {
+    photos = photos.filter((photo) => photo.assetType === query.assetType);
+  }
+
+  if (query.placementFocus && !query.assetType) {
     const focusedAnecdotes = query.placementFocus.activityId == null
       ? anecdotes
       : anecdotes.filter(
@@ -615,4 +620,25 @@ export async function querySlideshow(
   const total = photos.length;
 
   return { photos: photos.slice(0, limit), total };
+}
+
+export async function queryPlacementProcessGallery(
+  placementId: number,
+  limit = 500,
+): Promise<Photo[]> {
+  const result = await querySlideshow({
+    limit,
+    shuffle: false,
+    assetType: "process",
+    placementFocus: {
+      placementId,
+      // Placement-focused asset discovery uses the placement ID and tags. The
+      // geographic values are retained here only for the shared query shape.
+      lat: 0,
+      lng: 0,
+      radiusKm: 0,
+    },
+  });
+
+  return result.photos.filter((photo) => photo.mediaKind === "image");
 }

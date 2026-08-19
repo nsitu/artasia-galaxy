@@ -14,6 +14,7 @@ router.post("/query", async (req, res) => {
       shuffle: req.body.shuffle ?? true,
       seed: req.body.seed ?? Date.now(),
       limit: req.body.limit ?? 100,
+      assetType: req.body.assetType,
       placementFocus: req.body.placementFocus,
     });
 

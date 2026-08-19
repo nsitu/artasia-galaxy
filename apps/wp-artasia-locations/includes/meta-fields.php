@@ -454,6 +454,20 @@ function artasia_register_meta_fields(): void
         'show_in_rest' => true,
         'sanitize_callback' => 'sanitize_textarea_field',
     ]);
+    register_post_meta('artasia_document', 'artasia_documentation_gallery_source', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => 'wordpress',
+        'show_in_rest' => [
+            'schema' => [
+                'type' => 'string',
+                'enum' => ['wordpress', 'atlas'],
+            ],
+        ],
+        'sanitize_callback' => static function ($value): string {
+            return $value === 'atlas' ? 'atlas' : 'wordpress';
+        },
+    ]);
     register_post_meta('artasia_document', 'artasia_documentation_gallery_ids', [
         'type'         => 'array',
         'single'       => true,

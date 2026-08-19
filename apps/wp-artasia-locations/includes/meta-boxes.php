@@ -1450,6 +1450,8 @@ function artasia_documentation_meta_box_html(WP_Post $post): void
     $people_id = $people_ids[0] ?? 0;
     $placement_id = $placement_ids[0] ?? 0;
     $pull_quote = get_post_meta($post->ID, 'artasia_documentation_pull_quote', true);
+    $gallery_source = get_post_meta($post->ID, 'artasia_documentation_gallery_source', true);
+    $gallery_source = $gallery_source === 'atlas' ? 'atlas' : 'wordpress';
     $documentation_context = artasia_get_documentation_context($post);
     $documentation_page_id = intval($documentation_context['index_page_id'] ?? 0);
     $documentation_url = '';
@@ -1522,6 +1524,16 @@ function artasia_documentation_meta_box_html(WP_Post $post): void
             <td>
                 <textarea id="artasia_documentation_pull_quote" name="artasia_documentation_pull_quote" rows="4" class="widefat" placeholder="Optional short excerpt"><?php echo esc_textarea($pull_quote); ?></textarea>
                 <p class="description">A concise excerpt that can be highlighted when this documentation is displayed.</p>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_documentation_gallery_source">Gallery source</label></th>
+            <td>
+                <select id="artasia_documentation_gallery_source" name="artasia_documentation_gallery_source" class="widefat">
+                    <option value="wordpress" <?php selected($gallery_source, 'wordpress'); ?>>WordPress gallery</option>
+                    <option value="atlas" <?php selected($gallery_source, 'atlas'); ?>>Atlas process gallery</option>
+                </select>
+                <p class="description">Choose whether this documentation uses its selected WordPress images or published Atlas images tagged as process images for the selected placement.</p>
             </td>
         </tr>
     </table>
@@ -1657,6 +1669,11 @@ function artasia_save_documentation_meta(int $post_id): void
         $post_id,
         'artasia_documentation_pull_quote',
         sanitize_textarea_field($_POST['artasia_documentation_pull_quote'] ?? '')
+    );
+    update_post_meta(
+        $post_id,
+        'artasia_documentation_gallery_source',
+        ($_POST['artasia_documentation_gallery_source'] ?? '') === 'atlas' ? 'atlas' : 'wordpress'
     );
     update_post_meta(
         $post_id,
