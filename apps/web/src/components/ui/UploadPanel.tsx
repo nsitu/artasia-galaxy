@@ -4895,7 +4895,7 @@ export default function UploadPanel({
                   <span style={siteActionIconStyle} aria-hidden="true">
                     edit
                   </span>
-                  Edit
+                  Metadata
                 </a>
               </div>
             </div>
@@ -6795,6 +6795,17 @@ export default function UploadPanel({
                     )}
                   </div>
                   <div style={detailHeaderActionsStyle}>
+                    <a
+                      href={placementEditUrl(selectedPlacement)}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={siteActionLinkStyle}
+                    >
+                      <span style={siteActionIconStyle} aria-hidden="true">
+                        edit
+                      </span>
+                      Metadata
+                    </a>
                     <a
                       href={placementViewerUrl(selectedPlacement)}
                       target="_blank"
