@@ -104,6 +104,7 @@ type SiteScope = "select" | "placement";
 type SiteSort = "alphabetical" | "published-assets";
 type WorkspaceMode = "sites" | "browse" | "edit" | "upload" | "import";
 type BrowseAssetStatus = "draft" | "published" | "archived";
+type BrowseAssetFormat = "" | "image" | "audio" | "video";
 const CUSTOM_ACTIVITY_OPTION = "__custom_activity__";
 type PlacementMetaLine = {
   text: string;
@@ -311,6 +312,8 @@ export default function UploadPanel({
   const browseAssetStatusWasManuallySelectedRef = useRef(false);
   const [siteScope, setSiteScope] = useState<SiteScope>("select");
   const [assetTypeFilter, setAssetTypeFilter] = useState<"" | AssetType>("");
+  const [assetFormatFilter, setAssetFormatFilter] =
+    useState<BrowseAssetFormat>("");
   const [siteSort, setSiteSort] = useState<SiteSort>("published-assets");
   const [siteActivityStats, setSiteActivityStats] = useState<
     SiteActivityStats["sites"]
@@ -649,6 +652,7 @@ export default function UploadPanel({
     setSiteScope(site ? "placement" : "select");
     setActivityTagFilter(site && activity ? String(activity.id) : "");
     setAssetTypeFilter("");
+    setAssetFormatFilter("");
     if (mode === "browse") {
       const hasRequestedStatus = BROWSE_ASSET_STATUSES.some(
         (status) => status.value === requestedStatus,
@@ -1447,6 +1451,7 @@ export default function UploadPanel({
     visiblePlacementIds,
     activityTagFilter,
     assetTypeFilter,
+    assetFormatFilter,
   ]);
 
   useEffect(() => {
@@ -1535,6 +1540,7 @@ export default function UploadPanel({
       visiblePlacementIds,
       activityTagFilter ? parseInt(activityTagFilter, 10) : undefined,
       assetTypeFilter || undefined,
+      assetFormatFilter || undefined,
     )
       .then((assets) => {
         if (!cancelled) {
@@ -1555,6 +1561,7 @@ export default function UploadPanel({
   }, [
     activityTagFilter,
     assetTypeFilter,
+    assetFormatFilter,
     routeSelectionResolved,
     visiblePlacementIds,
     workspaceMode,
@@ -2169,6 +2176,7 @@ export default function UploadPanel({
       visiblePlacementIds,
       activityId,
       assetTypeFilter || undefined,
+      assetFormatFilter || undefined,
     );
 
     request
@@ -6536,6 +6544,25 @@ export default function UploadPanel({
                     <option value="">All assets</option>
                     <option value="artwork">Artwork</option>
                     <option value="process">Process</option>
+                  </select>
+                </label>
+              )}
+
+              {workspaceMode === "browse" && selectedPlacement && (
+                <label style={labelStyle}>
+                  Asset Format
+                  <select
+                    value={assetFormatFilter}
+                    onChange={(event) => {
+                      setAssetFormatFilter(event.target.value as BrowseAssetFormat);
+                      setSelectedAsset(null);
+                    }}
+                    style={inputStyle}
+                  >
+                    <option value="">All formats</option>
+                    <option value="image">Image</option>
+                    <option value="audio">Audio</option>
+                    <option value="video">Video</option>
                   </select>
                 </label>
               )}

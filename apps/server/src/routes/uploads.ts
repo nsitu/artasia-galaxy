@@ -46,7 +46,11 @@ import {
   type AssetType,
 } from "../services/assetType.service.js";
 import { flattenAsset, FlattenValidationError } from "../services/flattenAsset.service.js";
-import { isAudioAsset, parseImmichDuration } from "../services/audioAsset.service.js";
+import {
+  AUDIO_MEDIA_TAG,
+  isAudioAsset,
+  parseImmichDuration,
+} from "../services/audioAsset.service.js";
 import { getAudioWaveform } from "../services/audioWaveform.service.js";
 import {
   createAudioTrimJob,
@@ -1500,6 +1504,15 @@ router.get("/assets", async (req, res) => {
       rawAssetType === "artwork" || rawAssetType === "process"
         ? rawAssetType
         : null;
+    const rawMediaKind = typeof req.query.media_kind === "string"
+      ? req.query.media_kind.trim().toLowerCase()
+      : "";
+    const mediaKind: "image" | "audio" | "video" | null =
+      rawMediaKind === "image" ||
+      rawMediaKind === "audio" ||
+      rawMediaKind === "video"
+        ? rawMediaKind
+        : null;
 
     const [config, tags] = await Promise.all([
       getUploadConfig(),
@@ -1597,6 +1610,39 @@ router.get("/assets", async (req, res) => {
               : !processAssetIds.has(asset.id),
           );
         }
+      }
+    }
+
+    if (mediaKind) {
+      if (embeddedAssetTagsAvailable(assets)) {
+        assets = assets.filter((asset) => {
+          const audio = isAudioAsset(asset);
+          if (mediaKind === "audio") return audio;
+          if (mediaKind === "video") return asset.type === "VIDEO" && !audio;
+          return asset.type === "IMAGE";
+        });
+      } else {
+        const audioTagIds = tags
+          .filter((tag) =>
+            [tag.name, tag.value].some(
+              (value) => value.trim().toLowerCase() === AUDIO_MEDIA_TAG,
+            ),
+          )
+          .map((tag) => tag.id);
+        const audioAssetIds = new Set(
+          audioTagIds.length > 0
+            ? (
+                await Promise.all(audioTagIds.map(searchAdminAssetIdsByTag))
+              ).flat()
+            : [],
+        );
+        assets = assets.filter((asset) => {
+          if (mediaKind === "audio") return audioAssetIds.has(asset.id);
+          if (mediaKind === "video") {
+            return asset.type === "VIDEO" && !audioAssetIds.has(asset.id);
+          }
+          return asset.type === "IMAGE";
+        });
       }
     }
 

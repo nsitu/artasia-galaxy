@@ -362,6 +362,7 @@ export async function fetchPlacementAssetSet(
   placementIds: number[],
   activityId?: number,
   assetType?: AssetType,
+  mediaKind?: "image" | "audio" | "video",
 ): Promise<PlacementAsset[]> {
   if (placementIds.length === 0) return [];
   const params = new URLSearchParams({
@@ -369,6 +370,7 @@ export async function fetchPlacementAssetSet(
   });
   if (activityId != null) params.set("activity_id", String(activityId));
   if (assetType != null) params.set("asset_type", assetType);
+  if (mediaKind != null) params.set("media_kind", mediaKind);
   const res = await fetch(`/api/v1/uploads/assets?${params.toString()}`);
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
