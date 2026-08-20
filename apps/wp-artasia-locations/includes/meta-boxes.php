@@ -1613,7 +1613,7 @@ function artasia_documentation_gallery_meta_box_html(WP_Post $post): void
             <?php endforeach; ?>
         </ul>
     </div>
-    <div class="notice notice-info inline" data-artasia-gallery-source-panel="atlas"<?php echo $gallery_source === 'atlas' ? '' : ' hidden'; ?> aria-hidden="<?php echo $gallery_source === 'atlas' ? 'false' : 'true'; ?>">
+    <div class="artasia-documentation-atlas-panel" data-artasia-gallery-source-panel="atlas"<?php echo $gallery_source === 'atlas' ? '' : ' hidden'; ?> aria-hidden="<?php echo $gallery_source === 'atlas' ? 'false' : 'true'; ?>">
         <p><strong>Atlas process gallery</strong></p>
         <p>Published Atlas assets tagged as <code>Process</code> for the selected placement will be displayed automatically. Upload, tag, publish, and manage those assets in Atlas.</p>
         <p>

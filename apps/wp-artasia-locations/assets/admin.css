@@ -179,6 +179,13 @@
   overflow-wrap: anywhere;
 }
 
+.artasia-documentation-atlas-panel {
+  margin-top: 16px;
+  padding: 1px 12px 12px;
+  border-left: 4px solid #2271b1;
+  background: #f0f6fc;
+}
+
 .artasia-documentation-atlas-preview {
   margin-top: 16px;
 }
