@@ -17,7 +17,9 @@ import {
   removeAssetEdits,
   searchAssetIdsByTag,
   searchAssets,
+  ensureTag,
   tagAsset,
+  tagAssets,
   untagAssets,
   updateAsset,
   updateAssetDescription,
@@ -93,6 +95,15 @@ const assetDetailCache = new Map<string, {
   expiresAt: number;
   value: Awaited<ReturnType<typeof getAsset>>;
 }>();
+
+function parseBulkAssetIds(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
+  const assetIds = Array.from(
+    new Set(value.map((assetId) => String(assetId).trim()).filter(Boolean)),
+  );
+  if (assetIds.length === 0 || assetIds.length > 500) return null;
+  return assetIds;
+}
 
 export interface SiteActivityStatsResponse {
   sites: Record<string, {
@@ -1858,6 +1869,65 @@ router.post("/assets/:assetId/activity-tag", async (req, res) => {
   }
 });
 
+router.post("/assets/activity-tag", async (req, res) => {
+  try {
+    const auth = await getAuthContext(req);
+    if (!auth.authenticated) {
+      res.status(401).json({ error: "Sign in to assign activity tags." });
+      return;
+    }
+
+    const assetIds = parseBulkAssetIds(req.body?.asset_ids);
+    if (!assetIds) {
+      res.status(400).json({ error: "Select between 1 and 500 assets." });
+      return;
+    }
+
+    const rawActivityId = req.body?.activity_id;
+    const activityId = parseInt(String(rawActivityId ?? ""), 10);
+    if (!Number.isFinite(activityId)) {
+      res.status(400).json({ error: "Select a valid activity." });
+      return;
+    }
+
+    const [config, allTags, activityTagNames] = await Promise.all([
+      getUploadConfig(),
+      listTags(),
+      getActivityTagNames(activityId),
+    ]);
+    if (activityTagNames.length === 0) {
+      res.status(400).json({ error: "Unrecognised activity." });
+      return;
+    }
+
+    const activityLabelKeys = new Set(
+      config.activities.map((activity) => activity.label.trim().toLowerCase()),
+    );
+    const activityTagIds = allTags
+      .filter((tag) =>
+        isActivityAnchorTagName(tag.name) || isActivityAnchorTagName(tag.value) ||
+        isCustomActivityTagName(tag.name) || isCustomActivityTagName(tag.value) ||
+        activityLabelKeys.has(tag.name.trim().toLowerCase()) ||
+        activityLabelKeys.has(tag.value.trim().toLowerCase()),
+      )
+      .map((tag) => tag.id);
+    const targetTags = await Promise.all(
+      activityTagNames.map((tagName) => ensureTag(tagName, allTags)),
+    );
+
+    if (activityTagIds.length > 0) {
+      await untagAssets(assetIds, activityTagIds);
+    }
+    await tagAssets(assetIds, targetTags.map((tag) => tag.id));
+    invalidateAdminBrowseIndexes();
+    invalidateSiteActivityStats();
+
+    res.json({ ok: true, asset_ids: assetIds, activity_id: activityId });
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
+});
+
 router.post("/assets/:assetId/asset-type", async (req, res) => {
   try {
     const auth = await getAuthContext(req);
@@ -1892,6 +1962,46 @@ router.post("/assets/:assetId/asset-type", async (req, res) => {
     invalidateAdminBrowseIndexes();
 
     res.json({ ok: true, asset_id: assetId, asset_type: assetType });
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
+});
+
+router.post("/assets/asset-type", async (req, res) => {
+  try {
+    const auth = await getAuthContext(req);
+    if (!auth.authenticated) {
+      res.status(401).json({ error: "Sign in to assign an asset type." });
+      return;
+    }
+
+    const assetIds = parseBulkAssetIds(req.body?.asset_ids);
+    if (!assetIds) {
+      res.status(400).json({ error: "Select between 1 and 500 assets." });
+      return;
+    }
+
+    const assetType = String(req.body?.asset_type ?? "").trim().toLowerCase();
+    if (assetType !== "artwork" && assetType !== "process") {
+      res.status(400).json({ error: "Select a valid asset type." });
+      return;
+    }
+
+    const allTags = await listTags();
+    const existingAssetTypeTagIds = allTags
+      .filter((tag) =>
+        [tag.name, tag.value].some((value) => parseAssetTypeTagValue(value) !== null),
+      )
+      .map((tag) => tag.id);
+    const targetTag = await ensureTag(assetTypeTag(assetType), allTags);
+
+    if (existingAssetTypeTagIds.length > 0) {
+      await untagAssets(assetIds, existingAssetTypeTagIds);
+    }
+    await tagAssets(assetIds, [targetTag.id]);
+    invalidateAdminBrowseIndexes();
+
+    res.json({ ok: true, asset_ids: assetIds, asset_type: assetType });
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });
   }

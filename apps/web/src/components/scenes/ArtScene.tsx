@@ -1909,7 +1909,7 @@ export default function ArtScene() {
                     title="Return to documentation"
                     style={photoLightboxActionLinkStyle}
                   >
-                    <span aria-hidden="true" style={photoLightboxActionIconStyle}>
+                    <span aria-hidden="true" style={photoLightboxMaterialIconStyle}>
                       menu_book
                     </span>
                     <span>Documentation</span>
@@ -3319,6 +3319,19 @@ const photoLightboxActionLinkStyle: React.CSSProperties = {
 const photoLightboxActionIconStyle: React.CSSProperties = {
   width: 16,
   height: 16,
+};
+
+const photoLightboxMaterialIconStyle: React.CSSProperties = {
+  ...photoLightboxActionIconStyle,
+  display: "inline-block",
+  width: "auto",
+  height: "auto",
+  fontFamily: "'Material Symbols Outlined'",
+  fontSize: 18,
+  fontWeight: 400,
+  fontStyle: "normal",
+  fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20",
+  lineHeight: 1,
 };
 
 const photoLightboxMetadataToggleStyle: React.CSSProperties = {

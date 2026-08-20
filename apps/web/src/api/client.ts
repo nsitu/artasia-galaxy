@@ -616,6 +616,26 @@ export async function assignAssetActivityTag(params: {
   }
 }
 
+export async function assignAssetsActivityTag(params: {
+  assetIds: string[];
+  activityId: number;
+}): Promise<string[]> {
+  const res = await fetch("/api/v1/uploads/assets/activity-tag", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      asset_ids: params.assetIds,
+      activity_id: params.activityId,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  const body = await res.json() as { asset_ids?: string[] };
+  return body.asset_ids ?? params.assetIds;
+}
+
 export async function setAssetType(params: {
   assetId: string;
   assetType: "artwork" | "process";
@@ -629,6 +649,26 @@ export async function setAssetType(params: {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(body.error ?? `HTTP ${res.status}`);
   }
+}
+
+export async function setAssetsType(params: {
+  assetIds: string[];
+  assetType: "artwork" | "process";
+}): Promise<string[]> {
+  const res = await fetch("/api/v1/uploads/assets/asset-type", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      asset_ids: params.assetIds,
+      asset_type: params.assetType,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  const body = await res.json() as { asset_ids?: string[] };
+  return body.asset_ids ?? params.assetIds;
 }
 
 export async function setAssetIcon(params: {

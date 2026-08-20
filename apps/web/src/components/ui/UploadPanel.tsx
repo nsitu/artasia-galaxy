@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   assignAssetActivityTag,
+  assignAssetsActivityTag,
   assignAssetDisplayPlacement,
   assignAssetPlacement,
   assignAssetUploader,
@@ -34,6 +35,7 @@ import {
   setAssetArchived,
   setAssetsArchived,
   setAssetType,
+  setAssetsType,
   setAssetIcon,
   setAssetLinkedAudio,
   setAssetPublished,
@@ -356,6 +358,8 @@ export default function UploadPanel({
   const [publishingBrowseAssets, setPublishingBrowseAssets] = useState(false);
   const [archivingBrowseAssets, setArchivingBrowseAssets] = useState(false);
   const [deletingBrowseAssets, setDeletingBrowseAssets] = useState(false);
+  const [taggingBrowseAssets, setTaggingBrowseAssets] = useState(false);
+  const [bulkTagChoice, setBulkTagChoice] = useState("");
   const [publishingItemIds, setPublishingItemIds] = useState<Set<string>>(
     new Set(),
   );
@@ -1928,13 +1932,96 @@ export default function UploadPanel({
     });
   }
 
+  async function tagBrowseAssets(selection: string) {
+    const assetIds = Array.from(selectedBrowseAssetIds);
+    if (
+      assetIds.length === 0 ||
+      taggingBrowseAssets ||
+      publishingBrowseAssets ||
+      archivingBrowseAssets ||
+      deletingBrowseAssets
+    ) return;
+
+    const [tagKind, tagValue] = selection.split(":", 2);
+    const assetType =
+      tagKind === "asset-type" && (tagValue === "artwork" || tagValue === "process")
+        ? tagValue
+        : null;
+    const activityId = tagKind === "activity" ? Number(tagValue) : NaN;
+    const activity = Number.isFinite(activityId)
+      ? options?.activities.find((candidate) => candidate.id === activityId)
+      : undefined;
+    if (!assetType && !activity) return;
+
+    setTaggingBrowseAssets(true);
+    setError(null);
+    try {
+      const taggedIds = assetType
+        ? await setAssetsType({ assetIds, assetType })
+        : await assignAssetsActivityTag({
+            assetIds,
+            activityId: activity!.id,
+          });
+      const taggedIdSet = new Set(taggedIds);
+      if (assetType) {
+        setPlacementAssets((current) =>
+          current.map((asset) =>
+            taggedIdSet.has(asset.id) ? { ...asset, assetType } : asset,
+          ),
+        );
+        setSelectedAsset((current) =>
+          current && taggedIdSet.has(current.id)
+            ? { ...current, assetType }
+            : current,
+        );
+      } else {
+        setPlacementAssets((current) =>
+          current.map((asset) =>
+            taggedIdSet.has(asset.id)
+              ? {
+                  ...asset,
+                  activity_id: activity!.id,
+                  activity_label: activity!.label,
+                  custom_activity: null,
+                }
+              : asset,
+          ),
+        );
+        setSelectedAsset((current) =>
+          current && taggedIdSet.has(current.id)
+            ? {
+                ...current,
+                activity_id: activity!.id,
+                activity_label: activity!.label,
+                custom_activity: null,
+              }
+            : current,
+        );
+      }
+      setSelectedBrowseAssetIds((current) => {
+        const next = new Set(current);
+        taggedIds.forEach((assetId) => next.delete(assetId));
+        return next;
+      });
+      setNotice({
+        tone: "success",
+        message: `${assetType === "process" ? "Marked" : assetType === "artwork" ? "Marked" : "Tagged"} ${taggedIds.length} asset${taggedIds.length === 1 ? "" : "s"} as ${assetType ?? activity!.label}.`,
+      });
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setTaggingBrowseAssets(false);
+    }
+  }
+
   async function publishBrowseAssets(assetIds: string[]) {
     const uniqueAssetIds = Array.from(new Set(assetIds));
     if (
       uniqueAssetIds.length === 0 ||
       publishingBrowseAssets ||
       archivingBrowseAssets ||
-      deletingBrowseAssets
+      deletingBrowseAssets ||
+      taggingBrowseAssets
     ) return;
     setPublishingBrowseAssets(true);
     setError(null);
@@ -1983,7 +2070,8 @@ export default function UploadPanel({
       uniqueAssetIds.length === 0 ||
       archivingBrowseAssets ||
       publishingBrowseAssets ||
-      deletingBrowseAssets
+      deletingBrowseAssets ||
+      taggingBrowseAssets
     ) return;
     setArchivingBrowseAssets(true);
     setError(null);
@@ -2012,7 +2100,8 @@ export default function UploadPanel({
       uniqueAssetIds.length === 0 ||
       deletingBrowseAssets ||
       publishingBrowseAssets ||
-      archivingBrowseAssets
+      archivingBrowseAssets ||
+      taggingBrowseAssets
     ) return;
     const assetLabel = `${uniqueAssetIds.length} selected asset${uniqueAssetIds.length === 1 ? "" : "s"}`;
     if (
@@ -4097,6 +4186,9 @@ export default function UploadPanel({
                 </span>
               </span>
             )}
+            {asset.assetType === "process" && (
+              <span style={processAssetBadgeStyle}>Process</span>
+            )}
             {activityLabel && (
               <span
                 style={{
@@ -4144,7 +4236,8 @@ export default function UploadPanel({
                 disabled={
                   publishingBrowseAssets ||
                   archivingBrowseAssets ||
-                  deletingBrowseAssets
+                  deletingBrowseAssets ||
+                  taggingBrowseAssets
                 }
                 style={inlinePublishButtonStyle}
               >
@@ -4236,11 +4329,43 @@ export default function UploadPanel({
             </span>
             <div style={detailHeaderActionsStyle}>
               <span style={withSelectedLabelStyle}>With selected</span>
+              <select
+                aria-label="Tag selected assets"
+                value={bulkTagChoice}
+                onChange={(event) => {
+                  const selection = event.target.value;
+                  setBulkTagChoice("");
+                  if (selection) void tagBrowseAssets(selection);
+                }}
+                disabled={
+                  taggingBrowseAssets ||
+                  publishingBrowseAssets ||
+                  archivingBrowseAssets ||
+                  deletingBrowseAssets
+                }
+                style={bulkTagSelectStyle}
+              >
+                <option value="">{taggingBrowseAssets ? "Tagging..." : "Tag Asset"}</option>
+                <optgroup label="Asset type">
+                  <option value="asset-type:process">Process</option>
+                  <option value="asset-type:artwork">Artwork</option>
+                </optgroup>
+                {(options?.activities ?? []).length > 0 && (
+                  <optgroup label="Activity">
+                    {(options?.activities ?? []).map((activity) => (
+                      <option key={activity.id} value={`activity:${activity.id}`}>
+                        {activity.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
               <button
                 type="button"
                 onClick={() => void publishBrowseAssets(selectedDraftAssetIds)}
                 disabled={
                   selectedDraftAssetIds.length === 0 ||
+                  taggingBrowseAssets ||
                   publishingBrowseAssets ||
                   archivingBrowseAssets ||
                   deletingBrowseAssets
@@ -4254,6 +4379,7 @@ export default function UploadPanel({
                 onClick={() => void archiveBrowseAssets(Array.from(selectedBrowseAssetIds))}
                 disabled={
                   browseAssetStatus === "archived" ||
+                  taggingBrowseAssets ||
                   archivingBrowseAssets ||
                   publishingBrowseAssets ||
                   deletingBrowseAssets
@@ -4269,6 +4395,7 @@ export default function UploadPanel({
                 }
                 disabled={
                   deletingBrowseAssets ||
+                  taggingBrowseAssets ||
                   archivingBrowseAssets ||
                   publishingBrowseAssets
                 }
@@ -8028,6 +8155,16 @@ const withSelectedLabelStyle: React.CSSProperties = {
   whiteSpace: "nowrap",
 };
 
+const bulkTagSelectStyle: React.CSSProperties = {
+  color: "#eef3ff",
+  background: "#202b43",
+  border: "1px solid rgba(158, 190, 255, 0.55)",
+  borderRadius: 4,
+  padding: "7px 10px",
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+};
+
 const assetImageStyle: React.CSSProperties = {
   width: "100%",
   height: "100%",
@@ -8414,6 +8551,13 @@ const activityAssetBadgeStyle: React.CSSProperties = {
   background: "rgba(51, 65, 85, 0.94)",
   border: "1px solid rgba(203, 213, 225, 0.68)",
   color: "#f1f5f9",
+};
+
+const processAssetBadgeStyle: React.CSSProperties = {
+  ...activityAssetBadgeStyle,
+  background: "rgba(126, 87, 194, 0.94)",
+  borderColor: "rgba(221, 214, 254, 0.82)",
+  color: "#fff",
 };
 
 function readableBadgeTextColour(background: string) {
