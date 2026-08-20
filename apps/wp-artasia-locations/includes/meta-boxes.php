@@ -1668,16 +1668,6 @@ function artasia_validate_related_post_ids($values, string $post_type): array
     }));
 }
 
-function artasia_validate_image_attachment_ids($values): array
-{
-    $ids = artasia_sanitize_integer_array_meta($values);
-
-    return array_values(array_filter($ids, static function (int $attachment_id): bool {
-        return get_post_type($attachment_id) === 'attachment'
-            && strpos((string) get_post_mime_type($attachment_id), 'image/') === 0;
-    }));
-}
-
 function artasia_save_documentation_meta(int $post_id): void
 {
     if (!isset($_POST['artasia_documentation_meta_nonce']) || !wp_verify_nonce($_POST['artasia_documentation_meta_nonce'], 'artasia_documentation_meta')) {
@@ -1705,7 +1695,6 @@ function artasia_save_documentation_meta(int $post_id): void
         'artasia_documentation_pull_quote',
         sanitize_textarea_field($_POST['artasia_documentation_pull_quote'] ?? '')
     );
-    update_post_meta($post_id, 'artasia_documentation_gallery_source', 'atlas');
 }
 add_action('save_post_artasia_document', 'artasia_save_documentation_meta');
 

@@ -454,45 +454,6 @@ function artasia_register_meta_fields(): void
         'show_in_rest' => true,
         'sanitize_callback' => 'sanitize_textarea_field',
     ]);
-    register_post_meta('artasia_document', 'artasia_documentation_gallery_source', [
-        'type'         => 'string',
-        'single'       => true,
-        'default'      => 'wordpress',
-        'show_in_rest' => [
-            'schema' => [
-                'type' => 'string',
-                'enum' => ['wordpress', 'atlas'],
-            ],
-        ],
-        'sanitize_callback' => static function ($value): string {
-            return $value === 'atlas' ? 'atlas' : 'wordpress';
-        },
-    ]);
-    register_post_meta('artasia_document', 'artasia_documentation_gallery_ids', [
-        'type'         => 'array',
-        'single'       => true,
-        'default'      => [],
-        'show_in_rest' => [
-            'schema' => [
-                'type'  => 'array',
-                'items' => ['type' => 'integer'],
-            ],
-        ],
-        'sanitize_callback' => 'artasia_sanitize_integer_array_meta',
-    ]);
-    register_post_meta('artasia_document', 'artasia_documentation_gallery_captions', [
-        'type'         => 'array',
-        'single'       => true,
-        'default'      => [],
-        'show_in_rest' => [
-            'schema' => [
-                'type'  => 'array',
-                'items' => ['type' => 'string'],
-            ],
-        ],
-        'sanitize_callback' => 'artasia_sanitize_text_array_meta',
-    ]);
-
     // --- Learning Anecdote meta ---
     register_post_meta('artasia_anecdote', 'artasia_anecdote_placement_id', [
         'type'         => 'integer',
@@ -562,15 +523,6 @@ function artasia_sanitize_integer_array_meta($value, string $meta_key = '', stri
     }
 
     return array_values(array_unique(array_filter(array_map('intval', $value))));
-}
-
-function artasia_sanitize_text_array_meta($value, string $meta_key = '', string $object_type = '', string $object_subtype = ''): array
-{
-    if (!is_array($value)) {
-        return [];
-    }
-
-    return array_map('sanitize_textarea_field', array_values($value));
 }
 
 function artasia_sanitize_instagram_handle($value, string $meta_key = '', string $object_type = '', string $object_subtype = ''): string

@@ -219,7 +219,7 @@ function artasia_render_documentation_article(WP_Post $document, string $partner
             <?php endif; ?>
         </header>
         <div class="artasia-documentation__body"><?php echo $content; ?></div>
-        <?php echo artasia_render_documentation_gallery($document->ID); ?>
+        <?php echo artasia_render_atlas_documentation_gallery($document->ID); ?>
     </article>
 <?php
 

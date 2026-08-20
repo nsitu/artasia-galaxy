@@ -4,11 +4,6 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-function artasia_render_documentation_gallery(int $post_id): string
-{
-    return artasia_render_atlas_documentation_gallery($post_id);
-}
-
 function artasia_render_atlas_documentation_gallery(int $post_id): string
 {
     $placement_ids = artasia_validate_related_post_ids(
@@ -26,10 +21,9 @@ function artasia_render_atlas_documentation_gallery(int $post_id): string
     $endpoint = rest_url('artasia/v1/documentation/' . $post_id . '/process-gallery');
 
     return sprintf(
-        '<section id="%1$s" class="artasia-documentation-gallery artasia-documentation-gallery--atlas" data-gallery-source="atlas" data-atlas-endpoint="%2$s" data-placement-id="%3$d" aria-label="Documentation gallery"><p class="screen-reader-text" data-gallery-status aria-live="polite">Loading process gallery.</p></section>',
+        '<section id="%1$s" class="artasia-documentation-gallery artasia-documentation-gallery--atlas" data-atlas-endpoint="%2$s" aria-label="Documentation gallery"><p class="screen-reader-text" data-gallery-status aria-live="polite">Loading process gallery.</p></section>',
         esc_attr($gallery_id),
-        esc_url($endpoint),
-        $placement_id
+        esc_url($endpoint)
     );
 }
 
@@ -39,7 +33,7 @@ function artasia_append_documentation_gallery(string $content): string
         return $content;
     }
 
-    return $content . artasia_render_documentation_gallery((int) get_the_ID());
+    return $content . artasia_render_atlas_documentation_gallery((int) get_the_ID());
 }
 add_filter('the_content', 'artasia_append_documentation_gallery', 20);
 

@@ -60,23 +60,6 @@ export interface WpProject {
   };
 }
 
-export interface WpDocumentationGalleryAsset {
-  attachment_id: number;
-  file_name: string;
-  caption: string;
-  alt: string;
-  source_url: string;
-  mime_type: string;
-}
-
-export interface WpDocumentationGallery {
-  document_id: number;
-  document_slug: string;
-  document_title: string;
-  placement_ids: number[];
-  assets: WpDocumentationGalleryAsset[];
-}
-
 export interface WpArtasiaPlacement {
   placement_id: number;
   placement_name: string;
@@ -125,12 +108,6 @@ let lastKnownGood: WpArtasiaPlacement[] | null = null;
 
 let projectCache: { data: WpProject[]; timestamp: number } | null = null;
 let projectLastKnownGood: WpProject[] | null = null;
-
-let documentationGalleryCache: {
-  data: WpDocumentationGallery[];
-  timestamp: number;
-} | null = null;
-let documentationGalleryLastKnownGood: WpDocumentationGallery[] | null = null;
 
 let uploadTagCache: { data: WpActivityInfo[]; timestamp: number } | null = null;
 let uploadTagLastKnownGood: WpActivityInfo[] | null = null;
@@ -254,46 +231,6 @@ export async function getArtasiaProjects({
     }
     throw err;
   }
-}
-
-export async function getArtasiaDocumentationGalleries({
-  forceFresh = false,
-}: { forceFresh?: boolean } = {}): Promise<WpDocumentationGallery[]> {
-  if (
-    !forceFresh &&
-    documentationGalleryCache &&
-    Date.now() - documentationGalleryCache.timestamp < CACHE_TTL_MS
-  ) {
-    return documentationGalleryCache.data;
-  }
-
-  try {
-    const res = await wpRequest("/wp-json/artasia/v1/documentation-galleries");
-    const data = (await res.json()) as WpDocumentationGallery[];
-    documentationGalleryCache = { data, timestamp: Date.now() };
-    documentationGalleryLastKnownGood = data;
-    return data;
-  } catch (err) {
-    console.warn(`[WordPress] failed to fetch documentation galleries: ${(err as Error).message}`);
-    if (!forceFresh && documentationGalleryLastKnownGood) {
-      console.warn("[WordPress] serving last-known-good documentation galleries");
-      return documentationGalleryLastKnownGood;
-    }
-    throw err;
-  }
-}
-
-export async function migrateArtasiaDocumentationGalleries(documentIds: number[]): Promise<{
-  updated: number[];
-  skipped: number[];
-}> {
-  if (!RECONCILE_SECRET) {
-    throw new Error("RECONCILE_SECRET is not configured for WordPress gallery migration.");
-  }
-  const res = await wpPost("/wp-json/artasia/v1/documentation-galleries/migrate", {
-    document_ids: documentIds,
-  });
-  return res.json() as Promise<{ updated: number[]; skipped: number[] }>;
 }
 
 export async function getArtasiaAnecdotes({

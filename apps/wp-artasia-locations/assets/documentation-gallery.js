@@ -186,7 +186,6 @@
   window.artasiaInitDocumentationGalleries = function (root) {
     var scope = root || document;
     scope.querySelectorAll('.artasia-documentation-gallery--atlas').forEach(initializeAtlasGallery);
-    scope.querySelectorAll('.artasia-documentation-gallery').forEach(initializeGallery);
   };
 
   document.addEventListener('DOMContentLoaded', function () {
