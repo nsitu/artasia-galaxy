@@ -26,7 +26,6 @@ import {
   fetchUploadOptions,
   fetchUploadAssetAdjustments,
   fetchUploadAsset,
-  fetchUntaggedPlacementAssets,
   lookupMissingUploadAssetDriveSources,
   lookupUploadAssetDriveSource,
   logoutAuthUser,
@@ -101,7 +100,7 @@ type DeliveryDayFilter =
   | "wednesday"
   | "thursday"
   | "friday";
-type SiteScope = "select" | "all" | "placement";
+type SiteScope = "select" | "placement";
 type SiteSort = "alphabetical" | "published-assets";
 type WorkspaceMode = "sites" | "browse" | "edit" | "upload" | "import";
 type BrowseAssetStatus = "draft" | "published" | "archived";
@@ -289,9 +288,6 @@ export default function UploadPanel({
   const [activityTagFilter, setActivityTagFilter] = useState("");
   const [items, setItems] = useState<UploadItem[]>([]);
   const [placementAssets, setPlacementAssets] = useState<PlacementAsset[]>([]);
-  const [assetMode, setAssetMode] = useState<"placements" | "untagged">(
-    "placements",
-  );
   const [browseAssetStatus, setBrowseAssetStatus] = useState<BrowseAssetStatus>(
     () => {
       const requestedStatus = new URLSearchParams(
@@ -633,7 +629,6 @@ export default function UploadPanel({
     const params = new URLSearchParams(appSearch);
     const requestedSite = params.get("site");
     const requestedSiteId = Number(requestedSite);
-    const requestedUntagged = mode === "browse" && requestedSite === "untagged";
     const requestedActivityId = Number(params.get("activity"));
     const requestedStatus = params.get("status");
     const site = options.placements.find(
@@ -650,9 +645,8 @@ export default function UploadPanel({
     );
 
     setPlacementKey(site ? String(site.placement_id) : "");
-    setSiteScope(site ? "placement" : mode === "browse" && !requestedUntagged ? "all" : "select");
-    setAssetMode(requestedUntagged ? "untagged" : "placements");
-    setActivityTagFilter(!requestedUntagged && activity ? String(activity.id) : "");
+    setSiteScope(site ? "placement" : "select");
+    setActivityTagFilter(site && activity ? String(activity.id) : "");
     if (mode === "browse") {
       const hasRequestedStatus = BROWSE_ASSET_STATUSES.some(
         (status) => status.value === requestedStatus,
@@ -1276,7 +1270,6 @@ export default function UploadPanel({
     const placementId = String(driveFolderPlacement.placement_id);
     setPlacementKey(placementId);
     setSiteScope("placement");
-    setAssetMode("placements");
     setActivityTagFilter("");
     setSelectedAsset(null);
     setItems([]);
@@ -1364,21 +1357,6 @@ export default function UploadPanel({
     return existingPlacementDriveFileIds.has(file.id);
   }
 
-  const browsePlacementOptions = useMemo(() => {
-    const placements =
-      selectedPlacement &&
-      !filteredPlacements.some(
-        (placement) =>
-          placement.placement_id === selectedPlacement.placement_id,
-      )
-        ? [selectedPlacement, ...filteredPlacements]
-        : filteredPlacements;
-
-    return [...placements].sort((a, b) =>
-      placementLabel(a).localeCompare(placementLabel(b)),
-    );
-  }, [filteredPlacements, selectedPlacement]);
-
   const selectedActivityLabel = selectedActivity?.label ?? null;
 
   const browseAssetStatusCounts = useMemo(
@@ -1426,12 +1404,8 @@ export default function UploadPanel({
   }, [displayedPlacementAssets]);
 
   const browseBreadcrumbParents = useMemo(() => {
-    return [
-      browsePartnerKey.trim() || null,
-      selectedUploader?.name ?? null,
-      selectedActivityLabel,
-    ].filter((label): label is string => Boolean(label));
-  }, [browsePartnerKey, selectedActivityLabel, selectedUploader]);
+    return selectedActivityLabel ? [selectedActivityLabel] : [];
+  }, [selectedActivityLabel]);
 
   const hasActiveSiteFilters = Boolean(
     uploaderKey ||
@@ -1445,19 +1419,10 @@ export default function UploadPanel({
 
   const visiblePlacementIds = useMemo(() => {
     if (workspaceMode === "edit") return [];
-    if (assetMode === "untagged") return [];
-    if (
-      siteScope === "all" ||
-      (workspaceMode === "browse" && siteScope === "select")
-    ) {
-      return filteredPlacements.map((placement) => placement.placement_id);
-    }
     if (siteScope === "placement" && selectedPlacement)
       return [selectedPlacement.placement_id];
     return [];
   }, [
-    assetMode,
-    filteredPlacements,
     selectedPlacement,
     siteScope,
     workspaceMode,
@@ -1477,7 +1442,6 @@ export default function UploadPanel({
   }, [
     mediaRefreshAssetId,
     mediaRefreshAttempt,
-    assetMode,
     visiblePlacementIds,
     activityTagFilter,
   ]);
@@ -1490,7 +1454,7 @@ export default function UploadPanel({
   }, [selectedPlacement, siteScope]);
 
   useEffect(() => {
-    if (workspaceMode === "upload" || workspaceMode === "import") return;
+    if (workspaceMode !== "sites") return;
     if (!browsePartnerKey) return;
     if (
       browsePartnerOptions.some(
@@ -1526,7 +1490,7 @@ export default function UploadPanel({
   }, [ageRangeFilter, ageRangeOptions, workspaceMode]);
 
   useEffect(() => {
-    if (workspaceMode === "upload" || workspaceMode === "import") return;
+    if (workspaceMode !== "sites") return;
     if (!uploaderKey) return;
     if (
       browseUploaderOptions.some(
@@ -1556,30 +1520,9 @@ export default function UploadPanel({
       setAssetsLoading(false);
       return;
     }
-    if (assetMode === "untagged") {
-      let cancelled = false;
-      setAssetsLoading(true);
-      fetchUntaggedPlacementAssets()
-        .then((assets) => {
-          if (!cancelled) {
-            setPlacementAssets(assets);
-            applyAutomaticBrowseAssetStatus(assets);
-          }
-        })
-        .catch((err) => {
-          if (!cancelled) setError((err as Error).message);
-        })
-        .finally(() => {
-          if (!cancelled) setAssetsLoading(false);
-        });
-
-      return () => {
-        cancelled = true;
-      };
-    }
-
     if (visiblePlacementIds.length === 0) {
       setPlacementAssets([]);
+      setAssetsLoading(false);
       return;
     }
 
@@ -1607,7 +1550,6 @@ export default function UploadPanel({
     };
   }, [
     activityTagFilter,
-    assetMode,
     routeSelectionResolved,
     visiblePlacementIds,
     workspaceMode,
@@ -2140,7 +2082,6 @@ export default function UploadPanel({
   function selectPlacement(placement: UploadOptions["placements"][number]) {
     setPlacementKey(String(placement.placement_id));
     setSiteScope("placement");
-    setAssetMode("placements");
     setSelectedAsset(null);
     setItems([]);
     setNotice(null);
@@ -2213,16 +2154,13 @@ export default function UploadPanel({
       ? parseInt(activityTagFilter, 10)
       : undefined;
 
-    if (assetMode !== "untagged" && visiblePlacementIds.length === 0) {
+    if (visiblePlacementIds.length === 0) {
       setPlacementAssets([]);
       setAssetsLoading(false);
       return;
     }
 
-    const request =
-      assetMode === "untagged"
-        ? fetchUntaggedPlacementAssets()
-        : fetchPlacementAssetSet(visiblePlacementIds, activityId);
+    const request = fetchPlacementAssetSet(visiblePlacementIds, activityId);
 
     request
       .then((assets) => {
@@ -6143,6 +6081,8 @@ export default function UploadPanel({
     );
   }
 
+  const browseNeedsSite = workspaceMode === "browse" && !selectedPlacement;
+
   return (
     <main style={pageStyle}>
       <style>
@@ -6383,7 +6323,6 @@ export default function UploadPanel({
               setWorkspaceMode("upload");
               setBrowsePartnerKey("");
               setSelectedAsset(null);
-              setAssetMode("placements");
               setNotice(null);
               setApplicationPath("/admin/upload", true);
             }}
@@ -6404,7 +6343,6 @@ export default function UploadPanel({
             onClick={() => {
               setBrowsePartnerKey("");
               setSelectedAsset(null);
-              setAssetMode("placements");
               setSelectedDriveFiles(new Set());
               setApplicationPath("/admin/import", true);
             }}
@@ -6436,13 +6374,17 @@ export default function UploadPanel({
         <div
           className="atlas-admin-layout"
           style={
-            workspaceMode === "edit"
+            workspaceMode === "edit" || browseNeedsSite
               ? { ...adminLayoutStyle, gridTemplateColumns: "minmax(0, 1fr)" }
               : adminLayoutStyle
           }
         >
-          {workspaceMode !== "edit" && (
-            <aside className="atlas-admin-filters" style={placementMenuStyle}>
+          {(workspaceMode === "sites" ||
+            workspaceMode === "upload" ||
+            workspaceMode === "import" ||
+            (workspaceMode === "browse" && selectedPlacement)) &&
+            !browseNeedsSite && (
+              <aside className="atlas-admin-filters" style={placementMenuStyle}>
               {workspaceMode === "sites" && (
                 <label style={labelStyle}>
                   <span style={filterLabelWithIconStyle}>
@@ -6489,75 +6431,7 @@ export default function UploadPanel({
                 </label>
               )}
 
-              {workspaceMode === "browse" && (
-                <label style={labelStyle}>
-                  Artasia Site
-                  <select
-                    value={
-                      assetMode === "untagged"
-                        ? "untagged"
-                        : selectedPlacement
-                          ? String(selectedPlacement.placement_id)
-                          : ""
-                    }
-                    onChange={(e) => {
-                      const nextPlacementKey = e.target.value;
-                      const nextParams = new URLSearchParams();
-                      if (nextPlacementKey === "untagged") {
-                        nextParams.set("site", "untagged");
-                      } else if (nextPlacementKey) {
-                        nextParams.set("site", nextPlacementKey);
-                      }
-                      if (activityTagFilter && nextPlacementKey !== "untagged") {
-                        nextParams.set("activity", activityTagFilter);
-                      }
-                      if (nextPlacementKey === "untagged") {
-                        setPlacementKey("");
-                        setSiteScope("select");
-                        setAssetMode("untagged");
-                        setUploaderKey("");
-                        setActivityTagFilter("");
-                        setBrowseContextFilter("all");
-                        setDeliveryDayFilter("");
-                        setTimeOfDayFilter("");
-                        setAgeRangeFilter("");
-                        setBrowsePartnerKey("");
-                      } else if (!nextPlacementKey) {
-                        setPlacementKey("");
-                        setSiteScope("all");
-                        setAssetMode("placements");
-                      } else {
-                        setPlacementKey(nextPlacementKey);
-                        setSiteScope("placement");
-                        setAssetMode("placements");
-                      }
-                      const nextQuery = nextParams.toString();
-                      setApplicationPath(
-                        `/admin/browse${nextQuery ? `?${nextQuery}` : ""}`,
-                        true,
-                        false,
-                      );
-                      setSelectedAsset(null);
-                      setItems([]);
-                      setNotice(null);
-                    }}
-                    style={inputStyle}
-                  >
-                    <option value="">All Sites</option>
-                    <option value="untagged">No Site (Untagged)</option>
-                    {browsePlacementOptions.map((placement) => (
-                      <option
-                        key={placement.placement_id}
-                        value={String(placement.placement_id)}
-                      >
-                        {placementLabel(placement)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-
-              {workspaceMode !== "upload" && workspaceMode !== "import" && (
+              {workspaceMode === "sites" && (
                 <label style={labelStyle}>
                   Team Member
                   <select
@@ -6595,7 +6469,9 @@ export default function UploadPanel({
                 </label>
               )}
 
-              {workspaceMode !== "sites" && (
+              {((workspaceMode === "browse" && selectedPlacement) ||
+                workspaceMode === "upload" ||
+                workspaceMode === "import") && (
                 <>
                   <label style={labelStyle}>
                     {workspaceMode === "upload" || workspaceMode === "import"
@@ -6637,7 +6513,7 @@ export default function UploadPanel({
                 </>
               )}
 
-              {workspaceMode !== "upload" && workspaceMode !== "import" && (
+              {workspaceMode === "sites" && (
                 <label style={labelStyle}>
                   Program Context
                   <select
@@ -6671,7 +6547,7 @@ export default function UploadPanel({
                 </label>
               )}
 
-              {workspaceMode !== "upload" && workspaceMode !== "import" && (
+              {workspaceMode === "sites" && (
                 <label style={labelStyle}>
                   Artasia Partner
                   <select
@@ -6821,7 +6697,7 @@ export default function UploadPanel({
                 </div>
               )}
 
-            </aside>
+              </aside>
           )}
 
           <section
@@ -6961,34 +6837,7 @@ export default function UploadPanel({
                 {renderAssetGrid("No uploads tagged to this placement yet.")}
               </>
             ) : (
-              <>
-                <div style={detailHeaderStyle}>
-                  {assetMode === "placements" ? (
-                    renderSiteBreadcrumb("All Sites", browseBreadcrumbParents)
-                  ) : (
-                    <h2 style={detailTitleStyle}>No Site (Untagged)</h2>
-                  )}
-                  <div style={detailHeaderActionsStyle}>
-                    <div style={countBadgeStyle}>
-                      {assetsLoading ? "..." : placementAssets.length} upload
-                      {placementAssets.length === 1 ? "" : "s"}
-                    </div>
-                    {renderDriveMaintenanceButton()}
-                    <button
-                      type="button"
-                      onClick={refreshVisibleAssets}
-                      style={secondaryButtonStyle}
-                    >
-                      Refresh
-                    </button>
-                  </div>
-                </div>
-                {renderAssetGrid(
-                  assetMode === "untagged"
-                    ? "No uploads need placement right now."
-                    : "No uploads tagged to the visible placements yet.",
-                )}
-              </>
+              renderChooseSitePrompt("browse")
             )}
           </section>
         </div>
