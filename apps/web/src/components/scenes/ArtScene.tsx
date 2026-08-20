@@ -185,7 +185,8 @@ function LightboxMedia({
   activityColour,
   hasNavigation,
   wordpressEditUrl,
-  documentationUrl,
+  documentationPlacement,
+  onDocumentationOpen,
   style,
   onClick,
 }: {
@@ -196,7 +197,8 @@ function LightboxMedia({
   activityColour?: string;
   hasNavigation: boolean;
   wordpressEditUrl?: string;
-  documentationUrl?: string;
+  documentationPlacement?: MapPlacement;
+  onDocumentationOpen?: (placement: MapPlacement) => void;
   style: React.CSSProperties;
   onClick: React.MouseEventHandler<HTMLElement>;
 }) {
@@ -259,24 +261,25 @@ function LightboxMedia({
             — {photo.attribution}
           </footer>
         )}
-        {active && (wordpressEditUrl || documentationUrl) && (
+        {active && (wordpressEditUrl || documentationPlacement) && (
           <div
             style={anecdoteLightboxActionsStyle}
             onClick={(event) => event.stopPropagation()}
           >
-            {documentationUrl && (
-              <a
-                href={documentationUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+            {documentationPlacement && onDocumentationOpen && (
+              <button
+                type="button"
+                onClick={() => onDocumentationOpen(documentationPlacement)}
+                aria-label="View documentation"
+                title="View documentation"
                 className="atlas-control-surface"
                 style={anecdoteLightboxActionLinkStyle}
               >
                 <span aria-hidden="true" style={anecdoteLightboxActionIconStyle}>
-                  open_in_new
+                  menu_book
                 </span>
                 <span>Documentation</span>
-              </a>
+              </button>
             )}
             {wordpressEditUrl && (
               <a
@@ -732,11 +735,13 @@ export default function ArtScene() {
     authUser?.authenticated
     ? getWordPressPostEditUrl(selectedPhoto.wordpressPostId)
     : undefined;
-  const selectedAnecdoteDocumentationUrl = selectedPhoto?.mediaKind === "anecdote" &&
+  const selectedAnecdoteDocumentationPlacement = selectedPhoto?.mediaKind === "anecdote" &&
     focusedPlacementDetails &&
     (selectedPhoto.placementId == null ||
       selectedPhoto.placementId === focusedPlacementDetails.placement_id)
-    ? focusedPlacementDetails.documentation_url?.trim() || undefined
+    ? focusedPlacementDetails.documentation_content_html?.trim()
+      ? focusedPlacementDetails
+      : undefined
     : undefined;
   const selectedPhotoActivities = selectedPhoto?.activityIds
     ?.map((activityId) =>
@@ -1121,6 +1126,10 @@ export default function ArtScene() {
         setDocumentationProcessAssetsLoading(false);
       });
   }, []);
+  const handleAnecdoteDocumentationOpen = useCallback((placement: MapPlacement) => {
+    selectPhoto(null);
+    handleDocumentationOpen(placement);
+  }, [handleDocumentationOpen, selectPhoto]);
   const handleProcessAssetClick = useCallback((asset: ProcessGalleryAsset) => {
     selectPhoto(null);
     setProcessLightboxPhotoId(asset.id);
@@ -1697,7 +1706,8 @@ export default function ArtScene() {
                   activityColour={selectedPhotoActivityColour}
                   hasNavigation={lightboxPhotos.length > 1}
                   wordpressEditUrl={selectedAnecdoteEditUrl}
-                  documentationUrl={selectedAnecdoteDocumentationUrl}
+                  documentationPlacement={selectedAnecdoteDocumentationPlacement}
+                  onDocumentationOpen={handleAnecdoteDocumentationOpen}
                   style={{
                     ...photoLightboxImageStyle,
                     ...photoAdjustmentFilterStyle(selectedPhoto.adjustments),

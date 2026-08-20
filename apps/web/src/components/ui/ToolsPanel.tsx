@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import {
   fetchAuthUser,
+  lookupMissingUploadAssetDriveSources,
   logoutAuthUser,
   type AuthUser,
 } from "../../api/client";
+
+type NoticeTone = "success" | "warning";
 
 const tabs = [
   { href: "/admin", label: "Sites", icon: "location_on" },
@@ -17,6 +20,11 @@ const tabs = [
 export default function ToolsPanel({ initialError }: { initialError?: string | null }) {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [error, setError] = useState(initialError ?? "");
+  const [notice, setNotice] = useState<{
+    tone: NoticeTone;
+    message: string;
+  } | null>(null);
+  const [driveLookupRunning, setDriveLookupRunning] = useState(false);
 
   useEffect(() => {
     void fetchAuthUser()
@@ -29,6 +37,52 @@ export default function ToolsPanel({ initialError }: { initialError?: string | n
       await logoutAuthUser();
     } finally {
       window.location.href = "/admin";
+    }
+  }
+
+  async function lookupMissingDriveSources() {
+    if (!authUser?.authenticated) {
+      setError("Sign in with Google to look up Drive files.");
+      return;
+    }
+    if (!window.confirm("Look up Google Drive files for every unlinked asset? This may take a while.")) {
+      return;
+    }
+
+    setDriveLookupRunning(true);
+    setError("");
+    setNotice(null);
+    try {
+      const summary = await lookupMissingUploadAssetDriveSources();
+      console.groupCollapsed(
+        `[Drive maintenance] scanned ${summary.scanned} assets: linked ${summary.linked}, not found ${summary.notFound}, ambiguous ${summary.ambiguous}, skipped ${summary.skipped}, failed ${summary.failed}`,
+      );
+      console.table(summary.results.map((result) => ({
+        status: result.status,
+        assetId: result.assetId,
+        fileName: result.fileName,
+        placement: result.placementName
+          ? `${result.placementName} (${result.placementId ?? "?"})`
+          : result.placementTags?.join(", "),
+        folder: result.folderName
+          ? `${result.folderName} (${result.folderId ?? "?"})`
+          : result.folderId,
+        searchedFileName: result.searchedFileName,
+        matches: result.matches
+          ?.map((match) => `${match.name} (${match.id})`)
+          .join(" | "),
+        detail: result.error ?? result.driveFileName ?? "",
+      })));
+      console.log("Full Drive maintenance results", summary.results);
+      console.groupEnd();
+      setNotice({
+        tone: summary.linked > 0 ? "success" : "warning",
+        message: `Drive maintenance scanned ${summary.scanned} assets: linked ${summary.linked}, not found ${summary.notFound}, ambiguous ${summary.ambiguous}, skipped ${summary.skipped}${summary.failed ? `, failed ${summary.failed}` : ""}. Detailed results were logged to the browser console.`,
+      });
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setDriveLookupRunning(false);
     }
   }
 
@@ -66,9 +120,36 @@ export default function ToolsPanel({ initialError }: { initialError?: string | n
 
         <section style={contentStyle}>
           <p style={eyebrowStyle}>Tools</p>
-          <h2 style={headingStyle}>More tools will be added here</h2>
+          <h2 style={headingStyle}>Atlas administration tools</h2>
+
+          {notice && (
+            <div style={notice.tone === "success" ? successNoticeStyle : warningNoticeStyle}>
+              {notice.message}
+            </div>
+          )}
+
+          <section style={toolSectionStyle}>
+            <p style={eyebrowStyle}>Drive maintenance</p>
+            <h3 style={toolHeadingStyle}>Lookup missing Drive IDs</h3>
+            <p style={descriptionStyle}>
+              Look up Google Drive files for uploaded assets that do not yet have a known Drive ID. This can take a while; detailed results are written to the browser console.
+            </p>
+            {authUser?.authenticated && (
+              <button
+                type="button"
+                onClick={() => void lookupMissingDriveSources()}
+                disabled={driveLookupRunning}
+                title="Look up Drive files for all assets that do not have a known Drive ID"
+                style={secondaryButtonStyle}
+              >
+                <span style={iconStyle} aria-hidden="true">manage_search</span>
+                {driveLookupRunning ? "Looking up Drive IDs..." : "Lookup missing Drive IDs"}
+              </button>
+            )}
+          </section>
+
           <p style={descriptionStyle}>
-            The retired documentation gallery migration tools have been removed. This space is reserved for future Atlas administration tools.
+            The retired documentation gallery migration tools have been removed. Additional Atlas administration tools can be added here in the future.
           </p>
         </section>
       </section>
@@ -101,6 +182,10 @@ const iconStyle: React.CSSProperties = { fontFamily: "'Material Symbols Outlined
 const contentStyle: React.CSSProperties = { maxWidth: 820, paddingTop: 24 };
 const eyebrowStyle: React.CSSProperties = { margin: "0 0 4px", color: "#9aa3b3", textTransform: "uppercase", letterSpacing: "0.12em", fontSize: 11, fontWeight: 700 };
 const headingStyle: React.CSSProperties = { margin: 0, fontSize: 28, fontWeight: 600, color: "#f3f5fa" };
+const toolSectionStyle: React.CSSProperties = { marginTop: 28, padding: 20, border: "1px solid rgba(255,255,255,0.14)", borderRadius: 6, background: "rgba(255,255,255,0.025)" };
+const toolHeadingStyle: React.CSSProperties = { margin: "0 0 8px", fontSize: 20, fontWeight: 600, color: "#f3f5fa" };
 const descriptionStyle: React.CSSProperties = { color: "#aeb6c5", lineHeight: 1.6 };
 const secondaryButtonStyle: React.CSSProperties = { background: "transparent", color: "#ddd", border: "1px solid rgba(255,255,255,0.22)", borderRadius: 4, padding: "8px 11px", cursor: "pointer", whiteSpace: "nowrap" };
+const successNoticeStyle: React.CSSProperties = { color: "#9df7a8", background: "rgba(20,180,80,0.13)", border: "1px solid rgba(80,220,120,0.25)", padding: 10, borderRadius: 4, margin: "18px 0 0" };
+const warningNoticeStyle: React.CSSProperties = { color: "#ffe2a8", background: "rgba(220,150,40,0.14)", border: "1px solid rgba(240,185,80,0.28)", padding: 10, borderRadius: 4, margin: "18px 0 0" };
 const errorStyle: React.CSSProperties = { color: "#ffb0b0", background: "rgba(255,0,0,0.12)", border: "1px solid rgba(255,0,0,0.22)", padding: 10, borderRadius: 4, marginBottom: 12 };
