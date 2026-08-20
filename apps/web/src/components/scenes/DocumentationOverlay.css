@@ -3,9 +3,9 @@
   inset: 0;
   z-index: 40;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 0;
   background-color: rgba(142, 29, 88, 0.3);
   background-image: linear-gradient(45deg, rgba(142, 29, 88, 0.3) 0%, rgba(242, 139, 32, 0.3) 100%) !important;
   backdrop-filter: blur(8px);
@@ -16,8 +16,9 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  width: min(900px, 100%);
-  max-height: min(900px, calc(100dvh - 48px));
+  width: 100%;
+  height: 100dvh;
+  max-height: none;
   overflow: hidden;
   border: 0;
   background: #10131f66;
@@ -66,6 +67,14 @@
   line-height: 1.4;
 }
 
+.atlas-documentation-overlay__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 34vw);
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .atlas-documentation-overlay__close {
   flex: 0 0 auto;
   width: 5rem;
@@ -101,6 +110,7 @@
 }
 
 .atlas-documentation-overlay__content {
+  min-width: 0;
   min-height: 0;
   overflow-y: auto;
   padding: 28px clamp(24px, 5vw, 64px) clamp(32px, 5vw, 64px);
@@ -110,6 +120,113 @@
   font-weight: 400;
   line-height: 1.75;
   scrollbar-width: thin;
+}
+
+.atlas-documentation-overlay__assets {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 28px clamp(24px, 4vw, 48px) 40px 24px;
+  background: rgba(0, 0, 0, 0.08);
+  scrollbar-width: thin;
+}
+
+.atlas-documentation-overlay__assets-heading {
+  margin-bottom: 18px;
+  color: #fff;
+  font-family: Montserrat, Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.atlas-documentation-overlay__assets-status {
+  color: #c7ccd6;
+  font-family: Montserrat, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.atlas-documentation-overlay__assets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 14px;
+}
+
+.atlas-documentation-overlay__asset {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #eef3fb;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.atlas-documentation-overlay__asset-media {
+  position: relative;
+  display: block;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.atlas-documentation-overlay__asset-media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 180ms ease-out;
+}
+
+.atlas-documentation-overlay__asset:hover .atlas-documentation-overlay__asset-media img,
+.atlas-documentation-overlay__asset:focus-visible .atlas-documentation-overlay__asset-media img {
+  transform: scale(1.04);
+}
+
+.atlas-documentation-overlay__asset:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.9);
+  outline-offset: 4px;
+}
+
+.atlas-documentation-overlay__asset-placeholder {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: #fff;
+  font-size: 32px;
+}
+
+.atlas-documentation-overlay__asset-kind {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  padding: 4px 6px;
+  background: rgba(16, 19, 31, 0.8);
+  color: #fff;
+  font-family: Montserrat, Arial, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.atlas-documentation-overlay__asset-caption {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #d8dde7;
+  font-family: Montserrat, Arial, sans-serif;
+  font-size: 12px;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
 }
 
 .atlas-documentation-overlay__content p + p,
@@ -167,11 +284,36 @@
 
   .atlas-documentation-overlay__card {
     width: 100%;
-    max-height: 100dvh;
+    height: 100dvh;
+    max-height: none;
     border-width: 0;
   }
 
   .atlas-documentation-overlay__header {
     padding-top: max(24px, env(safe-area-inset-top));
+  }
+}
+
+@media (max-width: 800px) {
+  .atlas-documentation-overlay__body {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .atlas-documentation-overlay__content {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+
+  .atlas-documentation-overlay__assets {
+    flex: 0 0 auto;
+    overflow: visible;
+    padding: 0 clamp(24px, 5vw, 64px) max(32px, env(safe-area-inset-bottom));
+    background: transparent;
+  }
+
+  .atlas-documentation-overlay__assets-heading {
+    margin-top: 8px;
   }
 }

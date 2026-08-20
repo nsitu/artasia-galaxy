@@ -640,5 +640,9 @@ export async function queryPlacementProcessGallery(
     },
   });
 
-  return result.photos.filter((photo) => photo.mediaKind === "image");
+  return result.photos.filter((photo) =>
+    photo.mediaKind === "image" ||
+    photo.mediaKind === "video" ||
+    photo.mediaKind === "audio",
+  );
 }

@@ -2,7 +2,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { Canvas, useThree } from "@react-three/fiber";
 import { MapControls, Preload } from "@react-three/drei";
 import * as THREE from "three";
-import { fetchAuthUser, fetchProjects, fetchUploadOptions, type ActivityOption, type AuthUser, type MapPlacement, type Photo, type ProjectOption } from "../../api/client";
+import { fetchAuthUser, fetchPlacementProcessGallery, fetchProjects, fetchUploadOptions, type ActivityOption, type AuthUser, type MapPlacement, type Photo, type ProcessGalleryAsset, type ProjectOption } from "../../api/client";
 import { useGalleryStore } from "../../stores/galleryStore";
 import LoadingIndicator from "../ui/LoadingIndicator";
 import AudioLightboxPlayer from "../ui/AudioLightboxPlayer";
@@ -407,6 +407,10 @@ export default function ArtScene() {
   const [backAction, setBackAction] = useState<(() => void) | null>(null);
   const [focusedPlacementDetails, setFocusedPlacementDetails] = useState<MapPlacement | null>(null);
   const [documentationOverlayPlacement, setDocumentationOverlayPlacement] = useState<MapPlacement | null>(null);
+  const [documentationProcessAssets, setDocumentationProcessAssets] = useState<ProcessGalleryAsset[]>([]);
+  const [documentationProcessAssetsLoading, setDocumentationProcessAssetsLoading] = useState(false);
+  const [documentationProcessAssetsError, setDocumentationProcessAssetsError] = useState<string | null>(null);
+  const [processLightboxPhotoId, setProcessLightboxPhotoId] = useState<string | null>(null);
   const [hoveredPlacementDetails, setHoveredPlacementDetails] = useState<MapPlacement | null>(null);
   const [previewPlacementDetails, setPreviewPlacementDetails] = useState<MapPlacement | null>(null);
   const [previewPlacementAction, setPreviewPlacementAction] = useState<(() => void) | null>(null);
@@ -454,6 +458,8 @@ export default function ArtScene() {
   const lightboxPinchRef = useRef<{ distance: number; zoom: number } | null>(null);
   const lightboxSuppressClickRef = useRef(false);
   const introPanOffsetRef = useRef(false);
+  const processGalleryCacheRef = useRef(new Map<number, ProcessGalleryAsset[]>());
+  const documentationOverlayPlacementRef = useRef<MapPlacement | null>(null);
 
   const handleIntroReady = useCallback(() => {
     setIntroTerrainReady(true);
@@ -613,7 +619,14 @@ export default function ArtScene() {
     setMenuOpen(false);
   }, []);
 
-  const selectedPhoto = selectedPhotoIndex !== null ? photos[selectedPhotoIndex] : null;
+  const selectedGalleryPhoto = selectedPhotoIndex !== null
+    ? photos[selectedPhotoIndex]
+    : null;
+  const processLightboxPhoto = processLightboxPhotoId
+    ? documentationProcessAssets.find((photo) => photo.id === processLightboxPhotoId) ?? null
+    : null;
+  const selectedPhoto = processLightboxPhoto ?? selectedGalleryPhoto;
+  const isProcessLightbox = Boolean(processLightboxPhoto);
   const availableActivityFilterOptions = useMemo<ActivityOption[]>(() => {
     if (
       !focusedPlacementDetails ||
@@ -673,6 +686,7 @@ export default function ArtScene() {
     ?.trim()
     .toLocaleLowerCase();
   const lightboxPhotos = useMemo(() => {
+    if (processLightboxPhotoId) return documentationProcessAssets;
     if (photoScope.mode !== "placement" || selectedActivityOption == null) {
       return photos;
     }
@@ -688,8 +702,10 @@ export default function ArtScene() {
     }
     return photos.filter((photo) => photo.activityIds?.includes(selectedActivityId));
   }, [
+    documentationProcessAssets,
     photoScope.mode,
     photos,
+    processLightboxPhotoId,
     selectedActivityId,
     selectedActivityOption,
     selectedCustomActivity,
@@ -707,6 +723,10 @@ export default function ArtScene() {
     selectedLightboxIndex >= 0 && lightboxPhotos.length > 1
       ? lightboxPhotos[(selectedLightboxIndex + 1) % lightboxPhotos.length]
       : null;
+  const closeLightbox = useCallback(() => {
+    setProcessLightboxPhotoId(null);
+    selectPhoto(null);
+  }, [selectPhoto]);
   const selectedDescription = selectedPhoto?.exifInfo?.description?.trim();
   const selectedAnecdoteEditUrl = selectedPhoto?.mediaKind === "anecdote" &&
     authUser?.authenticated
@@ -830,7 +850,6 @@ export default function ArtScene() {
 
   const selectAdjacentPhoto = useCallback((direction: -1 | 1) => {
     if (
-      selectedPhotoIndex === null ||
       selectedLightboxIndex < 0 ||
       lightboxPhotos.length < 2
     ) {
@@ -839,11 +858,16 @@ export default function ArtScene() {
     const nextPhoto = lightboxPhotos[
       (selectedLightboxIndex + direction + lightboxPhotos.length) % lightboxPhotos.length
     ];
+    if (processLightboxPhotoId) {
+      if (nextPhoto) setProcessLightboxPhotoId(nextPhoto.id);
+      return;
+    }
+    if (selectedPhotoIndex === null) return;
     const nextIndex = nextPhoto
       ? photos.findIndex((photo) => photo.id === nextPhoto.id)
       : -1;
     if (nextIndex >= 0) selectPhoto(nextIndex);
-  }, [lightboxPhotos, photos, selectPhoto, selectedLightboxIndex, selectedPhotoIndex]);
+  }, [lightboxPhotos, photos, processLightboxPhotoId, selectPhoto, selectedLightboxIndex, selectedPhotoIndex]);
 
   useEffect(() => {
     if (!selectedPhoto) return;
@@ -851,7 +875,7 @@ export default function ArtScene() {
     const handleLightboxKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        selectPhoto(null);
+        closeLightbox();
       } else if (event.key === "ArrowLeft") {
         event.preventDefault();
         selectAdjacentPhoto(-1);
@@ -863,7 +887,7 @@ export default function ArtScene() {
 
     document.addEventListener("keydown", handleLightboxKeyDown);
     return () => document.removeEventListener("keydown", handleLightboxKeyDown);
-  }, [selectAdjacentPhoto, selectPhoto, selectedPhoto]);
+  }, [closeLightbox, selectAdjacentPhoto, selectedPhoto]);
 
   const setClampedLightboxPan = useCallback((
     nextPan: { x: number; y: number },
@@ -1057,14 +1081,58 @@ export default function ArtScene() {
   const handleFocusedPlacementChange = useCallback((placement: MapPlacement | null) => {
     setSelectedActivityFilter("");
     setFocusedPlacementDetails(placement);
+    documentationOverlayPlacementRef.current = null;
     setDocumentationOverlayPlacement(null);
+    setProcessLightboxPhotoId(null);
   }, []);
   const handleDocumentationOpen = useCallback((placement: MapPlacement) => {
     if (!placement.documentation_content_html?.trim()) return;
+    setProcessLightboxPhotoId(null);
+    documentationOverlayPlacementRef.current = placement;
     setDocumentationOverlayPlacement(placement);
+    const cachedAssets = processGalleryCacheRef.current.get(placement.placement_id);
+    if (cachedAssets) {
+      setDocumentationProcessAssets(cachedAssets);
+      setDocumentationProcessAssetsLoading(false);
+      setDocumentationProcessAssetsError(null);
+      return;
+    }
+
+    setDocumentationProcessAssets([]);
+    setDocumentationProcessAssetsLoading(true);
+    setDocumentationProcessAssetsError(null);
+    void fetchPlacementProcessGallery(placement.placement_id)
+      .then((assets) => {
+        processGalleryCacheRef.current.set(placement.placement_id, assets);
+        setDocumentationProcessAssets((current) =>
+          documentationOverlayPlacementRef.current?.placement_id === placement.placement_id
+            ? assets
+            : current,
+        );
+        setDocumentationProcessAssetsLoading((current) =>
+          documentationOverlayPlacementRef.current?.placement_id === placement.placement_id
+            ? false
+            : current,
+        );
+      })
+      .catch((error) => {
+        if (documentationOverlayPlacementRef.current?.placement_id !== placement.placement_id) return;
+        setDocumentationProcessAssetsError((error as Error).message);
+        setDocumentationProcessAssetsLoading(false);
+      });
   }, []);
+  const handleProcessAssetClick = useCallback((asset: ProcessGalleryAsset) => {
+    selectPhoto(null);
+    setProcessLightboxPhotoId(asset.id);
+  }, [selectPhoto]);
+  const handleReturnToDocumentation = useCallback(() => {
+    selectPhoto(null);
+    setProcessLightboxPhotoId(null);
+  }, [selectPhoto]);
   const handleDocumentationClose = useCallback(() => {
+    documentationOverlayPlacementRef.current = null;
     setDocumentationOverlayPlacement(null);
+    setProcessLightboxPhotoId(null);
   }, []);
   const handleProjectChange = useCallback((projectSlug: string) => {
     const project = projectOptions.find(
@@ -1547,9 +1615,13 @@ export default function ArtScene() {
         <PlacementHoverLabel placement={hoveredPlacementDetails} />
       )}
 
-      {documentationOverlayPlacement && (
+      {documentationOverlayPlacement && !processLightboxPhoto && (
         <DocumentationOverlay
           placement={documentationOverlayPlacement}
+          processAssets={documentationProcessAssets}
+          processAssetsLoading={documentationProcessAssetsLoading}
+          processAssetsError={documentationProcessAssetsError}
+          onProcessAssetClick={handleProcessAssetClick}
           onClose={handleDocumentationClose}
         />
       )}
@@ -1571,7 +1643,7 @@ export default function ArtScene() {
               lightboxSuppressClickRef.current = false;
               return;
             }
-            selectPhoto(null);
+            closeLightbox();
           }}
           style={{
             ...photoLightboxStyle,
@@ -1828,6 +1900,21 @@ export default function ArtScene() {
               </div>
             )}
                 <div style={photoLightboxActionRowStyle}>
+                {isProcessLightbox && documentationOverlayPlacement && (
+                  <button
+                    type="button"
+                    className="atlas-control-surface"
+                    onClick={handleReturnToDocumentation}
+                    aria-label="Return to documentation"
+                    title="Return to documentation"
+                    style={photoLightboxActionLinkStyle}
+                  >
+                    <span aria-hidden="true" style={photoLightboxActionIconStyle}>
+                      menu_book
+                    </span>
+                    <span>Documentation</span>
+                  </button>
+                )}
                 <a
                   href={`/api/v1/assets/${selectedPhoto.id}/original`}
                   className="atlas-control-surface"
@@ -1875,7 +1962,7 @@ export default function ArtScene() {
               <button
                 type="button"
                 className="atlas-control-surface"
-            onClick={() => selectPhoto(null)}
+            onClick={closeLightbox}
             aria-label="Close photo"
             style={photoLightboxCloseStyle}
           >

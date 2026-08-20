@@ -46,6 +46,23 @@ export interface Photo {
   }>;
 }
 
+export type ProcessGalleryAsset = Photo & {
+  caption: string;
+  alt: string;
+};
+
+export async function fetchPlacementProcessGallery(
+  placementId: number,
+): Promise<ProcessGalleryAsset[]> {
+  const res = await fetch(`/api/v1/placements/${encodeURIComponent(String(placementId))}/process-gallery`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  const body = await res.json() as { assets?: ProcessGalleryAsset[] };
+  return body.assets ?? [];
+}
+
 export async function fetchSlideshow(params: {
   albumIds?: string[];
   seed?: number;

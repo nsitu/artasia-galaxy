@@ -27,14 +27,7 @@ router.get("/:placementId/process-gallery", async (req, res) => {
     res.json({
       placementId,
       assets: photos.map((photo) => ({
-        id: photo.id,
-        mediaKind: photo.mediaKind,
-        thumbnailUrl: photo.thumbnailUrl,
-        previewUrl: photo.previewUrl,
-        width: photo.width,
-        height: photo.height,
-        createdAt: photo.createdAt,
-        fileName: photo.fileName,
+        ...photo,
         caption: photo.exifInfo?.description?.trim() || photo.fileName,
         alt: photo.exifInfo?.description?.trim() || photo.fileName,
       })),
