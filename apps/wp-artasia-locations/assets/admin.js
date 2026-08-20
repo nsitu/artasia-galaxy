@@ -33,10 +33,6 @@ jQuery(function ($) {
 
   setupGoogleDriveFolderLink();
 
-  if (!window.wp || !window.wp.media) {
-    return;
-  }
-
   function setupImagePicker(options) {
     var $attachmentId = $(options.inputSelector);
 
@@ -99,38 +95,42 @@ jQuery(function ($) {
     });
   }
 
-  setupImagePicker({
-    inputSelector: '#artasia_partner_logo_id',
-    previewSelector: '#artasia_partner_logo_preview',
-    selectSelector: '#artasia_partner_logo_select',
-    removeSelector: '#artasia_partner_logo_remove',
-    title: 'Select Artasia Partner Logo',
-    buttonText: 'Use this logo',
-    allowedMimeTypes: ['image/png', 'image/svg+xml'],
-    invalidMessage: 'Please choose a PNG or SVG logo.'
-  });
+  var hasWordPressMedia = window.wp && window.wp.media;
 
-  setupImagePicker({
-    inputSelector: '#artasia_partner_white_logo_id',
-    previewSelector: '#artasia_partner_white_logo_preview',
-    selectSelector: '#artasia_partner_white_logo_select',
-    removeSelector: '#artasia_partner_white_logo_remove',
-    title: 'Select Artasia Partner White Logo',
-    buttonText: 'Use this logo',
-    allowedMimeTypes: ['image/png', 'image/svg+xml'],
-    invalidMessage: 'Please choose a PNG or SVG logo.'
-  });
+  if (hasWordPressMedia) {
+    setupImagePicker({
+      inputSelector: '#artasia_partner_logo_id',
+      previewSelector: '#artasia_partner_logo_preview',
+      selectSelector: '#artasia_partner_logo_select',
+      removeSelector: '#artasia_partner_logo_remove',
+      title: 'Select Artasia Partner Logo',
+      buttonText: 'Use this logo',
+      allowedMimeTypes: ['image/png', 'image/svg+xml'],
+      invalidMessage: 'Please choose a PNG or SVG logo.'
+    });
 
-  setupImagePicker({
-    inputSelector: '#artasia_people_photo_id',
-    previewSelector: '#artasia_people_photo_preview',
-    selectSelector: '#artasia_people_photo_select',
-    removeSelector: '#artasia_people_photo_remove',
-    title: 'Select Artasia Person Photo',
-    buttonText: 'Use this photo',
-    invalidMessage: 'Please choose an image file.',
-    allowedMimeTypes: null
-  });
+    setupImagePicker({
+      inputSelector: '#artasia_partner_white_logo_id',
+      previewSelector: '#artasia_partner_white_logo_preview',
+      selectSelector: '#artasia_partner_white_logo_select',
+      removeSelector: '#artasia_partner_white_logo_remove',
+      title: 'Select Artasia Partner White Logo',
+      buttonText: 'Use this logo',
+      allowedMimeTypes: ['image/png', 'image/svg+xml'],
+      invalidMessage: 'Please choose a PNG or SVG logo.'
+    });
+
+    setupImagePicker({
+      inputSelector: '#artasia_people_photo_id',
+      previewSelector: '#artasia_people_photo_preview',
+      selectSelector: '#artasia_people_photo_select',
+      removeSelector: '#artasia_people_photo_remove',
+      title: 'Select Artasia Person Photo',
+      buttonText: 'Use this photo',
+      invalidMessage: 'Please choose an image file.',
+      allowedMimeTypes: null
+    });
+  }
 
   function setupDocumentationGallery() {
     var $items = $('#artasia_documentation_gallery_items');
@@ -283,6 +283,7 @@ jQuery(function ($) {
     var nonce = $preview.attr('data-artasia-atlas-preview-nonce');
     var $status = $preview.find('[data-artasia-atlas-preview-status]');
     var $items = $preview.find('[data-artasia-atlas-preview-items]');
+    var $refresh = $preview.find('[data-artasia-atlas-preview-refresh]');
     var requestNumber = 0;
 
     function setStatus(message) {
@@ -300,12 +301,20 @@ jQuery(function ($) {
 
         var caption = String(asset.caption || '').trim();
         var $item = $('<li>', { class: 'artasia-documentation-atlas-preview-item' });
-        $item.append($('<img>', {
+        var $link = $('<a>', {
+          class: 'artasia-documentation-atlas-preview-link',
+          href: asset.previewUrl || thumbnailUrl,
+          target: '_blank',
+          rel: 'noopener noreferrer',
+          'aria-label': 'Open process asset in a new tab'
+        });
+        $link.append($('<img>', {
           class: 'artasia-documentation-atlas-preview-thumbnail',
           src: thumbnailUrl,
           alt: asset.alt || caption || 'Process image',
           loading: 'lazy'
         }));
+        $item.append($link);
         if (caption) {
           $item.append($('<p>', {
             class: 'artasia-documentation-atlas-preview-caption',
@@ -319,6 +328,9 @@ jQuery(function ($) {
     }
 
     function loadPreview() {
+      var currentRequest = ++requestNumber;
+      $refresh.prop('disabled', false);
+
       if ($source.val() !== 'atlas') {
         return;
       }
@@ -336,10 +348,10 @@ jQuery(function ($) {
         return;
       }
 
-      var currentRequest = ++requestNumber;
       var separator = endpoint.indexOf('?') === -1 ? '?' : '&';
       var previewUrl = endpoint + separator + 'preview=1&placement_id=' + encodeURIComponent(placementId);
       setStatus('Loading Atlas process images…');
+      $refresh.prop('disabled', true);
 
       fetch(previewUrl, {
         credentials: 'same-origin',
@@ -349,10 +361,14 @@ jQuery(function ($) {
         }
       })
         .then(function (response) {
-          if (!response.ok) {
-            throw new Error('Unable to load process gallery.');
-          }
-          return response.json();
+          return response.json().catch(function () {
+            return {};
+          }).then(function (result) {
+            if (!response.ok) {
+              throw new Error(result.message || result.error || 'Unable to load process gallery.');
+            }
+            return result;
+          });
         })
         .then(function (result) {
           if (currentRequest !== requestNumber || $source.val() !== 'atlas') {
@@ -362,19 +378,30 @@ jQuery(function ($) {
           var count = renderAssets(Array.isArray(result.assets) ? result.assets : []);
           setStatus(count ? count + ' published process image' + (count === 1 ? '' : 's') + ' available from Atlas.' : 'No published Atlas process images are currently available for this placement.');
         })
-        .catch(function () {
+        .catch(function (error) {
           if (currentRequest === requestNumber) {
-            setStatus('Atlas process images could not be loaded.');
+            setStatus(error && error.message ? error.message : 'Atlas process images could not be loaded.');
+          }
+        })
+        .then(function () {
+          if (currentRequest === requestNumber) {
+            $refresh.prop('disabled', false);
           }
         });
     }
 
     $source.on('change', loadPreview);
     $placement.on('change', loadPreview);
+    $refresh.on('click', function (event) {
+      event.preventDefault();
+      loadPreview();
+    });
     loadPreview();
   }
 
   setupDocumentationGallerySource();
   setupDocumentationAtlasPreview();
-  setupDocumentationGallery();
+  if (hasWordPressMedia) {
+    setupDocumentationGallery();
+  }
 });

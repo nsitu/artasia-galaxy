@@ -163,12 +163,14 @@ function artasia_documentation_gallery_rest_routes(): void
 }
 add_action('rest_api_init', 'artasia_documentation_gallery_rest_routes');
 
-function artasia_get_atlas_process_gallery(int $placement_id): ?array
+function artasia_get_atlas_process_gallery(int $placement_id, bool $force_refresh = false): ?array
 {
     $cache_key = 'artasia_process_gallery_' . $placement_id;
-    $cached = get_transient($cache_key);
-    if (is_array($cached)) {
-        return $cached;
+    if (!$force_refresh) {
+        $cached = get_transient($cache_key);
+        if (is_array($cached)) {
+            return $cached;
+        }
     }
 
     $endpoint = apply_filters(
@@ -272,7 +274,7 @@ function artasia_rest_get_documentation_process_gallery(WP_REST_Request $request
         return new WP_Error('artasia_placement_not_found', 'Placement not found.', ['status' => 404]);
     }
 
-    $gallery = artasia_get_atlas_process_gallery($placement_id);
+    $gallery = artasia_get_atlas_process_gallery($placement_id, $is_preview);
     if (!is_array($gallery)) {
         return new WP_Error('artasia_atlas_gallery_unavailable', 'Atlas gallery is unavailable.', ['status' => 502]);
     }

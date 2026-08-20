@@ -1615,8 +1615,10 @@ function artasia_documentation_gallery_meta_box_html(WP_Post $post): void
     </div>
     <div class="notice notice-info inline" data-artasia-gallery-source-panel="atlas"<?php echo $gallery_source === 'atlas' ? '' : ' hidden'; ?> aria-hidden="<?php echo $gallery_source === 'atlas' ? 'false' : 'true'; ?>">
         <p><strong>Atlas process gallery</strong></p>
-        <p>Published Atlas images tagged as process images for the selected placement will be displayed automatically. Upload, tag, and manage those images in Atlas.</p>
-        <p><a href="<?php echo esc_url($atlas_admin_url); ?>" target="_blank" rel="noopener noreferrer">Open Atlas admin</a></p>
+        <p>Published Atlas assets tagged as <code>Process</code> for the selected placement will be displayed automatically. Upload, tag, publish, and manage those assets in Atlas.</p>
+        <p>
+            <a class="button button-secondary" href="<?php echo esc_url($atlas_admin_url); ?>" target="_blank" rel="noopener noreferrer">Manage process assets in Atlas</a>
+        </p>
         <div
             class="artasia-documentation-atlas-preview"
             data-artasia-atlas-preview
@@ -1624,7 +1626,9 @@ function artasia_documentation_gallery_meta_box_html(WP_Post $post): void
             data-artasia-atlas-preview-nonce="<?php echo esc_attr(wp_create_nonce('wp_rest')); ?>"
             aria-live="polite"
         >
+            <p><strong>Current Atlas gallery</strong></p>
             <p class="description" data-artasia-atlas-preview-status>Select a placement to preview its published Atlas process images.</p>
+            <p><button type="button" class="button" data-artasia-atlas-preview-refresh>Refresh preview</button></p>
             <ul class="artasia-documentation-atlas-preview-items" data-artasia-atlas-preview-items></ul>
         </div>
     </div>

@@ -199,6 +199,10 @@
   background: #fff;
 }
 
+.artasia-documentation-atlas-preview-link {
+  display: block;
+}
+
 .artasia-documentation-atlas-preview-thumbnail {
   display: block;
   width: 100%;
