@@ -132,150 +132,11 @@ jQuery(function ($) {
     });
   }
 
-  function setupDocumentationGallery() {
-    var $items = $('#artasia_documentation_gallery_items');
-
-    if (!$items.length) {
-      return;
-    }
-
-    var frame;
-    var $clearButton = $('#artasia_documentation_gallery_clear');
-
-    function updateClearButton() {
-      $clearButton.prop('disabled', !$items.children().length);
-    }
-
-    function addImage(attachment) {
-      if ($items.children('[data-attachment-id="' + attachment.id + '"]').length) {
-        return;
-      }
-
-      var thumbnailUrl = attachment.url;
-      if (attachment.sizes && attachment.sizes.medium) {
-        thumbnailUrl = attachment.sizes.medium.url;
-      } else if (attachment.sizes && attachment.sizes.thumbnail) {
-        thumbnailUrl = attachment.sizes.thumbnail.url;
-      }
-
-      var caption = attachment.caption || attachment.title || '';
-      var $item = $('<li>', {
-        class: 'artasia-documentation-gallery-item',
-        'data-attachment-id': attachment.id
-      });
-
-      $item.append($('<span>', {
-        class: 'artasia-documentation-gallery-handle dashicons dashicons-move',
-        'aria-label': 'Drag to reorder',
-        title: 'Drag to reorder'
-      }));
-      $item.append($('<img>', {
-        class: 'artasia-documentation-gallery-thumbnail',
-        src: thumbnailUrl,
-        alt: ''
-      }));
-      $item.append($('<label>', {
-        class: 'screen-reader-text',
-        for: 'artasia-documentation-caption-' + attachment.id,
-        text: 'Image caption'
-      }));
-      $item.append($('<textarea>', {
-        id: 'artasia-documentation-caption-' + attachment.id,
-        class: 'artasia-documentation-gallery-caption',
-        name: 'artasia_documentation_gallery_captions[]',
-        rows: 4,
-        placeholder: 'Add a caption',
-        val: caption
-      }));
-      $item.append($('<input>', {
-        type: 'hidden',
-        name: 'artasia_documentation_gallery_ids[]',
-        value: attachment.id
-      }));
-      $item.append($('<button>', {
-        type: 'button',
-        class: 'button-link-delete artasia-documentation-gallery-remove',
-        text: 'Remove'
-      }));
-
-      $items.append($item);
-    }
-
-    $items.sortable({
-      handle: '.artasia-documentation-gallery-handle',
-      placeholder: 'artasia-documentation-gallery-placeholder',
-      forcePlaceholderSize: true
-    });
-
-    $('#artasia_documentation_gallery_select').on('click', function (event) {
-      event.preventDefault();
-
-      if (frame) {
-        frame.open();
-        return;
-      }
-
-      frame = wp.media({
-        title: 'Select Documentation Gallery Images',
-        button: {
-          text: 'Add to gallery'
-        },
-        library: {
-          type: 'image'
-        },
-        multiple: 'add'
-      });
-
-      frame.on('select', function () {
-        frame.state().get('selection').each(function (model) {
-          addImage(model.toJSON());
-        });
-        updateClearButton();
-      });
-
-      frame.open();
-    });
-
-    $items.on('click', '.artasia-documentation-gallery-remove', function (event) {
-      event.preventDefault();
-      $(this).closest('.artasia-documentation-gallery-item').remove();
-      updateClearButton();
-    });
-
-    $clearButton.on('click', function (event) {
-      event.preventDefault();
-      $items.empty();
-      updateClearButton();
-    });
-  }
-
-  function setupDocumentationGallerySource() {
-    var $source = $('#artasia_documentation_gallery_source');
-    var $panels = $('[data-artasia-gallery-source-panel]');
-
-    if (!$source.length || !$panels.length) {
-      return;
-    }
-
-    function updatePanels() {
-      var source = $source.val() === 'atlas' ? 'atlas' : 'wordpress';
-
-      $panels.each(function () {
-        var isActive = $(this).attr('data-artasia-gallery-source-panel') === source;
-        $(this).prop('hidden', !isActive).attr('aria-hidden', isActive ? 'false' : 'true');
-      });
-    }
-
-    $source.on('change', updatePanels);
-    updatePanels();
-  }
-
   function setupDocumentationAtlasPreview() {
-    var $source = $('#artasia_documentation_gallery_source');
     var $placement = $('#artasia_documentation_placement_ids');
     var $preview = $('[data-artasia-atlas-preview]');
 
-    if (!$source.length || !$placement.length || !$preview.length || !window.fetch) {
+    if (!$placement.length || !$preview.length || !window.fetch) {
       return;
     }
 
@@ -346,10 +207,6 @@ jQuery(function ($) {
       var currentRequest = ++requestNumber;
       $refresh.prop('disabled', false);
 
-      if ($source.val() !== 'atlas') {
-        return;
-      }
-
       var placementId = String($placement.val() || '').trim();
       $items.empty();
 
@@ -386,7 +243,7 @@ jQuery(function ($) {
           });
         })
         .then(function (result) {
-          if (currentRequest !== requestNumber || $source.val() !== 'atlas') {
+          if (currentRequest !== requestNumber) {
             return;
           }
 
@@ -405,7 +262,6 @@ jQuery(function ($) {
         });
     }
 
-    $source.on('change', loadPreview);
     $placement.on('change', function () {
       updateAtlasBrowseLink();
       loadPreview();
@@ -418,9 +274,5 @@ jQuery(function ($) {
     loadPreview();
   }
 
-  setupDocumentationGallerySource();
   setupDocumentationAtlasPreview();
-  if (hasWordPressMedia) {
-    setupDocumentationGallery();
-  }
 });

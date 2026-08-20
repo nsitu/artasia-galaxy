@@ -6,74 +6,7 @@ if (!defined('ABSPATH')) {
 
 function artasia_render_documentation_gallery(int $post_id): string
 {
-    $gallery_source = get_post_meta($post_id, 'artasia_documentation_gallery_source', true);
-    if ($gallery_source === 'atlas') {
-        return artasia_render_atlas_documentation_gallery($post_id);
-    }
-
-    $gallery_ids = artasia_validate_image_attachment_ids(
-        get_post_meta($post_id, 'artasia_documentation_gallery_ids', true)
-    );
-
-    if (!$gallery_ids) {
-        return '';
-    }
-
-    $saved_captions = artasia_sanitize_text_array_meta(
-        get_post_meta($post_id, 'artasia_documentation_gallery_captions', true)
-    );
-
-    static $gallery_instance = 0;
-    $gallery_instance++;
-    $gallery_id = 'artasia-documentation-gallery-' . $post_id . '-' . $gallery_instance;
-
-    ob_start();
-?>
-    <section id="<?php echo esc_attr($gallery_id); ?>" class="artasia-documentation-gallery" aria-label="Documentation gallery">
-        <div class="artasia-documentation-gallery__grid">
-            <?php foreach ($gallery_ids as $index => $attachment_id) : ?>
-                <?php
-                $full_url = wp_get_attachment_image_url($attachment_id, 'full');
-                $caption = array_key_exists($index, $saved_captions)
-                    ? $saved_captions[$index]
-                    : (wp_get_attachment_caption($attachment_id) ?: get_the_title($attachment_id));
-                if (!$full_url) {
-                    continue;
-                }
-                ?>
-                <figure class="artasia-documentation-gallery__item">
-                    <a
-                        class="artasia-documentation-gallery__trigger"
-                        href="<?php echo esc_url($full_url); ?>"
-                        data-gallery-index="<?php echo esc_attr($index); ?>"
-                        aria-label="<?php echo esc_attr(sprintf('Open image %d of %d', $index + 1, count($gallery_ids))); ?>"
-                    >
-                        <?php
-                        echo wp_get_attachment_image($attachment_id, 'large', false, [
-                            'class'   => 'artasia-documentation-gallery__thumbnail',
-                            'loading' => 'lazy',
-                        ]);
-                        ?>
-                    </a>
-                    <?php if ($caption) : ?>
-                        <figcaption class="artasia-documentation-gallery__caption"><?php echo wp_kses_post($caption); ?></figcaption>
-                    <?php endif; ?>
-                </figure>
-            <?php endforeach; ?>
-        </div>
-        <dialog class="artasia-documentation-lightbox" aria-label="Image viewer">
-            <button type="button" class="artasia-documentation-lightbox__close" aria-label="Close image viewer">&times;</button>
-            <button type="button" class="artasia-documentation-lightbox__previous" aria-label="Previous image">&lsaquo;</button>
-            <div class="artasia-documentation-lightbox__content">
-                <img class="artasia-documentation-lightbox__image" alt="">
-                <p class="artasia-documentation-lightbox__caption" hidden></p>
-            </div>
-            <button type="button" class="artasia-documentation-lightbox__next" aria-label="Next image">&rsaquo;</button>
-        </dialog>
-    </section>
-<?php
-
-    return (string) ob_get_clean();
+    return artasia_render_atlas_documentation_gallery($post_id);
 }
 
 function artasia_render_atlas_documentation_gallery(int $post_id): string
@@ -251,11 +184,6 @@ function artasia_rest_get_documentation_process_gallery(WP_REST_Request $request
 
     if (!$can_preview && (!$document instanceof WP_Post || $document->post_status !== 'publish')) {
         return new WP_Error('artasia_documentation_not_found', 'Documentation not found.', ['status' => 404]);
-    }
-
-    $source = $document_id ? get_post_meta($document_id, 'artasia_documentation_gallery_source', true) : '';
-    if (!$can_preview && $source !== 'atlas') {
-        return new WP_Error('artasia_atlas_gallery_not_selected', 'Atlas gallery is not selected for this documentation.', ['status' => 404]);
     }
 
     $placement_id = $can_preview ? absint($request->get_param('placement_id')) : 0;

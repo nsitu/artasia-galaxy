@@ -120,7 +120,7 @@ function artasia_post_type_contexts(): array
                     artasia_context_post_type_link('artasia_placement', 'placements')
                 ),
                 'Use the classic rich text editor for the documentation itself, then identify its context and optionally provide a short pull quote.',
-                'Choose a WordPress gallery or an Atlas process gallery for the image sequence. WordPress gallery captions and alternative text come from the selected Media Library records, while Atlas process images are managed in Atlas and displayed automatically after the documentation.',
+                'Process assets are managed in Atlas and displayed automatically after the documentation. Use the Atlas process gallery panel to review the current assets or open the selected placement in Atlas.',
                 'Published records are indexed with the <code>[artasia_documentation year="2026"]</code> shortcode or the Artasia Documentation Elementor widget. A record appears under the partner connected to its selected placement and project, and opens in that project’s annual Documentation viewer.',
             ],
         ],
@@ -1610,66 +1610,19 @@ add_action('add_meta_boxes', 'artasia_register_documentation_meta_box');
 
 function artasia_documentation_gallery_meta_box_html(WP_Post $post): void
 {
-    $gallery_source = get_post_meta($post->ID, 'artasia_documentation_gallery_source', true);
-    $gallery_source = $gallery_source === 'atlas' ? 'atlas' : 'wordpress';
     $placement_ids = artasia_sanitize_integer_array_meta(
         get_post_meta($post->ID, 'artasia_documentation_placement_ids', true)
     );
     $placement_id = $placement_ids[0] ?? 0;
-    $gallery_ids = artasia_validate_image_attachment_ids(
-        get_post_meta($post->ID, 'artasia_documentation_gallery_ids', true)
-    );
-    $saved_captions = artasia_sanitize_text_array_meta(
-        get_post_meta($post->ID, 'artasia_documentation_gallery_captions', true)
-    );
     $atlas_admin_url = artasia_atlas_base_url() . '/admin/browse';
     if ($placement_id) {
         $atlas_admin_url = add_query_arg('site', $placement_id, $atlas_admin_url);
     }
     $atlas_preview_endpoint = rest_url('artasia/v1/documentation/' . $post->ID . '/process-gallery');
 ?>
-    <p>
-        <label for="artasia_documentation_gallery_source"><strong>Gallery source</strong></label>
-        <select id="artasia_documentation_gallery_source" name="artasia_documentation_gallery_source" class="widefat">
-            <option value="wordpress" <?php selected($gallery_source, 'wordpress'); ?>>WordPress gallery</option>
-            <option value="atlas" <?php selected($gallery_source, 'atlas'); ?>>Atlas process gallery</option>
-        </select>
-    </p>
-    <p class="description">Choose whether this documentation uses its selected WordPress images or published Atlas images tagged as process images for the selected placement.</p>
-    <div data-artasia-gallery-source-panel="wordpress"<?php echo $gallery_source === 'wordpress' ? '' : ' hidden'; ?> aria-hidden="<?php echo $gallery_source === 'wordpress' ? 'false' : 'true'; ?>">
-        <p>Select images from the Media Library, then drag them into the order in which they should appear.</p>
-        <p class="description">Edit each caption below its thumbnail. The caption appears in the gallery and lightbox. Alternative text continues to come from the Media Library.</p>
-        <p>
-            <button type="button" class="button button-primary" id="artasia_documentation_gallery_select">Select gallery images</button>
-            <button type="button" class="button" id="artasia_documentation_gallery_clear" <?php disabled(empty($gallery_ids)); ?>>Remove all</button>
-        </p>
-        <ul id="artasia_documentation_gallery_items" class="artasia-documentation-gallery-items">
-            <?php foreach ($gallery_ids as $index => $attachment_id) : ?>
-                <?php
-                $caption = array_key_exists($index, $saved_captions)
-                    ? $saved_captions[$index]
-                    : (wp_get_attachment_caption($attachment_id) ?: get_the_title($attachment_id));
-                ?>
-                <li class="artasia-documentation-gallery-item" data-attachment-id="<?php echo esc_attr($attachment_id); ?>">
-                    <span class="artasia-documentation-gallery-handle dashicons dashicons-move" aria-label="Drag to reorder" title="Drag to reorder"></span>
-                    <?php echo wp_get_attachment_image($attachment_id, 'medium', false, ['class' => 'artasia-documentation-gallery-thumbnail']); ?>
-                    <label class="screen-reader-text" for="artasia-documentation-caption-<?php echo esc_attr($attachment_id); ?>">Image caption</label>
-                    <textarea
-                        id="artasia-documentation-caption-<?php echo esc_attr($attachment_id); ?>"
-                        class="artasia-documentation-gallery-caption"
-                        name="artasia_documentation_gallery_captions[]"
-                        rows="4"
-                        placeholder="Add a caption"
-                    ><?php echo esc_textarea($caption); ?></textarea>
-                    <input type="hidden" name="artasia_documentation_gallery_ids[]" value="<?php echo esc_attr($attachment_id); ?>">
-                    <button type="button" class="button-link-delete artasia-documentation-gallery-remove">Remove</button>
-                </li>
-            <?php endforeach; ?>
-        </ul>
-    </div>
-    <div class="artasia-documentation-atlas-panel" data-artasia-gallery-source-panel="atlas"<?php echo $gallery_source === 'atlas' ? '' : ' hidden'; ?> aria-hidden="<?php echo $gallery_source === 'atlas' ? 'false' : 'true'; ?>">
+    <div class="artasia-documentation-atlas-panel">
         <p><strong>Atlas process gallery</strong></p>
-        <p>Published Atlas assets tagged as <code>Process</code> for the selected placement will be displayed automatically. Upload, tag, publish, and manage those assets in Atlas.</p>
+        <p>Published Atlas assets tagged as <code>Process</code> for the selected placement are displayed automatically. Upload, tag, publish, and manage those assets in Atlas.</p>
         <p>
             <a
                 class="button button-secondary"
@@ -1752,21 +1705,7 @@ function artasia_save_documentation_meta(int $post_id): void
         'artasia_documentation_pull_quote',
         sanitize_textarea_field($_POST['artasia_documentation_pull_quote'] ?? '')
     );
-    update_post_meta(
-        $post_id,
-        'artasia_documentation_gallery_source',
-        ($_POST['artasia_documentation_gallery_source'] ?? '') === 'atlas' ? 'atlas' : 'wordpress'
-    );
-    update_post_meta(
-        $post_id,
-        'artasia_documentation_gallery_ids',
-        artasia_validate_image_attachment_ids($_POST['artasia_documentation_gallery_ids'] ?? [])
-    );
-    update_post_meta(
-        $post_id,
-        'artasia_documentation_gallery_captions',
-        artasia_sanitize_text_array_meta($_POST['artasia_documentation_gallery_captions'] ?? [])
-    );
+    update_post_meta($post_id, 'artasia_documentation_gallery_source', 'atlas');
 }
 add_action('save_post_artasia_document', 'artasia_save_documentation_meta');
 

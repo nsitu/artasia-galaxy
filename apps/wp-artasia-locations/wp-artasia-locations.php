@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Artasia Locations
  * Description: Custom post types for Artasia placements, projects, activities, places, partners, people, learning anecdotes, and pedagogical documentation with a REST API endpoint for the Node.js backend.
- * Version:     2.2.17
+ * Version:     2.2.18
  * License:     GPL-2.0-or-later
  */
 
@@ -10,7 +10,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('ARTASIA_LOCATIONS_VERSION', '2.2.17');
+define('ARTASIA_LOCATIONS_VERSION', '2.2.18');
 define('ARTASIA_LOCATIONS_PATH', plugin_dir_path(__FILE__));
 define('ARTASIA_LOCATIONS_URL', plugin_dir_url(__FILE__));
 
@@ -47,13 +47,13 @@ function artasia_admin_enqueue_assets(string $hook_suffix): void
     );
 
     if (in_array($screen->post_type, ['artasia_partner', 'artasia_people', 'artasia_document', 'artasia_placement'], true) && in_array($hook_suffix, ['post.php', 'post-new.php'], true)) {
-        if (in_array($screen->post_type, ['artasia_partner', 'artasia_people', 'artasia_document'], true)) {
+        if (in_array($screen->post_type, ['artasia_partner', 'artasia_people'], true)) {
             wp_enqueue_media();
         }
         wp_enqueue_script(
             'artasia-locations-admin',
             ARTASIA_LOCATIONS_URL . 'assets/admin.js',
-            ['jquery', 'jquery-ui-sortable'],
+            ['jquery'],
             $admin_asset_version,
             true
         );
