@@ -79,6 +79,11 @@ export interface DocumentationGalleryMigrationDocument {
   documentTitle: string;
   placementIds: number[];
   placementNames: string[];
+  placementAssets: Array<{
+    placementId: number;
+    placementName: string;
+    fileNames: string[];
+  }>;
   matches: DocumentationGalleryMigrationMatch[];
   unmatched: Array<{
     attachmentId: number;
@@ -164,6 +169,16 @@ export interface PlacementTagCleanupReport {
   legacyTags: PlacementTagCleanupTagReport[];
 }
 
+export interface EmptyLegacyTagDeletionReport {
+  dryRun: false;
+  scanned: number;
+  eligible: number;
+  deleted: number;
+  failed: number;
+  deletedTagNames: string[];
+  failedTags: Array<{ tagName: string; error: string }>;
+}
+
 async function fetchPlacementTagCleanup(init?: RequestInit) {
   const res = await fetch("/api/v1/tools/placement-tag-cleanup", {
     credentials: "same-origin",
@@ -182,6 +197,18 @@ export function previewPlacementTagCleanup() {
 
 export function applyPlacementTagCleanup() {
   return fetchPlacementTagCleanup({ method: "POST" });
+}
+
+export async function deleteEmptyLegacyTags(): Promise<EmptyLegacyTagDeletionReport> {
+  const res = await fetch("/api/v1/tools/placement-tag-cleanup/delete-empty", {
+    method: "POST",
+    credentials: "same-origin",
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  return res.json() as Promise<EmptyLegacyTagDeletionReport>;
 }
 
 export async function fetchSlideshow(params: {

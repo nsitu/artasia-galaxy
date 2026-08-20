@@ -6,6 +6,7 @@ import {
 } from "../services/documentationGalleryMigration.service.js";
 import {
   applyPlacementTagCleanup,
+  deleteEmptyLegacyTags,
   previewPlacementTagCleanup,
 } from "../services/placementTagCleanup.service.js";
 
@@ -51,6 +52,15 @@ router.post("/placement-tag-cleanup", async (req, res) => {
   try {
     if (!(await requireAuthenticated(req, res))) return;
     res.json(await applyPlacementTagCleanup());
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
+});
+
+router.post("/placement-tag-cleanup/delete-empty", async (req, res) => {
+  try {
+    if (!(await requireAuthenticated(req, res))) return;
+    res.json(await deleteEmptyLegacyTags());
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });
   }

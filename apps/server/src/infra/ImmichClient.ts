@@ -662,6 +662,15 @@ export async function renameTag(tagId: string, newName: string): Promise<ImmichT
   return renamed;
 }
 
+export async function deleteTag(tagId: string): Promise<void> {
+  if (!isValidUUID(tagId)) {
+    throw new Error(`Invalid tag ID: "${tagId}". Expected UUID format.`);
+  }
+  await immichRequest(`/tags/${tagId}`, { method: "DELETE" });
+  tagAssetIdsCache.delete(tagId);
+  tagsCache = null;
+}
+
 export async function getServerStatistics(): Promise<ImmichServerStats> {
   const res = await immichRequest("/server/statistics");
   return res.json();

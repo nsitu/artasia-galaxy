@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   applyDocumentationGalleryMigration,
   applyPlacementTagCleanup,
+  deleteEmptyLegacyTags,
   fetchAuthUser,
   logoutAuthUser,
   previewDocumentationGalleryMigration,
@@ -29,6 +30,7 @@ export default function ToolsPanel({ initialError }: { initialError?: string | n
   const [cleanupLoading, setCleanupLoading] = useState(true);
   const [applying, setApplying] = useState(false);
   const [cleanupApplying, setCleanupApplying] = useState(false);
+  const [deletingLegacyTags, setDeletingLegacyTags] = useState(false);
   const [error, setError] = useState(initialError ?? "");
   const [notice, setNotice] = useState("");
 
@@ -117,6 +119,31 @@ export default function ToolsPanel({ initialError }: { initialError?: string | n
       setError((err as Error).message);
     } finally {
       setCleanupApplying(false);
+    }
+  }
+
+  async function removeEmptyLegacyTags() {
+    if (!cleanupReport) return;
+    const emptyTags = cleanupReport.legacyTags.filter((tag) => tag.assetCount === 0 && tag.membershipsToRemove === 0);
+    if (emptyTags.length === 0) return;
+    const confirmed = window.confirm(
+      `Delete ${emptyTags.length} empty legacy placement tag${emptyTags.length === 1 ? "" : "s"}? Atlas will recheck timeline, archive, hidden, and locked assets before deleting each tag.`,
+    );
+    if (!confirmed) return;
+
+    setDeletingLegacyTags(true);
+    setError("");
+    setNotice("");
+    try {
+      const result = await deleteEmptyLegacyTags();
+      setNotice(
+        `Deleted ${result.deleted} empty legacy tag${result.deleted === 1 ? "" : "s"}.${result.failed > 0 ? ` ${result.failed} tag${result.failed === 1 ? "" : "s"} could not be deleted.` : ""}`,
+      );
+      await loadCleanupPreview();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setDeletingLegacyTags(false);
     }
   }
 
@@ -246,6 +273,19 @@ export default function ToolsPanel({ initialError }: { initialError?: string | n
                     {cleanupReport.dryRun ? "Preview only — no placement tags have changed." : "This report reflects the completed cleanup pass."}
                   </span>
                 </div>
+                {cleanupReport.legacyTags.some((tag) => tag.assetCount === 0 && tag.membershipsToRemove === 0) && (
+                  <div style={actionRowStyle}>
+                    <button
+                      type="button"
+                      onClick={() => void removeEmptyLegacyTags()}
+                      disabled={deletingLegacyTags || cleanupApplying}
+                      style={secondaryButtonStyle}
+                    >
+                      {deletingLegacyTags ? "Deleting empty tags…" : "Delete empty legacy tags"}
+                    </button>
+                    <span style={mutedStyle}>Only tags with no memberships in any Immich visibility state will be deleted.</span>
+                  </div>
+                )}
                 {cleanupReport.legacyTags.length > 0 && (
                   <div style={tagTableStyle}>
                     {cleanupReport.legacyTags.map((tag) => (
@@ -316,6 +356,28 @@ function MigrationDocumentRow({ document }: { document: DocumentationGalleryMigr
         <span style={issueCount > 0 || document.skippedReason ? warningTextStyle : successTextStyle}>{status}</span>
       </summary>
       <div style={documentDetailsStyle}>
+        <details style={assetInventoryStyle}>
+          <summary style={assetInventorySummaryStyle}>
+            Immich placement filenames ({document.placementAssets.reduce((total, placement) => total + placement.fileNames.length, 0)})
+          </summary>
+          <div style={assetInventoryDetailsStyle}>
+            {document.placementAssets.map((placement) => (
+              <div key={placement.placementId}>
+                <strong>{placement.placementName}</strong>
+                {placement.fileNames.length > 0 ? (
+                  <ul style={assetFileListStyle}>
+                    {placement.fileNames.map((fileName, index) => <li key={`${placement.placementId}-${index}-${fileName}`}>{fileName}</li>)}
+                  </ul>
+                ) : (
+                  <div style={mutedStyle}>No published image assets found for this placement.</div>
+                )}
+              </div>
+            ))}
+            {document.placementAssets.length === 0 && (
+              <div style={mutedStyle}>No placement is selected.</div>
+            )}
+          </div>
+        </details>
         {document.matches.map((match) => (
           <div key={`${match.assetId}-${match.attachmentId}`} style={matchStyle}>
             <span>{match.wordpressFileName} → {match.immichFileName}</span>
@@ -377,6 +439,10 @@ const mutedStyle: React.CSSProperties = { color: "#8f98a8", fontSize: 12 };
 const loadingStyle: React.CSSProperties = { display: "flex", alignItems: "center", gap: 9, padding: 18, color: "#c9d1df" };
 const spinnerStyle: React.CSSProperties = { width: 15, height: 15, border: "3px solid #c9d1df", borderRightColor: "transparent", borderRadius: "50%", animation: "atlas-tools-spin 700ms linear infinite" };
 const documentListStyle: React.CSSProperties = { display: "grid", gap: 8 };
+const assetInventoryStyle: React.CSSProperties = { marginBottom: 14, border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4 };
+const assetInventorySummaryStyle: React.CSSProperties = { cursor: "pointer", padding: "10px 12px", color: "#c9d1df", fontSize: 13, fontWeight: 600 };
+const assetInventoryDetailsStyle: React.CSSProperties = { display: "grid", gap: 14, padding: "0 12px 12px", color: "#c9d1df", fontSize: 13 };
+const assetFileListStyle: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", columnGap: 24, margin: "8px 0 0", paddingLeft: 22, color: "#aeb6c5", lineHeight: 1.6 };
 const tagTableStyle: React.CSSProperties = { display: "grid", gap: 6, marginBottom: 18 };
 const tagRowStyle: React.CSSProperties = { display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", padding: "9px 11px", background: "rgba(255,255,255,0.045)", border: "1px solid rgba(255,255,255,0.10)", color: "#dce2ec", fontSize: 13 };
 const documentRowStyle: React.CSSProperties = { background: "rgba(255,255,255,0.045)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 5 };

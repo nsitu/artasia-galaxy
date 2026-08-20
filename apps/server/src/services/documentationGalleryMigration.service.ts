@@ -41,6 +41,11 @@ export interface DocumentationGalleryMigrationDocument {
   documentTitle: string;
   placementIds: number[];
   placementNames: string[];
+  placementAssets: Array<{
+    placementId: number;
+    placementName: string;
+    fileNames: string[];
+  }>;
   matches: DocumentationGalleryMigrationMatch[];
   unmatched: Array<{
     attachmentId: number;
@@ -152,6 +157,17 @@ function migrationDocument(
     placementIds: gallery.placement_ids,
     placementNames: gallery.placement_ids
       .map((id) => placementNames.get(id) ?? `Placement ${id}`),
+    placementAssets: gallery.placement_ids.map((placementId) => {
+      const filesByName = new Map<string, string>();
+      for (const assets of assetsByPlacement.get(placementId)?.values() ?? []) {
+        for (const asset of assets) filesByName.set(asset.id, asset.originalFileName);
+      }
+      return {
+        placementId,
+        placementName: placementNames.get(placementId) ?? `Placement ${placementId}`,
+        fileNames: [...filesByName.values()].sort((a, b) => a.localeCompare(b)),
+      };
+    }),
     matches: [],
     unmatched: [],
     ambiguous: [],

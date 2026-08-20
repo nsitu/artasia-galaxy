@@ -1,5 +1,6 @@
 import {
   ensureTag,
+  deleteTag,
   listTags,
   searchAssets,
   tagAssets,
@@ -43,6 +44,16 @@ export interface PlacementTagCleanupReport {
   legacyTags: PlacementTagCleanupTagReport[];
 }
 
+export interface EmptyLegacyTagDeletionReport {
+  dryRun: false;
+  scanned: number;
+  eligible: number;
+  deleted: number;
+  failed: number;
+  deletedTagNames: string[];
+  failedTags: Array<{ tagName: string; error: string }>;
+}
+
 type LegacyTagState = {
   tag: ImmichTag;
   placementIds: Set<number>;
@@ -75,7 +86,7 @@ function findPlacementId(value: string): number | null {
 
 async function searchAllAssetIdsByTag(tagId: string): Promise<Set<string>> {
   const assetIds = new Set<string>();
-  for (const visibility of ["timeline", "archive"] as const) {
+  for (const visibility of ["timeline", "archive", "hidden", "locked"] as const) {
     let page = 1;
     for (;;) {
       const result = await searchAssets({
@@ -305,5 +316,33 @@ export async function applyPlacementTagCleanup(): Promise<PlacementTagCleanupRep
   return {
     ...state.report,
     dryRun: false,
+  };
+}
+
+export async function deleteEmptyLegacyTags(): Promise<EmptyLegacyTagDeletionReport> {
+  const state = await loadCleanupState();
+  const emptyTags = state.report.legacyTags.filter((tag) =>
+    tag.assetCount === 0 && tag.membershipsToRemove === 0,
+  );
+  const deletedTagNames: string[] = [];
+  const failedTags: Array<{ tagName: string; error: string }> = [];
+
+  for (const tag of emptyTags) {
+    try {
+      await deleteTag(tag.tagId);
+      deletedTagNames.push(tag.tagName);
+    } catch (err) {
+      failedTags.push({ tagName: tag.tagName, error: (err as Error).message });
+    }
+  }
+
+  return {
+    dryRun: false,
+    scanned: state.report.legacyTags.length,
+    eligible: emptyTags.length,
+    deleted: deletedTagNames.length,
+    failed: failedTags.length,
+    deletedTagNames,
+    failedTags,
   };
 }
