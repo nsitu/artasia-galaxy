@@ -1441,6 +1441,49 @@ function artasia_documentation_meta_box_html(WP_Post $post): void
         'orderby'     => 'title',
         'order'       => 'ASC',
     ]);
+    $placement_groups = [];
+    $partner_ids = [];
+    foreach ($placements as $placement) {
+        $partner_id = absint(get_post_meta($placement->ID, 'artasia_partner_id', true));
+        $placement_groups[$partner_id][] = $placement;
+        if ($partner_id) {
+            $partner_ids[$partner_id] = $partner_id;
+        }
+    }
+
+    $partner_lookup = [];
+    if ($partner_ids) {
+        $partners = get_posts([
+            'post_type'      => 'artasia_partner',
+            'post__in'       => array_values($partner_ids),
+            'posts_per_page' => -1,
+            'orderby'        => 'title',
+            'order'          => 'ASC',
+            'no_found_rows'  => true,
+        ]);
+        foreach ($partners as $partner) {
+            $partner_lookup[$partner->ID] = $partner->post_title;
+        }
+    }
+
+    $placement_groups = array_map(
+        static function (array $group, int $partner_id) use ($partner_lookup): array {
+            usort($group, static function (WP_Post $a, WP_Post $b): int {
+                return strcasecmp($a->post_title, $b->post_title);
+            });
+
+            return [
+                'partner_name' => $partner_lookup[$partner_id] ?? 'Other placements',
+                'placements'   => $group,
+            ];
+        },
+        $placement_groups,
+        array_keys($placement_groups)
+    );
+    usort($placement_groups, static function (array $a, array $b): int {
+        return strcasecmp($a['partner_name'], $b['partner_name']);
+    });
+
     $people_ids = artasia_sanitize_integer_array_meta(
         get_post_meta($post->ID, 'artasia_documentation_people_ids', true)
     );
@@ -1503,15 +1546,19 @@ function artasia_documentation_meta_box_html(WP_Post $post): void
             <td>
                 <select id="artasia_documentation_placement_ids" name="artasia_documentation_placement_ids[]" class="widefat">
                     <option value="">&mdash; Select Placement &mdash;</option>
-                    <?php foreach ($placements as $placement) : ?>
-                        <?php
-                        $placement_section = trim((string) get_post_meta($placement->ID, 'artasia_section', true));
-                        $placement_label = $placement->post_title
-                            . ($placement_section !== '' ? ' — ' . $placement_section : '');
-                        ?>
-                        <option value="<?php echo esc_attr($placement->ID); ?>" <?php selected($placement_id, $placement->ID); ?>>
-                            <?php echo esc_html($placement_label); ?>
-                        </option>
+                    <?php foreach ($placement_groups as $placement_group) : ?>
+                        <optgroup label="<?php echo esc_attr($placement_group['partner_name']); ?>">
+                            <?php foreach ($placement_group['placements'] as $placement) : ?>
+                                <?php
+                                $placement_section = trim((string) get_post_meta($placement->ID, 'artasia_section', true));
+                                $placement_label = $placement->post_title
+                                    . ($placement_section !== '' ? ' — ' . $placement_section : '');
+                                ?>
+                                <option value="<?php echo esc_attr($placement->ID); ?>" <?php selected($placement_id, $placement->ID); ?>>
+                                    <?php echo esc_html($placement_label); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </optgroup>
                     <?php endforeach; ?>
                 </select>
                 <p class="description">Select the placement that defines where and in what program context the documentation occurred.</p>
@@ -1565,13 +1612,20 @@ function artasia_documentation_gallery_meta_box_html(WP_Post $post): void
 {
     $gallery_source = get_post_meta($post->ID, 'artasia_documentation_gallery_source', true);
     $gallery_source = $gallery_source === 'atlas' ? 'atlas' : 'wordpress';
+    $placement_ids = artasia_sanitize_integer_array_meta(
+        get_post_meta($post->ID, 'artasia_documentation_placement_ids', true)
+    );
+    $placement_id = $placement_ids[0] ?? 0;
     $gallery_ids = artasia_validate_image_attachment_ids(
         get_post_meta($post->ID, 'artasia_documentation_gallery_ids', true)
     );
     $saved_captions = artasia_sanitize_text_array_meta(
         get_post_meta($post->ID, 'artasia_documentation_gallery_captions', true)
     );
-    $atlas_admin_url = artasia_atlas_base_url() . '/admin';
+    $atlas_admin_url = artasia_atlas_base_url() . '/admin/browse';
+    if ($placement_id) {
+        $atlas_admin_url = add_query_arg('site', $placement_id, $atlas_admin_url);
+    }
     $atlas_preview_endpoint = rest_url('artasia/v1/documentation/' . $post->ID . '/process-gallery');
 ?>
     <p>
@@ -1617,7 +1671,14 @@ function artasia_documentation_gallery_meta_box_html(WP_Post $post): void
         <p><strong>Atlas process gallery</strong></p>
         <p>Published Atlas assets tagged as <code>Process</code> for the selected placement will be displayed automatically. Upload, tag, publish, and manage those assets in Atlas.</p>
         <p>
-            <a class="button button-secondary" href="<?php echo esc_url($atlas_admin_url); ?>" target="_blank" rel="noopener noreferrer">Manage process assets in Atlas</a>
+            <a
+                class="button button-secondary"
+                href="<?php echo esc_url($atlas_admin_url); ?>"
+                data-artasia-atlas-browse-link
+                data-artasia-atlas-browse-base-url="<?php echo esc_url(artasia_atlas_base_url() . '/admin/browse'); ?>"
+                target="_blank"
+                rel="noopener noreferrer"
+            >Manage process assets in Atlas</a>
         </p>
         <div
             class="artasia-documentation-atlas-preview"

@@ -284,7 +284,22 @@ jQuery(function ($) {
     var $status = $preview.find('[data-artasia-atlas-preview-status]');
     var $items = $preview.find('[data-artasia-atlas-preview-items]');
     var $refresh = $preview.find('[data-artasia-atlas-preview-refresh]');
+    var $atlasBrowseLink = $('[data-artasia-atlas-browse-link]');
+    var atlasBrowseBaseUrl = $atlasBrowseLink.attr('data-artasia-atlas-browse-base-url');
     var requestNumber = 0;
+
+    function updateAtlasBrowseLink() {
+      if (!$atlasBrowseLink.length || !atlasBrowseBaseUrl) {
+        return;
+      }
+
+      var placementId = String($placement.val() || '').trim();
+      var browseUrl = atlasBrowseBaseUrl;
+      if (placementId) {
+        browseUrl += (browseUrl.indexOf('?') === -1 ? '?' : '&') + 'site=' + encodeURIComponent(placementId);
+      }
+      $atlasBrowseLink.attr('href', browseUrl);
+    }
 
     function setStatus(message) {
       $status.text(message);
@@ -391,11 +406,15 @@ jQuery(function ($) {
     }
 
     $source.on('change', loadPreview);
-    $placement.on('change', loadPreview);
+    $placement.on('change', function () {
+      updateAtlasBrowseLink();
+      loadPreview();
+    });
     $refresh.on('click', function (event) {
       event.preventDefault();
       loadPreview();
     });
+    updateAtlasBrowseLink();
     loadPreview();
   }
 
