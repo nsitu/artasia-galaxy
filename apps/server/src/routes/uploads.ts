@@ -1571,28 +1571,31 @@ router.get("/assets", async (req, res) => {
     }
 
     if (assetType) {
-      const assetTypeTagName = assetTypeTag(assetType);
       if (embeddedAssetTagsAvailable(assets)) {
         assets = assets.filter((asset) =>
-          embeddedTagKeys(asset).has(assetTypeTagName),
+          getAssetTypeFromTagValues([...embeddedTagKeys(asset)]) === assetType,
         );
       } else {
-        const assetTypeTagIds = tags
+        const processTagIds = tags
           .filter((tag) =>
             [tag.name, tag.value].some(
-              (value) => parseAssetTypeTagValue(value) === assetType,
+              (value) => parseAssetTypeTagValue(value) === "process",
             ),
           )
           .map((tag) => tag.id);
-        if (assetTypeTagIds.length === 0) {
-          assets = [];
+        if (processTagIds.length === 0) {
+          if (assetType === "process") assets = [];
         } else {
-          const assetIds = new Set(
+          const processAssetIds = new Set(
             (
-              await Promise.all(assetTypeTagIds.map(searchAdminAssetIdsByTag))
+              await Promise.all(processTagIds.map(searchAdminAssetIdsByTag))
             ).flat(),
           );
-          assets = assets.filter((asset) => assetIds.has(asset.id));
+          assets = assets.filter((asset) =>
+            assetType === "process"
+              ? processAssetIds.has(asset.id)
+              : !processAssetIds.has(asset.id),
+          );
         }
       }
     }
