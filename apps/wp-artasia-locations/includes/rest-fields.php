@@ -119,6 +119,8 @@ function artasia_get_documentation_galleries(): WP_REST_Response
                 'file_name'     => $file_name,
                 'caption'       => $caption,
                 'alt'           => trim((string) get_post_meta($attachment_id, '_wp_attachment_image_alt', true)),
+                'source_url'    => esc_url_raw((string) wp_get_attachment_url($attachment_id)),
+                'mime_type'     => (string) get_post_mime_type($attachment_id),
             ];
         }
 

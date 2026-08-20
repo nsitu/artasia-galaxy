@@ -1,16 +1,16 @@
 import { useEffect, useState } from "react";
 import {
   applyDocumentationGalleryMigration,
-  applyPlacementTagCleanup,
-  deleteEmptyLegacyTags,
+  importDocumentationGalleries,
   fetchAuthUser,
   logoutAuthUser,
+  previewDocumentationGalleryImport,
   previewDocumentationGalleryMigration,
-  previewPlacementTagCleanup,
   type AuthUser,
+  type DocumentationGalleryImportDocument,
+  type DocumentationGalleryImportReport,
   type DocumentationGalleryMigrationDocument,
   type DocumentationGalleryMigrationReport,
-  type PlacementTagCleanupReport,
 } from "../../api/client";
 
 const tabs = [
@@ -25,12 +25,11 @@ const tabs = [
 export default function ToolsPanel({ initialError }: { initialError?: string | null }) {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [report, setReport] = useState<DocumentationGalleryMigrationReport | null>(null);
-  const [cleanupReport, setCleanupReport] = useState<PlacementTagCleanupReport | null>(null);
+  const [importReport, setImportReport] = useState<DocumentationGalleryImportReport | null>(null);
   const [loading, setLoading] = useState(true);
-  const [cleanupLoading, setCleanupLoading] = useState(true);
+  const [importLoading, setImportLoading] = useState(true);
   const [applying, setApplying] = useState(false);
-  const [cleanupApplying, setCleanupApplying] = useState(false);
-  const [deletingLegacyTags, setDeletingLegacyTags] = useState(false);
+  const [importApplying, setImportApplying] = useState(false);
   const [error, setError] = useState(initialError ?? "");
   const [notice, setNotice] = useState("");
 
@@ -48,15 +47,15 @@ export default function ToolsPanel({ initialError }: { initialError?: string | n
     }
   }
 
-  async function loadCleanupPreview() {
-    setCleanupLoading(true);
+  async function loadImportPreview() {
+    setImportLoading(true);
     setError("");
     try {
-      setCleanupReport(await previewPlacementTagCleanup());
+      setImportReport(await previewDocumentationGalleryImport());
     } catch (err) {
       setError((err as Error).message);
     } finally {
-      setCleanupLoading(false);
+      setImportLoading(false);
     }
   }
 
@@ -65,7 +64,7 @@ export default function ToolsPanel({ initialError }: { initialError?: string | n
       .then(setAuthUser)
       .catch((err) => setError((err as Error).message));
     void loadPreview();
-    void loadCleanupPreview();
+    void loadImportPreview();
   }, []);
 
   async function applyMigration() {
@@ -91,59 +90,34 @@ export default function ToolsPanel({ initialError }: { initialError?: string | n
     }
   }
 
+  async function applyImport() {
+    if (!importReport || (importReport.imagesToImport === 0 && importReport.documentsReadyToSwitch === 0)) return;
+    const confirmed = window.confirm(
+      `Import ${importReport.imagesToImport} WordPress image${importReport.imagesToImport === 1 ? "" : "s"} into Immich, mark them as Process, publish them, and switch ${importReport.documentsReadyToSwitch} document${importReport.documentsReadyToSwitch === 1 ? "" : "s"} to Atlas galleries after successful completion?`,
+    );
+    if (!confirmed) return;
+
+    setImportApplying(true);
+    setError("");
+    setNotice("");
+    try {
+      const applied = await importDocumentationGalleries();
+      setImportReport(applied);
+      setNotice(
+        `WordPress gallery import completed: ${applied.imagesImported} image${applied.imagesImported === 1 ? "" : "s"} imported, ${applied.imagesFailed} failed, and ${applied.sourceDocumentsUpdated} document${applied.sourceDocumentsUpdated === 1 ? "" : "s"} switched to Atlas.${applied.sourceUpdateError ? ` WordPress source updates failed: ${applied.sourceUpdateError}` : ""}`,
+      );
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setImportApplying(false);
+    }
+  }
+
   async function signOut() {
     try {
       await logoutAuthUser();
     } finally {
       window.location.href = "/admin";
-    }
-  }
-
-  async function applyCleanup() {
-    if (!cleanupReport || (cleanupReport.assetsToAnchor === 0 && cleanupReport.membershipsToRemove === 0)) return;
-    const confirmed = window.confirm(
-      `Backfill ${cleanupReport.assetsToAnchor} durable placement anchor${cleanupReport.assetsToAnchor === 1 ? "" : "s"} and remove ${cleanupReport.membershipsToRemove} safe legacy tag membership${cleanupReport.membershipsToRemove === 1 ? "" : "s"}? Ambiguous and conflicting assets will be left untouched.`,
-    );
-    if (!confirmed) return;
-
-    setCleanupApplying(true);
-    setError("");
-    setNotice("");
-    try {
-      const applied = await applyPlacementTagCleanup();
-      setCleanupReport(applied);
-      setNotice(
-        `Placement tag cleanup applied: ${applied.assetsToAnchor} durable anchor${applied.assetsToAnchor === 1 ? "" : "s"} backfilled and ${applied.membershipsToRemove} legacy membership${applied.membershipsToRemove === 1 ? "" : "s"} removed.`,
-      );
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setCleanupApplying(false);
-    }
-  }
-
-  async function removeEmptyLegacyTags() {
-    if (!cleanupReport) return;
-    const emptyTags = cleanupReport.legacyTags.filter((tag) => tag.assetCount === 0 && tag.membershipsToRemove === 0);
-    if (emptyTags.length === 0) return;
-    const confirmed = window.confirm(
-      `Delete ${emptyTags.length} empty legacy placement tag${emptyTags.length === 1 ? "" : "s"}? Atlas will recheck timeline, archive, and hidden assets before deleting each tag. Locked assets require a separate elevated Immich user session.`,
-    );
-    if (!confirmed) return;
-
-    setDeletingLegacyTags(true);
-    setError("");
-    setNotice("");
-    try {
-      const result = await deleteEmptyLegacyTags();
-      setNotice(
-        `Deleted ${result.deleted} empty legacy tag${result.deleted === 1 ? "" : "s"}.${result.failed > 0 ? ` ${result.failed} tag${result.failed === 1 ? "" : "s"} could not be deleted.` : ""}`,
-      );
-      await loadCleanupPreview();
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setDeletingLegacyTags(false);
     }
   }
 
@@ -183,6 +157,55 @@ export default function ToolsPanel({ initialError }: { initialError?: string | n
         {notice && <div style={successStyle}>{notice}</div>}
 
         <section style={contentStyle}>
+          <section style={toolSectionStyle}>
+            <div className="atlas-tools-heading" style={headingRowStyle}>
+              <div>
+                <p style={eyebrowStyle}>Recommended</p>
+                <h2 style={headingStyle}>Import WordPress galleries into Atlas</h2>
+              </div>
+              <button type="button" onClick={() => void loadImportPreview()} disabled={importLoading || importApplying} style={secondaryButtonStyle}>
+                {importLoading ? "Scanning…" : "Refresh preview"}
+              </button>
+            </div>
+            <p style={descriptionStyle}>
+              Download the selected WordPress gallery images directly into Immich, mark them as Process, apply their placement anchors, publish them, and switch each document to its Atlas gallery after every image imports successfully. Existing imports are recognized by their WordPress attachment source marker.
+            </p>
+
+            {importLoading && <div style={loadingStyle}><span style={spinnerStyle} /> Scanning WordPress galleries and Immich source markers…</div>}
+            {importReport && !importLoading && (
+              <>
+                <div style={summaryGridStyle}>
+                  <Summary label="Documents" value={importReport.documentsScanned} />
+                  <Summary label="Images to import" value={importReport.imagesToImport} />
+                  <Summary label="Already imported" value={importReport.imagesAlreadyImported} />
+                  <Summary label="Ready to switch" value={importReport.documentsReadyToSwitch} />
+                  <Summary label="Failed / review" value={importReport.imagesFailed} warning />
+                </div>
+                <div style={actionRowStyle}>
+                  <button
+                    type="button"
+                    onClick={() => void applyImport()}
+                    disabled={importApplying || (importReport.imagesToImport === 0 && importReport.documentsReadyToSwitch === 0)}
+                    style={primaryButtonStyle}
+                  >
+                    {importApplying ? "Importing galleries…" : "Import WordPress galleries"}
+                  </button>
+                  <span style={mutedStyle}>
+                    {importReport.dryRun ? "Preview only — no images have been downloaded or changed." : "This report reflects the completed import pass."}
+                  </span>
+                </div>
+                <div style={documentListStyle}>
+                  {importReport.documents.map((document) => (
+                    <DocumentationImportDocumentRow key={document.documentId} document={document} />
+                  ))}
+                  {importReport.documents.length === 0 && (
+                    <div style={emptyStyle}>No published WordPress galleries using the legacy WordPress source were found.</div>
+                  )}
+                </div>
+              </>
+            )}
+          </section>
+
           <div style={headingRowStyle}>
             <div>
               <p style={eyebrowStyle}>Maintenance</p>
@@ -235,87 +258,6 @@ export default function ToolsPanel({ initialError }: { initialError?: string | n
             </>
           )}
 
-          <section style={toolSectionStyle}>
-            <div className="atlas-tools-heading" style={headingRowStyle}>
-              <div>
-                <p style={eyebrowStyle}>Maintenance</p>
-                <h2 style={headingStyle}>Placement tag cleanup</h2>
-              </div>
-              <button type="button" onClick={() => void loadCleanupPreview()} disabled={cleanupLoading || cleanupApplying} style={secondaryButtonStyle}>
-                {cleanupLoading ? "Scanning…" : "Refresh preview"}
-              </button>
-            </div>
-            <p style={descriptionStyle}>
-              Backfill durable <code>placement:&lt;id&gt;</code> tags for unambiguous legacy partner or placement-name matches, then detach those human-readable tags from safely anchored assets. Legacy memberships without a unique durable match, and placement conflicts, are left untouched for manual review. The legacy read fallback remains available during this transition.
-            </p>
-
-            {cleanupLoading && <div style={loadingStyle}><span style={spinnerStyle} /> Scanning Immich placement tags…</div>}
-            {cleanupReport && !cleanupLoading && (
-              <>
-                <div style={summaryGridStyle}>
-                  <Summary label="Legacy tags" value={cleanupReport.legacyTagsFound} />
-                  <Summary label="Legacy memberships" value={cleanupReport.legacyMemberships} />
-                  <Summary label="Assets to anchor" value={cleanupReport.assetsToAnchor} />
-                  <Summary label="Memberships to remove" value={cleanupReport.membershipsToRemove} />
-                  <Summary label="Ambiguous" value={cleanupReport.ambiguousAssets.length} warning />
-                  <Summary label="Conflicts" value={cleanupReport.conflictingAssets.length} warning />
-                </div>
-                <div style={actionRowStyle}>
-                  <button
-                    type="button"
-                    onClick={() => void applyCleanup()}
-                    disabled={cleanupApplying || (cleanupReport.assetsToAnchor === 0 && cleanupReport.membershipsToRemove === 0)}
-                    style={primaryButtonStyle}
-                  >
-                    {cleanupApplying ? "Applying cleanup…" : "Apply safe cleanup"}
-                  </button>
-                  <span style={mutedStyle}>
-                    {cleanupReport.dryRun ? "Preview only — no placement tags have changed." : "This report reflects the completed cleanup pass."}
-                  </span>
-                </div>
-                {cleanupReport.legacyTags.some((tag) => tag.assetCount === 0 && tag.membershipsToRemove === 0) && (
-                  <div style={actionRowStyle}>
-                    <button
-                      type="button"
-                      onClick={() => void removeEmptyLegacyTags()}
-                      disabled={deletingLegacyTags || cleanupApplying}
-                      style={secondaryButtonStyle}
-                    >
-                      {deletingLegacyTags ? "Deleting empty tags…" : "Delete empty legacy tags"}
-                    </button>
-                    <span style={mutedStyle}>Only tags with no memberships in API-key-visible timeline, archive, or hidden assets will be deleted. Immich locked assets require a separate elevated user session.</span>
-                  </div>
-                )}
-                {cleanupReport.legacyTags.length > 0 && (
-                  <div style={tagTableStyle}>
-                    {cleanupReport.legacyTags.map((tag) => (
-                      <div key={tag.tagId} style={tagRowStyle}>
-                        <strong>{tag.tagName}</strong>
-                        <span style={mutedStyle}>
-                          {tag.assetCount} asset{tag.assetCount === 1 ? "" : "s"} · {tag.membershipsToRemove} membership{tag.membershipsToRemove === 1 ? "" : "s"} eligible for removal
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {(cleanupReport.ambiguousAssets.length > 0 || cleanupReport.conflictingAssets.length > 0) && (
-                  <details style={documentRowStyle}>
-                    <summary style={documentSummaryStyle}>Review unresolved assets</summary>
-                    <div style={documentDetailsStyle}>
-                      {[...cleanupReport.ambiguousAssets, ...cleanupReport.conflictingAssets].map((issue) => (
-                        <div key={`${issue.reason}-${issue.assetId}`} style={issueStyle}>
-                          <strong>{issue.assetId}</strong> · {issue.reason} · legacy tags: {issue.legacyTags.join(", ")}
-                        </div>
-                      ))}
-                    </div>
-                  </details>
-                )}
-                {cleanupReport.legacyTags.length === 0 && (
-                  <div style={emptyStyle}>No configured partner or placement-name tags were found in Immich.</div>
-                )}
-              </>
-            )}
-          </section>
         </section>
       </section>
       <style>{`
@@ -335,6 +277,47 @@ function Summary({ label, value, warning = false }: { label: string; value: numb
       <strong style={summaryValueStyle}>{value}</strong>
       <span style={summaryLabelStyle}>{label}</span>
     </div>
+  );
+}
+
+function DocumentationImportDocumentRow({ document }: { document: DocumentationGalleryImportDocument }) {
+  const issueCount = document.assets.filter((asset) =>
+    ["missing-source", "unsupported", "duplicate-source", "failed"].includes(asset.status),
+  ).length;
+  const status = document.sourceSwitched
+    ? "Atlas gallery"
+    : issueCount > 0
+      ? `${issueCount} image${issueCount === 1 ? "" : "s"} need review`
+      : `${document.assets.length} image${document.assets.length === 1 ? "" : "s"} ready`;
+
+  return (
+    <details style={documentRowStyle}>
+      <summary style={documentSummaryStyle}>
+        <span>
+          <strong>{document.documentTitle}</strong>
+          <span style={documentMetaStyle}>{document.placementNames.join(", ") || "No placement"}</span>
+        </span>
+        <span style={issueCount > 0 ? warningTextStyle : successTextStyle}>{status}</span>
+      </summary>
+      <div style={documentDetailsStyle}>
+        {document.assets.map((asset) => {
+          const isIssue = ["missing-source", "unsupported", "duplicate-source", "failed"].includes(asset.status);
+          const statusLabel = asset.status === "already-imported"
+            ? "Already imported"
+            : asset.status === "imported"
+              ? "Imported"
+              : asset.status === "ready"
+                ? "Ready to import"
+                : asset.status;
+          return (
+            <div key={asset.attachmentId} style={isIssue ? issueStyle : matchStyle}>
+              <span><strong>{asset.wordpressFileName}</strong>{asset.wordpressCaption ? ` — ${asset.wordpressCaption}` : ""}</span>
+              <span style={mutedStyle}>{statusLabel}{asset.error ? ` · ${asset.error}` : ""}</span>
+            </div>
+          );
+        })}
+      </div>
+    </details>
   );
 }
 
@@ -422,7 +405,7 @@ const tabStyle: React.CSSProperties = { display: "inline-flex", alignItems: "cen
 const activeTabStyle: React.CSSProperties = { color: "#eef3fb", borderBottomColor: "#e8edf8" };
 const iconStyle: React.CSSProperties = { fontFamily: "'Material Symbols Outlined'", fontSize: 20 };
 const contentStyle: React.CSSProperties = { maxWidth: 1180 };
-const toolSectionStyle: React.CSSProperties = { marginTop: 42, paddingTop: 28, borderTop: "1px solid rgba(255,255,255,0.14)" };
+const toolSectionStyle: React.CSSProperties = { marginBottom: 42, paddingBottom: 28, borderBottom: "1px solid rgba(255,255,255,0.14)" };
 const headingRowStyle: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 18, marginBottom: 12 };
 const eyebrowStyle: React.CSSProperties = { margin: "0 0 4px", color: "#9aa3b3", textTransform: "uppercase", letterSpacing: "0.12em", fontSize: 11, fontWeight: 700 };
 const headingStyle: React.CSSProperties = { margin: 0, fontSize: 28, fontWeight: 600, color: "#f3f5fa" };
@@ -443,8 +426,6 @@ const assetInventoryStyle: React.CSSProperties = { marginBottom: 14, border: "1p
 const assetInventorySummaryStyle: React.CSSProperties = { cursor: "pointer", padding: "10px 12px", color: "#c9d1df", fontSize: 13, fontWeight: 600 };
 const assetInventoryDetailsStyle: React.CSSProperties = { display: "grid", gap: 14, padding: "0 12px 12px", color: "#c9d1df", fontSize: 13 };
 const assetFileListStyle: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", columnGap: 24, margin: "8px 0 0", paddingLeft: 22, color: "#aeb6c5", lineHeight: 1.6 };
-const tagTableStyle: React.CSSProperties = { display: "grid", gap: 6, marginBottom: 18 };
-const tagRowStyle: React.CSSProperties = { display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", padding: "9px 11px", background: "rgba(255,255,255,0.045)", border: "1px solid rgba(255,255,255,0.10)", color: "#dce2ec", fontSize: 13 };
 const documentRowStyle: React.CSSProperties = { background: "rgba(255,255,255,0.045)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 5 };
 const documentSummaryStyle: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, padding: "13px 15px", cursor: "pointer", listStyle: "none" };
 const documentMetaStyle: React.CSSProperties = { display: "block", marginTop: 4, color: "#8f98a8", fontSize: 12 };

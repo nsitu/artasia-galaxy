@@ -138,49 +138,52 @@ export function applyDocumentationGalleryMigration() {
   return fetchDocumentationGalleryMigration({ method: "POST" });
 }
 
-export interface PlacementTagCleanupTagReport {
-  tagId: string;
-  tagName: string;
+export type DocumentationGalleryImportAssetStatus =
+  | "ready"
+  | "already-imported"
+  | "imported"
+  | "missing-source"
+  | "unsupported"
+  | "duplicate-source"
+  | "failed";
+
+export interface DocumentationGalleryImportAsset {
+  attachmentId: number;
+  wordpressFileName: string;
+  wordpressCaption: string;
+  status: DocumentationGalleryImportAssetStatus;
+  assetId?: string;
+  error?: string;
+}
+
+export interface DocumentationGalleryImportDocument {
+  documentId: number;
+  documentTitle: string;
   placementIds: number[];
-  assetCount: number;
-  membershipsToRemove: number;
+  placementNames: string[];
+  assets: DocumentationGalleryImportAsset[];
+  sourceSwitched: boolean;
 }
 
-export interface PlacementTagCleanupIssue {
-  assetId: string;
-  legacyTags: string[];
-  candidatePlacementIds: number[];
-  durablePlacementIds: number[];
-  reason: "ambiguous" | "conflict";
-}
-
-export interface PlacementTagCleanupReport {
+export interface DocumentationGalleryImportReport {
   dryRun: boolean;
   generatedAt: string;
-  placementsScanned: number;
-  legacyTagsFound: number;
-  legacyMemberships: number;
-  assetsWithLegacyTags: number;
-  assetsAlreadyAnchored: number;
-  assetsToAnchor: number;
-  membershipsToRemove: number;
-  ambiguousAssets: PlacementTagCleanupIssue[];
-  conflictingAssets: PlacementTagCleanupIssue[];
-  legacyTags: PlacementTagCleanupTagReport[];
+  documentsScanned: number;
+  imagesScanned: number;
+  imagesToImport: number;
+  imagesAlreadyImported: number;
+  imagesImported: number;
+  imagesFailed: number;
+  documentsReadyToSwitch: number;
+  sourceDocumentsUpdated: number;
+  sourceUpdateError?: string;
+  documents: DocumentationGalleryImportDocument[];
 }
 
-export interface EmptyLegacyTagDeletionReport {
-  dryRun: false;
-  scanned: number;
-  eligible: number;
-  deleted: number;
-  failed: number;
-  deletedTagNames: string[];
-  failedTags: Array<{ tagName: string; error: string }>;
-}
-
-async function fetchPlacementTagCleanup(init?: RequestInit) {
-  const res = await fetch("/api/v1/tools/placement-tag-cleanup", {
+async function fetchDocumentationGalleryImport(
+  init?: RequestInit,
+): Promise<DocumentationGalleryImportReport> {
+  const res = await fetch("/api/v1/tools/documentation-gallery-import", {
     credentials: "same-origin",
     ...init,
   });
@@ -188,27 +191,15 @@ async function fetchPlacementTagCleanup(init?: RequestInit) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(body.error ?? `HTTP ${res.status}`);
   }
-  return res.json() as Promise<PlacementTagCleanupReport>;
+  return res.json() as Promise<DocumentationGalleryImportReport>;
 }
 
-export function previewPlacementTagCleanup() {
-  return fetchPlacementTagCleanup();
+export function previewDocumentationGalleryImport() {
+  return fetchDocumentationGalleryImport();
 }
 
-export function applyPlacementTagCleanup() {
-  return fetchPlacementTagCleanup({ method: "POST" });
-}
-
-export async function deleteEmptyLegacyTags(): Promise<EmptyLegacyTagDeletionReport> {
-  const res = await fetch("/api/v1/tools/placement-tag-cleanup/delete-empty", {
-    method: "POST",
-    credentials: "same-origin",
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(body.error ?? `HTTP ${res.status}`);
-  }
-  return res.json() as Promise<EmptyLegacyTagDeletionReport>;
+export function importDocumentationGalleries() {
+  return fetchDocumentationGalleryImport({ method: "POST" });
 }
 
 export async function fetchSlideshow(params: {

@@ -5,10 +5,9 @@ import {
   previewDocumentationGalleryMigration,
 } from "../services/documentationGalleryMigration.service.js";
 import {
-  applyPlacementTagCleanup,
-  deleteEmptyLegacyTags,
-  previewPlacementTagCleanup,
-} from "../services/placementTagCleanup.service.js";
+  importDocumentationGalleries,
+  previewDocumentationGalleryImport,
+} from "../services/documentationGalleryImport.service.js";
 
 const router = Router();
 
@@ -39,28 +38,19 @@ router.post("/documentation-gallery-migration", async (req, res) => {
   }
 });
 
-router.get("/placement-tag-cleanup", async (req, res) => {
+router.get("/documentation-gallery-import", async (req, res) => {
   try {
     if (!(await requireAuthenticated(req, res))) return;
-    res.json(await previewPlacementTagCleanup());
+    res.json(await previewDocumentationGalleryImport());
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });
   }
 });
 
-router.post("/placement-tag-cleanup", async (req, res) => {
+router.post("/documentation-gallery-import", async (req, res) => {
   try {
     if (!(await requireAuthenticated(req, res))) return;
-    res.json(await applyPlacementTagCleanup());
-  } catch (err) {
-    res.status(502).json({ error: (err as Error).message });
-  }
-});
-
-router.post("/placement-tag-cleanup/delete-empty", async (req, res) => {
-  try {
-    if (!(await requireAuthenticated(req, res))) return;
-    res.json(await deleteEmptyLegacyTags());
+    res.json(await importDocumentationGalleries());
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });
   }

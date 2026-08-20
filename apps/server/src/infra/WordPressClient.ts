@@ -65,6 +65,8 @@ export interface WpDocumentationGalleryAsset {
   file_name: string;
   caption: string;
   alt: string;
+  source_url: string;
+  mime_type: string;
 }
 
 export interface WpDocumentationGallery {

@@ -669,15 +669,6 @@ export async function renameTag(tagId: string, newName: string): Promise<ImmichT
   return renamed;
 }
 
-export async function deleteTag(tagId: string): Promise<void> {
-  if (!isValidUUID(tagId)) {
-    throw new Error(`Invalid tag ID: "${tagId}". Expected UUID format.`);
-  }
-  await immichRequest(`/tags/${tagId}`, { method: "DELETE" });
-  tagAssetIdsCache.delete(tagId);
-  tagsCache = null;
-}
-
 export async function getServerStatistics(): Promise<ImmichServerStats> {
   const res = await immichRequest("/server/statistics");
   return res.json();
@@ -737,6 +728,31 @@ export async function uploadAssetStream(params: {
 
   return uploadAssetBlob({
     blob,
+    checksum,
+    filename: params.filename,
+    createdAt,
+    modifiedAt,
+    legacyDeviceAssetId: params.deviceAssetId,
+  });
+}
+
+export async function uploadAssetBuffer(params: {
+  buffer: Buffer;
+  filename: string;
+  mimeType: string;
+  deviceAssetId: string;
+  createdAt?: Date;
+  modifiedAt?: Date;
+}): Promise<ImmichUploadResponse> {
+  const createdAt = params.createdAt ?? new Date();
+  const modifiedAt = params.modifiedAt ?? createdAt;
+  const checksum = createHash("sha1").update(params.buffer).digest("hex");
+  const arrayBuffer = params.buffer.buffer.slice(
+    params.buffer.byteOffset,
+    params.buffer.byteOffset + params.buffer.byteLength,
+  ) as ArrayBuffer;
+  return uploadAssetBlob({
+    blob: new Blob([arrayBuffer], { type: params.mimeType }),
     checksum,
     filename: params.filename,
     createdAt,
