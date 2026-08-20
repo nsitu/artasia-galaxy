@@ -358,12 +358,17 @@ export async function fetchPlacementAssets(placementId: number): Promise<Placeme
   return body.assets ?? [];
 }
 
-export async function fetchPlacementAssetSet(placementIds: number[], activityId?: number): Promise<PlacementAsset[]> {
+export async function fetchPlacementAssetSet(
+  placementIds: number[],
+  activityId?: number,
+  assetType?: AssetType,
+): Promise<PlacementAsset[]> {
   if (placementIds.length === 0) return [];
   const params = new URLSearchParams({
     placement_ids: placementIds.join(","),
   });
   if (activityId != null) params.set("activity_id", String(activityId));
+  if (assetType != null) params.set("asset_type", assetType);
   const res = await fetch(`/api/v1/uploads/assets?${params.toString()}`);
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));

@@ -310,6 +310,7 @@ export default function UploadPanel({
   );
   const browseAssetStatusWasManuallySelectedRef = useRef(false);
   const [siteScope, setSiteScope] = useState<SiteScope>("select");
+  const [assetTypeFilter, setAssetTypeFilter] = useState<"" | AssetType>("");
   const [siteSort, setSiteSort] = useState<SiteSort>("published-assets");
   const [siteActivityStats, setSiteActivityStats] = useState<
     SiteActivityStats["sites"]
@@ -647,6 +648,7 @@ export default function UploadPanel({
     setPlacementKey(site ? String(site.placement_id) : "");
     setSiteScope(site ? "placement" : "select");
     setActivityTagFilter(site && activity ? String(activity.id) : "");
+    setAssetTypeFilter("");
     if (mode === "browse") {
       const hasRequestedStatus = BROWSE_ASSET_STATUSES.some(
         (status) => status.value === requestedStatus,
@@ -1444,6 +1446,7 @@ export default function UploadPanel({
     mediaRefreshAttempt,
     visiblePlacementIds,
     activityTagFilter,
+    assetTypeFilter,
   ]);
 
   useEffect(() => {
@@ -1531,6 +1534,7 @@ export default function UploadPanel({
     fetchPlacementAssetSet(
       visiblePlacementIds,
       activityTagFilter ? parseInt(activityTagFilter, 10) : undefined,
+      assetTypeFilter || undefined,
     )
       .then((assets) => {
         if (!cancelled) {
@@ -1550,6 +1554,7 @@ export default function UploadPanel({
     };
   }, [
     activityTagFilter,
+    assetTypeFilter,
     routeSelectionResolved,
     visiblePlacementIds,
     workspaceMode,
@@ -2160,7 +2165,11 @@ export default function UploadPanel({
       return;
     }
 
-    const request = fetchPlacementAssetSet(visiblePlacementIds, activityId);
+    const request = fetchPlacementAssetSet(
+      visiblePlacementIds,
+      activityId,
+      assetTypeFilter || undefined,
+    );
 
     request
       .then((assets) => {
@@ -6511,6 +6520,24 @@ export default function UploadPanel({
                       </div>
                     )}
                 </>
+              )}
+
+              {workspaceMode === "browse" && selectedPlacement && (
+                <label style={labelStyle}>
+                  Asset Type
+                  <select
+                    value={assetTypeFilter}
+                    onChange={(event) => {
+                      setAssetTypeFilter(event.target.value as "" | AssetType);
+                      setSelectedAsset(null);
+                    }}
+                    style={inputStyle}
+                  >
+                    <option value="">All assets</option>
+                    <option value="artwork">Artwork</option>
+                    <option value="process">Process</option>
+                  </select>
+                </label>
               )}
 
               {workspaceMode === "sites" && (

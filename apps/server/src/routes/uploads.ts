@@ -1493,6 +1493,13 @@ router.get("/assets", async (req, res) => {
 
     const rawActivityId = typeof req.query.activity_id === "string" ? req.query.activity_id : "";
     const activityId = rawActivityId ? parseInt(rawActivityId, 10) : null;
+    const rawAssetType = typeof req.query.asset_type === "string"
+      ? req.query.asset_type.trim().toLowerCase()
+      : "";
+    const assetType: AssetType | null =
+      rawAssetType === "artwork" || rawAssetType === "process"
+        ? rawAssetType
+        : null;
 
     const [config, tags] = await Promise.all([
       getUploadConfig(),
@@ -1559,6 +1566,33 @@ router.get("/assets", async (req, res) => {
             ).flat(),
           );
           assets = assets.filter((asset) => activityAssetIds.has(asset.id));
+        }
+      }
+    }
+
+    if (assetType) {
+      const assetTypeTagName = assetTypeTag(assetType);
+      if (embeddedAssetTagsAvailable(assets)) {
+        assets = assets.filter((asset) =>
+          embeddedTagKeys(asset).has(assetTypeTagName),
+        );
+      } else {
+        const assetTypeTagIds = tags
+          .filter((tag) =>
+            [tag.name, tag.value].some(
+              (value) => parseAssetTypeTagValue(value) === assetType,
+            ),
+          )
+          .map((tag) => tag.id);
+        if (assetTypeTagIds.length === 0) {
+          assets = [];
+        } else {
+          const assetIds = new Set(
+            (
+              await Promise.all(assetTypeTagIds.map(searchAdminAssetIdsByTag))
+            ).flat(),
+          );
+          assets = assets.filter((asset) => assetIds.has(asset.id));
         }
       }
     }
