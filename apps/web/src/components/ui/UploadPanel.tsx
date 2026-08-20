@@ -4233,7 +4233,7 @@ export default function UploadPanel({
                 }
                 style={bulkTagSelectStyle}
               >
-                <option value="">{taggingBrowseAssets ? "Tagging..." : "Tag Asset"}</option>
+                <option value="">{taggingBrowseAssets ? "Tagging..." : "Tag"}</option>
                 <optgroup label="Asset type">
                   <option value="asset-type:process">Process</option>
                   <option value="asset-type:artwork">Artwork</option>
@@ -4920,14 +4920,26 @@ export default function UploadPanel({
       return <div style={siteStatsEmptyStyle}>No published assets</div>;
     }
 
+    const hasBreakdown =
+      stats.processPublishedCount > 0 || stats.activities.length > 0;
+
     return (
       <div style={siteStatsStyle}>
         <div style={siteStatsTotalStyle}>
-          {stats.totalPublished} published asset
-          {stats.totalPublished === 1 ? "" : "s"}
+          {stats.artworkPublishedCount} published artwork asset
+          {stats.artworkPublishedCount === 1 ? "" : "s"}
         </div>
-        {stats.activities.length > 0 ? (
+        {hasBreakdown ? (
           <ul style={siteStatsListStyle}>
+            {stats.processPublishedCount > 0 && (
+              <li style={siteStatsItemStyle}>
+                <span>Process</span>
+                <span style={siteStatsCountStyle}>
+                  {stats.processPublishedCount} published process asset
+                  {stats.processPublishedCount === 1 ? "" : "s"}
+                </span>
+              </li>
+            )}
             {stats.activities.map((activity) => (
               <li key={activity.activityId} style={siteStatsItemStyle}>
                 <span>{activity.label}</span>

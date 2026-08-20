@@ -303,6 +303,8 @@ export interface LinkedAudioOption {
 export interface SiteActivityStats {
   sites: Record<string, {
     totalPublished: number;
+    artworkPublishedCount: number;
+    processPublishedCount: number;
     activities: Array<{
       activityId: number;
       label: string;

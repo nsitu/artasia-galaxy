@@ -112,6 +112,8 @@ function parseBulkAssetIds(value: unknown): string[] | null {
 export interface SiteActivityStatsResponse {
   sites: Record<string, {
     totalPublished: number;
+    artworkPublishedCount: number;
+    processPublishedCount: number;
     activities: Array<{
       activityId: number;
       label: string;
@@ -685,6 +687,8 @@ async function buildSiteActivityStats(): Promise<SiteActivityStatsResponse> {
         { includeAudio: false, includeIcons: false },
       );
   const totals = new Map<number, number>();
+  const artworkCounts = new Map<number, number>();
+  const processCounts = new Map<number, number>();
   const counts = new Map<number, Map<number, number>>();
 
   for (const asset of activePublishedAssets) {
@@ -695,6 +699,17 @@ async function buildSiteActivityStats(): Promise<SiteActivityStatsResponse> {
       assignment.placementId,
       (totals.get(assignment.placementId) ?? 0) + 1,
     );
+    if (assignment.assetType === "process") {
+      processCounts.set(
+        assignment.placementId,
+        (processCounts.get(assignment.placementId) ?? 0) + 1,
+      );
+    } else {
+      artworkCounts.set(
+        assignment.placementId,
+        (artworkCounts.get(assignment.placementId) ?? 0) + 1,
+      );
+    }
     if (assignment.activityId == null) continue;
 
     const placementCounts =
@@ -711,6 +726,8 @@ async function buildSiteActivityStats(): Promise<SiteActivityStatsResponse> {
     const placementCounts = counts.get(placement.placement_id);
     sites[String(placement.placement_id)] = {
       totalPublished: totals.get(placement.placement_id) ?? 0,
+      artworkPublishedCount: artworkCounts.get(placement.placement_id) ?? 0,
+      processPublishedCount: processCounts.get(placement.placement_id) ?? 0,
       activities: config.activities.flatMap((activity) => {
         const publishedCount = placementCounts?.get(activity.id) ?? 0;
         return publishedCount > 0
