@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import ArtScene from "./components/scenes/ArtScene";
 import PartnerUploadPanel from "./components/ui/PartnerUploadPanel";
+import ToolsPanel from "./components/ui/ToolsPanel";
 import UploadPanel from "./components/ui/UploadPanel";
 
 function getAdminAuthError() {
@@ -66,6 +67,10 @@ export default function App() {
   const isAdminPath = path === adminBase || path.startsWith(adminBase + "/");
 
   if (isAdminPath) {
+    if (path === "/admin/tools") {
+      return <ToolsPanel initialError={adminAuthError} />;
+    }
+
     // Extract initialAssetId from /admin/edit/{immich-id}
     const adminEditMatch = path.match(/^\/admin\/edit\/([0-9a-f-]{36})$/i);
     return (

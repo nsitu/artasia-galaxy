@@ -1,9 +1,7 @@
 import {
-  ensureTag,
   listTags,
   renameTag,
   searchAssetIdsByTag,
-  tagAssets,
   type ImmichTag,
 } from "../infra/ImmichClient.js";
 import { getArtasiaPlacements } from "../infra/WordPressClient.js";
@@ -17,16 +15,8 @@ const ARCHIVED_ANCHOR_PREFIX = "archived:placement:";
 export interface DriftReport {
   scanned: number;
   inSync: number;
-  staleDerived: StaleDerivedEntry[];
   orphaned: OrphanEntry[];
   restored: RestoreEntry[];
-}
-
-export interface StaleDerivedEntry {
-  placement_id: number;
-  anchorTag: string;
-  missing: string[];
-  assetCount: number;
 }
 
 export interface OrphanEntry {
@@ -72,12 +62,6 @@ function placementIdFromArchived(name: string): number | null {
   return Number.isFinite(id) ? id : null;
 }
 
-function nonEmpty(values: Array<string | undefined>): string[] {
-  return values
-    .map((value) => value?.trim())
-    .filter((value): value is string => Boolean(value));
-}
-
 async function collectAnchorTags(): Promise<{ active: ImmichTag[]; archived: ImmichTag[] }> {
   const all = await listTags();
   const active: ImmichTag[] = [];
@@ -102,28 +86,17 @@ async function tagHasAssets(tagId: string): Promise<boolean> {
   return (await safeAssetIds(tagId)).length > 0;
 }
 
-export function expectedDerivedTagNames(
-  partnerName: string | undefined,
-  placementName: string | undefined
-): string[] {
-  return nonEmpty([partnerName, placementName]);
-}
-
 export async function collectDrift(): Promise<DriftReport> {
   const [wpPlacements, { active, archived }] = await Promise.all([
     getArtasiaPlacements({ forceFresh: true }),
     collectAnchorTags(),
   ]);
 
-  const wpById = new Map<number, { partnerName?: string; placementName: string }>();
+  const wpById = new Set<number>();
   for (const p of wpPlacements) {
-    wpById.set(p.placement_id, {
-      partnerName: p.partner?.name,
-      placementName: p.placement_name,
-    });
+    wpById.add(p.placement_id);
   }
 
-  const staleDerived: StaleDerivedEntry[] = [];
   const orphaned: OrphanEntry[] = [];
   const restored: RestoreEntry[] = [];
   let inSync = 0;
@@ -132,8 +105,7 @@ export async function collectDrift(): Promise<DriftReport> {
     const placementId = placementIdFromAnchor(tag.name);
     if (placementId == null) continue;
 
-    const wp = wpById.get(placementId);
-    if (!wp) {
+    if (!wpById.has(placementId)) {
       const assetCount = (await safeAssetIds(tag.id)).length;
       orphaned.push({
         placement_id: placementId,
@@ -143,19 +115,7 @@ export async function collectDrift(): Promise<DriftReport> {
       });
       continue;
     }
-
-    const expectedDerived = expectedDerivedTagNames(wp.partnerName, wp.placementName);
-    const missing = await computeMissingDerivedTags(tag.id, expectedDerived);
-    if (missing.length === 0) {
-      inSync += 1;
-      continue;
-    }
-    staleDerived.push({
-      placement_id: placementId,
-      anchorTag: tag.name,
-      missing,
-      assetCount: (await safeAssetIds(tag.id)).length,
-    });
+    inSync += 1;
   }
 
   for (const tag of archived) {
@@ -174,58 +134,13 @@ export async function collectDrift(): Promise<DriftReport> {
   return {
     scanned: active.length,
     inSync,
-    staleDerived,
     orphaned,
     restored,
   };
 }
 
-async function computeMissingDerivedTags(
-  anchorTagId: string,
-  expectedDerived: string[]
-): Promise<string[]> {
-  if (expectedDerived.length === 0) return [];
-  const anchorAssetIds = new Set(await safeAssetIds(anchorTagId));
-  if (anchorAssetIds.size === 0) return [];
-
-  const missing: string[] = [];
-  for (const name of expectedDerived) {
-    const derived = await ensureTag(name).catch(() => null);
-    if (!derived) continue;
-    const derivedAssetIds = await safeAssetIds(derived.id);
-    const derivedSet = new Set(derivedAssetIds);
-    let hasGap = false;
-    for (const id of anchorAssetIds) {
-      if (!derivedSet.has(id)) {
-        hasGap = true;
-        break;
-      }
-    }
-    if (hasGap) missing.push(name);
-  }
-  return missing;
-}
-
 export async function applyReconcile(report: DriftReport): Promise<ReconcileResult> {
   const mutations: string[] = [];
-
-  for (const entry of report.staleDerived) {
-    const anchor = await ensureTag(entry.anchorTag);
-    const assetIds = await safeAssetIds(anchor.id);
-    if (assetIds.length === 0) continue;
-
-    const tagIds: string[] = [];
-    for (const name of entry.missing) {
-      const tag = await ensureTag(name);
-      tagIds.push(tag.id);
-    }
-    if (tagIds.length === 0) continue;
-
-    await tagAssets(assetIds, tagIds);
-    mutations.push(
-      `placement:${entry.placement_id} added [${entry.missing.join(", ")}] to ${assetIds.length} assets`
-    );
-  }
 
   for (const entry of report.orphaned) {
     if (entry.assetCount === 0) continue;

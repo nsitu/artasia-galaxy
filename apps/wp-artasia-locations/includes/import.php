@@ -96,7 +96,7 @@ function artasia_render_tools_page(): void
         <?php endif; ?>
 
         <h2>Reconcile Immich</h2>
-        <p>Trigger a manual reconcile between WordPress placement data and Immich tags. The Atlas server will sync human-readable tags on existing assets via the durable <code>placement:&lt;id&gt;</code> anchor tags, archive orphaned placements, and restore previously archived ones.</p>
+        <p>Trigger a manual reconcile between WordPress placement data and Immich tags. The Atlas server compares WordPress placement IDs with Immich's durable <code>placement:&lt;id&gt;</code> anchor tags, archives orphaned placement anchors, and restores previously archived ones. Partner and placement-name tags are no longer maintained by reconcile.</p>
 
         <h3>Settings</h3>
         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">

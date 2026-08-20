@@ -12,12 +12,11 @@ export async function logReconcileDriftAtBoot() {
   if (process.env.RECONCILE_SKIP_BOOT_DRIFT === "1") return;
   try {
     const drift = await collectDrift();
-    const stale = drift.staleDerived.length;
     const orphaned = drift.orphaned.length;
     const restored = drift.restored.length;
-    if (stale || orphaned || restored) {
+    if (orphaned || restored) {
       console.warn(
-        `[startup] reconcile drift: ${stale} stale, ${orphaned} orphaned, ${restored} to restore (in-sync: ${drift.inSync}/${drift.scanned})`
+        `[startup] reconcile drift: ${orphaned} orphaned, ${restored} to restore (in-sync: ${drift.inSync}/${drift.scanned})`
       );
     } else {
       console.log(`[startup] reconcile drift: clean (${drift.scanned} anchors in-sync)`);

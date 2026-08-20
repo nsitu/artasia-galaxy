@@ -7,10 +7,12 @@
 
     var projectId = viewer.dataset.projectId;
     var restBase = viewer.dataset.restBase;
+    var restNonce = viewer.dataset.restNonce;
     var directory = viewer.querySelector('.artasia-documentation__directory');
     var detail = viewer.querySelector('.artasia-documentation__viewer');
     var content = viewer.querySelector('.artasia-documentation__content');
     var status = viewer.querySelector('.artasia-documentation__status');
+    var loadingIndicator = viewer.querySelector('.artasia-documentation__loading');
     var compactNavigation = viewer.querySelector('.artasia-documentation__navigation--compact');
     var back = viewer.querySelector('[data-documentation-back]');
     var requestController = null;
@@ -41,6 +43,19 @@
           link.removeAttribute('aria-current');
         }
       });
+    }
+
+    function setLoading(isLoading) {
+      viewer.classList.toggle('is-loading', isLoading);
+      if (isLoading) {
+        viewer.setAttribute('aria-busy', 'true');
+      } else {
+        viewer.removeAttribute('aria-busy');
+      }
+      if (loadingIndicator) {
+        loadingIndicator.hidden = !isLoading;
+        loadingIndicator.setAttribute('aria-hidden', isLoading ? 'false' : 'true');
+      }
     }
 
     function updateCompactNavigation(slug) {
@@ -83,8 +98,7 @@
 
       detail.hidden = true;
       directory.hidden = false;
-      viewer.classList.remove('is-loading');
-      viewer.removeAttribute('aria-busy');
+      setLoading(false);
       setCurrentLink('');
 
       if (pushHistory) {
@@ -105,19 +119,23 @@
       scrollToPageTop();
       requestController = new AbortController();
       var activeController = requestController;
-      viewer.classList.add('is-loading');
-      viewer.setAttribute('aria-busy', 'true');
+      setLoading(true);
       status.textContent = 'Loading documentation.';
 
       var endpoint = restBase + encodeURIComponent(slug)
         + '?project_id=' + encodeURIComponent(projectId);
 
+      var headers = {
+        Accept: 'application/json'
+      };
+      if (restNonce) {
+        headers['X-WP-Nonce'] = restNonce;
+      }
+
       return fetch(endpoint, {
         credentials: 'same-origin',
         signal: requestController.signal,
-        headers: {
-          Accept: 'application/json'
-        }
+        headers: headers
       })
         .then(function (response) {
           if (!response.ok) {
@@ -156,8 +174,7 @@
         })
         .finally(function () {
           if (requestController === activeController) {
-            viewer.classList.remove('is-loading');
-            viewer.removeAttribute('aria-busy');
+            setLoading(false);
           }
         });
     }

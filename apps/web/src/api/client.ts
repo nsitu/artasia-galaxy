@@ -63,6 +63,127 @@ export async function fetchPlacementProcessGallery(
   return body.assets ?? [];
 }
 
+export interface DocumentationGalleryMigrationMatch {
+  attachmentId: number;
+  wordpressFileName: string;
+  wordpressCaption: string;
+  assetId: string;
+  immichFileName: string;
+  currentDescription: string;
+  assetAlreadyProcess: boolean;
+  descriptionAction: "update" | "preserve" | "none";
+}
+
+export interface DocumentationGalleryMigrationDocument {
+  documentId: number;
+  documentTitle: string;
+  placementIds: number[];
+  placementNames: string[];
+  matches: DocumentationGalleryMigrationMatch[];
+  unmatched: Array<{
+    attachmentId: number;
+    wordpressFileName: string;
+  }>;
+  ambiguous: Array<{
+    attachmentId: number;
+    wordpressFileName: string;
+    assetIds: string[];
+  }>;
+  skippedReason?: string;
+}
+
+export interface DocumentationGalleryMigrationReport {
+  dryRun: boolean;
+  generatedAt: string;
+  documentsScanned: number;
+  documentsWithMatches: number;
+  documentsReady: number;
+  documentsWithIssues: number;
+  exactMatches: number;
+  unmatchedImages: number;
+  ambiguousImages: number;
+  assetsToTag: number;
+  descriptionsToUpdate: number;
+  descriptionsPreserved: number;
+  sourceDocumentsToUpdate: number;
+  sourceDocumentsUpdated: number;
+  sourceUpdateError?: string;
+  documents: DocumentationGalleryMigrationDocument[];
+}
+
+async function fetchDocumentationGalleryMigration(
+  init?: RequestInit,
+): Promise<DocumentationGalleryMigrationReport> {
+  const res = await fetch("/api/v1/tools/documentation-gallery-migration", {
+    credentials: "same-origin",
+    ...init,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  return res.json() as Promise<DocumentationGalleryMigrationReport>;
+}
+
+export function previewDocumentationGalleryMigration() {
+  return fetchDocumentationGalleryMigration();
+}
+
+export function applyDocumentationGalleryMigration() {
+  return fetchDocumentationGalleryMigration({ method: "POST" });
+}
+
+export interface PlacementTagCleanupTagReport {
+  tagId: string;
+  tagName: string;
+  placementIds: number[];
+  assetCount: number;
+  membershipsToRemove: number;
+}
+
+export interface PlacementTagCleanupIssue {
+  assetId: string;
+  legacyTags: string[];
+  candidatePlacementIds: number[];
+  durablePlacementIds: number[];
+  reason: "ambiguous" | "conflict";
+}
+
+export interface PlacementTagCleanupReport {
+  dryRun: boolean;
+  generatedAt: string;
+  placementsScanned: number;
+  legacyTagsFound: number;
+  legacyMemberships: number;
+  assetsWithLegacyTags: number;
+  assetsAlreadyAnchored: number;
+  assetsToAnchor: number;
+  membershipsToRemove: number;
+  ambiguousAssets: PlacementTagCleanupIssue[];
+  conflictingAssets: PlacementTagCleanupIssue[];
+  legacyTags: PlacementTagCleanupTagReport[];
+}
+
+async function fetchPlacementTagCleanup(init?: RequestInit) {
+  const res = await fetch("/api/v1/tools/placement-tag-cleanup", {
+    credentials: "same-origin",
+    ...init,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  return res.json() as Promise<PlacementTagCleanupReport>;
+}
+
+export function previewPlacementTagCleanup() {
+  return fetchPlacementTagCleanup();
+}
+
+export function applyPlacementTagCleanup() {
+  return fetchPlacementTagCleanup({ method: "POST" });
+}
+
 export async function fetchSlideshow(params: {
   albumIds?: string[];
   seed?: number;

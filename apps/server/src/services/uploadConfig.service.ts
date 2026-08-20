@@ -157,12 +157,6 @@ function formatPlaceAddress(place: WpArtasiaPlacement["place"]) {
   return `${address}, ${city}`;
 }
 
-function nonEmptyValues(values: Array<string | undefined>) {
-  return values
-    .map((value) => value?.trim())
-    .filter((value): value is string => Boolean(value));
-}
-
 function cleanStringList(input: unknown, options?: { excludeReservedAlbums?: boolean }) {
   if (!Array.isArray(input)) return [];
   const seen = new Set<string>();
@@ -356,9 +350,5 @@ export function displayPlacementTag(postId: number): string {
 }
 
 export function getPlacementTagNames(location: WpArtasiaPlacement): string[] {
-  return nonEmptyValues([
-    placementAnchorTag(location.placement_id),
-    location.partner?.name,
-    location.placement_name,
-  ]);
+  return [placementAnchorTag(location.placement_id)];
 }

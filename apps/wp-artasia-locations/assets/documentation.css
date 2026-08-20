@@ -115,6 +115,31 @@
   opacity: 0.45;
 }
 
+.artasia-documentation__loading {
+  align-items: center;
+  display: flex;
+  gap: 0.65rem;
+  margin: 0 0 1.25rem;
+  color: inherit;
+  font-weight: 700;
+}
+
+.artasia-documentation__loading-spinner {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 1rem;
+  border: 3px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: artasia-documentation-spin 700ms linear infinite;
+}
+
+@keyframes artasia-documentation-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .artasia-documentation__partner {
   margin: 0 0 0.4rem;
   font-weight: 900;

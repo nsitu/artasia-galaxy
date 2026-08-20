@@ -6293,6 +6293,17 @@ export default function UploadPanel({
               Import
             </span>
           </button>
+          <a
+            href="/admin/tools"
+            style={workspaceTabStyle}
+          >
+            <span style={workspaceTabContentStyle}>
+              <span style={materialSymbolStyle} aria-hidden="true">
+                build
+              </span>
+              Tools
+            </span>
+          </a>
         </div>
 
         <div

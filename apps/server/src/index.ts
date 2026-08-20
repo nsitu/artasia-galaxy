@@ -12,6 +12,7 @@ import projectRoutes from "./routes/projects.js";
 import reconcileRoutes from "./routes/reconcile.js";
 import settingsRoutes, { mountSSE } from "./routes/settings.js";
 import driveRoutes from "./routes/drive.js";
+import toolsRoutes from "./routes/tools.js";
 import { checkImmichHealth, getImmichConfig } from "./infra/ImmichClient.js";
 import { readAuthSession } from "./services/auth.service.js";
 import { initializeImmichStructure, logReconcileDriftAtBoot } from "./services/startup.service.js";
@@ -62,6 +63,7 @@ app.use("/api/v1/projects", projectRoutes);
 app.use("/api/v1/reconcile", reconcileRoutes);
 app.use("/api/v1/settings", settingsRoutes);
 app.use("/api/v1/drive", driveRoutes);
+app.use("/api/v1/tools", toolsRoutes);
 mountSSE(app);
 
 app.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {

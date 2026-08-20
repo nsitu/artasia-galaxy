@@ -342,6 +342,7 @@ function artasia_render_documentation_viewer(int $project_id): string
         class="artasia-documentation"
         data-project-id="<?php echo esc_attr($project_id); ?>"
         data-rest-base="<?php echo esc_url(rest_url('artasia/v1/documentation/')); ?>"
+        data-rest-nonce="<?php echo esc_attr(is_user_logged_in() ? wp_create_nonce('wp_rest') : ''); ?>"
     >
         <div class="artasia-documentation__directory" <?php echo $selected ? 'hidden' : ''; ?>>
             <?php echo artasia_render_documentation_directory($groups, $base_url); ?>
@@ -349,6 +350,10 @@ function artasia_render_documentation_viewer(int $project_id): string
         <div class="artasia-documentation__viewer" <?php echo $selected ? '' : 'hidden'; ?>>
             <p class="artasia-documentation__status screen-reader-text" aria-live="polite"></p>
             <a class="artasia-documentation__back" href="<?php echo esc_url($base_url); ?>" data-documentation-back>&larr; Back</a>
+            <div class="artasia-documentation__loading" hidden aria-hidden="true">
+                <span class="artasia-documentation__loading-spinner" aria-hidden="true"></span>
+                <span>Loading documentation&hellip;</span>
+            </div>
             <div class="artasia-documentation__content">
                 <?php if ($selected) : ?>
                     <?php echo artasia_render_documentation_article($selected, $selected_partner, artasia_get_documentation_context($selected)); ?>

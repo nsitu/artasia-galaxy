@@ -41,7 +41,129 @@ add_action('rest_api_init', function () {
             ],
         ],
     ]);
+
+    register_rest_route('artasia/v1', '/documentation-galleries', [
+        'methods'             => 'GET',
+        'callback'            => 'artasia_get_documentation_galleries',
+        'permission_callback' => '__return_true',
+    ]);
+
+    register_rest_route('artasia/v1', '/documentation-galleries/migrate', [
+        'methods'             => 'POST',
+        'callback'            => 'artasia_migrate_documentation_galleries',
+        'permission_callback' => 'artasia_documentation_migration_permission',
+    ]);
 });
+
+function artasia_documentation_migration_permission(WP_REST_Request $request): bool
+{
+    $configured_secret = function_exists('artasia_get_reconcile_secret')
+        ? artasia_get_reconcile_secret()
+        : '';
+    $provided_secret = (string) $request->get_header('x-reconcile-secret');
+
+    return $configured_secret !== ''
+        && $provided_secret !== ''
+        && hash_equals($configured_secret, $provided_secret);
+}
+
+/**
+ * Return the legacy WordPress gallery records needed by the Atlas migration.
+ * The endpoint is read-only and only exposes data from published documents.
+ */
+function artasia_get_documentation_galleries(): WP_REST_Response
+{
+    $documents = get_posts([
+        'post_type'      => 'artasia_document',
+        'posts_per_page' => -1,
+        'post_status'    => 'publish',
+        'orderby'        => 'ID',
+        'order'          => 'ASC',
+        'no_found_rows'  => true,
+    ]);
+
+    $results = [];
+    foreach ($documents as $document) {
+        $gallery_source = get_post_meta($document->ID, 'artasia_documentation_gallery_source', true);
+        if ($gallery_source === 'atlas') {
+            continue;
+        }
+
+        $placement_ids = artasia_validate_related_post_ids(
+            get_post_meta($document->ID, 'artasia_documentation_placement_ids', true),
+            'artasia_placement'
+        );
+        $gallery_ids = artasia_validate_image_attachment_ids(
+            get_post_meta($document->ID, 'artasia_documentation_gallery_ids', true)
+        );
+        $saved_captions = artasia_sanitize_text_array_meta(
+            get_post_meta($document->ID, 'artasia_documentation_gallery_captions', true)
+        );
+        $assets = [];
+
+        foreach ($gallery_ids as $index => $attachment_id) {
+            $file_path = get_attached_file($attachment_id);
+            $file_name = $file_path
+                ? wp_basename($file_path)
+                : wp_basename((string) wp_get_attachment_url($attachment_id));
+            if (!$file_name) {
+                continue;
+            }
+
+            $caption = array_key_exists($index, $saved_captions)
+                ? trim((string) $saved_captions[$index])
+                : trim((string) wp_get_attachment_caption($attachment_id));
+
+            $assets[] = [
+                'attachment_id' => $attachment_id,
+                'file_name'     => $file_name,
+                'caption'       => $caption,
+                'alt'           => trim((string) get_post_meta($attachment_id, '_wp_attachment_image_alt', true)),
+            ];
+        }
+
+        $results[] = [
+            'document_id'    => $document->ID,
+            'document_slug'  => $document->post_name,
+            'document_title' => $document->post_title,
+            'placement_ids'  => $placement_ids,
+            'assets'         => $assets,
+        ];
+    }
+
+    return rest_ensure_response($results);
+}
+
+function artasia_migrate_documentation_galleries(WP_REST_Request $request): WP_REST_Response
+{
+    $document_ids = $request->get_param('document_ids');
+    if (!is_array($document_ids)) {
+        return new WP_REST_Response(['error' => 'document_ids must be an array.'], 400);
+    }
+
+    $updated = [];
+    $skipped = [];
+    foreach (array_unique(array_map('absint', $document_ids)) as $document_id) {
+        $document = get_post($document_id);
+        if (!$document instanceof WP_Post || $document->post_type !== 'artasia_document' || $document->post_status !== 'publish') {
+            $skipped[] = $document_id;
+            continue;
+        }
+
+        if (get_post_meta($document_id, 'artasia_documentation_gallery_source', true) === 'atlas') {
+            $skipped[] = $document_id;
+            continue;
+        }
+
+        update_post_meta($document_id, 'artasia_documentation_gallery_source', 'atlas');
+        $updated[] = $document_id;
+    }
+
+    return rest_ensure_response([
+        'updated' => $updated,
+        'skipped' => $skipped,
+    ]);
+}
 
 /**
  * Return the annual Artasia projects that can be selected by the public Atlas
