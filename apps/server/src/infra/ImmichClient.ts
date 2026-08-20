@@ -110,7 +110,14 @@ async function immichRequest(
 
   if (!res.ok && !options?.allowErrorStatus) {
     if (res.status === 401) {
-      throw new Error(`Immich auth failed (401) — check IMMICH_API_KEY permissions`);
+      throw new Error(
+        `Immich authentication failed (401) for ${init?.method ?? "GET"} ${path} — the running Atlas container may have an invalid, expired, or stale IMMICH_API_KEY`,
+      );
+    }
+    if (res.status === 403) {
+      throw new Error(
+        `Immich permission denied (403) for ${init?.method ?? "GET"} ${path} — update the API key permissions for this operation`,
+      );
     }
     const body = await res.text().catch(() => "");
     throw new Error(

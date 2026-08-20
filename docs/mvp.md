@@ -170,6 +170,8 @@ The Artasia server-side Immich API key must have these Immich permissions:
 | `job.create` | Regenerate a missing asset thumbnail when Atlas receives an Immich `Asset media not found` response. |
 | `tag.read` | Find existing activity, partner, and site tags. |
 | `tag.create` | Create missing activity, partner, and site tags. |
+| `tag.update` | Rename durable placement anchors when reconcile archives or restores them. |
+| `tag.delete` | Delete empty legacy partner and placement-name tags from Atlas Tools. |
 | `tag.asset` | Attach tags to uploaded assets. |
 | `server.statistics` | Read Immich storage usage and disable uploads above 50 GB. |
 

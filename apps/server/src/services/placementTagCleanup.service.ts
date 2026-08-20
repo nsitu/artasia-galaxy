@@ -86,7 +86,9 @@ function findPlacementId(value: string): number | null {
 
 async function searchAllAssetIdsByTag(tagId: string): Promise<Set<string>> {
   const assetIds = new Set<string>();
-  for (const visibility of ["timeline", "archive", "hidden", "locked"] as const) {
+  // Immich requires an elevated user session (not an API key) for locked assets.
+  // The Atlas service can safely inspect the API-key-visible states only.
+  for (const visibility of ["timeline", "archive", "hidden"] as const) {
     let page = 1;
     for (;;) {
       const result = await searchAssets({

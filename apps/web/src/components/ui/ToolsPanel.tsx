@@ -127,7 +127,7 @@ export default function ToolsPanel({ initialError }: { initialError?: string | n
     const emptyTags = cleanupReport.legacyTags.filter((tag) => tag.assetCount === 0 && tag.membershipsToRemove === 0);
     if (emptyTags.length === 0) return;
     const confirmed = window.confirm(
-      `Delete ${emptyTags.length} empty legacy placement tag${emptyTags.length === 1 ? "" : "s"}? Atlas will recheck timeline, archive, hidden, and locked assets before deleting each tag.`,
+      `Delete ${emptyTags.length} empty legacy placement tag${emptyTags.length === 1 ? "" : "s"}? Atlas will recheck timeline, archive, and hidden assets before deleting each tag. Locked assets require a separate elevated Immich user session.`,
     );
     if (!confirmed) return;
 
@@ -283,7 +283,7 @@ export default function ToolsPanel({ initialError }: { initialError?: string | n
                     >
                       {deletingLegacyTags ? "Deleting empty tags…" : "Delete empty legacy tags"}
                     </button>
-                    <span style={mutedStyle}>Only tags with no memberships in any Immich visibility state will be deleted.</span>
+                    <span style={mutedStyle}>Only tags with no memberships in API-key-visible timeline, archive, or hidden assets will be deleted. Immich locked assets require a separate elevated user session.</span>
                   </div>
                 )}
                 {cleanupReport.legacyTags.length > 0 && (
