@@ -2587,6 +2587,28 @@ export function ProjectInfoPanel({
           <p style={projectDescriptionStyle}>{description}</p>
         </div>
       )}
+
+      <div
+        style={{
+          ...projectPresenterStyle,
+          ...(isMobile ? mobileProjectPresenterStyle : {}),
+        }}
+      >
+        <span style={projectPresenterTextStyle}>PRESENTED BY</span>
+        <a
+          href="https://artsforall.co"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Presented by Arts For All"
+          style={projectPresenterLinkStyle}
+        >
+          <img
+            src="/afa-horizontal.svg"
+            alt="Arts For All"
+            style={projectPresenterLogoStyle}
+          />
+        </a>
+      </div>
     </section>
   );
 }
@@ -3529,6 +3551,40 @@ const projectDescriptionStyle: React.CSSProperties = {
   fontWeight: 400,
   lineHeight: 1.6,
   whiteSpace: "pre-line",
+};
+
+const projectPresenterStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "flex-end",
+  gap: 8,
+  padding: "0 16px 12px",
+};
+
+const mobileProjectPresenterStyle: React.CSSProperties = {
+  padding: "0 12px max(12px, env(safe-area-inset-bottom))",
+};
+
+const projectPresenterTextStyle: React.CSSProperties = {
+  color: "#ffffff",
+  fontSize: 10,
+  fontWeight: 600,
+  fontVariant: "small-caps",
+  letterSpacing: "0.16em",
+  lineHeight: 1,
+};
+
+const projectPresenterLinkStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  color: "inherit",
+  textDecoration: "none",
+};
+
+const projectPresenterLogoStyle: React.CSSProperties = {
+  width: "clamp(92px, 21vw, 132px)",
+  height: "auto",
+  display: "block",
 };
 
 const siteDetailsGridStyle: React.CSSProperties = {
