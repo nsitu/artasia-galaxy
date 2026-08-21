@@ -72,7 +72,7 @@ const MAP_STYLE_STORAGE_KEY = "artasia-map-style";
 type MenuItem = {
   href: string;
   label: string;
-  action?: "about" | "search";
+  action?: "about";
 };
 type IntroPhase = "loading" | "ready" | "exiting" | "complete";
 const PARTNER_PATH_PREFIX = "/partners/";
@@ -649,7 +649,6 @@ export default function ArtScene() {
   const menuItems = useMemo(
     (): MenuItem[] => [
       { href: "#about", label: "About", action: "about" as const },
-      { href: "#search", label: "Search", action: "search" as const },
       { href: "/admin", label: "Admin" },
       { href: "/partners", label: "Partners" },
     ],
@@ -1746,26 +1745,6 @@ export default function ArtScene() {
           {menuOpen && (
             <div className="atlas-menu-panel" role="menu" style={menuPanelStyle}>
                 {menuItems.map((item) => {
-                  if (item.action === "search") {
-                    return (
-                      <button
-                        key={item.href}
-                        type="button"
-                        className="atlas-control-surface"
-                        role="menuitem"
-                        style={{
-                          ...menuItemStyle,
-                          textAlign: "left",
-                          border: 0,
-                          borderBottom: "1px solid rgba(255,255,255,0.12)",
-                          cursor: "pointer",
-                        }}
-                        onClick={() => { setMenuOpen(false); setContextSearchOpen(true); }}
-                      >
-                        {item.label}
-                      </button>
-                    );
-                  }
                   if (item.action === "about") {
                     return (
                       <button
@@ -1863,6 +1842,7 @@ export default function ArtScene() {
           <div style={contextSearchCardStyle}>
             <form onSubmit={handleContextSearchSubmit} style={contextSearchFormStyle}>
               <input
+                className="atlas-context-search-input"
                 type="search"
                 value={contextSearchQuery}
                 onChange={(event) => setContextSearchQuery(event.target.value)}
@@ -2909,6 +2889,11 @@ const responsiveTopNavStyles = `
       background-image: linear-gradient(45deg, rgba(142, 29, 88, 0.3) 0%, rgba(242, 139, 32, 0.3) 100%) !important;
   }
 
+  .atlas-context-search-input::placeholder {
+    color: #c7ccd6;
+    opacity: 1;
+  }
+
   .atlas-placement-gallery-action,
   .atlas-placement-gallery-action:hover,
   .atlas-placement-gallery-action:focus-visible {
@@ -3860,7 +3845,6 @@ const photoLightboxAssetCaptionSeparatedStyle: React.CSSProperties = {
 const photoLightboxPlacementCaptionStyle: React.CSSProperties = {
   marginTop: 10,
   paddingTop: 10,
-  borderTop: "1px solid rgba(255,255,255,0.12)",
   color: "#c7ccd6",
   fontSize: 13,
   lineHeight: 1.45,
@@ -3967,6 +3951,8 @@ const contextSearchOverlayStyle: React.CSSProperties = {
   placeItems: "center",
   padding: "max(16px, env(safe-area-inset-top)) 16px 24px",
   background: "rgba(5, 7, 14, 0.2)",
+  backdropFilter: "blur(8px)",
+  WebkitBackdropFilter: "blur(8px)",
 };
 const contextSearchCardStyle: React.CSSProperties = {
   ...atlasPanelSurfaceStyle,

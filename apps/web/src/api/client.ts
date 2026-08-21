@@ -1311,6 +1311,35 @@ export interface BulkDriveLookupSummary {
   results: BulkDriveLookupResult[];
 }
 
+export interface ScreenshotCaptionCleanupResult {
+  assetId: string;
+  fileName: string;
+  status: "cleared" | "failed";
+  error?: string;
+}
+
+export interface ScreenshotCaptionCleanupSummary {
+  scanned: number;
+  matched: number;
+  cleared: number;
+  failed: number;
+  results: ScreenshotCaptionCleanupResult[];
+}
+
+export async function clearScreenshotAssetCaptions(): Promise<ScreenshotCaptionCleanupSummary> {
+  const res = await fetch("/api/v1/tools/cleanup-screenshot-captions", {
+    method: "POST",
+  });
+  const body = await res.json().catch(() => ({})) as Partial<ScreenshotCaptionCleanupSummary> & {
+    error?: string;
+  };
+  if (!res.ok) {
+    if (res.status === 401) throw new Error("Please sign in to use Atlas administration tools.");
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  return body as ScreenshotCaptionCleanupSummary;
+}
+
 export async function lookupMissingUploadAssetDriveSources(): Promise<BulkDriveLookupSummary> {
   const startRes = await fetch("/api/v1/drive/assets/lookup-missing", {
     method: "POST",

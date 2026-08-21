@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  clearScreenshotAssetCaptions,
   fetchAuthUser,
   lookupMissingUploadAssetDriveSources,
   logoutAuthUser,
@@ -25,6 +26,7 @@ export default function ToolsPanel({ initialError }: { initialError?: string | n
     message: string;
   } | null>(null);
   const [driveLookupRunning, setDriveLookupRunning] = useState(false);
+  const [screenshotCleanupRunning, setScreenshotCleanupRunning] = useState(false);
 
   useEffect(() => {
     void fetchAuthUser()
@@ -86,6 +88,36 @@ export default function ToolsPanel({ initialError }: { initialError?: string | n
     }
   }
 
+  async function clearScreenshotCaptions() {
+    if (!authUser?.authenticated) {
+      setError("Sign in with Google to use Atlas administration tools.");
+      return;
+    }
+    if (!window.confirm("Remove the exact caption ‘Screenshot’ from every matching asset? This updates Immich metadata.")) {
+      return;
+    }
+
+    setScreenshotCleanupRunning(true);
+    setError("");
+    setNotice(null);
+    try {
+      const summary = await clearScreenshotAssetCaptions();
+      console.groupCollapsed(
+        `[Caption maintenance] scanned ${summary.scanned} assets: matched ${summary.matched}, cleared ${summary.cleared}, failed ${summary.failed}`,
+      );
+      console.table(summary.results);
+      console.groupEnd();
+      setNotice({
+        tone: summary.failed > 0 ? "warning" : "success",
+        message: `Caption maintenance scanned ${summary.scanned} assets: found ${summary.matched} exact “Screenshot” captions, cleared ${summary.cleared}${summary.failed ? `, failed ${summary.failed}` : ""}. Detailed results were logged to the browser console.`,
+      });
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setScreenshotCleanupRunning(false);
+    }
+  }
+
   return (
     <main style={pageStyle}>
       <section style={panelStyle}>
@@ -144,6 +176,26 @@ export default function ToolsPanel({ initialError }: { initialError?: string | n
               >
                 <span style={iconStyle} aria-hidden="true">manage_search</span>
                 {driveLookupRunning ? "Looking up Drive IDs..." : "Lookup missing Drive IDs"}
+              </button>
+            )}
+          </section>
+
+          <section style={toolSectionStyle}>
+            <p style={eyebrowStyle}>Caption maintenance</p>
+            <h3 style={toolHeadingStyle}>Remove accidental “Screenshot” captions</h3>
+            <p style={descriptionStyle}>
+              Find assets whose caption is exactly “Screenshot” and clear that caption. Other captions are left unchanged.
+            </p>
+            {authUser?.authenticated && (
+              <button
+                type="button"
+                onClick={() => void clearScreenshotCaptions()}
+                disabled={screenshotCleanupRunning}
+                title="Clear exact Screenshot captions from Immich assets"
+                style={secondaryButtonStyle}
+              >
+                <span style={iconStyle} aria-hidden="true">cleaning_services</span>
+                {screenshotCleanupRunning ? "Removing captions..." : "Remove Screenshot captions"}
               </button>
             )}
           </section>
