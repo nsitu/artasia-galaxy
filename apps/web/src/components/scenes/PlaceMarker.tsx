@@ -1,5 +1,5 @@
 import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 
 interface Props {
@@ -13,6 +13,9 @@ interface Props {
   clusterCount?: number;
   isSelected?: boolean;
   hasAssets?: boolean;
+  thumbnailUrl?: string;
+  thumbnailWidth?: number;
+  thumbnailHeight?: number;
   onClick?: () => void;
   onPointerEnter?: () => void;
   onPointerLeave?: () => void;
@@ -51,6 +54,9 @@ export default function PlaceMarker({
   clusterCount = 1,
   isSelected = false,
   hasAssets = false,
+  thumbnailUrl,
+  thumbnailWidth,
+  thumbnailHeight,
   onClick,
   onPointerEnter,
   onPointerLeave,
@@ -69,6 +75,12 @@ export default function PlaceMarker({
   const camera = useThree((state) => state.camera);
   const size = useThree((state) => state.size);
   const [x, y, z] = position;
+  const thumbnailTexture = useThumbnailTexture(
+    thumbnailUrl,
+    thumbnailWidth,
+    thumbnailHeight,
+  );
+  const isThumbnailMarker = Boolean(thumbnailUrl);
   const flowerColors = useMemo(() => getFlowerColors(brandColorOne, brandColorTwo), [brandColorOne, brandColorTwo]);
   const clusterLane = clusterIndex - (clusterCount - 1) / 2;
   const rendersClusterTrunk = !isForked || clusterIndex === 0;
@@ -97,6 +109,11 @@ export default function PlaceMarker({
 
   const headGeometry = useMemo(() => createPetalledHeadGeometry(), []);
   const centerGeometry = useMemo(() => new THREE.CircleGeometry(HEAD_RADIUS * 0.34, 24), []);
+  const thumbnailGeometry = useMemo(() => new THREE.CircleGeometry(HEAD_RADIUS, 32), []);
+  const thumbnailRingGeometry = useMemo(
+    () => new THREE.RingGeometry(HEAD_RADIUS * 0.98, HEAD_RADIUS * 1.08, 32),
+    [],
+  );
   const baseGeometry = useMemo(() => new THREE.SphereGeometry(STEM_RADIUS * 1.45, 12, 8), []);
   const leafGeometry = useMemo(() => createLeafGeometry(), []);
   const initialStemGeometry = useMemo(
@@ -114,12 +131,14 @@ export default function PlaceMarker({
     return () => {
       headGeometry.dispose();
       centerGeometry.dispose();
+      thumbnailGeometry.dispose();
+      thumbnailRingGeometry.dispose();
       baseGeometry.dispose();
       leafGeometry.dispose();
       stemRef.current?.geometry.dispose();
       markerAgents.delete(state.id);
     };
-  }, [baseGeometry, centerGeometry, headGeometry, initialStemGeometry, leafGeometry, markerId]);
+  }, [baseGeometry, centerGeometry, headGeometry, initialStemGeometry, leafGeometry, markerId, thumbnailGeometry, thumbnailRingGeometry]);
 
   useFrame((_, delta) => {
     const group = groupRef.current;
@@ -165,7 +184,7 @@ export default function PlaceMarker({
         cameraDistance,
         camera,
         size.height,
-      ) * selectionScale.current;
+      ) * selectionScale.current * (isThumbnailMarker ? 1.35 : 1);
     const preferredHeadCenter = naturalHeadCenter.clone();
     if (isForked && clusterCount > 1) {
       const cameraWorldQuaternion = camera.getWorldQuaternion(
@@ -308,35 +327,110 @@ export default function PlaceMarker({
         </group>
       )}
       <group ref={headRef} position={[0, 0, baseStemHeight]} {...pointerHandlers}>
-        <mesh geometry={headGeometry} renderOrder={isSelected ? 6 : 3}>
-          <meshStandardMaterial
-            color={flowerColors.head}
-            emissive={flowerColors.headEmissive}
-            roughness={0.55}
-            transparent={false}
-            opacity={1}
-            side={THREE.DoubleSide}
-            polygonOffset
-            polygonOffsetFactor={-3}
-            polygonOffsetUnits={-3}
-          />
-        </mesh>
-        <mesh geometry={centerGeometry} position={[0, 0, 0.003]} renderOrder={isSelected ? 7 : 4}>
-          <meshStandardMaterial
-            color={flowerColors.center}
-            emissive={flowerColors.centerEmissive}
-            roughness={0.75}
-            transparent={false}
-            opacity={1}
-            side={THREE.DoubleSide}
-            polygonOffset
-            polygonOffsetFactor={-4}
-            polygonOffsetUnits={-4}
-          />
-        </mesh>
+        {isThumbnailMarker ? (
+          <>
+            <mesh geometry={thumbnailGeometry} renderOrder={isSelected ? 6 : 3}>
+              <meshBasicMaterial
+                map={thumbnailTexture ?? undefined}
+                color={thumbnailTexture ? "#ffffff" : flowerColors.center}
+                side={THREE.DoubleSide}
+                transparent
+                toneMapped={false}
+              />
+            </mesh>
+            <mesh geometry={thumbnailRingGeometry} position={[0, 0, 0.004]} renderOrder={isSelected ? 7 : 4}>
+              <meshBasicMaterial
+                color={isSelected ? "#f6cc55" : "#ffffff"}
+                side={THREE.DoubleSide}
+                toneMapped={false}
+              />
+            </mesh>
+          </>
+        ) : (
+          <>
+            <mesh geometry={headGeometry} renderOrder={isSelected ? 6 : 3}>
+              <meshStandardMaterial
+                color={flowerColors.head}
+                emissive={flowerColors.headEmissive}
+                roughness={0.55}
+                transparent={false}
+                opacity={1}
+                side={THREE.DoubleSide}
+                polygonOffset
+                polygonOffsetFactor={-3}
+                polygonOffsetUnits={-3}
+              />
+            </mesh>
+            <mesh geometry={centerGeometry} position={[0, 0, 0.003]} renderOrder={isSelected ? 7 : 4}>
+              <meshStandardMaterial
+                color={flowerColors.center}
+                emissive={flowerColors.centerEmissive}
+                roughness={0.75}
+                transparent={false}
+                opacity={1}
+                side={THREE.DoubleSide}
+                polygonOffset
+                polygonOffsetFactor={-4}
+                polygonOffsetUnits={-4}
+              />
+            </mesh>
+          </>
+        )}
       </group>
     </group>
   );
+}
+
+function useThumbnailTexture(url?: string, width?: number, height?: number) {
+  const [texture, setTexture] = useState<THREE.Texture | null>(null);
+  const textureRef = useRef<THREE.Texture | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    textureRef.current?.dispose();
+    textureRef.current = null;
+    setTexture(null);
+    if (!url) return () => { active = false; };
+
+    const loader = new THREE.TextureLoader();
+    loader.load(
+      url,
+      (loaded) => {
+        if (!active) {
+          loaded.dispose();
+          return;
+        }
+        const imageWidth = width ?? loaded.image.width;
+        const imageHeight = height ?? loaded.image.height;
+        const aspect = imageWidth > 0 && imageHeight > 0
+          ? imageWidth / imageHeight
+          : 1;
+        if (aspect > 1) {
+          loaded.repeat.set(1 / aspect, 1);
+          loaded.offset.set((1 - 1 / aspect) / 2, 0);
+        } else {
+          loaded.repeat.set(1, aspect);
+          loaded.offset.set(0, (1 - aspect) / 2);
+        }
+        loaded.colorSpace = THREE.SRGBColorSpace;
+        loaded.needsUpdate = true;
+        textureRef.current = loaded;
+        setTexture(loaded);
+      },
+      undefined,
+      () => {
+        if (active) setTexture(null);
+      },
+    );
+
+    return () => {
+      active = false;
+      textureRef.current?.dispose();
+      textureRef.current = null;
+    };
+  }, [height, url, width]);
+
+  return texture;
 }
 
 function orientHeadToCamera(head: THREE.Object3D, parent: THREE.Object3D, camera: THREE.Camera) {

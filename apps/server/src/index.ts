@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 import assetRoutes from "./routes/assets.js";
 import slideshowRoutes from "./routes/slideshow.js";
+import searchRoutes from "./routes/search.js";
 import albumRoutes from "./routes/albums.js";
 import authRoutes from "./routes/auth.js";
 import uploadRoutes, { getSiteActivityStats } from "./routes/uploads.js";
@@ -28,6 +29,7 @@ app.use(express.json());
 
 app.use("/api/v1/assets", assetRoutes);
 app.use("/api/v1/slideshow", slideshowRoutes);
+app.use("/api/v1/search", searchRoutes);
 app.use("/api/v1/albums", albumRoutes);
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/uploads", uploadRoutes);

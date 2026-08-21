@@ -2,7 +2,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { Canvas, useThree } from "@react-three/fiber";
 import { MapControls, Preload } from "@react-three/drei";
 import * as THREE from "three";
-import { fetchAuthUser, fetchPlacementProcessGallery, fetchProjects, fetchSimilarAsset, fetchUploadOptions, fetchViewerAsset, type ActivityOption, type AuthUser, type MapPlacement, type Photo, type ProcessGalleryAsset, type ProjectOption, type SimilarAssetRecommendation } from "../../api/client";
+import { fetchAuthUser, fetchContextSearch, fetchPlacementProcessGallery, fetchProjects, fetchSimilarAsset, fetchUploadOptions, fetchViewerAsset, type ActivityOption, type AuthUser, type ContextSearchResult, type MapPlacement, type Photo, type ProcessGalleryAsset, type ProjectOption, type SimilarAssetRecommendation } from "../../api/client";
 import { useGalleryStore } from "../../stores/galleryStore";
 import LoadingIndicator from "../ui/LoadingIndicator";
 import AudioLightboxPlayer from "../ui/AudioLightboxPlayer";
@@ -71,7 +71,7 @@ const MAP_STYLE_STORAGE_KEY = "artasia-map-style";
 type MenuItem = {
   href: string;
   label: string;
-  action?: "about";
+  action?: "about" | "search";
 };
 type IntroPhase = "loading" | "ready" | "exiting" | "complete";
 const PARTNER_PATH_PREFIX = "/partners/";
@@ -446,6 +446,11 @@ export default function ArtScene() {
   const [mapStyle, setMapStyle] = useState<MapStyleId>(getInitialMapStyle);
   const [openFilter, setOpenFilter] = useState<"partner" | "educator" | "activity" | null>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [contextSearchOpen, setContextSearchOpen] = useState(false);
+  const [contextSearchQuery, setContextSearchQuery] = useState("");
+  const [contextSearchResults, setContextSearchResults] = useState<ContextSearchResult[] | null>(null);
+  const [contextSearchLoading, setContextSearchLoading] = useState(false);
+  const [contextSearchError, setContextSearchError] = useState<string | null>(null);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [webglError, setWebglError] = useState<string | null>(() => getWebGL2SupportError());
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -624,11 +629,38 @@ export default function ArtScene() {
   const menuItems = useMemo(
     (): MenuItem[] => [
       { href: "#about", label: "About", action: "about" as const },
+      { href: "#search", label: "Search", action: "search" as const },
       { href: "/admin", label: "Admin" },
       { href: "/partners", label: "Partners" },
     ],
     []
   );
+  const handleContextSearchSubmit = useCallback((event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const query = contextSearchQuery.trim();
+    if (!query) {
+      setContextSearchResults(null);
+      setContextSearchError("Enter a word or phrase to search the artwork.");
+      return;
+    }
+
+    if (focusedPlacementDetails) backAction?.();
+    setContextSearchLoading(true);
+    setContextSearchError(null);
+    setContextSearchResults([]);
+    void fetchContextSearch(query)
+      .then((results) => setContextSearchResults(results))
+      .catch((error) => {
+        setContextSearchResults([]);
+        setContextSearchError((error as Error).message);
+      })
+      .finally(() => setContextSearchLoading(false));
+  }, [backAction, contextSearchQuery, focusedPlacementDetails]);
+  const clearContextSearch = useCallback(() => {
+    setContextSearchResults(null);
+    setContextSearchError(null);
+    setContextSearchQuery("");
+  }, []);
   const handleMapStyleChange = useCallback((nextStyle: MapStyleId) => {
     setMapStyle(nextStyle);
     try {
@@ -1602,6 +1634,26 @@ export default function ArtScene() {
           {menuOpen && (
             <div className="atlas-menu-panel" role="menu" style={menuPanelStyle}>
                 {menuItems.map((item) => {
+                  if (item.action === "search") {
+                    return (
+                      <button
+                        key={item.href}
+                        type="button"
+                        className="atlas-control-surface"
+                        role="menuitem"
+                        style={{
+                          ...menuItemStyle,
+                          textAlign: "left",
+                          border: 0,
+                          borderBottom: "1px solid rgba(255,255,255,0.12)",
+                          cursor: "pointer",
+                        }}
+                        onClick={() => { setMenuOpen(false); setContextSearchOpen(true); }}
+                      >
+                        {item.label}
+                      </button>
+                    );
+                  }
                   if (item.action === "about") {
                     return (
                       <button
@@ -1682,6 +1734,60 @@ export default function ArtScene() {
             <img src="/artasia-atlas.svg" alt="ArtAsia Atlas" style={aboutLogoStyle} />
             <p style={aboutTextStyle}>Explore artist-led learning experiences and creative spaces across our community.</p>
             <a href="https://artsforall.co" target="_blank" rel="noopener noreferrer" style={aboutLinkStyle}>Visit Arts For All</a>
+          </div>
+        </div>
+      )}
+
+      {contextSearchOpen && (
+        <div role="dialog" aria-modal="true" aria-label="Search artwork" style={aboutOverlayStyle}>
+          <div style={contextSearchCardStyle}>
+            <button
+              type="button"
+              aria-label="Close search"
+              onClick={() => setContextSearchOpen(false)}
+              style={aboutCloseStyle}
+            >×</button>
+            <h2 style={contextSearchTitleStyle}>Search artwork</h2>
+            <p style={contextSearchIntroStyle}>
+              Describe what you are looking for and we’ll show one matching artwork at each placement.
+            </p>
+            <form onSubmit={handleContextSearchSubmit} style={contextSearchFormStyle}>
+              <input
+                type="search"
+                value={contextSearchQuery}
+                onChange={(event) => setContextSearchQuery(event.target.value)}
+                placeholder="Try “yellow” or “children painting”"
+                aria-label="Artwork search"
+                autoFocus
+                style={contextSearchInputStyle}
+              />
+              <button
+                type="submit"
+                className="atlas-control-surface"
+                disabled={contextSearchLoading}
+                style={contextSearchSubmitStyle}
+              >
+                {contextSearchLoading ? "Searching…" : "Search"}
+              </button>
+            </form>
+            {contextSearchError && (
+              <div role="alert" style={contextSearchErrorStyle}>{contextSearchError}</div>
+            )}
+            {contextSearchResults && !contextSearchLoading && !contextSearchError && (
+              <p role="status" style={contextSearchResultStyle}>
+                Found artwork at {contextSearchResults.length} placement{contextSearchResults.length === 1 ? "" : "s"}.
+              </p>
+            )}
+            {contextSearchResults && (
+              <button
+                type="button"
+                className="atlas-control-surface"
+                onClick={clearContextSearch}
+                style={contextSearchClearStyle}
+              >
+                Clear search
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -2199,6 +2305,7 @@ export default function ArtScene() {
               onPlacementNavigationChange={handlePlacementNavigationChange}
               onPartnerFilterOptionsChange={setPartnerFilterOptions}
               onEducatorFilterOptionsChange={setEducatorFilterOptions}
+              contextSearchResults={contextSearchResults}
               projectSlug={selectedProject?.slug}
               projectStatistics={selectedProject?.statistics}
               onProjectInferred={handleProjectInferred}
@@ -3748,6 +3855,63 @@ const aboutCardStyle: React.CSSProperties = {
   position: "relative", width: "min(420px, 100%)", padding: "42px 28px 30px",
   borderRadius: 18, background: "rgba(16, 19, 31, 0.96)", border: "1px solid rgba(255,255,255,0.16)",
   color: "#eef3fb", textAlign: "center", boxShadow: "0 24px 70px rgba(0,0,0,0.45)",
+};
+const contextSearchCardStyle: React.CSSProperties = {
+  ...aboutCardStyle,
+  textAlign: "left",
+};
+const contextSearchTitleStyle: React.CSSProperties = {
+  margin: "0 0 10px",
+  color: "#fff",
+  fontSize: 22,
+};
+const contextSearchIntroStyle: React.CSSProperties = {
+  margin: "0 0 20px",
+  color: "#c1c9d7",
+  fontSize: 14,
+  lineHeight: 1.5,
+};
+const contextSearchFormStyle: React.CSSProperties = {
+  display: "flex",
+  gap: 8,
+  alignItems: "stretch",
+};
+const contextSearchInputStyle: React.CSSProperties = {
+  ...atlasControlSurfaceStyle,
+  minWidth: 0,
+  flex: 1,
+  padding: "11px 12px",
+  color: "#fff",
+  background: "rgba(255,255,255,0.08)",
+  border: "1px solid rgba(255,255,255,0.2)",
+  borderRadius: 8,
+  outline: "none",
+};
+const contextSearchSubmitStyle: React.CSSProperties = {
+  padding: "0 16px",
+  border: "1px solid rgba(255,255,255,0.22)",
+  borderRadius: 8,
+  color: "#fff",
+  cursor: "pointer",
+};
+const contextSearchErrorStyle: React.CSSProperties = {
+  marginTop: 14,
+  color: "#ffb4b4",
+  fontSize: 13,
+  lineHeight: 1.4,
+};
+const contextSearchResultStyle: React.CSSProperties = {
+  margin: "14px 0 0",
+  color: "#b9e4b1",
+  fontSize: 13,
+};
+const contextSearchClearStyle: React.CSSProperties = {
+  marginTop: 18,
+  padding: "8px 12px",
+  border: "1px solid rgba(255,255,255,0.18)",
+  borderRadius: 8,
+  color: "#dbe2ee",
+  cursor: "pointer",
 };
 const aboutCloseStyle: React.CSSProperties = { position: "absolute", top: 10, right: 14, border: 0, background: "transparent", color: "#cfd6e2", fontSize: 28, cursor: "pointer" };
 const aboutPresenterStyle: React.CSSProperties = {

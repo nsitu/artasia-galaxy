@@ -57,6 +57,25 @@ export interface SimilarAssetRecommendation {
   contextualLabels: string[];
 }
 
+export interface ContextSearchResult {
+  placementId: number;
+  asset: Photo;
+}
+
+export async function fetchContextSearch(query: string): Promise<ContextSearchResult[]> {
+  const res = await fetch("/api/v1/search/context", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  const body = await res.json() as { results?: ContextSearchResult[] };
+  return body.results ?? [];
+}
+
 export async function fetchSimilarAsset(params: {
   assetId: string;
   excludePlacementId?: number;

@@ -12,6 +12,7 @@ import {
   fetchMapPlacements,
   fetchSiteActivityStats,
   type ActivityOption,
+  type ContextSearchResult,
   type MapPlacement,
   type Photo,
   type ProjectOption,
@@ -594,6 +595,7 @@ interface TerrainGalleryProps {
   selectedActivityColour?: string;
   activityOptions?: ActivityOption[];
   activityOptionsReady?: boolean;
+  contextSearchResults?: ContextSearchResult[] | null;
 }
 
 export default function TerrainGallery({
@@ -623,6 +625,7 @@ export default function TerrainGallery({
   selectedActivityColour,
   activityOptions = [],
   activityOptionsReady = true,
+  contextSearchResults = null,
 }: TerrainGalleryProps = {}) {
   const camera = useThree((state) => state.camera);
   const controls = useThree(
@@ -1242,6 +1245,13 @@ export default function TerrainGallery({
       };
     });
   }, [focusedPlacement, projection, projectionMatchesRequest, terrain, visiblePlacements]);
+
+  const contextSearchByPlacementId = useMemo(
+    () => new Map(
+      (contextSearchResults ?? []).map((result) => [result.placementId, result]),
+    ),
+    [contextSearchResults],
+  );
 
   const placementSigns = useMemo(() => {
     const signsByPlacementId = new Map<number, PlacementSign[]>();
@@ -2335,6 +2345,12 @@ export default function TerrainGallery({
   }, [educatorFilterOptions, onEducatorFilterOptionsChange]);
 
   useEffect(() => {
+    if (contextSearchResults === null) return;
+    setHoveredPlacement(null);
+    setPreviewPlacement(null);
+  }, [contextSearchResults]);
+
+  useEffect(() => {
     return () => onPartnerFilterOptionsChange?.([]);
   }, [onPartnerFilterOptionsChange]);
 
@@ -2436,52 +2452,105 @@ export default function TerrainGallery({
             }
           />
         ))}
-      {sceneReadyForMarkers && !focusedPlacement &&
-        placementLayout.map(({
-          placement,
-          position,
-          isForked,
-          clusterIndex,
-          clusterCount,
-        }) => (
-          <PlaceMarker
-            key={placement.placement_id}
-            markerId={String(placement.placement_id)}
-            stemColorSeed={getPlacementAnchorKey(placement)}
-            position={position}
-            brandColorOne={placement.partner_brand_color_one}
-            brandColorTwo={placement.partner_brand_color_two}
-            isForked={isForked}
-            clusterIndex={clusterIndex}
-            clusterCount={clusterCount}
-            hasAssets={placementsWithAssets.has(placement.placement_id)}
-            isSelected={
-              (previewPlacement ?? hoveredPlacement)?.placement_id ===
-              placement.placement_id
-            }
-            onClick={() => {
-              setHoveredPlacement(null);
-              setPreviewPlacement((current) =>
-                current?.placement_id === placement.placement_id
-                  ? null
-                  : placement,
+      {sceneReadyForMarkers && !focusedPlacement && (
+        contextSearchResults
+          ? placementLayout.map(({
+              placement,
+              position,
+              isForked,
+              clusterIndex,
+              clusterCount,
+            }) => {
+              const result = contextSearchByPlacementId.get(placement.placement_id);
+              if (!result) return null;
+              return (
+                <PlaceMarker
+                  key={`context:${placement.placement_id}`}
+                  markerId={`context:${placement.placement_id}`}
+                  stemColorSeed={getPlacementAnchorKey(placement)}
+                  position={position}
+                  brandColorOne={placement.partner_brand_color_one}
+                  brandColorTwo={placement.partner_brand_color_two}
+                  isForked={isForked}
+                  clusterIndex={clusterIndex}
+                  clusterCount={clusterCount}
+                  thumbnailUrl={result.asset.thumbnailUrl}
+                  thumbnailWidth={result.asset.width}
+                  thumbnailHeight={result.asset.height}
+                  isSelected={
+                    (previewPlacement ?? hoveredPlacement)?.placement_id ===
+                    placement.placement_id
+                  }
+                  onClick={() => {
+                    setHoveredPlacement(null);
+                    setPreviewPlacement((current) =>
+                      current?.placement_id === placement.placement_id
+                        ? null
+                        : placement,
+                    );
+                    if (usesTouchPreview) {
+                      panToPlacement(position);
+                    }
+                  }}
+                  onPointerEnter={
+                    usesTouchPreview
+                      ? undefined
+                      : () => setHoveredPlacement(placement)
+                  }
+                  onPointerLeave={
+                    usesTouchPreview
+                      ? undefined
+                      : () => setHoveredPlacement(null)
+                  }
+                />
               );
-              if (usesTouchPreview) {
-                panToPlacement(position);
-              }
-            }}
-            onPointerEnter={
-              usesTouchPreview
-                ? undefined
-                : () => setHoveredPlacement(placement)
-            }
-            onPointerLeave={
-              usesTouchPreview
-                ? undefined
-                : () => setHoveredPlacement(null)
-            }
-          />
-        ))}
+            })
+          : placementLayout.map(({
+              placement,
+              position,
+              isForked,
+              clusterIndex,
+              clusterCount,
+            }) => (
+              <PlaceMarker
+                key={placement.placement_id}
+                markerId={String(placement.placement_id)}
+                stemColorSeed={getPlacementAnchorKey(placement)}
+                position={position}
+                brandColorOne={placement.partner_brand_color_one}
+                brandColorTwo={placement.partner_brand_color_two}
+                isForked={isForked}
+                clusterIndex={clusterIndex}
+                clusterCount={clusterCount}
+                hasAssets={placementsWithAssets.has(placement.placement_id)}
+                isSelected={
+                  (previewPlacement ?? hoveredPlacement)?.placement_id ===
+                  placement.placement_id
+                }
+                onClick={() => {
+                  setHoveredPlacement(null);
+                  setPreviewPlacement((current) =>
+                    current?.placement_id === placement.placement_id
+                      ? null
+                      : placement,
+                  );
+                  if (usesTouchPreview) {
+                    panToPlacement(position);
+                  }
+                }}
+                onPointerEnter={
+                  usesTouchPreview
+                    ? undefined
+                    : () => setHoveredPlacement(placement)
+                }
+                onPointerLeave={
+                  usesTouchPreview
+                    ? undefined
+                    : () => setHoveredPlacement(null)
+                }
+              />
+            ))
+      )}
       {sceneReadyForMarkers && focusedPlacement && documentationQuoteLayout && (
         <DocumentationPullQuotePanel
           quote={documentationQuoteLayout.quote}
