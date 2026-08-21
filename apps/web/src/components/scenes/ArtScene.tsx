@@ -649,18 +649,16 @@ export default function ArtScene() {
     setContextSearchError(null);
     setContextSearchResults([]);
     void fetchContextSearch(query)
-      .then((results) => setContextSearchResults(results))
+      .then((results) => {
+        setContextSearchResults(results);
+        setContextSearchOpen(false);
+      })
       .catch((error) => {
         setContextSearchResults([]);
         setContextSearchError((error as Error).message);
       })
       .finally(() => setContextSearchLoading(false));
   }, [backAction, contextSearchQuery, focusedPlacementDetails]);
-  const clearContextSearch = useCallback(() => {
-    setContextSearchResults(null);
-    setContextSearchError(null);
-    setContextSearchQuery("");
-  }, []);
   const handleMapStyleChange = useCallback((nextStyle: MapStyleId) => {
     setMapStyle(nextStyle);
     try {
@@ -1739,24 +1737,22 @@ export default function ArtScene() {
       )}
 
       {contextSearchOpen && (
-        <div role="dialog" aria-modal="true" aria-label="Search artwork" style={aboutOverlayStyle}>
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Search artwork"
+          style={contextSearchOverlayStyle}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setContextSearchOpen(false);
+          }}
+        >
           <div style={contextSearchCardStyle}>
-            <button
-              type="button"
-              aria-label="Close search"
-              onClick={() => setContextSearchOpen(false)}
-              style={aboutCloseStyle}
-            >×</button>
-            <h2 style={contextSearchTitleStyle}>Search artwork</h2>
-            <p style={contextSearchIntroStyle}>
-              Describe what you are looking for and we’ll show one matching artwork at each placement.
-            </p>
             <form onSubmit={handleContextSearchSubmit} style={contextSearchFormStyle}>
               <input
                 type="search"
                 value={contextSearchQuery}
                 onChange={(event) => setContextSearchQuery(event.target.value)}
-                placeholder="Try “yellow” or “children painting”"
+                placeholder="Search artwork"
                 aria-label="Artwork search"
                 autoFocus
                 style={contextSearchInputStyle}
@@ -1765,28 +1761,17 @@ export default function ArtScene() {
                 type="submit"
                 className="atlas-control-surface"
                 disabled={contextSearchLoading}
+                aria-label="Submit artwork search"
                 style={contextSearchSubmitStyle}
               >
-                {contextSearchLoading ? "Searching…" : "Search"}
+                <svg viewBox="0 0 24 24" aria-hidden="true" style={contextSearchIconStyle}>
+                  <circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                  <path d="m15.5 15.5 5 5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
               </button>
             </form>
             {contextSearchError && (
               <div role="alert" style={contextSearchErrorStyle}>{contextSearchError}</div>
-            )}
-            {contextSearchResults && !contextSearchLoading && !contextSearchError && (
-              <p role="status" style={contextSearchResultStyle}>
-                Found artwork at {contextSearchResults.length} placement{contextSearchResults.length === 1 ? "" : "s"}.
-              </p>
-            )}
-            {contextSearchResults && (
-              <button
-                type="button"
-                className="atlas-control-surface"
-                onClick={clearContextSearch}
-                style={contextSearchClearStyle}
-              >
-                Clear search
-              </button>
             )}
           </div>
         </div>
@@ -3856,62 +3841,55 @@ const aboutCardStyle: React.CSSProperties = {
   borderRadius: 18, background: "rgba(16, 19, 31, 0.96)", border: "1px solid rgba(255,255,255,0.16)",
   color: "#eef3fb", textAlign: "center", boxShadow: "0 24px 70px rgba(0,0,0,0.45)",
 };
+const contextSearchOverlayStyle: React.CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  zIndex: 40,
+  display: "grid",
+  placeItems: "start center",
+  padding: "max(16px, env(safe-area-inset-top)) 16px 24px",
+  background: "rgba(5, 7, 14, 0.2)",
+};
 const contextSearchCardStyle: React.CSSProperties = {
-  ...aboutCardStyle,
-  textAlign: "left",
-};
-const contextSearchTitleStyle: React.CSSProperties = {
-  margin: "0 0 10px",
-  color: "#fff",
-  fontSize: 22,
-};
-const contextSearchIntroStyle: React.CSSProperties = {
-  margin: "0 0 20px",
-  color: "#c1c9d7",
-  fontSize: 14,
-  lineHeight: 1.5,
+  ...atlasPanelSurfaceStyle,
+  width: "min(560px, 100%)",
+  padding: 8,
+  boxSizing: "border-box",
+  border: "1px solid rgba(255,255,255,0.16)",
+  boxShadow: "0 18px 50px rgba(0,0,0,0.35)",
 };
 const contextSearchFormStyle: React.CSSProperties = {
   display: "flex",
-  gap: 8,
+  gap: 6,
   alignItems: "stretch",
 };
 const contextSearchInputStyle: React.CSSProperties = {
   ...atlasControlSurfaceStyle,
   minWidth: 0,
   flex: 1,
-  padding: "11px 12px",
+  height: menuButtonStyle.height,
+  padding: "0 14px",
+  boxSizing: "border-box",
   color: "#fff",
   background: "rgba(255,255,255,0.08)",
   border: "1px solid rgba(255,255,255,0.2)",
-  borderRadius: 8,
+  borderRadius: 0,
   outline: "none",
 };
 const contextSearchSubmitStyle: React.CSSProperties = {
-  padding: "0 16px",
-  border: "1px solid rgba(255,255,255,0.22)",
-  borderRadius: 8,
-  color: "#fff",
-  cursor: "pointer",
+  ...menuButtonStyle,
+  flex: "0 0 auto",
+  padding: 0,
+};
+const contextSearchIconStyle: React.CSSProperties = {
+  width: 24,
+  height: 24,
 };
 const contextSearchErrorStyle: React.CSSProperties = {
-  marginTop: 14,
+  margin: "8px 4px 0",
   color: "#ffb4b4",
   fontSize: 13,
   lineHeight: 1.4,
-};
-const contextSearchResultStyle: React.CSSProperties = {
-  margin: "14px 0 0",
-  color: "#b9e4b1",
-  fontSize: 13,
-};
-const contextSearchClearStyle: React.CSSProperties = {
-  marginTop: 18,
-  padding: "8px 12px",
-  border: "1px solid rgba(255,255,255,0.18)",
-  borderRadius: 8,
-  color: "#dbe2ee",
-  cursor: "pointer",
 };
 const aboutCloseStyle: React.CSSProperties = { position: "absolute", top: 10, right: 14, border: 0, background: "transparent", color: "#cfd6e2", fontSize: 28, cursor: "pointer" };
 const aboutPresenterStyle: React.CSSProperties = {
