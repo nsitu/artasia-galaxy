@@ -2,7 +2,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { Canvas, useThree } from "@react-three/fiber";
 import { MapControls, Preload } from "@react-three/drei";
 import * as THREE from "three";
-import { fetchAuthUser, fetchPlacementProcessGallery, fetchProjects, fetchUploadOptions, type ActivityOption, type AuthUser, type MapPlacement, type Photo, type ProcessGalleryAsset, type ProjectOption } from "../../api/client";
+import { fetchAuthUser, fetchPlacementProcessGallery, fetchProjects, fetchSimilarAsset, fetchUploadOptions, type ActivityOption, type AuthUser, type MapPlacement, type Photo, type ProcessGalleryAsset, type ProjectOption, type SimilarAssetRecommendation } from "../../api/client";
 import { useGalleryStore } from "../../stores/galleryStore";
 import LoadingIndicator from "../ui/LoadingIndicator";
 import AudioLightboxPlayer from "../ui/AudioLightboxPlayer";
@@ -76,11 +76,18 @@ type MenuItem = {
 type IntroPhase = "loading" | "ready" | "exiting" | "complete";
 const PARTNER_PATH_PREFIX = "/partners/";
 const PROJECT_QUERY_KEY = "project";
+const ASSET_QUERY_KEY = "asset";
 const PROJECT_STORAGE_KEY = "artasia-project";
+const ASSET_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function getProjectSlugFromSearch(search: string): string | null {
   const value = new URLSearchParams(search).get(PROJECT_QUERY_KEY)?.trim();
   return value || null;
+}
+
+function getLightboxAssetIdFromSearch(search: string): string | null {
+  const value = new URLSearchParams(search).get(ASSET_QUERY_KEY)?.trim() ?? "";
+  return ASSET_ID_PATTERN.test(value) ? value : null;
 }
 
 function getStoredProjectSlug(): string | null {
@@ -396,6 +403,9 @@ export default function ArtScene() {
   const [requestedProjectSlug, setRequestedProjectSlug] = useState(() =>
     getProjectSlugFromSearch(window.location.search),
   );
+  const [requestedLightboxAssetId, setRequestedLightboxAssetId] = useState(() =>
+    getLightboxAssetIdFromSearch(window.location.search),
+  );
   const [selectedProjectSlug, setSelectedProjectSlug] = useState(() =>
     getProjectSlugFromSearch(window.location.search) ?? getStoredProjectSlug() ?? "",
   );
@@ -454,6 +464,10 @@ export default function ArtScene() {
   const [lightboxZoom, setLightboxZoom] = useState(1);
   const [lightboxPan, setLightboxPan] = useState({ x: 0, y: 0 });
   const [lightboxMetadataExpanded, setLightboxMetadataExpanded] = useState(true);
+  const [similarAssetForId, setSimilarAssetForId] = useState<string | null>(null);
+  const [similarRecommendation, setSimilarRecommendation] = useState<SimilarAssetRecommendation | null>(null);
+  const [similarLoading, setSimilarLoading] = useState(false);
+  const [similarError, setSimilarError] = useState<string | null>(null);
   const lightboxZoomRef = useRef(1);
   const lightboxPanRef = useRef({ x: 0, y: 0 });
   const lightboxStageRef = useRef<HTMLDivElement | null>(null);
@@ -463,6 +477,7 @@ export default function ArtScene() {
   const introPanOffsetRef = useRef(false);
   const processGalleryCacheRef = useRef(new Map<number, ProcessGalleryAsset[]>());
   const documentationOverlayPlacementRef = useRef<MapPlacement | null>(null);
+  const similarRequestIdRef = useRef(0);
 
   const handleIntroReady = useCallback(() => {
     setIntroTerrainReady(true);
@@ -565,6 +580,7 @@ export default function ArtScene() {
   useEffect(() => {
     const onPopState = () => {
       setRequestedProjectSlug(getProjectSlugFromSearch(window.location.search));
+      setRequestedLightboxAssetId(getLightboxAssetIdFromSearch(window.location.search));
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
@@ -726,10 +742,83 @@ export default function ArtScene() {
     selectedLightboxIndex >= 0 && lightboxPhotos.length > 1
       ? lightboxPhotos[(selectedLightboxIndex + 1) % lightboxPhotos.length]
       : null;
+  useEffect(() => {
+    if (
+      !requestedLightboxAssetId ||
+      processLightboxPhotoId ||
+      photoScope.mode !== "placement" ||
+      photos.length === 0
+    ) {
+      return;
+    }
+    const targetIndex = photos.findIndex((photo) => photo.id === requestedLightboxAssetId);
+    if (targetIndex >= 0 && selectedGalleryPhoto?.id !== requestedLightboxAssetId) {
+      selectPhoto(targetIndex);
+    }
+  }, [
+    photos,
+    photoScope.mode,
+    processLightboxPhotoId,
+    requestedLightboxAssetId,
+    selectPhoto,
+    selectedGalleryPhoto?.id,
+  ]);
+
+  useEffect(() => {
+    if (
+      processLightboxPhotoId ||
+      !selectedPhoto ||
+      !window.location.pathname.startsWith("/sites/")
+    ) {
+      return;
+    }
+    const assetId = ASSET_ID_PATTERN.test(selectedPhoto.id) ? selectedPhoto.id : null;
+    updateLightboxAssetQuery(assetId);
+    setRequestedLightboxAssetId(assetId);
+  }, [processLightboxPhotoId, selectedPhoto]);
+
+  useEffect(() => {
+    similarRequestIdRef.current += 1;
+    setSimilarAssetForId(null);
+    setSimilarRecommendation(null);
+    setSimilarLoading(false);
+    setSimilarError(null);
+  }, [selectedPhoto?.id]);
+
   const closeLightbox = useCallback(() => {
     setProcessLightboxPhotoId(null);
     selectPhoto(null);
+    if (window.location.pathname.startsWith("/sites/")) {
+      updateLightboxAssetQuery(null);
+      setRequestedLightboxAssetId(null);
+    }
   }, [selectPhoto]);
+
+  const handleFindSimilar = useCallback(() => {
+    if (!selectedPhoto || selectedPhoto.mediaKind !== "image") return;
+    const sourceAssetId = selectedPhoto.id;
+    const requestId = similarRequestIdRef.current + 1;
+    similarRequestIdRef.current = requestId;
+    setSimilarAssetForId(sourceAssetId);
+    setSimilarRecommendation(null);
+    setSimilarLoading(true);
+    setSimilarError(null);
+    void fetchSimilarAsset({
+      assetId: sourceAssetId,
+      excludePlacementId: focusedPlacementDetails?.placement_id,
+    })
+      .then((recommendation) => {
+        if (similarRequestIdRef.current !== requestId) return;
+        setSimilarRecommendation(recommendation);
+      })
+      .catch((error) => {
+        if (similarRequestIdRef.current !== requestId) return;
+        setSimilarError((error as Error).message);
+      })
+      .finally(() => {
+        if (similarRequestIdRef.current === requestId) setSimilarLoading(false);
+      });
+  }, [focusedPlacementDetails?.placement_id, selectedPhoto]);
   const selectedDescription = selectedPhoto?.exifInfo?.description?.trim();
   const selectedAnecdoteEditUrl = selectedPhoto?.mediaKind === "anecdote" &&
     authUser?.authenticated
@@ -1925,6 +2014,62 @@ export default function ArtScene() {
                     <span>Documentation</span>
                   </button>
                 )}
+                {selectedPhoto.mediaKind === "image" && (
+                  <div className="atlas-lightbox-similar" style={photoLightboxSimilarStyle}>
+                    <button
+                      type="button"
+                      className="atlas-control-surface"
+                      onClick={handleFindSimilar}
+                      disabled={similarLoading}
+                      style={photoLightboxActionLinkStyle}
+                      aria-label="Find a similar artwork in another placement"
+                    >
+                      <span aria-hidden="true" style={photoLightboxMaterialIconStyle}>
+                        travel_explore
+                      </span>
+                      <span>{similarLoading ? "Finding…" : "Find Similar"}</span>
+                    </button>
+                    {similarAssetForId === selectedPhoto.id && similarRecommendation && (
+                      <a
+                        className="atlas-lightbox-similar-result"
+                        href={getPlacementAssetPath(
+                          similarRecommendation.placement,
+                          similarRecommendation.asset.id,
+                        )}
+                        style={photoLightboxSimilarResultStyle}
+                        aria-label={`Open similar artwork from ${similarRecommendation.placement.placement_name}`}
+                      >
+                        <img
+                          src={similarRecommendation.asset.thumbnailUrl}
+                          alt=""
+                          loading="lazy"
+                          style={photoLightboxSimilarThumbnailStyle}
+                        />
+                        <span style={photoLightboxSimilarCopyStyle}>
+                          <span style={photoLightboxSimilarCaptionStyle}>
+                            This reminds me of an artwork from
+                          </span>
+                          <span style={photoLightboxSimilarPlacementStyle}>
+                            {similarRecommendation.placement.placement_name}
+                            {similarRecommendation.placement.section
+                              ? ` · ${similarRecommendation.placement.section}`
+                              : ""}
+                          </span>
+                          {similarRecommendation.contextualLabels.length > 0 && (
+                            <span style={photoLightboxSimilarLabelsStyle}>
+                              {similarRecommendation.contextualLabels.join(" · ")}
+                            </span>
+                          )}
+                        </span>
+                      </a>
+                    )}
+                    {similarAssetForId === selectedPhoto.id && !similarLoading && !similarRecommendation && (
+                      <span style={photoLightboxSimilarStatusStyle}>
+                        {similarError || "No similar artwork found."}
+                      </span>
+                    )}
+                  </div>
+                )}
                 <a
                   href={`/api/v1/assets/${selectedPhoto.id}/original`}
                   className="atlas-control-surface"
@@ -2210,6 +2355,32 @@ function getEducatorPath(educator: string) {
   return withProjectQuery(
     slug ? `${PEOPLE_PATH_PREFIX}${encodeURIComponent(slug)}` : "/",
   );
+}
+
+function updateLightboxAssetQuery(assetId: string | null) {
+  const target = new URL(window.location.href);
+  if (assetId && ASSET_ID_PATTERN.test(assetId)) {
+    target.searchParams.set(ASSET_QUERY_KEY, assetId);
+  } else {
+    target.searchParams.delete(ASSET_QUERY_KEY);
+  }
+  const nextUrl = `${target.pathname}${target.search}${target.hash}`;
+  const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (nextUrl !== currentUrl) {
+    window.history.replaceState(null, "", nextUrl);
+  }
+}
+
+function getPlacementAssetPath(
+  placement: SimilarAssetRecommendation["placement"],
+  assetId: string,
+) {
+  const slug = placement.placement_slug?.trim() || slugifyPartnerName(placement.placement_name);
+  const target = new URL(`/sites/${encodeURIComponent(slug)}`, window.location.origin);
+  const project = getProjectSlugFromSearch(window.location.search);
+  if (project) target.searchParams.set(PROJECT_QUERY_KEY, project);
+  target.searchParams.set(ASSET_QUERY_KEY, assetId);
+  return `${target.pathname}${target.search}`;
 }
 
 function getWebGL2SupportError() {
@@ -2601,6 +2772,15 @@ const responsiveTopNavStyles = `
     .atlas-photo-lightbox-audio {
       width: 100% !important;
       max-width: 100% !important;
+    }
+    .atlas-lightbox-similar {
+      flex-basis: 100% !important;
+      width: 100% !important;
+      flex-wrap: wrap !important;
+    }
+    .atlas-lightbox-similar-result {
+      flex-basis: 100% !important;
+      max-width: none !important;
     }
     .atlas-audio-lightbox-controls {
       grid-template-columns: minmax(0, 1fr) auto !important;
@@ -3301,9 +3481,80 @@ const photoLightboxActionRowStyle: React.CSSProperties = {
   flex: "0 0 auto",
   display: "flex",
   alignItems: "center",
+  flexWrap: "wrap",
   gap: 8,
   width: "100%",
   marginTop: 10,
+};
+
+const photoLightboxSimilarStyle: React.CSSProperties = {
+  flex: "1 1 auto",
+  minWidth: 0,
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+};
+
+const photoLightboxSimilarResultStyle: React.CSSProperties = {
+  flex: "1 1 18rem",
+  minWidth: 0,
+  maxWidth: "32rem",
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  minHeight: 44,
+  padding: 4,
+  boxSizing: "border-box",
+  color: "#eef2f8",
+  border: "1px solid rgba(255,255,255,0.16)",
+  background: "rgba(255,255,255,0.06)",
+  textDecoration: "none",
+};
+
+const photoLightboxSimilarThumbnailStyle: React.CSSProperties = {
+  flex: "0 0 52px",
+  width: 52,
+  height: 52,
+  objectFit: "cover",
+  background: "rgba(0,0,0,0.28)",
+};
+
+const photoLightboxSimilarCopyStyle: React.CSSProperties = {
+  minWidth: 0,
+  display: "flex",
+  flexDirection: "column",
+  gap: 2,
+  lineHeight: 1.2,
+};
+
+const photoLightboxSimilarCaptionStyle: React.CSSProperties = {
+  color: "#c9ced8",
+  fontSize: 10,
+  whiteSpace: "nowrap",
+};
+
+const photoLightboxSimilarPlacementStyle: React.CSSProperties = {
+  overflow: "hidden",
+  color: "#fff",
+  fontSize: 12,
+  fontWeight: 700,
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+
+const photoLightboxSimilarLabelsStyle: React.CSSProperties = {
+  overflow: "hidden",
+  color: "#c7ec9d",
+  fontSize: 10,
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+
+const photoLightboxSimilarStatusStyle: React.CSSProperties = {
+  minWidth: 0,
+  color: "#c9ced8",
+  fontSize: 11,
+  lineHeight: 1.3,
 };
 
 const photoLightboxActionLinkStyle: React.CSSProperties = {

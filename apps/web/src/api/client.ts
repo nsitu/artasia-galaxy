@@ -46,6 +46,35 @@ export interface Photo {
   }>;
 }
 
+export interface SimilarAssetRecommendation {
+  asset: Photo;
+  placement: {
+    placement_id: number;
+    placement_name: string;
+    placement_slug?: string;
+    section?: string;
+  };
+  contextualLabels: string[];
+}
+
+export async function fetchSimilarAsset(params: {
+  assetId: string;
+  excludePlacementId?: number;
+}): Promise<SimilarAssetRecommendation | null> {
+  const query = new URLSearchParams();
+  if (params.excludePlacementId != null) {
+    query.set("excludePlacementId", String(params.excludePlacementId));
+  }
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  const res = await fetch(`/api/v1/assets/${encodeURIComponent(params.assetId)}/similar${suffix}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  const body = await res.json() as { recommendation?: SimilarAssetRecommendation | null };
+  return body.recommendation ?? null;
+}
+
 export type ProcessGalleryAsset = Photo & {
   caption: string;
   alt: string;

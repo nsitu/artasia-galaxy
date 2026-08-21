@@ -101,7 +101,7 @@ function resolveDateRange(preset?: string, startDate?: string, endDate?: string)
   return { takenAfter: startDate, takenBefore: endDate };
 }
 
-function assetToPhoto(
+export function assetToPhoto(
   asset: ImmichAsset,
   adjustments?: AssetAdjustments,
   forceAudio = false,

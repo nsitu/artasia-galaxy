@@ -5,6 +5,7 @@ import {
   regenerateAssetThumbnail,
 } from "../infra/ImmichClient.js";
 import { getWordPressConfig } from "../infra/WordPressClient.js";
+import { findSimilarAsset } from "../services/similarAsset.service.js";
 
 const router = Router();
 const THUMBNAIL_REGEN_COOLDOWN_MS = 5 * 60_000;
@@ -166,6 +167,25 @@ router.get("/:id/preview", async (req, res) => {
   } catch (err) {
     const msg = (err as Error).message;
     console.error(`[preview] ${req.params.id}: ${msg}`);
+    res.status(502).json({ error: msg });
+  }
+});
+
+router.get("/:id/similar", async (req, res) => {
+  const rawPlacementId = typeof req.query.excludePlacementId === "string"
+    ? Number(req.query.excludePlacementId)
+    : undefined;
+  const excludePlacementId = rawPlacementId != null && Number.isInteger(rawPlacementId) && rawPlacementId > 0
+    ? rawPlacementId
+    : undefined;
+
+  try {
+    const recommendation = await findSimilarAsset(req.params.id, excludePlacementId);
+    res.set("Cache-Control", "public, max-age=300, stale-while-revalidate=900");
+    res.json({ recommendation });
+  } catch (err) {
+    const msg = (err as Error).message;
+    console.error(`[similar] ${req.params.id}: ${msg}`);
     res.status(502).json({ error: msg });
   }
 });

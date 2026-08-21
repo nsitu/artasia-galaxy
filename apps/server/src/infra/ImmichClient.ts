@@ -329,6 +329,34 @@ export async function searchAssets(params: {
   return res.json();
 }
 
+export async function searchSimilarAssets(params: {
+  assetId: string;
+  albumIds?: string[];
+  type?: "IMAGE" | "VIDEO";
+  size?: number;
+}): Promise<ImmichAsset[]> {
+  if (!isValidUUID(params.assetId)) {
+    throw new Error(`Cannot search similar assets for invalid asset ID: ${params.assetId}`);
+  }
+
+  const body: Record<string, unknown> = {
+    queryAssetId: params.assetId,
+    size: params.size ?? 50,
+    withExif: true,
+    visibility: "timeline",
+  };
+  if (params.albumIds?.length) body.albumIds = params.albumIds;
+  if (params.type) body.type = params.type;
+
+  const res = await immichRequest("/search/smart", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const response = await res.json() as ImmichSearchResponse;
+  return response.assets?.items ?? [];
+}
+
 export async function searchAssetIdsByTag(tagId: string): Promise<string[]> {
   const cached = tagAssetIdsCache.get(tagId);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
