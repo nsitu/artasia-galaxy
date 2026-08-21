@@ -20,6 +20,7 @@ const coreIconNames = [
   "person",
   "upload",
   "menu_book",
+  "travel_explore",
   "open_in_new",
   "photo_prints",
   "add_to_drive",

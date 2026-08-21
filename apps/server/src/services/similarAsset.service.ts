@@ -1,6 +1,8 @@
 import {
   getAsset,
   getPublishedAlbum,
+  listTags,
+  searchAssetIdsByTags,
   searchSimilarAssets,
   type ImmichAsset,
 } from "../infra/ImmichClient.js";
@@ -8,6 +10,7 @@ import {
   getCustomActivityFromValues,
   getMapPlacements,
   getUploadConfig,
+  placementAnchorTag,
   type ActivityConfig,
   type ArtasiaMapPlacement,
 } from "./uploadConfig.service.js";
@@ -36,6 +39,23 @@ function placementIdsForAsset(asset: ImmichAsset): number[] {
     .map((value) => value.match(PLACEMENT_TAG_PATTERN)?.[1])
     .flatMap((value) => value ? [Number(value)] : [])
     .filter((value) => Number.isInteger(value) && value > 0);
+}
+
+function placementTagIdsForPlacements(
+  tags: Awaited<ReturnType<typeof listTags>>,
+  placementIds: Iterable<number>,
+): string[] {
+  const requestedTags = new Set(
+    Array.from(placementIds, (placementId) =>
+      placementAnchorTag(placementId).toLocaleLowerCase(),
+    ),
+  );
+  return tags.flatMap((tag) => {
+    const matches = [tag.name, tag.value]
+      .map((value) => value.trim().toLocaleLowerCase())
+      .some((value) => requestedTags.has(value));
+    return matches ? [tag.id] : [];
+  });
 }
 
 function activityLabelsForAsset(asset: ImmichAsset, activities: ActivityConfig[]): string[] {
@@ -105,6 +125,18 @@ export async function findSimilarAsset(
   const excludedPlacementIds = new Set(placementIdsForAsset(source));
   if (excludedPlacementId != null) excludedPlacementIds.add(excludedPlacementId);
 
+  const placementTagIds = placementTagIdsForPlacements(
+    await listTags(),
+    excludedPlacementIds,
+  );
+  const excludedPlacementAssetIds = new Set<string>();
+  if (placementTagIds.length > 0) {
+    const assetIdsByTag = await searchAssetIdsByTags(placementTagIds);
+    for (const assetIds of assetIdsByTag.values()) {
+      for (const assetId of assetIds) excludedPlacementAssetIds.add(assetId);
+    }
+  }
+
   const placementById = new Map(placements.map((placement) => [placement.placement_id, placement]));
   const results = await searchSimilarAssets({
     assetId,
@@ -114,17 +146,27 @@ export async function findSimilarAsset(
   });
 
   for (const candidate of results) {
-    if (candidate.id === assetId || candidate.type !== "IMAGE" || candidate.isArchived || candidate.isTrashed) {
+    if (
+      candidate.id === assetId ||
+      excludedPlacementAssetIds.has(candidate.id) ||
+      candidate.type !== "IMAGE" ||
+      candidate.isArchived ||
+      candidate.isTrashed
+    ) {
       continue;
     }
 
-    const placement = placementIdsForAsset(candidate)
+    // Smart-search results use Immich's lightweight search projection, which
+    // does not include tags. Fetch full metadata only for candidates that have
+    // already survived the current-placement exclusion.
+    const fullCandidate = await getAsset(candidate.id);
+    const placement = placementIdsForAsset(fullCandidate)
       .filter((placementId) => !excludedPlacementIds.has(placementId))
       .map((placementId) => placementById.get(placementId))
       .find((value): value is ArtasiaMapPlacement => Boolean(value));
     if (!placement) continue;
 
-    return mapRecommendationAsset(candidate, placement, config.activities);
+    return mapRecommendationAsset(fullCandidate, placement, config.activities);
   }
 
   return null;
