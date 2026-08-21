@@ -66,7 +66,9 @@ export async function fetchSimilarAsset(params: {
     query.set("excludePlacementId", String(params.excludePlacementId));
   }
   const suffix = query.toString() ? `?${query.toString()}` : "";
-  const res = await fetch(`/api/v1/assets/${encodeURIComponent(params.assetId)}/similar${suffix}`);
+  const res = await fetch(`/api/v1/assets/${encodeURIComponent(params.assetId)}/similar${suffix}`, {
+    cache: "no-store",
+  });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(body.error ?? `HTTP ${res.status}`);

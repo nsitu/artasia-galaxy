@@ -145,6 +145,7 @@ export async function findSimilarAsset(
     size: 50,
   });
 
+  const eligibleRecommendations: SimilarAssetRecommendation[] = [];
   for (const candidate of results) {
     if (
       candidate.id === assetId ||
@@ -166,8 +167,14 @@ export async function findSimilarAsset(
       .find((value): value is ArtasiaMapPlacement => Boolean(value));
     if (!placement) continue;
 
-    return mapRecommendationAsset(fullCandidate, placement, config.activities);
+    eligibleRecommendations.push(
+      mapRecommendationAsset(fullCandidate, placement, config.activities),
+    );
+    if (eligibleRecommendations.length >= 5) break;
   }
 
-  return null;
+  if (eligibleRecommendations.length === 0) return null;
+  return eligibleRecommendations[
+    Math.floor(Math.random() * eligibleRecommendations.length)
+  ];
 }

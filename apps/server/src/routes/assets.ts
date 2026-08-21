@@ -181,7 +181,9 @@ router.get("/:id/similar", async (req, res) => {
 
   try {
     const recommendation = await findSimilarAsset(req.params.id, excludePlacementId);
-    res.set("Cache-Control", "public, max-age=300, stale-while-revalidate=900");
+    // Each request samples from the top eligible matches, so caching would
+    // defeat the variety users get from repeated searches.
+    res.set("Cache-Control", "no-store");
     res.json({ recommendation });
   } catch (err) {
     const msg = (err as Error).message;
