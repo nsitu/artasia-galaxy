@@ -1724,6 +1724,23 @@ export default function ArtScene() {
           )}
         </div>
 
+        <button
+          type="button"
+          className="atlas-control-surface atlas-search-button"
+          aria-label="Search artwork"
+          onClick={() => {
+            setMenuOpen(false);
+            setOpenFilter(null);
+            setContextSearchOpen(true);
+          }}
+          style={searchButtonStyle}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true" style={searchButtonIconStyle}>
+            <circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" strokeWidth="1.8" />
+            <path d="m15.5 15.5 5 5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+        </button>
+
         <div ref={menuRef} className="atlas-menu-wrap" style={menuWrapStyle}>
           <button
             type="button"
@@ -3141,8 +3158,16 @@ const responsiveTopNavStyles = `
     }
 
     .atlas-menu-wrap {
-      order: 2;
+      order: 3;
       margin: 0;
+    }
+
+    .atlas-search-button {
+      order: 2;
+      width: 5rem !important;
+      height: 5rem !important;
+      border-radius: 0 !important;
+      border-top: 0 !important;
     }
 
     .atlas-menu-wrap > button {
@@ -3278,6 +3303,18 @@ const menuButtonStyle: React.CSSProperties = {
   border: 0,
   borderRadius: 0,
   cursor: "pointer",
+};
+
+const searchButtonStyle: React.CSSProperties = {
+  ...menuButtonStyle,
+  flex: "0 0 auto",
+  padding: 0,
+};
+
+const searchButtonIconStyle: React.CSSProperties = {
+  width: 24,
+  height: 24,
+  display: "block",
 };
 
 const menuIconStyle: React.CSSProperties = {
