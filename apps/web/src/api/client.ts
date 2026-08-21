@@ -62,9 +62,17 @@ export interface SimilarAssetSearchResult {
   recommendations: SimilarAssetRecommendation[];
 }
 
+export interface ContextSearchPlacement {
+  placement_id: number;
+  placement_name: string;
+  placement_slug?: string;
+  section?: string;
+}
+
 export interface ContextSearchResult {
   placementId: number;
   asset: Photo;
+  placement?: ContextSearchPlacement;
 }
 
 export async function fetchContextSearch(query: string): Promise<ContextSearchResult[]> {

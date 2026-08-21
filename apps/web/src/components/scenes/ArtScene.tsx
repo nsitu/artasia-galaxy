@@ -2,7 +2,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { Canvas, useThree } from "@react-three/fiber";
 import { MapControls, Preload } from "@react-three/drei";
 import * as THREE from "three";
-import { fetchAuthUser, fetchContextSearch, fetchPlacementProcessGallery, fetchProjects, fetchSimilarAssets, fetchUploadOptions, fetchViewerAsset, type ActivityOption, type AuthUser, type ContextSearchResult, type MapPlacement, type Photo, type ProcessGalleryAsset, type ProjectOption } from "../../api/client";
+import { fetchAuthUser, fetchContextSearch, fetchPlacementProcessGallery, fetchProjects, fetchSimilarAssets, fetchUploadOptions, fetchViewerAsset, type ActivityOption, type AuthUser, type ContextSearchPlacement, type ContextSearchResult, type MapPlacement, type Photo, type ProcessGalleryAsset, type ProjectOption } from "../../api/client";
 import { useGalleryStore } from "../../stores/galleryStore";
 import LoadingIndicator from "../ui/LoadingIndicator";
 import AudioLightboxPlayer from "../ui/AudioLightboxPlayer";
@@ -696,8 +696,11 @@ export default function ArtScene() {
   const processLightboxPhoto = processLightboxPhotoId
     ? documentationProcessAssets.find((photo) => photo.id === processLightboxPhotoId) ?? null
     : null;
+  const contextSearchLightboxResult = contextSearchLightboxPhotoId
+    ? contextSearchResults?.find((result) => result.asset.id === contextSearchLightboxPhotoId) ?? null
+    : null;
   const contextSearchLightboxPhoto = contextSearchLightboxPhotoId
-    ? contextSearchResults?.find((result) => result.asset.id === contextSearchLightboxPhotoId)?.asset ?? null
+    ? contextSearchLightboxResult?.asset ?? null
     : null;
   const requestedDeepLinkedPhoto = requestedAssetView !== MAP_ASSET_VIEW &&
     deepLinkedPhoto?.id === requestedLightboxAssetId
@@ -705,6 +708,13 @@ export default function ArtScene() {
     : null;
   const selectedPhoto = processLightboxPhoto ?? contextSearchLightboxPhoto ?? requestedDeepLinkedPhoto ?? selectedGalleryPhoto;
   const isProcessLightbox = Boolean(processLightboxPhoto);
+  const similarityLightboxHeading = similarMapOrigin && contextSearchLightboxPhotoId
+    ? `Curation by Similarity - ${contextSearchResults?.length ?? 0} ${(contextSearchResults?.length ?? 0) === 1 ? "Artwork" : "Artworks"}`
+    : null;
+  const similarityLightboxPlacement = contextSearchLightboxResult?.placement;
+  const similarityLightboxPlacementHref = similarityLightboxPlacement
+    ? getContextSearchPlacementHref(similarityLightboxPlacement, selectedProjectSlug)
+    : null;
 
   useEffect(() => {
     if (
@@ -938,6 +948,7 @@ export default function ArtScene() {
         setContextSearchResults(recommendations.map((recommendation) => ({
           placementId: recommendation.placement.placement_id,
           asset: recommendation.asset,
+          placement: recommendation.placement,
         })));
         backAction?.();
         closeLightbox();
@@ -1970,14 +1981,18 @@ export default function ArtScene() {
             touchAction: selectedPhoto.mediaKind === "anecdote" ? "pan-y" : "none",
           }}
         >
-          {focusedPlacementDetails && (
+          {similarityLightboxHeading ? (
+            <div style={photoLightboxPlacementStyle}>
+              {similarityLightboxHeading}
+            </div>
+          ) : focusedPlacementDetails ? (
             <div style={photoLightboxPlacementStyle}>
               {focusedPlacementDetails.placement_name}
               {focusedPlacementDetails.section?.trim()
                 ? ` - ${focusedPlacementDetails.section.trim()}`
                 : ""}
             </div>
-          )}
+          ) : null}
           <div
             ref={lightboxStageRef}
             className="atlas-photo-lightbox-stage"
@@ -2190,6 +2205,21 @@ export default function ArtScene() {
                 }}
               >
                 {selectedDescription}
+              </div>
+            )}
+            {similarityLightboxPlacement && similarityLightboxPlacementHref && (
+              <div style={photoLightboxPlacementCaptionStyle}>
+                <span>From </span>
+                <a
+                  href={similarityLightboxPlacementHref}
+                  onClick={(event) => event.stopPropagation()}
+                  style={photoLightboxPlacementLinkStyle}
+                >
+                  {similarityLightboxPlacement.placement_name}
+                  {similarityLightboxPlacement.section?.trim()
+                    ? ` - ${similarityLightboxPlacement.section.trim()}`
+                    : ""}
+                </a>
               </div>
             )}
             {selectedPhoto.linkedAudioUrl && (
@@ -2516,6 +2546,14 @@ function slugifyPartnerName(value: string) {
     .replace(/['"]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+function getContextSearchPlacementHref(
+  placement: ContextSearchPlacement,
+  projectSlug?: string | null,
+) {
+  const slug = placement.placement_slug?.trim() || slugifyPartnerName(placement.placement_name);
+  return withProjectQuery(`/sites/${encodeURIComponent(slug)}`, projectSlug);
 }
 
 function updatePartnerPath(partner: string) {
@@ -3798,6 +3836,23 @@ const photoLightboxAssetCaptionSeparatedStyle: React.CSSProperties = {
   marginTop: 10,
   paddingTop: 10,
   borderTop: "1px solid rgba(255,255,255,0.12)",
+};
+
+const photoLightboxPlacementCaptionStyle: React.CSSProperties = {
+  marginTop: 10,
+  paddingTop: 10,
+  borderTop: "1px solid rgba(255,255,255,0.12)",
+  color: "#c7ccd6",
+  fontSize: 13,
+  lineHeight: 1.45,
+};
+
+const photoLightboxPlacementLinkStyle: React.CSSProperties = {
+  color: "#fff",
+  fontWeight: 700,
+  textDecoration: "underline",
+  textDecorationColor: "rgba(255,255,255,0.65)",
+  textUnderlineOffset: 2,
 };
 
 const photoLightboxActivityBadgeStyle: React.CSSProperties = {
