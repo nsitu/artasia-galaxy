@@ -5,7 +5,10 @@ import {
   regenerateAssetThumbnail,
 } from "../infra/ImmichClient.js";
 import { getWordPressConfig } from "../infra/WordPressClient.js";
-import { findSimilarAsset } from "../services/similarAsset.service.js";
+import {
+  findSimilarAssets,
+  pickSimilarAsset,
+} from "../services/similarAsset.service.js";
 
 const router = Router();
 const THUMBNAIL_REGEN_COOLDOWN_MS = 5 * 60_000;
@@ -180,11 +183,12 @@ router.get("/:id/similar", async (req, res) => {
     : undefined;
 
   try {
-    const recommendation = await findSimilarAsset(req.params.id, excludePlacementId);
+    const recommendations = await findSimilarAssets(req.params.id, excludePlacementId);
+    const recommendation = pickSimilarAsset(recommendations);
     // Each request samples from the top eligible matches, so caching would
     // defeat the variety users get from repeated searches.
     res.set("Cache-Control", "no-store");
-    res.json({ recommendation });
+    res.json({ recommendation, recommendations });
   } catch (err) {
     const msg = (err as Error).message;
     console.error(`[similar] ${req.params.id}: ${msg}`);

@@ -112,10 +112,10 @@ function mapRecommendationAsset(
   };
 }
 
-export async function findSimilarAsset(
+export async function findSimilarAssets(
   assetId: string,
   excludedPlacementId?: number,
-): Promise<SimilarAssetRecommendation | null> {
+): Promise<SimilarAssetRecommendation[]> {
   const [source, publishedAlbum, placements, config] = await Promise.all([
     getAsset(assetId),
     getPublishedAlbum(),
@@ -173,8 +173,21 @@ export async function findSimilarAsset(
     if (eligibleRecommendations.length >= 5) break;
   }
 
-  if (eligibleRecommendations.length === 0) return null;
-  return eligibleRecommendations[
-    Math.floor(Math.random() * eligibleRecommendations.length)
+  return eligibleRecommendations;
+}
+
+export function pickSimilarAsset(
+  recommendations: SimilarAssetRecommendation[],
+): SimilarAssetRecommendation | null {
+  if (recommendations.length === 0) return null;
+  return recommendations[
+    Math.floor(Math.random() * recommendations.length)
   ];
+}
+
+export async function findSimilarAsset(
+  assetId: string,
+  excludedPlacementId?: number,
+): Promise<SimilarAssetRecommendation | null> {
+  return pickSimilarAsset(await findSimilarAssets(assetId, excludedPlacementId));
 }

@@ -57,6 +57,11 @@ export interface SimilarAssetRecommendation {
   contextualLabels: string[];
 }
 
+export interface SimilarAssetSearchResult {
+  recommendation: SimilarAssetRecommendation | null;
+  recommendations: SimilarAssetRecommendation[];
+}
+
 export interface ContextSearchResult {
   placementId: number;
   asset: Photo;
@@ -76,10 +81,10 @@ export async function fetchContextSearch(query: string): Promise<ContextSearchRe
   return body.results ?? [];
 }
 
-export async function fetchSimilarAsset(params: {
+async function fetchSimilarAssetSearch(params: {
   assetId: string;
   excludePlacementId?: number;
-}): Promise<SimilarAssetRecommendation | null> {
+}): Promise<SimilarAssetSearchResult> {
   const query = new URLSearchParams();
   if (params.excludePlacementId != null) {
     query.set("excludePlacementId", String(params.excludePlacementId));
@@ -92,8 +97,29 @@ export async function fetchSimilarAsset(params: {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(body.error ?? `HTTP ${res.status}`);
   }
-  const body = await res.json() as { recommendation?: SimilarAssetRecommendation | null };
-  return body.recommendation ?? null;
+  const body = await res.json() as {
+    recommendation?: SimilarAssetRecommendation | null;
+    recommendations?: SimilarAssetRecommendation[];
+  };
+  const recommendations = body.recommendations ?? (body.recommendation ? [body.recommendation] : []);
+  return {
+    recommendation: body.recommendation ?? recommendations[0] ?? null,
+    recommendations,
+  };
+}
+
+export async function fetchSimilarAsset(params: {
+  assetId: string;
+  excludePlacementId?: number;
+}): Promise<SimilarAssetRecommendation | null> {
+  return (await fetchSimilarAssetSearch(params)).recommendation;
+}
+
+export async function fetchSimilarAssets(params: {
+  assetId: string;
+  excludePlacementId?: number;
+}): Promise<SimilarAssetRecommendation[]> {
+  return (await fetchSimilarAssetSearch(params)).recommendations;
 }
 
 export async function fetchViewerAsset(assetId: string): Promise<Photo> {

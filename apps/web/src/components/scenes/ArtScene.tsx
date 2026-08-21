@@ -2,7 +2,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { Canvas, useThree } from "@react-three/fiber";
 import { MapControls, Preload } from "@react-three/drei";
 import * as THREE from "three";
-import { fetchAuthUser, fetchContextSearch, fetchPlacementProcessGallery, fetchProjects, fetchSimilarAsset, fetchUploadOptions, fetchViewerAsset, type ActivityOption, type AuthUser, type ContextSearchResult, type MapPlacement, type Photo, type ProcessGalleryAsset, type ProjectOption, type SimilarAssetRecommendation } from "../../api/client";
+import { fetchAuthUser, fetchContextSearch, fetchPlacementProcessGallery, fetchProjects, fetchSimilarAssets, fetchUploadOptions, fetchViewerAsset, type ActivityOption, type AuthUser, type ContextSearchResult, type MapPlacement, type Photo, type ProcessGalleryAsset, type ProjectOption, type SimilarAssetRecommendation } from "../../api/client";
 import { useGalleryStore } from "../../stores/galleryStore";
 import LoadingIndicator from "../ui/LoadingIndicator";
 import AudioLightboxPlayer from "../ui/AudioLightboxPlayer";
@@ -484,6 +484,7 @@ export default function ArtScene() {
   const [lightboxMetadataExpanded, setLightboxMetadataExpanded] = useState(true);
   const [similarAssetForId, setSimilarAssetForId] = useState<string | null>(null);
   const [similarRecommendation, setSimilarRecommendation] = useState<SimilarAssetRecommendation | null>(null);
+  const [similarRecommendations, setSimilarRecommendations] = useState<SimilarAssetRecommendation[] | null>(null);
   const [similarLoading, setSimilarLoading] = useState(false);
   const [similarError, setSimilarError] = useState<string | null>(null);
   const lightboxZoomRef = useRef(1);
@@ -872,6 +873,7 @@ export default function ArtScene() {
     similarRequestIdRef.current += 1;
     setSimilarAssetForId(null);
     setSimilarRecommendation(null);
+    setSimilarRecommendations(null);
     setSimilarLoading(false);
     setSimilarError(null);
   }, [selectedPhoto?.id]);
@@ -894,15 +896,21 @@ export default function ArtScene() {
     similarRequestIdRef.current = requestId;
     setSimilarAssetForId(sourceAssetId);
     setSimilarRecommendation(null);
+    setSimilarRecommendations(null);
     setSimilarLoading(true);
     setSimilarError(null);
-    void fetchSimilarAsset({
+    void fetchSimilarAssets({
       assetId: sourceAssetId,
       excludePlacementId: focusedPlacementDetails?.placement_id,
     })
-      .then((recommendation) => {
+      .then((recommendations) => {
         if (similarRequestIdRef.current !== requestId) return;
-        setSimilarRecommendation(recommendation);
+        setSimilarRecommendations(recommendations);
+        setSimilarRecommendation(
+          recommendations.length > 0
+            ? recommendations[Math.floor(Math.random() * recommendations.length)]
+            : null,
+        );
       })
       .catch((error) => {
         if (similarRequestIdRef.current !== requestId) return;
@@ -912,6 +920,21 @@ export default function ArtScene() {
         if (similarRequestIdRef.current === requestId) setSimilarLoading(false);
       });
   }, [focusedPlacementDetails?.placement_id, selectedPhoto]);
+
+  const handleViewSimilarOnMap = useCallback(() => {
+    if (
+      !selectedPhoto ||
+      similarAssetForId !== selectedPhoto.id ||
+      !similarRecommendations?.length
+    ) return;
+
+    setContextSearchResults(similarRecommendations.map((recommendation) => ({
+      placementId: recommendation.placement.placement_id,
+      asset: recommendation.asset,
+    })));
+    backAction?.();
+    closeLightbox();
+  }, [backAction, closeLightbox, selectedPhoto, similarAssetForId, similarRecommendations]);
   const selectedDescription = selectedPhoto?.exifInfo?.description?.trim();
   const selectedAnecdoteEditUrl = selectedPhoto?.mediaKind === "anecdote" &&
     authUser?.authenticated
@@ -2202,6 +2225,23 @@ export default function ArtScene() {
                         </span>
                       </a>
                     )}
+                    {similarAssetForId === selectedPhoto.id &&
+                      !similarLoading &&
+                      similarRecommendations &&
+                      similarRecommendations.length > 0 && (
+                        <button
+                          type="button"
+                          className="atlas-control-surface"
+                          onClick={handleViewSimilarOnMap}
+                          style={photoLightboxSimilarMapButtonStyle}
+                          aria-label="View similar artworks on the regional map"
+                        >
+                          <span aria-hidden="true" style={photoLightboxMaterialIconStyle}>
+                            map
+                          </span>
+                          <span>See Similar on Map</span>
+                        </button>
+                      )}
                     {similarAssetForId === selectedPhoto.id && !similarLoading && !similarRecommendation && (
                       <span style={photoLightboxSimilarStatusStyle}>
                         {similarError || "No similar artwork found."}
@@ -3715,6 +3755,13 @@ const photoLightboxActionLinkStyle: React.CSSProperties = {
   textDecoration: "none",
   whiteSpace: "nowrap",
   cursor: "pointer",
+};
+
+const photoLightboxSimilarMapButtonStyle: React.CSSProperties = {
+  ...photoLightboxActionLinkStyle,
+  minHeight: 36,
+  padding: "0 10px",
+  fontSize: 11,
 };
 
 const photoLightboxActionIconStyle: React.CSSProperties = {
