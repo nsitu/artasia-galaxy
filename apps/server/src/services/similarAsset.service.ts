@@ -21,6 +21,8 @@ import {
 } from "./slideshow.service.js";
 
 const PLACEMENT_TAG_PATTERN = /^placement:(\d+)$/i;
+export const DEFAULT_SIMILAR_RESULT_LIMIT = 5;
+export const MAX_SIMILAR_RESULT_LIMIT = 500;
 
 export interface SimilarAssetRecommendation {
   asset: Photo;
@@ -115,7 +117,15 @@ function mapRecommendationAsset(
 export async function findSimilarAssets(
   assetId: string,
   excludedPlacementId?: number,
+  resultLimit = DEFAULT_SIMILAR_RESULT_LIMIT,
 ): Promise<SimilarAssetRecommendation[]> {
+  const requestedResultLimit = Number.isFinite(resultLimit)
+    ? resultLimit
+    : DEFAULT_SIMILAR_RESULT_LIMIT;
+  const normalizedResultLimit = Math.max(
+    1,
+    Math.min(MAX_SIMILAR_RESULT_LIMIT, Math.floor(requestedResultLimit)),
+  );
   const [source, publishedAlbum, placements, config] = await Promise.all([
     getAsset(assetId),
     getPublishedAlbum(),
@@ -142,10 +152,11 @@ export async function findSimilarAssets(
     assetId,
     albumIds: [publishedAlbum.id],
     type: "IMAGE",
-    size: 50,
+    size: Math.max(50, normalizedResultLimit),
   });
 
   const eligibleRecommendations: SimilarAssetRecommendation[] = [];
+  const recommendationPlacementIds = new Set<number>();
   for (const candidate of results) {
     if (
       candidate.id === assetId ||
@@ -166,11 +177,13 @@ export async function findSimilarAssets(
       .map((placementId) => placementById.get(placementId))
       .find((value): value is ArtasiaMapPlacement => Boolean(value));
     if (!placement) continue;
+    if (recommendationPlacementIds.has(placement.placement_id)) continue;
 
+    recommendationPlacementIds.add(placement.placement_id);
     eligibleRecommendations.push(
       mapRecommendationAsset(fullCandidate, placement, config.activities),
     );
-    if (eligibleRecommendations.length >= 5) break;
+    if (eligibleRecommendations.length >= normalizedResultLimit) break;
   }
 
   return eligibleRecommendations;

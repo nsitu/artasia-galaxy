@@ -703,6 +703,7 @@ const CIRCLE_FRAME_SIZE = 0.72;
 const HIGHLIGHT_HEAD_SIZE = 1.18;
 const HIGHLIGHT_STEM_HEIGHT = 0.68;
 const HIGHLIGHT_STEM_RADIUS = 0.018;
+const HIGHLIGHT_ROTATION_SPEED = 0.34;
 const ORBIT_INDICATOR_SCALE = 0.34;
 const ORBIT_MIN_UNITS = 0.72;
 const ORBIT_MAX_UNITS = 2.15;
@@ -1274,6 +1275,7 @@ export function OrbitingPhotoHighlight({
   onPointerLeave,
 }: OrbitPhotoHighlightProps) {
   const groupRef = useRef<THREE.Group>(null);
+  const headRef = useRef<THREE.Group>(null);
   const pointerDragRef = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   const texture = usePhotoTexture(url);
   const orbit = useMemo(
@@ -1314,6 +1316,9 @@ export function OrbitingPhotoHighlight({
       cy + Math.sin(angle) * orbit.radius,
       cz + orbitZ,
     );
+    if (headRef.current) {
+      headRef.current.rotation.z = state.clock.elapsedTime * HIGHLIGHT_ROTATION_SPEED;
+    }
   });
 
   return (
@@ -1340,70 +1345,71 @@ export function OrbitingPhotoHighlight({
         />
       </mesh>
       <Billboard position={[0, 0, HIGHLIGHT_STEM_HEIGHT]}>
-        <mesh
-          scale={isHighlighted ? 1.06 : 1}
-          renderOrder={8}
-          onPointerDown={(event) => {
-            pointerDragRef.current = {
-              x: event.nativeEvent.clientX,
-              y: event.nativeEvent.clientY,
-              moved: false,
-            };
-          }}
-          onClick={(event) => {
-            if (pointerDragRef.current?.moved) {
+        <group ref={headRef} scale={isHighlighted ? 1.06 : 1}>
+          <mesh
+            renderOrder={8}
+            onPointerDown={(event) => {
+              pointerDragRef.current = {
+                x: event.nativeEvent.clientX,
+                y: event.nativeEvent.clientY,
+                moved: false,
+              };
+            }}
+            onClick={(event) => {
+              if (pointerDragRef.current?.moved) {
+                pointerDragRef.current = null;
+                event.stopPropagation();
+                return;
+              }
               pointerDragRef.current = null;
               event.stopPropagation();
-              return;
-            }
-            pointerDragRef.current = null;
-            event.stopPropagation();
-            onClick();
-          }}
-          onPointerMove={(event) => {
-            const drag = pointerDragRef.current;
-            if (!drag) return;
-            if (Math.hypot(
-              event.nativeEvent.clientX - drag.x,
-              event.nativeEvent.clientY - drag.y,
-            ) > 6) {
-              drag.moved = true;
-            }
-          }}
-          onPointerOver={(event) => {
-            event.stopPropagation();
-            document.body.style.cursor = "pointer";
-            onPointerEnter();
-          }}
-          onPointerOut={(event) => {
-            event.stopPropagation();
-            pointerDragRef.current = null;
-            document.body.style.cursor = "";
-            onPointerLeave();
-          }}
-        >
-          <planeGeometry args={[HIGHLIGHT_HEAD_SIZE, HIGHLIGHT_HEAD_SIZE]} />
-          <orbitingCutoutPhotoMaterial
-            photoMap={texture}
-            brightness={brightness}
-            contrast={contrast}
-            saturation={saturation}
-            cardAspect={1}
-            shapeMode={1}
-            imageAspect={imageAspect}
-            indicatorMix={0}
-            indicatorShade={0}
-            borderColor={borderColour ?? "#f6cc55"}
-            borderWidth={0.065}
-            dashLength={Math.PI * 2}
-            dashGap={0}
-            transparent
-            side={THREE.DoubleSide}
-            toneMapped={false}
-            depthWrite={false}
-            depthTest={false}
-          />
-        </mesh>
+              onClick();
+            }}
+            onPointerMove={(event) => {
+              const drag = pointerDragRef.current;
+              if (!drag) return;
+              if (Math.hypot(
+                event.nativeEvent.clientX - drag.x,
+                event.nativeEvent.clientY - drag.y,
+              ) > 6) {
+                drag.moved = true;
+              }
+            }}
+            onPointerOver={(event) => {
+              event.stopPropagation();
+              document.body.style.cursor = "pointer";
+              onPointerEnter();
+            }}
+            onPointerOut={(event) => {
+              event.stopPropagation();
+              pointerDragRef.current = null;
+              document.body.style.cursor = "";
+              onPointerLeave();
+            }}
+          >
+            <planeGeometry args={[HIGHLIGHT_HEAD_SIZE, HIGHLIGHT_HEAD_SIZE]} />
+            <orbitingCutoutPhotoMaterial
+              photoMap={texture}
+              brightness={brightness}
+              contrast={contrast}
+              saturation={saturation}
+              cardAspect={1}
+              shapeMode={1}
+              imageAspect={imageAspect}
+              indicatorMix={0}
+              indicatorShade={0}
+              borderColor={borderColour ?? "#f6cc55"}
+              borderWidth={0.065}
+              dashLength={0.34}
+              dashGap={0.16}
+              transparent
+              side={THREE.DoubleSide}
+              toneMapped={false}
+              depthWrite={false}
+              depthTest={false}
+            />
+          </mesh>
+        </group>
       </Billboard>
     </group>
   );

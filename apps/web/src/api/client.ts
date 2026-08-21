@@ -84,10 +84,14 @@ export async function fetchContextSearch(query: string): Promise<ContextSearchRe
 async function fetchSimilarAssetSearch(params: {
   assetId: string;
   excludePlacementId?: number;
+  limit?: number;
 }): Promise<SimilarAssetSearchResult> {
   const query = new URLSearchParams();
   if (params.excludePlacementId != null) {
     query.set("excludePlacementId", String(params.excludePlacementId));
+  }
+  if (params.limit != null) {
+    query.set("limit", String(params.limit));
   }
   const suffix = query.toString() ? `?${query.toString()}` : "";
   const res = await fetch(`/api/v1/assets/${encodeURIComponent(params.assetId)}/similar${suffix}`, {
@@ -118,6 +122,7 @@ export async function fetchSimilarAsset(params: {
 export async function fetchSimilarAssets(params: {
   assetId: string;
   excludePlacementId?: number;
+  limit?: number;
 }): Promise<SimilarAssetRecommendation[]> {
   return (await fetchSimilarAssetSearch(params)).recommendations;
 }

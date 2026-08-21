@@ -7,6 +7,8 @@ import {
 } from "./modules/iconLoader";
 
 const coreIconNames = [
+  // Keep this subset in sync with every Material Symbol rendered on public pages;
+  // an unregistered name falls back to invisible text instead of a glyph.
   "reset_brightness",
   "reset_colors",
   "reset_shadow",
@@ -26,6 +28,7 @@ const coreIconNames = [
   "add_to_drive",
   "browse",
   "location_on",
+  "map",
   "filter_alt_off",
   "warning",
   "child_hat",

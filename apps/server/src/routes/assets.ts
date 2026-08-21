@@ -6,6 +6,8 @@ import {
 } from "../infra/ImmichClient.js";
 import { getWordPressConfig } from "../infra/WordPressClient.js";
 import {
+  DEFAULT_SIMILAR_RESULT_LIMIT,
+  MAX_SIMILAR_RESULT_LIMIT,
   findSimilarAssets,
   pickSimilarAsset,
 } from "../services/similarAsset.service.js";
@@ -181,9 +183,15 @@ router.get("/:id/similar", async (req, res) => {
   const excludePlacementId = rawPlacementId != null && Number.isInteger(rawPlacementId) && rawPlacementId > 0
     ? rawPlacementId
     : undefined;
+  const rawLimit = typeof req.query.limit === "string"
+    ? Number(req.query.limit)
+    : DEFAULT_SIMILAR_RESULT_LIMIT;
+  const limit = Number.isFinite(rawLimit)
+    ? Math.max(1, Math.min(MAX_SIMILAR_RESULT_LIMIT, Math.floor(rawLimit)))
+    : DEFAULT_SIMILAR_RESULT_LIMIT;
 
   try {
-    const recommendations = await findSimilarAssets(req.params.id, excludePlacementId);
+    const recommendations = await findSimilarAssets(req.params.id, excludePlacementId, limit);
     const recommendation = pickSimilarAsset(recommendations);
     // Each request samples from the top eligible matches, so caching would
     // defeat the variety users get from repeated searches.

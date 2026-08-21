@@ -70,6 +70,11 @@ const headerStyle: CSSProperties = {
 const spinnerStyle: CSSProperties = {
   width: 28,
   height: 28,
+  minWidth: 28,
+  minHeight: 28,
+  flex: "0 0 28px",
+  aspectRatio: "1 / 1",
+  boxSizing: "border-box",
   border: "3px solid rgba(255,255,255,0.2)",
   borderTopColor: "#f5f7fb",
   borderRadius: "50%",

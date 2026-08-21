@@ -597,6 +597,7 @@ interface TerrainGalleryProps {
   activityOptions?: ActivityOption[];
   activityOptionsReady?: boolean;
   contextSearchResults?: ContextSearchResult[] | null;
+  onContextSearchAssetSelect?: (asset: Photo) => void;
   mapHighlightAssetId?: string | null;
   onMapHighlightExit?: () => void;
 }
@@ -629,6 +630,7 @@ export default function TerrainGallery({
   activityOptions = [],
   activityOptionsReady = true,
   contextSearchResults = null,
+  onContextSearchAssetSelect,
   mapHighlightAssetId = null,
   onMapHighlightExit,
 }: TerrainGalleryProps = {}) {
@@ -2511,6 +2513,8 @@ export default function TerrainGallery({
                     placement.placement_id
                   }
                   onClick={() => {
+                    onContextSearchAssetSelect?.(result.asset);
+                    if (onContextSearchAssetSelect) return;
                     setHoveredPlacement(null);
                     setPreviewPlacement((current) =>
                       current?.placement_id === placement.placement_id

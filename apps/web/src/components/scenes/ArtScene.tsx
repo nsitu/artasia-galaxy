@@ -81,6 +81,7 @@ const ASSET_QUERY_KEY = "asset";
 // and promotes the asset in its orbit instead.
 const ASSET_VIEW_QUERY_KEY = "view";
 const MAP_ASSET_VIEW = "map";
+const SIMILAR_MAP_RESULT_LIMIT = 500;
 const PROJECT_STORAGE_KEY = "artasia-project";
 const ASSET_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -437,6 +438,7 @@ export default function ArtScene() {
   const [documentationProcessAssetsLoading, setDocumentationProcessAssetsLoading] = useState(false);
   const [documentationProcessAssetsError, setDocumentationProcessAssetsError] = useState<string | null>(null);
   const [processLightboxPhotoId, setProcessLightboxPhotoId] = useState<string | null>(null);
+  const [contextSearchLightboxPhotoId, setContextSearchLightboxPhotoId] = useState<string | null>(null);
   const [hoveredPlacementDetails, setHoveredPlacementDetails] = useState<MapPlacement | null>(null);
   const [previewPlacementDetails, setPreviewPlacementDetails] = useState<MapPlacement | null>(null);
   const [previewPlacementAction, setPreviewPlacementAction] = useState<(() => void) | null>(null);
@@ -487,6 +489,8 @@ export default function ArtScene() {
   const [similarRecommendations, setSimilarRecommendations] = useState<SimilarAssetRecommendation[] | null>(null);
   const [similarLoading, setSimilarLoading] = useState(false);
   const [similarError, setSimilarError] = useState<string | null>(null);
+  const [similarMapLoading, setSimilarMapLoading] = useState(false);
+  const [similarMapError, setSimilarMapError] = useState<string | null>(null);
   const lightboxZoomRef = useRef(1);
   const lightboxPanRef = useRef({ x: 0, y: 0 });
   const lightboxStageRef = useRef<HTMLDivElement | null>(null);
@@ -689,11 +693,14 @@ export default function ArtScene() {
   const processLightboxPhoto = processLightboxPhotoId
     ? documentationProcessAssets.find((photo) => photo.id === processLightboxPhotoId) ?? null
     : null;
+  const contextSearchLightboxPhoto = contextSearchLightboxPhotoId
+    ? contextSearchResults?.find((result) => result.asset.id === contextSearchLightboxPhotoId)?.asset ?? null
+    : null;
   const requestedDeepLinkedPhoto = requestedAssetView !== MAP_ASSET_VIEW &&
     deepLinkedPhoto?.id === requestedLightboxAssetId
     ? deepLinkedPhoto
     : null;
-  const selectedPhoto = processLightboxPhoto ?? requestedDeepLinkedPhoto ?? selectedGalleryPhoto;
+  const selectedPhoto = processLightboxPhoto ?? contextSearchLightboxPhoto ?? requestedDeepLinkedPhoto ?? selectedGalleryPhoto;
   const isProcessLightbox = Boolean(processLightboxPhoto);
 
   useEffect(() => {
@@ -791,6 +798,9 @@ export default function ArtScene() {
     .toLocaleLowerCase();
   const lightboxPhotos = useMemo(() => {
     if (processLightboxPhotoId) return documentationProcessAssets;
+    if (contextSearchLightboxPhotoId) {
+      return (contextSearchResults ?? []).map((result) => result.asset);
+    }
     if (photoScope.mode !== "placement" || selectedActivityOption == null) {
       return photos;
     }
@@ -807,6 +817,8 @@ export default function ArtScene() {
     return photos.filter((photo) => photo.activityIds?.includes(selectedActivityId));
   }, [
     documentationProcessAssets,
+    contextSearchLightboxPhotoId,
+    contextSearchResults,
     photoScope.mode,
     photos,
     processLightboxPhotoId,
@@ -876,10 +888,13 @@ export default function ArtScene() {
     setSimilarRecommendations(null);
     setSimilarLoading(false);
     setSimilarError(null);
+    setSimilarMapLoading(false);
+    setSimilarMapError(null);
   }, [selectedPhoto?.id]);
 
   const closeLightbox = useCallback(() => {
     setProcessLightboxPhotoId(null);
+    setContextSearchLightboxPhotoId(null);
     setDeepLinkedPhoto(null);
     selectPhoto(null);
     if (window.location.pathname.startsWith("/sites/")) {
@@ -928,13 +943,37 @@ export default function ArtScene() {
       !similarRecommendations?.length
     ) return;
 
-    setContextSearchResults(similarRecommendations.map((recommendation) => ({
-      placementId: recommendation.placement.placement_id,
-      asset: recommendation.asset,
-    })));
-    backAction?.();
-    closeLightbox();
-  }, [backAction, closeLightbox, selectedPhoto, similarAssetForId, similarRecommendations]);
+    const requestId = similarRequestIdRef.current + 1;
+    similarRequestIdRef.current = requestId;
+    setSimilarMapLoading(true);
+    setSimilarMapError(null);
+    void fetchSimilarAssets({
+      assetId: selectedPhoto.id,
+      excludePlacementId: focusedPlacementDetails?.placement_id,
+      limit: SIMILAR_MAP_RESULT_LIMIT,
+    })
+      .then((recommendations) => {
+        if (similarRequestIdRef.current !== requestId) return;
+        if (recommendations.length === 0) {
+          setSimilarMapError("No similar artwork found.");
+          return;
+        }
+        setSimilarRecommendations(recommendations);
+        setContextSearchResults(recommendations.map((recommendation) => ({
+          placementId: recommendation.placement.placement_id,
+          asset: recommendation.asset,
+        })));
+        backAction?.();
+        closeLightbox();
+      })
+      .catch((error) => {
+        if (similarRequestIdRef.current !== requestId) return;
+        setSimilarMapError((error as Error).message);
+      })
+      .finally(() => {
+        if (similarRequestIdRef.current === requestId) setSimilarMapLoading(false);
+      });
+  }, [backAction, closeLightbox, focusedPlacementDetails?.placement_id, selectedPhoto, similarAssetForId, similarRecommendations]);
   const selectedDescription = selectedPhoto?.exifInfo?.description?.trim();
   const selectedAnecdoteEditUrl = selectedPhoto?.mediaKind === "anecdote" &&
     authUser?.authenticated
@@ -1072,12 +1111,16 @@ export default function ArtScene() {
       if (nextPhoto) setProcessLightboxPhotoId(nextPhoto.id);
       return;
     }
+    if (contextSearchLightboxPhotoId) {
+      if (nextPhoto) setContextSearchLightboxPhotoId(nextPhoto.id);
+      return;
+    }
     if (selectedPhotoIndex === null) return;
     const nextIndex = nextPhoto
       ? photos.findIndex((photo) => photo.id === nextPhoto.id)
       : -1;
     if (nextIndex >= 0) selectPhoto(nextIndex);
-  }, [lightboxPhotos, photos, processLightboxPhotoId, selectPhoto, selectedLightboxIndex, selectedPhotoIndex]);
+  }, [contextSearchLightboxPhotoId, lightboxPhotos, photos, processLightboxPhotoId, selectPhoto, selectedLightboxIndex, selectedPhotoIndex]);
 
   useEffect(() => {
     if (!selectedPhoto) return;
@@ -2233,15 +2276,21 @@ export default function ArtScene() {
                           type="button"
                           className="atlas-control-surface"
                           onClick={handleViewSimilarOnMap}
+                          disabled={similarMapLoading}
                           style={photoLightboxSimilarMapButtonStyle}
                           aria-label="View similar artworks on the regional map"
                         >
                           <span aria-hidden="true" style={photoLightboxMaterialIconStyle}>
                             map
                           </span>
-                          <span>See Similar on Map</span>
+                          <span>{similarMapLoading ? "Loading…" : "See Similar on Map"}</span>
                         </button>
                       )}
+                    {similarAssetForId === selectedPhoto.id && similarMapError && (
+                      <span role="alert" style={photoLightboxSimilarStatusStyle}>
+                        {similarMapError}
+                      </span>
+                    )}
                     {similarAssetForId === selectedPhoto.id && !similarLoading && !similarRecommendation && (
                       <span style={photoLightboxSimilarStatusStyle}>
                         {similarError || "No similar artwork found."}
@@ -2357,6 +2406,7 @@ export default function ArtScene() {
               onPartnerFilterOptionsChange={setPartnerFilterOptions}
               onEducatorFilterOptionsChange={setEducatorFilterOptions}
               contextSearchResults={contextSearchResults}
+              onContextSearchAssetSelect={(asset) => setContextSearchLightboxPhotoId(asset.id)}
               mapHighlightAssetId={requestedAssetView === MAP_ASSET_VIEW ? requestedLightboxAssetId : null}
               onMapHighlightExit={() => setRequestedAssetView(null)}
               projectSlug={selectedProject?.slug}
