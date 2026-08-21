@@ -22,6 +22,7 @@ import {
   ORBIT_HEIGHT,
   OrbitingActivityRing,
   OrbitingIconMarker,
+  OrbitingPhotoHighlight,
   OrbitingPhotoBanner,
   createOrbitGapMotion,
   type OrbitGapMotion,
@@ -596,6 +597,8 @@ interface TerrainGalleryProps {
   activityOptions?: ActivityOption[];
   activityOptionsReady?: boolean;
   contextSearchResults?: ContextSearchResult[] | null;
+  mapHighlightAssetId?: string | null;
+  onMapHighlightExit?: () => void;
 }
 
 export default function TerrainGallery({
@@ -626,6 +629,8 @@ export default function TerrainGallery({
   activityOptions = [],
   activityOptionsReady = true,
   contextSearchResults = null,
+  mapHighlightAssetId = null,
+  onMapHighlightExit,
 }: TerrainGalleryProps = {}) {
   const camera = useThree((state) => state.camera);
   const controls = useThree(
@@ -1023,7 +1028,7 @@ export default function TerrainGallery({
         isEngaged: item.sourceIndex === hoveredIndex || (
           item.photo.mediaKind !== "audio" &&
           item.photo.mediaKind !== "anecdote" &&
-          item.sourceIndex === selectedIndex
+          (item.sourceIndex === selectedIndex || item.photo.id === mapHighlightAssetId)
         ),
       });
       const existingRing = rings.get(item.activityKey);
@@ -1039,7 +1044,7 @@ export default function TerrainGallery({
       });
     }
     return [...rings.values()];
-  }, [hoveredIndex, localPhotoLayout, selectedIndex]);
+  }, [hoveredIndex, localPhotoLayout, mapHighlightAssetId, selectedIndex]);
   const orbitHeight = useMemo(() => {
     if (
       !focusedPlacement ||
@@ -2402,7 +2407,30 @@ export default function TerrainGallery({
               activityColour={item.orbitColour}
               isDenseOrbit={item.orbitAssetCount >= 5}
               isHighlighted={item.sourceIndex === hoveredIndex}
-              onClick={() => selectPhoto(item.sourceIndex)}
+              onClick={() => {
+                onMapHighlightExit?.();
+                selectPhoto(item.sourceIndex);
+              }}
+              onPointerEnter={() => setHoveredIndex(item.sourceIndex)}
+              onPointerLeave={() => setHoveredIndex(null)}
+            />
+          ) : item.photo.id === mapHighlightAssetId ? (
+            <OrbitingPhotoHighlight
+              key={item.photo.id}
+              id={item.photo.id}
+              url={item.photo.thumbnailUrl}
+              width={item.photo.width}
+              height={item.photo.height}
+              adjustments={item.photo.adjustments}
+              borderColour={selectedActivityColour ?? item.orbitColour}
+              center={item.center}
+              orbitRadius={item.orbitRadius}
+              orbitHeight={orbitHeight}
+              onClick={() => {
+                onMapHighlightExit?.();
+                selectPhoto(item.sourceIndex);
+              }}
+              isHighlighted={item.sourceIndex === hoveredIndex}
               onPointerEnter={() => setHoveredIndex(item.sourceIndex)}
               onPointerLeave={() => setHoveredIndex(null)}
             />
@@ -2421,11 +2449,12 @@ export default function TerrainGallery({
               isDenseOrbit={item.orbitAssetCount >= 5}
               isSelected={item.sourceIndex === selectedIndex}
               isHighlighted={item.sourceIndex === hoveredIndex}
-              onClick={() =>
+              onClick={() => {
+                onMapHighlightExit?.();
                 selectPhoto(
                   item.sourceIndex === selectedIndex ? null : item.sourceIndex,
-                )
-              }
+                );
+              }}
               onPointerEnter={() => setHoveredIndex(item.sourceIndex)}
               onPointerLeave={() => setHoveredIndex(null)}
             />

@@ -77,6 +77,10 @@ type IntroPhase = "loading" | "ready" | "exiting" | "complete";
 const PARTNER_PATH_PREFIX = "/partners/";
 const PROJECT_QUERY_KEY = "project";
 const ASSET_QUERY_KEY = "asset";
+// Asset links default to the lightbox; view=map keeps the placement map open
+// and promotes the asset in its orbit instead.
+const ASSET_VIEW_QUERY_KEY = "view";
+const MAP_ASSET_VIEW = "map";
 const PROJECT_STORAGE_KEY = "artasia-project";
 const ASSET_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -88,6 +92,11 @@ function getProjectSlugFromSearch(search: string): string | null {
 function getLightboxAssetIdFromSearch(search: string): string | null {
   const value = new URLSearchParams(search).get(ASSET_QUERY_KEY)?.trim() ?? "";
   return ASSET_ID_PATTERN.test(value) ? value : null;
+}
+
+function getAssetViewFromSearch(search: string): "map" | null {
+  const value = new URLSearchParams(search).get(ASSET_VIEW_QUERY_KEY)?.trim().toLowerCase();
+  return value === MAP_ASSET_VIEW ? MAP_ASSET_VIEW : null;
 }
 
 function getStoredProjectSlug(): string | null {
@@ -406,6 +415,9 @@ export default function ArtScene() {
   const [requestedLightboxAssetId, setRequestedLightboxAssetId] = useState(() =>
     getLightboxAssetIdFromSearch(window.location.search),
   );
+  const [requestedAssetView, setRequestedAssetView] = useState<"map" | null>(() =>
+    getAssetViewFromSearch(window.location.search),
+  );
   const [deepLinkedPhoto, setDeepLinkedPhoto] = useState<Photo | null>(null);
   const [selectedProjectSlug, setSelectedProjectSlug] = useState(() =>
     getProjectSlugFromSearch(window.location.search) ?? getStoredProjectSlug() ?? "",
@@ -587,6 +599,7 @@ export default function ArtScene() {
     const onPopState = () => {
       setRequestedProjectSlug(getProjectSlugFromSearch(window.location.search));
       setRequestedLightboxAssetId(getLightboxAssetIdFromSearch(window.location.search));
+      setRequestedAssetView(getAssetViewFromSearch(window.location.search));
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
@@ -675,7 +688,8 @@ export default function ArtScene() {
   const processLightboxPhoto = processLightboxPhotoId
     ? documentationProcessAssets.find((photo) => photo.id === processLightboxPhotoId) ?? null
     : null;
-  const requestedDeepLinkedPhoto = deepLinkedPhoto?.id === requestedLightboxAssetId
+  const requestedDeepLinkedPhoto = requestedAssetView !== MAP_ASSET_VIEW &&
+    deepLinkedPhoto?.id === requestedLightboxAssetId
     ? deepLinkedPhoto
     : null;
   const selectedPhoto = processLightboxPhoto ?? requestedDeepLinkedPhoto ?? selectedGalleryPhoto;
@@ -684,6 +698,7 @@ export default function ArtScene() {
   useEffect(() => {
     if (
       !requestedLightboxAssetId ||
+      requestedAssetView === MAP_ASSET_VIEW ||
       !window.location.pathname.startsWith("/sites/")
     ) {
       setDeepLinkedPhoto(null);
@@ -714,7 +729,7 @@ export default function ArtScene() {
     return () => {
       cancelled = true;
     };
-  }, [deepLinkedPhoto?.id, photos, requestedLightboxAssetId, selectedGalleryPhoto?.id]);
+  }, [deepLinkedPhoto?.id, photos, requestedAssetView, requestedLightboxAssetId, selectedGalleryPhoto?.id]);
   const availableActivityFilterOptions = useMemo<ActivityOption[]>(() => {
     if (
       !focusedPlacementDetails ||
@@ -815,6 +830,7 @@ export default function ArtScene() {
     if (
       !requestedLightboxAssetId ||
       processLightboxPhotoId ||
+      requestedAssetView === MAP_ASSET_VIEW ||
       photoScope.mode !== "placement" ||
       photos.length === 0
     ) {
@@ -827,12 +843,20 @@ export default function ArtScene() {
     photoScope.mode,
     processLightboxPhotoId,
     requestedLightboxAssetId,
+    requestedAssetView,
     selectPhoto,
   ]);
 
   useEffect(() => {
+    if (requestedAssetView !== MAP_ASSET_VIEW) return;
+    setProcessLightboxPhotoId(null);
+    selectPhoto(null);
+  }, [requestedAssetView, selectPhoto]);
+
+  useEffect(() => {
     if (
       processLightboxPhotoId ||
+      requestedAssetView === MAP_ASSET_VIEW ||
       !selectedPhoto ||
       !window.location.pathname.startsWith("/sites/")
     ) {
@@ -841,7 +865,8 @@ export default function ArtScene() {
     const assetId = ASSET_ID_PATTERN.test(selectedPhoto.id) ? selectedPhoto.id : null;
     updateLightboxAssetQuery(assetId);
     setRequestedLightboxAssetId(assetId);
-  }, [processLightboxPhotoId, selectedPhoto]);
+    setRequestedAssetView(null);
+  }, [processLightboxPhotoId, requestedAssetView, selectedPhoto]);
 
   useEffect(() => {
     similarRequestIdRef.current += 1;
@@ -858,6 +883,7 @@ export default function ArtScene() {
     if (window.location.pathname.startsWith("/sites/")) {
       updateLightboxAssetQuery(null);
       setRequestedLightboxAssetId(null);
+      setRequestedAssetView(null);
     }
   }, [selectPhoto]);
 
@@ -2291,6 +2317,8 @@ export default function ArtScene() {
               onPartnerFilterOptionsChange={setPartnerFilterOptions}
               onEducatorFilterOptionsChange={setEducatorFilterOptions}
               contextSearchResults={contextSearchResults}
+              mapHighlightAssetId={requestedAssetView === MAP_ASSET_VIEW ? requestedLightboxAssetId : null}
+              onMapHighlightExit={() => setRequestedAssetView(null)}
               projectSlug={selectedProject?.slug}
               projectStatistics={selectedProject?.statistics}
               onProjectInferred={handleProjectInferred}
@@ -2471,12 +2499,17 @@ function getEducatorPath(educator: string) {
   );
 }
 
-function updateLightboxAssetQuery(assetId: string | null) {
+function updateLightboxAssetQuery(assetId: string | null, view: "map" | null = null) {
   const target = new URL(window.location.href);
   if (assetId && ASSET_ID_PATTERN.test(assetId)) {
     target.searchParams.set(ASSET_QUERY_KEY, assetId);
   } else {
     target.searchParams.delete(ASSET_QUERY_KEY);
+  }
+  if (view === MAP_ASSET_VIEW && assetId) {
+    target.searchParams.set(ASSET_VIEW_QUERY_KEY, MAP_ASSET_VIEW);
+  } else {
+    target.searchParams.delete(ASSET_VIEW_QUERY_KEY);
   }
   const nextUrl = `${target.pathname}${target.search}${target.hash}`;
   const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
@@ -2494,6 +2527,7 @@ function getPlacementAssetPath(
   const project = getProjectSlugFromSearch(window.location.search);
   if (project) target.searchParams.set(PROJECT_QUERY_KEY, project);
   target.searchParams.set(ASSET_QUERY_KEY, assetId);
+  target.searchParams.set(ASSET_VIEW_QUERY_KEY, MAP_ASSET_VIEW);
   return `${target.pathname}${target.search}`;
 }
 
