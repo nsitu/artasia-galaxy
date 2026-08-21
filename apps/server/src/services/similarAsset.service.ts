@@ -23,6 +23,7 @@ import {
 const PLACEMENT_TAG_PATTERN = /^placement:(\d+)$/i;
 export const DEFAULT_SIMILAR_RESULT_LIMIT = 5;
 export const MAX_SIMILAR_RESULT_LIMIT = 500;
+const PLACEMENT_TAG_SEARCH_CONCURRENCY = 4;
 
 export interface SimilarAssetRecommendation {
   asset: Photo;
@@ -43,20 +44,21 @@ function placementIdsForAsset(asset: ImmichAsset): number[] {
     .filter((value) => Number.isInteger(value) && value > 0);
 }
 
-function placementTagIdsForPlacements(
+function placementTagEntriesForPlacements(
   tags: Awaited<ReturnType<typeof listTags>>,
   placementIds: Iterable<number>,
-): string[] {
-  const requestedTags = new Set(
-    Array.from(placementIds, (placementId) =>
+): Array<{ tagId: string; placementId: number }> {
+  const requestedTags = new Map(
+    Array.from(placementIds, (placementId) => [
       placementAnchorTag(placementId).toLocaleLowerCase(),
-    ),
+      placementId,
+    ] as const),
   );
   return tags.flatMap((tag) => {
-    const matches = [tag.name, tag.value]
-      .map((value) => value.trim().toLocaleLowerCase())
-      .some((value) => requestedTags.has(value));
-    return matches ? [tag.id] : [];
+    const placementId = [tag.name, tag.value]
+      .map((value) => requestedTags.get(value.trim().toLocaleLowerCase()))
+      .find((value): value is number => value != null);
+    return placementId == null ? [] : [{ tagId: tag.id, placementId }];
   });
 }
 
@@ -135,19 +137,32 @@ export async function findSimilarAssets(
   const excludedPlacementIds = new Set(placementIdsForAsset(source));
   if (excludedPlacementId != null) excludedPlacementIds.add(excludedPlacementId);
 
-  const placementTagIds = placementTagIdsForPlacements(
+  const placementById = new Map(placements.map((placement) => [placement.placement_id, placement]));
+  const placementTagEntries = placementTagEntriesForPlacements(
     await listTags(),
-    excludedPlacementIds,
+    placementById.keys(),
   );
-  const excludedPlacementAssetIds = new Set<string>();
-  if (placementTagIds.length > 0) {
-    const assetIdsByTag = await searchAssetIdsByTags(placementTagIds);
-    for (const assetIds of assetIdsByTag.values()) {
-      for (const assetId of assetIds) excludedPlacementAssetIds.add(assetId);
+  const placementByTagId = new Map(
+    placementTagEntries.map(({ tagId, placementId }) => [tagId, placementId]),
+  );
+  // Immich's legacy metadata search treats multiple tagIds as an all-of
+  // filter, so query each placement tag once and assemble the index locally.
+  // The tag lookup cache keeps this work out of subsequent similar searches.
+  const assetIdsByTag = await searchAssetIdsByTags(
+    placementTagEntries.map(({ tagId }) => tagId),
+    PLACEMENT_TAG_SEARCH_CONCURRENCY,
+  );
+  const placementIdsByAssetId = new Map<string, Set<number>>();
+  for (const [tagId, assetIds] of assetIdsByTag) {
+    const placementId = placementByTagId.get(tagId);
+    if (placementId == null) continue;
+    for (const candidateAssetId of assetIds) {
+      const placementIdsForAsset = placementIdsByAssetId.get(candidateAssetId) ?? new Set<number>();
+      placementIdsForAsset.add(placementId);
+      placementIdsByAssetId.set(candidateAssetId, placementIdsForAsset);
     }
   }
 
-  const placementById = new Map(placements.map((placement) => [placement.placement_id, placement]));
   const results = await searchSimilarAssets({
     assetId,
     albumIds: [publishedAlbum.id],
@@ -160,7 +175,6 @@ export async function findSimilarAssets(
   for (const candidate of results) {
     if (
       candidate.id === assetId ||
-      excludedPlacementAssetIds.has(candidate.id) ||
       candidate.type !== "IMAGE" ||
       candidate.isArchived ||
       candidate.isTrashed
@@ -169,16 +183,16 @@ export async function findSimilarAssets(
     }
 
     // Smart-search results use Immich's lightweight search projection, which
-    // does not include tags. Fetch full metadata only for candidates that have
-    // already survived the current-placement exclusion.
-    const fullCandidate = await getAsset(candidate.id);
-    const placement = placementIdsForAsset(fullCandidate)
+    // does not include tags. Resolve placement from the tag index, then fetch
+    // full metadata only for the first candidate selected for each placement.
+    const placement = [...(placementIdsByAssetId.get(candidate.id) ?? [])]
       .filter((placementId) => !excludedPlacementIds.has(placementId))
       .map((placementId) => placementById.get(placementId))
       .find((value): value is ArtasiaMapPlacement => Boolean(value));
     if (!placement) continue;
     if (recommendationPlacementIds.has(placement.placement_id)) continue;
 
+    const fullCandidate = await getAsset(candidate.id);
     recommendationPlacementIds.add(placement.placement_id);
     eligibleRecommendations.push(
       mapRecommendationAsset(fullCandidate, placement, config.activities),
