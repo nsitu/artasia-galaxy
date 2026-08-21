@@ -680,6 +680,13 @@ export default function ArtScene() {
       })
       .finally(() => setContextSearchLoading(false));
   }, [backAction, contextSearchQuery, focusedPlacementDetails]);
+  const handleClearContextSearch = useCallback(() => {
+    setContextSearchResults(null);
+    setContextSearchQuery("");
+    setContextSearchError(null);
+    setContextSearchLightboxPhotoId(null);
+    setSimilarMapOrigin(null);
+  }, []);
   const handleMapStyleChange = useCallback((nextStyle: MapStyleId) => {
     setMapStyle(nextStyle);
     try {
@@ -710,6 +717,9 @@ export default function ArtScene() {
   const isProcessLightbox = Boolean(processLightboxPhoto);
   const similarityLightboxHeading = similarMapOrigin && contextSearchLightboxPhotoId
     ? `Curation by Similarity - ${contextSearchResults?.length ?? 0} ${(contextSearchResults?.length ?? 0) === 1 ? "Artwork" : "Artworks"}`
+    : null;
+  const textSearchLightboxHeading = !similarMapOrigin && contextSearchLightboxPhotoId
+    ? `Search results for “${contextSearchQuery.trim() || "artwork"}”`
     : null;
   const similarityLightboxPlacement = contextSearchLightboxResult?.placement;
   const similarityLightboxPlacementHref = similarityLightboxPlacement
@@ -1295,6 +1305,9 @@ export default function ArtScene() {
     setBackAction(action ? () => action : null);
   }, []);
   const handleHomeLogoClick = useCallback((event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (contextSearchResults !== null) {
+      handleClearContextSearch();
+    }
     if (backAction) {
       event.preventDefault();
       backAction();
@@ -1318,7 +1331,7 @@ export default function ArtScene() {
       window.history.pushState(null, "", nextPath);
     }
     window.dispatchEvent(new PopStateEvent("popstate"));
-  }, [backAction, selectedProjectSlug]);
+  }, [backAction, contextSearchResults, handleClearContextSearch, selectedProjectSlug]);
   const handlePreviewPlacementChange = useCallback((placement: MapPlacement | null, action?: (() => void) | null) => {
     setPreviewPlacementDetails(placement);
     setPreviewPlacementAction(action ? () => action : null);
@@ -1896,6 +1909,7 @@ export default function ArtScene() {
             query={similarMapOrigin ? undefined : contextSearchQuery}
             resultCount={contextSearchResults.length}
             similarOrigin={similarMapOrigin ?? undefined}
+            onClearSearch={handleClearContextSearch}
           />
         ) : selectedProject &&
           !focusedPlacementDetails &&
@@ -1981,9 +1995,9 @@ export default function ArtScene() {
             touchAction: selectedPhoto.mediaKind === "anecdote" ? "pan-y" : "none",
           }}
         >
-          {similarityLightboxHeading ? (
+          {similarityLightboxHeading || textSearchLightboxHeading ? (
             <div style={photoLightboxPlacementStyle}>
-              {similarityLightboxHeading}
+              {similarityLightboxHeading || textSearchLightboxHeading}
             </div>
           ) : focusedPlacementDetails ? (
             <div style={photoLightboxPlacementStyle}>
@@ -2408,6 +2422,7 @@ export default function ArtScene() {
               selectedActivityColour={selectedActivityColour}
               activityOptions={availableActivityFilterOptions}
               activityOptionsReady={activityFilterOptionsReady}
+              contextSearchIsSimilarity={Boolean(similarMapOrigin)}
             />
             <MapControls
               makeDefault
@@ -3082,7 +3097,7 @@ const responsiveTopNavStyles = `
     }
 
     .atlas-menu-wrap {
-      order: 3;
+      order: 2;
       margin: 0;
     }
 

@@ -564,6 +564,11 @@ const CUSTOM_ACTIVITY_COLOURS = [
   "#9a7b1f",
 ];
 
+function getSimilarityThumbnailScale(rank: number, resultCount: number) {
+  if (resultCount <= 1) return 1;
+  return THREE.MathUtils.lerp(1.5, 0.5, rank / (resultCount - 1));
+}
+
 interface TerrainGalleryProps {
   authenticated?: boolean | null;
   mapStyle?: string;
@@ -597,6 +602,7 @@ interface TerrainGalleryProps {
   activityOptions?: ActivityOption[];
   activityOptionsReady?: boolean;
   contextSearchResults?: ContextSearchResult[] | null;
+  contextSearchIsSimilarity?: boolean;
   onContextSearchAssetSelect?: (asset: Photo) => void;
   mapHighlightAssetId?: string | null;
   onMapHighlightExit?: () => void;
@@ -630,6 +636,7 @@ export default function TerrainGallery({
   activityOptions = [],
   activityOptionsReady = true,
   contextSearchResults = null,
+  contextSearchIsSimilarity = false,
   onContextSearchAssetSelect,
   mapHighlightAssetId = null,
   onMapHighlightExit,
@@ -1256,6 +1263,12 @@ export default function TerrainGallery({
   const contextSearchByPlacementId = useMemo(
     () => new Map(
       (contextSearchResults ?? []).map((result) => [result.placementId, result]),
+    ),
+    [contextSearchResults],
+  );
+  const contextSearchRankByPlacementId = useMemo(
+    () => new Map(
+      (contextSearchResults ?? []).map((result, index) => [result.placementId, index]),
     ),
     [contextSearchResults],
   );
@@ -2494,6 +2507,10 @@ export default function TerrainGallery({
             }) => {
               const result = contextSearchByPlacementId.get(placement.placement_id);
               if (!result) return null;
+              const resultRank = contextSearchRankByPlacementId.get(placement.placement_id);
+              const thumbnailScale = contextSearchIsSimilarity && resultRank !== undefined
+                ? getSimilarityThumbnailScale(resultRank, contextSearchResults.length)
+                : 1;
               return (
                 <PlaceMarker
                   key={`context:${placement.placement_id}`}
@@ -2508,6 +2525,7 @@ export default function TerrainGallery({
                   thumbnailUrl={result.asset.thumbnailUrl}
                   thumbnailWidth={result.asset.width}
                   thumbnailHeight={result.asset.height}
+                  thumbnailScale={thumbnailScale}
                   isSelected={
                     (previewPlacement ?? hoveredPlacement)?.placement_id ===
                     placement.placement_id
@@ -2722,9 +2740,11 @@ export function MapContextInfoPanel({
   query,
   resultCount,
   similarOrigin,
+  onClearSearch,
 }: {
   query?: string;
   resultCount: number;
+  onClearSearch: () => void;
   similarOrigin?: {
     asset: Photo;
     placementName: string;
@@ -2763,6 +2783,15 @@ export function MapContextInfoPanel({
         <div style={siteDetailsTitleWrapStyle}>
           <div style={siteNameStyle}>{heading}</div>
         </div>
+        <button
+          type="button"
+          className="atlas-control-surface"
+          aria-label="Clear search results"
+          onClick={onClearSearch}
+          style={mapContextClearButtonStyle}
+        >
+          Clear search
+        </button>
         <button
           type="button"
           className="atlas-control-surface"
@@ -3686,6 +3715,22 @@ const siteDetailsToggleStyle: React.CSSProperties = {
   cursor: "pointer",
   fontSize: 18,
   lineHeight: 1,
+};
+
+const mapContextClearButtonStyle: React.CSSProperties = {
+  ...atlasControlSurfaceStyle,
+  flex: "0 0 auto",
+  alignSelf: "stretch",
+  minHeight: "100%",
+  padding: "0 12px",
+  border: 0,
+  borderRadius: 0,
+  color: "#d8dde7",
+  font: "inherit",
+  fontSize: 12,
+  fontWeight: 700,
+  whiteSpace: "nowrap",
+  cursor: "pointer",
 };
 
 const siteDetailsChevronStyle: React.CSSProperties = {

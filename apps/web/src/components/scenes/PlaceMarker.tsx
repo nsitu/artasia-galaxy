@@ -16,6 +16,7 @@ interface Props {
   thumbnailUrl?: string;
   thumbnailWidth?: number;
   thumbnailHeight?: number;
+  thumbnailScale?: number;
   onClick?: () => void;
   onPointerEnter?: () => void;
   onPointerLeave?: () => void;
@@ -57,6 +58,7 @@ export default function PlaceMarker({
   thumbnailUrl,
   thumbnailWidth,
   thumbnailHeight,
+  thumbnailScale = 1,
   onClick,
   onPointerEnter,
   onPointerLeave,
@@ -184,7 +186,7 @@ export default function PlaceMarker({
         cameraDistance,
         camera,
         size.height,
-      ) * selectionScale.current * (isThumbnailMarker ? 1.35 : 1);
+      ) * selectionScale.current * (isThumbnailMarker ? 1.35 * thumbnailScale : 1);
     const preferredHeadCenter = naturalHeadCenter.clone();
     if (isForked && clusterCount > 1) {
       const cameraWorldQuaternion = camera.getWorldQuaternion(
