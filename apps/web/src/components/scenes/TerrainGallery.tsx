@@ -2181,9 +2181,12 @@ export default function TerrainGallery({
     !isPreparingTerrain && geoPhotos.length === 0 && geoPlacements.length === 0;
 
   const notice = useMemo<TerrainNotice | null>(() => {
-    if (focusedPlacement && (galleryLoading || !activityOptionsReady)) {
+    if (
+      focusedPlacement &&
+      (galleryLoading || !activityOptionsReady || isPreparingTerrain || loading)
+    ) {
       return {
-        label: "Loading artworks",
+        label: `Loading ${focusedPlacement.placement_name}`,
       };
     }
 

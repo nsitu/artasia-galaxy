@@ -2055,11 +2055,6 @@ export default function ArtScene() {
                               ? ` · ${similarRecommendation.placement.section}`
                               : ""}
                           </span>
-                          {similarRecommendation.contextualLabels.length > 0 && (
-                            <span style={photoLightboxSimilarLabelsStyle}>
-                              {similarRecommendation.contextualLabels.join(" · ")}
-                            </span>
-                          )}
                         </span>
                       </a>
                     )}
@@ -3538,14 +3533,6 @@ const photoLightboxSimilarPlacementStyle: React.CSSProperties = {
   color: "#fff",
   fontSize: 12,
   fontWeight: 700,
-  textOverflow: "ellipsis",
-  whiteSpace: "nowrap",
-};
-
-const photoLightboxSimilarLabelsStyle: React.CSSProperties = {
-  overflow: "hidden",
-  color: "#c7ec9d",
-  fontSize: 10,
   textOverflow: "ellipsis",
   whiteSpace: "nowrap",
 };
