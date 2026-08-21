@@ -752,16 +752,13 @@ export default function ArtScene() {
       return;
     }
     const targetIndex = photos.findIndex((photo) => photo.id === requestedLightboxAssetId);
-    if (targetIndex >= 0 && selectedGalleryPhoto?.id !== requestedLightboxAssetId) {
-      selectPhoto(targetIndex);
-    }
+    if (targetIndex >= 0) selectPhoto(targetIndex);
   }, [
     photos,
     photoScope.mode,
     processLightboxPhotoId,
     requestedLightboxAssetId,
     selectPhoto,
-    selectedGalleryPhoto?.id,
   ]);
 
   useEffect(() => {
@@ -1677,11 +1674,6 @@ export default function ArtScene() {
               : undefined
           }
           onDocumentationOpen={handleDocumentationOpen}
-          wordpressHref={
-            authUser?.authenticated
-              ? getWordPressPostEditUrl(focusedPlacementDetails.placement_id)
-              : undefined
-          }
         />
       )}
       {!focusedPlacementDetails && previewPlacementDetails && previewPlacementAction && (
@@ -1700,11 +1692,6 @@ export default function ArtScene() {
           adminHref={
             authUser?.authenticated
               ? `/admin/browse?site=${encodeURIComponent(String(previewPlacementDetails.placement_id))}`
-              : undefined
-          }
-          wordpressHref={
-            authUser?.authenticated
-              ? getWordPressPostEditUrl(previewPlacementDetails.placement_id)
               : undefined
           }
         />

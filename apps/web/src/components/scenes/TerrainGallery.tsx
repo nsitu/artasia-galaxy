@@ -2659,7 +2659,6 @@ function applyTerrainCameraFrame(
 export function FocusedPlacementOverlay({
   placement,
   adminHref,
-  wordpressHref,
   onDocumentationOpen,
   partnerHref,
   onPartnerSelect,
@@ -2672,7 +2671,6 @@ export function FocusedPlacementOverlay({
 }: {
   placement: MapPlacement;
   adminHref?: string;
-  wordpressHref?: string;
   onDocumentationOpen?: (placement: MapPlacement) => void;
   partnerHref?: string;
   onPartnerSelect?: (partner: string) => void;
@@ -2687,7 +2685,6 @@ export function FocusedPlacementOverlay({
     <PlacementInfoPanel
       placement={placement}
       adminHref={adminHref}
-      wordpressHref={wordpressHref}
       onDocumentationOpen={onDocumentationOpen}
       partnerHref={partnerHref}
       onPartnerSelect={onPartnerSelect}
@@ -2704,7 +2701,6 @@ export function FocusedPlacementOverlay({
 function PlacementInfoPanel({
   placement,
   adminHref,
-  wordpressHref,
   onDocumentationOpen,
   partnerHref,
   onPartnerSelect,
@@ -2719,7 +2715,6 @@ function PlacementInfoPanel({
 }: {
   placement: MapPlacement;
   adminHref?: string;
-  wordpressHref?: string;
   onDocumentationOpen?: (placement: MapPlacement) => void;
   partnerHref?: string;
   onPartnerSelect?: (partner: string) => void;
@@ -2970,7 +2965,7 @@ function PlacementInfoPanel({
               />
             )}
           </div>
-          {(previousAction || hasDocumentationAction || adminHref || wordpressHref || onView || nextAction) && (
+          {(previousAction || hasDocumentationAction || adminHref || onView || nextAction) && (
             <div className="atlas-placement-actions" style={siteDetailsActionsStyle}>
               {previousAction && (
                 <PlacementNavigationButton
@@ -3015,30 +3010,14 @@ function PlacementInfoPanel({
                 <a
                   href={adminHref}
                   className="atlas-control-surface atlas-placement-action-link"
-                  aria-label="Manage assets in Atlas"
-                  title="Manage assets in Atlas"
+                  aria-label="Open Atlas admin"
+                  title="Open Atlas admin"
                   style={siteDetailsActionLinkStyle}
                 >
                   <span aria-hidden="true" style={siteDetailsActionIconStyle}>
                     settings
                   </span>
-                  <span className="atlas-placement-action-label">Manage Assets</span>
-                </a>
-              )}
-              {wordpressHref && (
-                <a
-                  href={wordpressHref}
-                  className="atlas-control-surface atlas-placement-action-link"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Edit site metadata in WordPress"
-                  title="Edit site metadata in WordPress"
-                  style={siteDetailsActionLinkStyle}
-                >
-                  <span aria-hidden="true" style={siteDetailsActionIconStyle}>
-                    page_info
-                  </span>
-                  <span className="atlas-placement-action-label">Site Metadata</span>
+                  <span className="atlas-placement-action-label">Admin</span>
                 </a>
               )}
               {onView && (
@@ -3128,7 +3107,6 @@ export function PlacementPreviewPanel({
   placement,
   onOpen,
   adminHref,
-  wordpressHref,
   onDocumentationOpen,
   partnerHref,
   onPartnerSelect,
@@ -3142,7 +3120,6 @@ export function PlacementPreviewPanel({
   placement: MapPlacement;
   onOpen: () => void;
   adminHref?: string;
-  wordpressHref?: string;
   onDocumentationOpen?: (placement: MapPlacement) => void;
   partnerHref?: string;
   onPartnerSelect?: (partner: string) => void;
@@ -3157,7 +3134,6 @@ export function PlacementPreviewPanel({
     <PlacementInfoPanel
       placement={placement}
       adminHref={adminHref}
-      wordpressHref={wordpressHref}
       onDocumentationOpen={onDocumentationOpen}
       partnerHref={partnerHref}
       onPartnerSelect={onPartnerSelect}
