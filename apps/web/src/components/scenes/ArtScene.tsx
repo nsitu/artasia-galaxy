@@ -669,14 +669,15 @@ export default function ArtScene() {
     setContextSearchLoading(true);
     setContextSearchError(null);
     setContextSearchResults([]);
+    setContextSearchOpen(false);
     void fetchContextSearch(query)
       .then((results) => {
         setContextSearchResults(results);
-        setContextSearchOpen(false);
       })
       .catch((error) => {
         setContextSearchResults([]);
         setContextSearchError((error as Error).message);
+        setContextSearchOpen(true);
       })
       .finally(() => setContextSearchLoading(false));
   }, [backAction, contextSearchQuery, focusedPlacementDetails]);
@@ -1899,8 +1900,10 @@ export default function ArtScene() {
       {terrainNotice && (!showWelcomeIntro || introPhase === "complete") && (
         <LoadingIndicator {...terrainNotice} />
       )}
+      {contextSearchLoading && <LoadingIndicator label="Searching" />}
       {contextSearchResults !== null &&
         !contextSearchOpen &&
+        !contextSearchLoading &&
         !selectedPhoto &&
         !focusedPlacementDetails &&
         !previewPlacementDetails &&
@@ -3960,7 +3963,7 @@ const contextSearchOverlayStyle: React.CSSProperties = {
   inset: 0,
   zIndex: 40,
   display: "grid",
-  placeItems: "start center",
+  placeItems: "center",
   padding: "max(16px, env(safe-area-inset-top)) 16px 24px",
   background: "rgba(5, 7, 14, 0.2)",
 };
