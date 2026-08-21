@@ -2718,6 +2718,94 @@ export function ProjectInfoPanel({
   );
 }
 
+export function MapContextInfoPanel({
+  query,
+  resultCount,
+  similarOrigin,
+}: {
+  query?: string;
+  resultCount: number;
+  similarOrigin?: {
+    asset: Photo;
+    placementName: string;
+    section?: string;
+  };
+}) {
+  const isMobile = useIsMobileBreakpoint();
+  const trimmedQuery = query?.trim() ?? "";
+  const isSimilar = Boolean(similarOrigin);
+  const heading = isSimilar
+    ? "Similar artwork"
+    : `Search results for “${trimmedQuery || "artwork"}”`;
+
+  return (
+    <section
+      style={{
+        ...siteDetailsStyle,
+        ...(isMobile ? mobileSiteDetailsStyle : {}),
+      }}
+      aria-label={isSimilar ? "Similar artwork context" : "Artwork search context"}
+    >
+      <div
+        style={{
+          ...siteDetailsHeaderStyle,
+          ...(isMobile ? mobileSiteDetailsHeaderStyle : {}),
+        }}
+      >
+        <div style={siteDetailsTitleWrapStyle}>
+          <div style={siteNameStyle}>{heading}</div>
+        </div>
+      </div>
+
+      {similarOrigin ? (
+        <div
+          style={{
+            ...siteDetailsBodyStyle,
+            ...(isMobile ? mobileSiteDetailsBodyStyle : {}),
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+          }}
+        >
+          <img
+            src={similarOrigin.asset.thumbnailUrl}
+            alt=""
+            loading="lazy"
+            style={mapContextThumbnailStyle}
+          />
+          <div style={mapContextSimilarCopyStyle}>
+            <span style={mapContextCaptionStyle}>This artwork from</span>
+            <span style={mapContextPlacementStyle}>
+              {similarOrigin.placementName}
+              {similarOrigin.section?.trim()
+                ? ` · ${similarOrigin.section.trim()}`
+                : ""}
+            </span>
+            <span style={mapContextCaptionStyle}>resonates with many others</span>
+            <span style={mapContextResultCountStyle}>
+              {resultCount} similar {resultCount === 1 ? "artwork" : "artworks"} on the map
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div
+          style={{
+            ...siteDetailsBodyStyle,
+            ...(isMobile ? mobileSiteDetailsBodyStyle : {}),
+          }}
+        >
+          <p style={projectDescriptionStyle}>
+            Showing one artwork per placement matching “{trimmedQuery || "artwork"}”
+            {resultCount === 0
+              ? ". No matching placements were found."
+              : ` across ${resultCount} ${resultCount === 1 ? "placement" : "placements"}.`}
+          </p>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function getTerrainCameraFrame(
   camera: THREE.Camera,
   terrain: THREE.Group,
@@ -3632,6 +3720,44 @@ const projectDescriptionStyle: React.CSSProperties = {
   fontWeight: 400,
   lineHeight: 1.6,
   whiteSpace: "pre-line",
+};
+
+const mapContextThumbnailStyle: React.CSSProperties = {
+  width: 72,
+  height: 72,
+  flex: "0 0 72px",
+  objectFit: "cover",
+  borderRadius: 4,
+  border: "1px solid rgba(255,255,255,0.22)",
+  background: "rgba(0,0,0,0.24)",
+};
+
+const mapContextSimilarCopyStyle: React.CSSProperties = {
+  minWidth: 0,
+  display: "flex",
+  flexDirection: "column",
+  gap: 2,
+};
+
+const mapContextCaptionStyle: React.CSSProperties = {
+  color: "#d8dde7",
+  fontSize: 13,
+  lineHeight: 1.35,
+};
+
+const mapContextPlacementStyle: React.CSSProperties = {
+  color: "#f4f7fb",
+  fontSize: 16,
+  fontWeight: 700,
+  lineHeight: 1.35,
+  overflowWrap: "anywhere",
+};
+
+const mapContextResultCountStyle: React.CSSProperties = {
+  marginTop: 4,
+  color: "#aeb7c6",
+  fontSize: 11,
+  lineHeight: 1.35,
 };
 
 const projectPresenterStyle: React.CSSProperties = {
