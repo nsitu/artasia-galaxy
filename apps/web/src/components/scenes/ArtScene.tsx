@@ -926,6 +926,7 @@ export default function ArtScene() {
   const handleFindSimilar = useCallback(() => {
     if (!selectedPhoto || selectedPhoto.mediaKind !== "image") return;
     const sourceAssetId = selectedPhoto.id;
+    const sourcePlacement = contextSearchLightboxResult?.placement ?? focusedPlacementDetails;
     const requestId = similarRequestIdRef.current + 1;
     similarRequestIdRef.current = requestId;
     setSimilarLoading(true);
@@ -933,7 +934,7 @@ export default function ArtScene() {
     setSimilarMapOrigin(null);
     void fetchSimilarAssets({
       assetId: sourceAssetId,
-      excludePlacementId: focusedPlacementDetails?.placement_id,
+      excludePlacementId: sourcePlacement?.placement_id,
       limit: SIMILAR_MAP_RESULT_LIMIT,
     })
       .then((recommendations) => {
@@ -944,16 +945,10 @@ export default function ArtScene() {
         }
         setSimilarMapOrigin({
           asset: selectedPhoto,
-          placementName: focusedPlacementDetails?.placement_name ?? "this placement",
-          section: focusedPlacementDetails?.section,
-          placementHref: focusedPlacementDetails
-            ? withProjectQuery(
-                `/sites/${encodeURIComponent(
-                  focusedPlacementDetails.placement_slug?.trim() ||
-                    slugifyPartnerName(focusedPlacementDetails.placement_name),
-                )}`,
-                selectedProjectSlug,
-              )
+          placementName: sourcePlacement?.placement_name ?? "this placement",
+          section: sourcePlacement?.section,
+          placementHref: sourcePlacement
+            ? getContextSearchPlacementHref(sourcePlacement, selectedProjectSlug)
             : undefined,
         });
         setContextSearchResults(recommendations.map((recommendation) => ({
@@ -974,6 +969,7 @@ export default function ArtScene() {
   }, [
     backAction,
     closeLightbox,
+    contextSearchLightboxResult,
     focusedPlacementDetails?.placement_id,
     focusedPlacementDetails?.placement_name,
     focusedPlacementDetails?.section,
@@ -1900,7 +1896,12 @@ export default function ArtScene() {
       {terrainNotice && (!showWelcomeIntro || introPhase === "complete") && (
         <LoadingIndicator {...terrainNotice} />
       )}
-      {contextSearchLoading && <LoadingIndicator label="Searching" />}
+      {contextSearchLoading && (
+        <LoadingIndicator
+          label="Searching"
+          detail={contextSearchQuery.trim()}
+        />
+      )}
       {contextSearchResults !== null &&
         !contextSearchOpen &&
         !contextSearchLoading &&
