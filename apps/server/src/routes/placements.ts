@@ -26,11 +26,14 @@ router.get("/:placementId/process-gallery", async (req, res) => {
     res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
     res.json({
       placementId,
-      assets: photos.map((photo) => ({
-        ...photo,
-        caption: photo.exifInfo?.description?.trim() || photo.fileName,
-        alt: photo.exifInfo?.description?.trim() || photo.fileName,
-      })),
+      assets: photos.map((photo) => {
+        const caption = photo.exifInfo?.description?.trim() ?? "";
+        return {
+          ...photo,
+          caption,
+          alt: caption || "Artwork from process gallery",
+        };
+      }),
     });
   } catch (err) {
     const msg = (err as Error).message;

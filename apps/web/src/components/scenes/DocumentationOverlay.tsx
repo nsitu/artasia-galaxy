@@ -121,7 +121,7 @@ export default function DocumentationOverlay({
                     type="button"
                     className="atlas-documentation-overlay__asset"
                     onClick={() => onProcessAssetClick?.(asset)}
-                    aria-label={`View process asset: ${asset.caption}`}
+                    aria-label={asset.caption ? `View process asset: ${asset.caption}` : "View process asset"}
                   >
                     <span className="atlas-documentation-overlay__asset-media">
                       {asset.thumbnailUrl ? (
@@ -137,9 +137,11 @@ export default function DocumentationOverlay({
                         </span>
                       )}
                     </span>
-                    <span className="atlas-documentation-overlay__asset-caption">
-                      {asset.caption}
-                    </span>
+                    {asset.caption && (
+                      <span className="atlas-documentation-overlay__asset-caption">
+                        {asset.caption}
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
