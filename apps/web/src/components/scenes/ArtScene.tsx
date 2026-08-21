@@ -491,6 +491,11 @@ export default function ArtScene() {
   const [similarError, setSimilarError] = useState<string | null>(null);
   const [similarMapLoading, setSimilarMapLoading] = useState(false);
   const [similarMapError, setSimilarMapError] = useState<string | null>(null);
+  const [similarMapOrigin, setSimilarMapOrigin] = useState<{
+    asset: Photo;
+    placementName: string;
+    section?: string;
+  } | null>(null);
   const lightboxZoomRef = useRef(1);
   const lightboxPanRef = useRef({ x: 0, y: 0 });
   const lightboxStageRef = useRef<HTMLDivElement | null>(null);
@@ -655,6 +660,7 @@ export default function ArtScene() {
   );
   const handleContextSearchSubmit = useCallback((event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setSimilarMapOrigin(null);
     const query = contextSearchQuery.trim();
     if (!query) {
       setContextSearchResults(null);
@@ -959,6 +965,11 @@ export default function ArtScene() {
           return;
         }
         setSimilarRecommendations(recommendations);
+        setSimilarMapOrigin({
+          asset: selectedPhoto,
+          placementName: focusedPlacementDetails?.placement_name ?? "this placement",
+          section: focusedPlacementDetails?.section,
+        });
         setContextSearchResults(recommendations.map((recommendation) => ({
           placementId: recommendation.placement.placement_id,
           asset: recommendation.asset,
@@ -973,7 +984,16 @@ export default function ArtScene() {
       .finally(() => {
         if (similarRequestIdRef.current === requestId) setSimilarMapLoading(false);
       });
-  }, [backAction, closeLightbox, focusedPlacementDetails?.placement_id, selectedPhoto, similarAssetForId, similarRecommendations]);
+  }, [
+    backAction,
+    closeLightbox,
+    focusedPlacementDetails?.placement_id,
+    focusedPlacementDetails?.placement_name,
+    focusedPlacementDetails?.section,
+    selectedPhoto,
+    similarAssetForId,
+    similarRecommendations,
+  ]);
   const selectedDescription = selectedPhoto?.exifInfo?.description?.trim();
   const selectedAnecdoteEditUrl = selectedPhoto?.mediaKind === "anecdote" &&
     authUser?.authenticated
@@ -1880,6 +1900,30 @@ export default function ArtScene() {
         (!showWelcomeIntro || introPhase === "exiting" || introPhase === "complete") && (
           <ProjectInfoPanel project={selectedProject} />
         )}
+      {similarMapOrigin && contextSearchResults && !selectedPhoto && (
+        <div role="status" style={similarMapOriginOverlayStyle}>
+          <img
+            src={similarMapOrigin.asset.thumbnailUrl}
+            alt=""
+            loading="lazy"
+            style={similarMapOriginThumbnailStyle}
+          />
+          <span style={similarMapOriginCopyStyle}>
+            <span style={similarMapOriginCaptionStyle}>
+              This artwork from
+            </span>
+            <span style={similarMapOriginPlacementStyle}>
+              {similarMapOrigin.placementName}
+              {similarMapOrigin.section?.trim()
+                ? ` · ${similarMapOrigin.section.trim()}`
+                : ""}
+            </span>
+            <span style={similarMapOriginCaptionStyle}>
+              resonates with many others
+            </span>
+          </span>
+        </div>
+      )}
       {focusedPlacementDetails && (
         <FocusedPlacementOverlay
           placement={focusedPlacementDetails}
@@ -3731,6 +3775,55 @@ const photoLightboxSimilarStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 8,
+};
+
+const similarMapOriginOverlayStyle: React.CSSProperties = {
+  ...atlasPanelSurfaceStyle,
+  position: "fixed",
+  top: "max(88px, calc(env(safe-area-inset-top) + 16px))",
+  left: "50%",
+  transform: "translateX(-50%)",
+  zIndex: 15,
+  width: "min(420px, calc(100vw - 32px))",
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  padding: 6,
+  boxSizing: "border-box",
+  border: "1px solid rgba(255,255,255,0.16)",
+  color: "#eef2f8",
+  boxShadow: "0 12px 32px rgba(0,0,0,0.28)",
+  pointerEvents: "none",
+};
+
+const similarMapOriginThumbnailStyle: React.CSSProperties = {
+  flex: "0 0 64px",
+  width: 64,
+  height: 64,
+  objectFit: "cover",
+  background: "rgba(0,0,0,0.28)",
+};
+
+const similarMapOriginCopyStyle: React.CSSProperties = {
+  minWidth: 0,
+  display: "flex",
+  flexDirection: "column",
+  gap: 2,
+  lineHeight: 1.2,
+};
+
+const similarMapOriginCaptionStyle: React.CSSProperties = {
+  color: "#c9ced8",
+  fontSize: 11,
+};
+
+const similarMapOriginPlacementStyle: React.CSSProperties = {
+  overflow: "hidden",
+  color: "#fff",
+  fontSize: 13,
+  fontWeight: 700,
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
 };
 
 const photoLightboxSimilarResultStyle: React.CSSProperties = {
