@@ -106,6 +106,17 @@ async function fetchSimilarAssetSearch(params: {
     recommendations?: SimilarAssetRecommendation[];
   };
   const recommendations = body.recommendations ?? (body.recommendation ? [body.recommendation] : []);
+  console.log("[Atlas] Similar artwork search", {
+    assetId: params.assetId,
+    limit: params.limit,
+    excludePlacementId: params.excludePlacementId,
+    rawResponse: body,
+    orderedResults: recommendations.map((recommendation, index) => ({
+      rank: index + 1,
+      assetId: recommendation.asset.id,
+      placement: recommendation.placement.placement_name,
+    })),
+  });
   return {
     recommendation: body.recommendation ?? recommendations[0] ?? null,
     recommendations,
