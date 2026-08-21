@@ -75,6 +75,17 @@ export async function fetchSimilarAsset(params: {
   return body.recommendation ?? null;
 }
 
+export async function fetchViewerAsset(assetId: string): Promise<Photo> {
+  const res = await fetch(`/api/v1/slideshow/assets/${encodeURIComponent(assetId)}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  const body = await res.json() as { photo?: Photo };
+  if (!body.photo) throw new Error("The viewer asset response was empty");
+  return body.photo;
+}
+
 export type ProcessGalleryAsset = Photo & {
   caption: string;
   alt: string;

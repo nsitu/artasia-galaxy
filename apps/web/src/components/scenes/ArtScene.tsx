@@ -2,7 +2,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { Canvas, useThree } from "@react-three/fiber";
 import { MapControls, Preload } from "@react-three/drei";
 import * as THREE from "three";
-import { fetchAuthUser, fetchPlacementProcessGallery, fetchProjects, fetchSimilarAsset, fetchUploadOptions, type ActivityOption, type AuthUser, type MapPlacement, type Photo, type ProcessGalleryAsset, type ProjectOption, type SimilarAssetRecommendation } from "../../api/client";
+import { fetchAuthUser, fetchPlacementProcessGallery, fetchProjects, fetchSimilarAsset, fetchUploadOptions, fetchViewerAsset, type ActivityOption, type AuthUser, type MapPlacement, type Photo, type ProcessGalleryAsset, type ProjectOption, type SimilarAssetRecommendation } from "../../api/client";
 import { useGalleryStore } from "../../stores/galleryStore";
 import LoadingIndicator from "../ui/LoadingIndicator";
 import AudioLightboxPlayer from "../ui/AudioLightboxPlayer";
@@ -406,6 +406,7 @@ export default function ArtScene() {
   const [requestedLightboxAssetId, setRequestedLightboxAssetId] = useState(() =>
     getLightboxAssetIdFromSearch(window.location.search),
   );
+  const [deepLinkedPhoto, setDeepLinkedPhoto] = useState<Photo | null>(null);
   const [selectedProjectSlug, setSelectedProjectSlug] = useState(() =>
     getProjectSlugFromSearch(window.location.search) ?? getStoredProjectSlug() ?? "",
   );
@@ -644,8 +645,46 @@ export default function ArtScene() {
   const processLightboxPhoto = processLightboxPhotoId
     ? documentationProcessAssets.find((photo) => photo.id === processLightboxPhotoId) ?? null
     : null;
-  const selectedPhoto = processLightboxPhoto ?? selectedGalleryPhoto;
+  const requestedDeepLinkedPhoto = deepLinkedPhoto?.id === requestedLightboxAssetId
+    ? deepLinkedPhoto
+    : null;
+  const selectedPhoto = processLightboxPhoto ?? requestedDeepLinkedPhoto ?? selectedGalleryPhoto;
   const isProcessLightbox = Boolean(processLightboxPhoto);
+
+  useEffect(() => {
+    if (
+      !requestedLightboxAssetId ||
+      !window.location.pathname.startsWith("/sites/")
+    ) {
+      setDeepLinkedPhoto(null);
+      return;
+    }
+    if (photos.some((photo) => photo.id === requestedLightboxAssetId)) {
+      if (selectedGalleryPhoto?.id === requestedLightboxAssetId) {
+        setDeepLinkedPhoto((current) => current?.id === requestedLightboxAssetId ? null : current);
+      }
+      return;
+    }
+    if (deepLinkedPhoto?.id === requestedLightboxAssetId) return;
+
+    let cancelled = false;
+    setDeepLinkedPhoto(null);
+    void fetchViewerAsset(requestedLightboxAssetId)
+      .then((photo) => {
+        if (!cancelled) setDeepLinkedPhoto(photo);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          console.warn(
+            `[viewer] failed to load deep-linked asset ${requestedLightboxAssetId}: ${(error as Error).message}`,
+          );
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [deepLinkedPhoto?.id, photos, requestedLightboxAssetId, selectedGalleryPhoto?.id]);
   const availableActivityFilterOptions = useMemo<ActivityOption[]>(() => {
     if (
       !focusedPlacementDetails ||
@@ -784,6 +823,7 @@ export default function ArtScene() {
 
   const closeLightbox = useCallback(() => {
     setProcessLightboxPhotoId(null);
+    setDeepLinkedPhoto(null);
     selectPhoto(null);
     if (window.location.pathname.startsWith("/sites/")) {
       updateLightboxAssetQuery(null);

@@ -1,4 +1,4 @@
-import { getPublishedAlbum, listTags, searchAssetIdsByTag, searchAssetIdsByTags, searchAssets, ImmichAsset } from "../infra/ImmichClient.js";
+import { getAsset, getPublishedAlbum, listTags, searchAssetIdsByTag, searchAssetIdsByTags, searchAssets, ImmichAsset } from "../infra/ImmichClient.js";
 import { DEFAULT_ASSET_ADJUSTMENTS, getAssetAdjustmentMap, type AssetAdjustments } from "./assetAdjustments.service.js";
 import {
   activityAnchorTag,
@@ -620,6 +620,28 @@ export async function querySlideshow(
   const total = photos.length;
 
   return { photos: photos.slice(0, limit), total };
+}
+
+export async function queryViewerAsset(assetId: string): Promise<Photo | null> {
+  const asset = await getAsset(assetId);
+  if (asset.isArchived || asset.isTrashed || (asset.visibility && asset.visibility !== "timeline")) {
+    return null;
+  }
+
+  const assetType = getAssetTypeFromTagValues(
+    (asset.tags ?? []).flatMap((tag) => [tag.name, tag.value]),
+  );
+  return assetToPhoto(
+    asset,
+    undefined,
+    false,
+    true,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    assetType,
+  );
 }
 
 export async function queryPlacementProcessGallery(

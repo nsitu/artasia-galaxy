@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { querySlideshow } from "../services/slideshow.service.js";
+import { querySlideshow, queryViewerAsset } from "../services/slideshow.service.js";
 
 const router = Router();
 
@@ -22,6 +22,22 @@ router.post("/query", async (req, res) => {
   } catch (err) {
     const msg = (err as Error).message;
     console.error(`[slideshow] query failed: ${msg}`);
+    res.status(502).json({ error: msg });
+  }
+});
+
+router.get("/assets/:assetId", async (req, res) => {
+  try {
+    const photo = await queryViewerAsset(req.params.assetId);
+    if (!photo) {
+      res.status(404).json({ error: "Asset is not available in the viewer" });
+      return;
+    }
+    res.set("Cache-Control", "public, max-age=300, stale-while-revalidate=900");
+    res.json({ photo });
+  } catch (err) {
+    const msg = (err as Error).message;
+    console.error(`[slideshow/asset] ${req.params.assetId}: ${msg}`);
     res.status(502).json({ error: msg });
   }
 });
