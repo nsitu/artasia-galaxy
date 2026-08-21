@@ -2729,20 +2729,27 @@ export function MapContextInfoPanel({
     asset: Photo;
     placementName: string;
     section?: string;
+    placementHref?: string;
   };
 }) {
   const isMobile = useIsMobileBreakpoint();
   const trimmedQuery = query?.trim() ?? "";
   const isSimilar = Boolean(similarOrigin);
+  const [expanded, setExpanded] = useState(!isMobile);
   const heading = isSimilar
-    ? "Similar artwork"
+    ? `Curation by Similarity - ${resultCount} ${resultCount === 1 ? "Artwork" : "Artworks"}`
     : `Search results for “${trimmedQuery || "artwork"}”`;
+
+  useEffect(() => {
+    setExpanded(!isMobile);
+  }, [isMobile, isSimilar, resultCount, trimmedQuery]);
 
   return (
     <section
       style={{
         ...siteDetailsStyle,
         ...(isMobile ? mobileSiteDetailsStyle : {}),
+        ...(isMobile && !expanded ? mobileSiteDetailsCollapsedStyle : {}),
       }}
       aria-label={isSimilar ? "Similar artwork context" : "Artwork search context"}
     >
@@ -2750,14 +2757,25 @@ export function MapContextInfoPanel({
         style={{
           ...siteDetailsHeaderStyle,
           ...(isMobile ? mobileSiteDetailsHeaderStyle : {}),
+          ...(!expanded ? siteDetailsHeaderCollapsedStyle : {}),
         }}
       >
         <div style={siteDetailsTitleWrapStyle}>
           <div style={siteNameStyle}>{heading}</div>
         </div>
+        <button
+          type="button"
+          className="atlas-control-surface"
+          aria-expanded={expanded}
+          aria-label={expanded ? "Collapse map context" : "Expand map context"}
+          onClick={() => setExpanded((current) => !current)}
+          style={siteDetailsToggleStyle}
+        >
+          <ChevronIcon direction={expanded ? "down" : "up"} />
+        </button>
       </div>
 
-      {similarOrigin ? (
+      {expanded && similarOrigin ? (
         <div
           style={{
             ...siteDetailsBodyStyle,
@@ -2774,20 +2792,27 @@ export function MapContextInfoPanel({
             style={mapContextThumbnailStyle}
           />
           <div style={mapContextSimilarCopyStyle}>
-            <span style={mapContextCaptionStyle}>This artwork from</span>
-            <span style={mapContextPlacementStyle}>
-              {similarOrigin.placementName}
-              {similarOrigin.section?.trim()
-                ? ` · ${similarOrigin.section.trim()}`
-                : ""}
+            <span style={mapContextCaptionStyle}>
+              The vibe of this collection was inspired by an artwork from:
             </span>
-            <span style={mapContextCaptionStyle}>resonates with many others</span>
-            <span style={mapContextResultCountStyle}>
-              {resultCount} similar {resultCount === 1 ? "artwork" : "artworks"} on the map
-            </span>
+            {similarOrigin.placementHref ? (
+              <a href={similarOrigin.placementHref} style={mapContextPlacementLinkStyle}>
+                {similarOrigin.placementName}
+                {similarOrigin.section?.trim()
+                  ? ` · ${similarOrigin.section.trim()}`
+                  : ""}
+              </a>
+            ) : (
+              <span style={mapContextPlacementStyle}>
+                {similarOrigin.placementName}
+                {similarOrigin.section?.trim()
+                  ? ` · ${similarOrigin.section.trim()}`
+                  : ""}
+              </span>
+            )}
           </div>
         </div>
-      ) : (
+      ) : expanded ? (
         <div
           style={{
             ...siteDetailsBodyStyle,
@@ -2801,7 +2826,7 @@ export function MapContextInfoPanel({
               : ` across ${resultCount} ${resultCount === 1 ? "placement" : "placements"}.`}
           </p>
         </div>
-      )}
+      ) : null}
     </section>
   );
 }
@@ -3753,11 +3778,11 @@ const mapContextPlacementStyle: React.CSSProperties = {
   overflowWrap: "anywhere",
 };
 
-const mapContextResultCountStyle: React.CSSProperties = {
-  marginTop: 4,
-  color: "#aeb7c6",
-  fontSize: 11,
-  lineHeight: 1.35,
+const mapContextPlacementLinkStyle: React.CSSProperties = {
+  ...mapContextPlacementStyle,
+  textDecoration: "underline",
+  textDecorationColor: "rgba(255,255,255,0.5)",
+  textUnderlineOffset: 3,
 };
 
 const projectPresenterStyle: React.CSSProperties = {

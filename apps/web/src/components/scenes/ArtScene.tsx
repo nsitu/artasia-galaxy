@@ -491,6 +491,7 @@ export default function ArtScene() {
     asset: Photo;
     placementName: string;
     section?: string;
+    placementHref?: string;
   } | null>(null);
   const lightboxZoomRef = useRef(1);
   const lightboxPanRef = useRef({ x: 0, y: 0 });
@@ -924,6 +925,15 @@ export default function ArtScene() {
           asset: selectedPhoto,
           placementName: focusedPlacementDetails?.placement_name ?? "this placement",
           section: focusedPlacementDetails?.section,
+          placementHref: focusedPlacementDetails
+            ? withProjectQuery(
+                `/sites/${encodeURIComponent(
+                  focusedPlacementDetails.placement_slug?.trim() ||
+                    slugifyPartnerName(focusedPlacementDetails.placement_name),
+                )}`,
+                selectedProjectSlug,
+              )
+            : undefined,
         });
         setContextSearchResults(recommendations.map((recommendation) => ({
           placementId: recommendation.placement.placement_id,
@@ -946,6 +956,7 @@ export default function ArtScene() {
     focusedPlacementDetails?.placement_name,
     focusedPlacementDetails?.section,
     selectedPhoto,
+    selectedProjectSlug,
   ]);
   const selectedDescription = selectedPhoto?.exifInfo?.description?.trim();
   const selectedAnecdoteEditUrl = selectedPhoto?.mediaKind === "anecdote" &&
@@ -2243,11 +2254,6 @@ export default function ArtScene() {
                     {!similarLoading && similarError && (
                       <span role="alert" style={photoLightboxSimilarStatusStyle}>
                         {similarError}
-                      </span>
-                    )}
-                    {!similarLoading && !similarError && (
-                      <span style={photoLightboxSimilarStatusStyle}>
-                        Find similar artworks across the regional map.
                       </span>
                     )}
                   </div>
