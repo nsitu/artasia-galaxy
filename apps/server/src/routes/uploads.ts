@@ -710,6 +710,7 @@ async function buildSiteActivityStats(): Promise<SiteActivityStatsResponse> {
         (artworkCounts.get(assignment.placementId) ?? 0) + 1,
       );
     }
+    if (assignment.assetType === "process") continue;
     if (assignment.activityId == null) continue;
 
     const placementCounts =

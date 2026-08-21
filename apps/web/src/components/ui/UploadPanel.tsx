@@ -4920,38 +4920,49 @@ export default function UploadPanel({
       return <div style={siteStatsEmptyStyle}>No published assets</div>;
     }
 
-    const hasBreakdown =
-      stats.processPublishedCount > 0 || stats.activities.length > 0;
+    const hasArtworkAssets = stats.artworkPublishedCount > 0;
+    const hasProcessAssets = stats.processPublishedCount > 0;
 
     return (
       <div style={siteStatsStyle}>
-        <div style={siteStatsTotalStyle}>
-          {stats.artworkPublishedCount} published artwork asset
-          {stats.artworkPublishedCount === 1 ? "" : "s"}
-        </div>
-        {hasBreakdown ? (
-          <ul style={siteStatsListStyle}>
-            {stats.processPublishedCount > 0 && (
-              <li style={siteStatsItemStyle}>
-                <span>Process</span>
-                <span style={siteStatsCountStyle}>
-                  {stats.processPublishedCount} published process asset
-                  {stats.processPublishedCount === 1 ? "" : "s"}
-                </span>
-              </li>
+        {hasArtworkAssets && (
+          <section style={siteStatsSectionStyle}>
+            <div style={siteStatsSectionHeaderStyle}>
+              <span style={siteStatsSectionTitleStyle}>Artwork Assets</span>
+              <span style={siteStatsSectionCountStyle}>
+                {stats.artworkPublishedCount} published
+              </span>
+            </div>
+            {stats.activities.length > 0 ? (
+              <ul style={siteStatsListStyle}>
+                {stats.activities.map((activity) => (
+                  <li key={activity.activityId} style={siteStatsItemStyle}>
+                    <span>{activity.label}</span>
+                    <span style={siteStatsCountStyle}>
+                      {activity.publishedCount} published
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div style={siteStatsEmptyStyle}>No activity tags assigned</div>
             )}
-            {stats.activities.map((activity) => (
-              <li key={activity.activityId} style={siteStatsItemStyle}>
-                <span>{activity.label}</span>
-                <span style={siteStatsCountStyle}>
-                  {activity.publishedCount} asset
-                  {activity.publishedCount === 1 ? "" : "s"} published
-                </span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <div style={siteStatsEmptyStyle}>No activity tags assigned</div>
+          </section>
+        )}
+        {hasProcessAssets && (
+          <section
+            style={{
+              ...siteStatsSectionStyle,
+              ...siteStatsSectionSeparatedStyle,
+            }}
+          >
+            <div style={siteStatsSectionHeaderStyle}>
+              <span style={siteStatsSectionTitleStyle}>Process Assets</span>
+              <span style={siteStatsSectionCountStyle}>
+                {stats.processPublishedCount} published
+              </span>
+            </div>
+          </section>
         )}
       </div>
     );
@@ -7115,10 +7126,36 @@ const siteStatsStyle: React.CSSProperties = {
   borderTop: "1px solid rgba(255,255,255,0.1)",
 };
 
-const siteStatsTotalStyle: React.CSSProperties = {
+const siteStatsSectionStyle: React.CSSProperties = {
+  display: "grid",
+  gap: 5,
+};
+
+const siteStatsSectionSeparatedStyle: React.CSSProperties = {
+  paddingTop: 8,
+  borderTop: "1px solid rgba(255,255,255,0.08)",
+};
+
+const siteStatsSectionHeaderStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "baseline",
+  justifyContent: "space-between",
+  gap: 10,
+};
+
+const siteStatsSectionTitleStyle: React.CSSProperties = {
   color: "#d8e7ff",
   fontSize: 12,
+  fontWeight: 700,
+  letterSpacing: "0.03em",
+};
+
+const siteStatsSectionCountStyle: React.CSSProperties = {
+  flex: "0 0 auto",
+  color: "#8fc85c",
+  fontSize: 11,
   fontWeight: 600,
+  textAlign: "right",
 };
 
 const siteStatsListStyle: React.CSSProperties = {
