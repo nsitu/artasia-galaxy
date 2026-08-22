@@ -1615,6 +1615,7 @@ export default function ArtScene() {
         whiteLogo: focusedPlacementDetails.partner_white_logo,
       }
     : selectedPartnerOption;
+  const hasTopNavPartnerLogo = Boolean(topNavPartner?.whiteLogo?.url);
   const selectedProject = projectOptions.find(
     (project) => project.slug.toLocaleLowerCase() === selectedProjectSlug.toLocaleLowerCase(),
   );
@@ -1622,7 +1623,10 @@ export default function ArtScene() {
   return (
     <div className={window.location.pathname.startsWith("/sites/") ? "atlas-site-view" : undefined} style={{ width: "100vw", height: "100vh", position: "relative" }}>
       <style>{responsiveTopNavStyles}</style>
-      <div className="atlas-top-nav" style={topNavStyle}>
+      <div
+        className={`atlas-top-nav${hasTopNavPartnerLogo ? " atlas-top-nav-has-partner-logo" : ""}`}
+        style={topNavStyle}
+      >
         <div className="atlas-home-brand" style={homeBrandStyle}>
           <a
             className="atlas-home-logo-link"
@@ -3137,6 +3141,10 @@ const responsiveTopNavStyles = `
       box-sizing: border-box;
     }
 
+    .atlas-top-nav-has-partner-logo .atlas-home-brand {
+      padding-left: 0;
+    }
+
     .atlas-selected-partner-logo {
       order: 1;
       flex: 0 1 clamp(5rem, 24vw, 9rem) !important;
@@ -3149,6 +3157,15 @@ const responsiveTopNavStyles = `
       padding-left: 0 !important;
       padding-bottom: 8px;
       box-sizing: border-box;
+    }
+
+    .atlas-top-nav-has-partner-logo .atlas-home-logo-link {
+      padding-right: 0 !important;
+    }
+
+    .atlas-top-nav-has-partner-logo .atlas-selected-partner-logo {
+      flex-basis: clamp(3rem, calc(100vw - 20rem), 6rem) !important;
+      width: clamp(3rem, calc(100vw - 20rem), 6rem) !important;
     }
 
     .atlas-menu-wrap {
