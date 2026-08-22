@@ -2697,7 +2697,7 @@ function GroundPlanePanControls({ enabled }: { enabled: boolean }) {
     const raycaster = new THREE.Raycaster();
     const pointerNdc = new THREE.Vector2();
     const dragPlane = new THREE.Plane(TERRAIN_GROUND_PLANE_NORMAL, -terrainControls.target.z);
-    const activePointers = new Map<number, PointerEvent>();
+    const activePointers = new Set<number>();
     const dragAnchor = new THREE.Vector3();
     const dragPoint = new THREE.Vector3();
     let activePointerId: number | null = null;
@@ -2719,35 +2719,38 @@ function GroundPlanePanControls({ enabled }: { enabled: boolean }) {
       return event.isPrimary;
     }
 
-    function stopPan(event?: PointerEvent) {
-      if (activePointerId !== null && element.hasPointerCapture?.(activePointerId)) {
-        element.releasePointerCapture(activePointerId);
-      }
+    function stopPan() {
+      const pointerId = activePointerId;
       activePointerId = null;
-      if (event) activePointers.delete(event.pointerId);
+      activePointers.clear();
+      if (pointerId !== null && element.hasPointerCapture?.(pointerId)) {
+        element.releasePointerCapture(pointerId);
+      }
     }
 
     function onPointerDown(event: PointerEvent) {
-      activePointers.set(event.pointerId, event);
+      if (activePointerId !== null || activePointers.size > 0) {
+        stopPan();
+      }
 
-      if (activePointerId !== null || activePointers.size !== 1 || !canStartPan(event)) {
+      if (!canStartPan(event)) return;
+      activePointers.add(event.pointerId);
+
+      const point = intersectGroundPlane(event, dragAnchor);
+      if (!point) {
         stopPan();
         return;
       }
-
-      const point = intersectGroundPlane(event, dragAnchor);
-      if (!point) return;
       activePointerId = event.pointerId;
       element.setPointerCapture?.(event.pointerId);
       event.preventDefault();
     }
 
     function onPointerMove(event: PointerEvent) {
-      activePointers.set(event.pointerId, event);
       if (activePointerId !== event.pointerId) return;
 
-      if (activePointers.size !== 1) {
-        stopPan(event);
+      if (activePointers.size !== 1 || !activePointers.has(event.pointerId)) {
+        stopPan();
         return;
       }
 
@@ -2762,8 +2765,25 @@ function GroundPlanePanControls({ enabled }: { enabled: boolean }) {
     }
 
     function onPointerUp(event: PointerEvent) {
-      if (activePointerId === event.pointerId) stopPan(event);
+      if (activePointerId === event.pointerId) stopPan();
       else activePointers.delete(event.pointerId);
+    }
+
+    function onPointerCancel() {
+      stopPan();
+    }
+
+    function onLostPointerCapture(event: PointerEvent) {
+      if (activePointerId === event.pointerId) stopPan();
+      else activePointers.delete(event.pointerId);
+    }
+
+    function onWindowBlur() {
+      stopPan();
+    }
+
+    function onVisibilityChange() {
+      if (document.hidden) stopPan();
     }
 
     function onContextMenu(event: MouseEvent) {
@@ -2773,15 +2793,22 @@ function GroundPlanePanControls({ enabled }: { enabled: boolean }) {
     element.addEventListener("pointerdown", onPointerDown);
     element.addEventListener("pointermove", onPointerMove);
     element.addEventListener("pointerup", onPointerUp);
-    element.addEventListener("pointercancel", onPointerUp);
+    element.addEventListener("pointercancel", onPointerCancel);
+    element.addEventListener("lostpointercapture", onLostPointerCapture);
     element.addEventListener("contextmenu", onContextMenu);
+    window.addEventListener("blur", onWindowBlur);
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
+      stopPan();
       element.removeEventListener("pointerdown", onPointerDown);
       element.removeEventListener("pointermove", onPointerMove);
       element.removeEventListener("pointerup", onPointerUp);
-      element.removeEventListener("pointercancel", onPointerUp);
+      element.removeEventListener("pointercancel", onPointerCancel);
+      element.removeEventListener("lostpointercapture", onLostPointerCapture);
       element.removeEventListener("contextmenu", onContextMenu);
+      window.removeEventListener("blur", onWindowBlur);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [camera, controls, enabled, gl]);
 

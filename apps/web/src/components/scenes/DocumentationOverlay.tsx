@@ -91,62 +91,60 @@ export default function DocumentationOverlay({
               __html: placement.documentation_content_html ?? "",
             }}
           />
-          <aside
-            className="atlas-documentation-overlay__assets"
-            aria-label="Process assets"
-          >
-            <div className="atlas-documentation-overlay__assets-heading">
-              Process
-            </div>
-            {processAssetsLoading && (
-              <div className="atlas-documentation-overlay__assets-status">
-                Loading process assets…
-              </div>
-            )}
-            {!processAssetsLoading && processAssetsError && (
-              <div className="atlas-documentation-overlay__assets-status">
-                Process assets could not be loaded.
-              </div>
-            )}
-            {!processAssetsLoading && !processAssetsError && processAssets.length === 0 && (
-              <div className="atlas-documentation-overlay__assets-status">
-                No process assets are available for this placement.
-              </div>
-            )}
-            {processAssets.length > 0 && (
-              <div className="atlas-documentation-overlay__assets-grid">
-                {processAssets.map((asset) => (
-                  <button
-                    key={asset.id}
-                    type="button"
-                    className="atlas-documentation-overlay__asset"
-                    onClick={() => onProcessAssetClick?.(asset)}
-                    aria-label={asset.caption ? `View process asset: ${asset.caption}` : "View process asset"}
-                  >
-                    <span className="atlas-documentation-overlay__asset-media">
-                      {asset.thumbnailUrl ? (
-                        <img src={asset.thumbnailUrl} alt={asset.alt} loading="lazy" />
-                      ) : (
-                        <span aria-hidden="true" className="atlas-documentation-overlay__asset-placeholder">
-                          {asset.mediaKind === "audio" ? "♪" : "▶"}
-                        </span>
-                      )}
-                      {asset.mediaKind !== "image" && (
-                        <span className="atlas-documentation-overlay__asset-kind">
-                          {asset.mediaKind === "audio" ? "Sound" : "Video"}
-                        </span>
-                      )}
-                    </span>
-                    {asset.caption && (
-                      <span className="atlas-documentation-overlay__asset-caption">
-                        {asset.caption}
+            <aside
+              className="atlas-documentation-overlay__assets"
+              aria-label="Process assets"
+            >
+              {processAssetsLoading && (
+                <div className="atlas-documentation-overlay__assets-status atlas-documentation-overlay__assets-status--loading">
+                  <span className="atlas-documentation-overlay__loading-spinner" aria-hidden="true" />
+                  <span>Loading</span>
+                </div>
+              )}
+              {!processAssetsLoading && processAssetsError && (
+                <div className="atlas-documentation-overlay__assets-status">
+                  Process assets could not be loaded.
+                </div>
+              )}
+              {!processAssetsLoading && !processAssetsError && processAssets.length === 0 && (
+                <div className="atlas-documentation-overlay__assets-status">
+                  No process assets are available for this placement.
+                </div>
+              )}
+              {processAssets.length > 0 && (
+                <div className="atlas-documentation-overlay__assets-grid">
+                  {processAssets.map((asset) => (
+                    <button
+                      key={asset.id}
+                      type="button"
+                      className="atlas-documentation-overlay__asset"
+                      onClick={() => onProcessAssetClick?.(asset)}
+                      aria-label={asset.caption ? `View process asset: ${asset.caption}` : "View process asset"}
+                    >
+                      <span className="atlas-documentation-overlay__asset-media">
+                        {asset.thumbnailUrl ? (
+                          <img src={asset.thumbnailUrl} alt={asset.alt} loading="lazy" />
+                        ) : (
+                          <span aria-hidden="true" className="atlas-documentation-overlay__asset-placeholder">
+                            {asset.mediaKind === "audio" ? "♪" : "▶"}
+                          </span>
+                        )}
+                        {asset.mediaKind !== "image" && (
+                          <span className="atlas-documentation-overlay__asset-kind">
+                            {asset.mediaKind === "audio" ? "Sound" : "Video"}
+                          </span>
+                        )}
                       </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-          </aside>
+                      {asset.caption && (
+                        <span className="atlas-documentation-overlay__asset-caption">
+                          {asset.caption}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </aside>
         </div>
       </article>
     </div>
