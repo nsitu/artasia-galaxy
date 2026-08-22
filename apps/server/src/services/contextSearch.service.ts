@@ -12,7 +12,7 @@ import {
 import { getMapPlacements, type ArtasiaMapPlacement } from "./uploadConfig.service.js";
 
 const PLACEMENT_TAG_PATTERN = /^(?:placement|display-placement):(\d+)$/i;
-const CONTEXT_SEARCH_RESULT_LIMIT = 20;
+const CONTEXT_SEARCH_RESULT_LIMIT = 40;
 
 export interface ContextSearchResult {
   placementId: number;

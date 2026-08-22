@@ -2664,7 +2664,6 @@ export function ProjectInfoPanel({
         style={{
           ...siteDetailsHeaderStyle,
           ...(isMobile ? mobileSiteDetailsHeaderStyle : {}),
-          ...(!expanded ? siteDetailsHeaderCollapsedStyle : {}),
         }}
       >
         <button
@@ -2755,21 +2754,15 @@ export function MapContextInfoPanel({
   const isMobile = useIsMobileBreakpoint();
   const trimmedQuery = query?.trim() ?? "";
   const isSimilar = Boolean(similarOrigin);
-  const [expanded, setExpanded] = useState(!isMobile);
   const heading = isSimilar
     ? `Curation by Similarity - ${resultCount} ${resultCount === 1 ? "Artwork" : "Artworks"}`
     : `Search results for “${trimmedQuery || "artwork"}”`;
-
-  useEffect(() => {
-    setExpanded(!isMobile);
-  }, [isMobile, isSimilar, resultCount, trimmedQuery]);
 
   return (
     <section
       style={{
         ...siteDetailsStyle,
         ...(isMobile ? mobileSiteDetailsStyle : {}),
-        ...(isMobile && !expanded ? mobileSiteDetailsCollapsedStyle : {}),
       }}
       aria-label={isSimilar ? "Similar artwork context" : "Artwork search context"}
     >
@@ -2777,7 +2770,6 @@ export function MapContextInfoPanel({
         style={{
           ...siteDetailsHeaderStyle,
           ...(isMobile ? mobileSiteDetailsHeaderStyle : {}),
-          ...(!expanded ? siteDetailsHeaderCollapsedStyle : {}),
         }}
       >
         <div style={siteDetailsTitleWrapStyle}>
@@ -2790,21 +2782,19 @@ export function MapContextInfoPanel({
           onClick={onClearSearch}
           style={mapContextClearButtonStyle}
         >
-          Clear search
-        </button>
-        <button
-          type="button"
-          className="atlas-control-surface"
-          aria-expanded={expanded}
-          aria-label={expanded ? "Collapse map context" : "Expand map context"}
-          onClick={() => setExpanded((current) => !current)}
-          style={siteDetailsToggleStyle}
-        >
-          <ChevronIcon direction={expanded ? "down" : "up"} />
+          <svg viewBox="0 0 16 16" aria-hidden="true" style={mapContextClearIconStyle}>
+            <path
+              d="m3.5 3.5 9 9m0-9-9 9"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+            />
+          </svg>
         </button>
       </div>
 
-      {expanded && similarOrigin ? (
+      {similarOrigin ? (
         <div
           style={{
             ...siteDetailsBodyStyle,
@@ -2841,7 +2831,7 @@ export function MapContextInfoPanel({
             )}
           </div>
         </div>
-      ) : expanded ? (
+      ) : (
         <div
           style={{
             ...siteDetailsBodyStyle,
@@ -2855,7 +2845,7 @@ export function MapContextInfoPanel({
               : ` across ${resultCount} ${resultCount === 1 ? "placement" : "placements"}.`}
           </p>
         </div>
-      ) : null}
+      )}
     </section>
   );
 }
@@ -3719,18 +3709,24 @@ const siteDetailsToggleStyle: React.CSSProperties = {
 
 const mapContextClearButtonStyle: React.CSSProperties = {
   ...atlasControlSurfaceStyle,
-  flex: "0 0 auto",
+  pointerEvents: "auto",
+  flex: "0 0 5rem",
   alignSelf: "stretch",
-  minHeight: "100%",
-  padding: "0 12px",
+  marginLeft: "auto",
+  width: "5rem",
+  height: "100%",
+  display: "grid",
+  placeItems: "center",
+  padding: 0,
   border: 0,
   borderRadius: 0,
-  color: "#d8dde7",
-  font: "inherit",
-  fontSize: 12,
-  fontWeight: 700,
-  whiteSpace: "nowrap",
+  color: "#eef2f8",
   cursor: "pointer",
+};
+
+const mapContextClearIconStyle: React.CSSProperties = {
+  width: 16,
+  height: 16,
 };
 
 const siteDetailsChevronStyle: React.CSSProperties = {

@@ -82,7 +82,7 @@ const ASSET_QUERY_KEY = "asset";
 // and promotes the asset in its orbit instead.
 const ASSET_VIEW_QUERY_KEY = "view";
 const MAP_ASSET_VIEW = "map";
-const SIMILAR_MAP_RESULT_LIMIT = 20;
+const SIMILAR_MAP_RESULT_LIMIT = 40;
 const PROJECT_STORAGE_KEY = "artasia-project";
 const ASSET_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -2195,32 +2195,6 @@ export default function ArtScene() {
                 ) : selectedDescription ? (
                   <div style={photoLightboxTitleStyle}>{selectedDescription}</div>
                 ) : null}
-                {similarityLightboxPlacement && similarityLightboxPlacementHref && (
-                  <a
-                    className="atlas-lightbox-placement-link"
-                    href={similarityLightboxPlacementHref}
-                    onClick={(event) => event.stopPropagation()}
-                    style={photoLightboxPlacementHeaderLinkStyle}
-                  >
-                    {(similarityLightboxPlacement.partner_white_logo?.url ||
-                      similarityLightboxPlacement.partner_logo?.url) && (
-                      <img
-                        src={similarityLightboxPlacement.partner_white_logo?.url || similarityLightboxPlacement.partner_logo?.url}
-                        alt={similarityLightboxPlacement.partner_white_logo?.alt || similarityLightboxPlacement.partner_logo?.alt || ""}
-                        style={photoLightboxPlacementHeaderLogoStyle}
-                      />
-                    )}
-                    <span style={photoLightboxPlacementHeaderTextStyle}>
-                      <span style={photoLightboxPlacementHeaderPrefixStyle}>From</span>
-                      <span style={photoLightboxPlacementHeaderNameStyle}>
-                        {similarityLightboxPlacement.placement_name}
-                        {similarityLightboxPlacement.section?.trim()
-                          ? ` - ${similarityLightboxPlacement.section.trim()}`
-                          : ""}
-                      </span>
-                    </span>
-                  </a>
-                )}
               </div>
               <button
                 type="button"
@@ -2245,6 +2219,32 @@ export default function ArtScene() {
             </div>
             {lightboxMetadataExpanded && (
               <div id="atlas-lightbox-caption-details" style={photoLightboxMetadataBodyStyle}>
+            {similarityLightboxPlacement && similarityLightboxPlacementHref && (
+              <a
+                className="atlas-lightbox-placement-link"
+                href={similarityLightboxPlacementHref}
+                onClick={(event) => event.stopPropagation()}
+                style={photoLightboxPlacementLinkStyle}
+              >
+                {(similarityLightboxPlacement.partner_white_logo?.url ||
+                  similarityLightboxPlacement.partner_logo?.url) && (
+                  <img
+                    src={similarityLightboxPlacement.partner_white_logo?.url || similarityLightboxPlacement.partner_logo?.url}
+                    alt={similarityLightboxPlacement.partner_white_logo?.alt || similarityLightboxPlacement.partner_logo?.alt || ""}
+                    style={photoLightboxPlacementLogoStyle}
+                  />
+                )}
+                <span style={photoLightboxPlacementTextStyle}>
+                  <span style={photoLightboxPlacementPrefixStyle}>From</span>
+                  <span style={photoLightboxPlacementNameStyle}>
+                    {similarityLightboxPlacement.placement_name}
+                    {similarityLightboxPlacement.section?.trim()
+                      ? ` - ${similarityLightboxPlacement.section.trim()}`
+                      : ""}
+                  </span>
+                </span>
+              </a>
+            )}
             {selectedActivityDescriptions.length > 0 && (
               <div style={photoLightboxActivityListStyle}>
                 {selectedActivityDescriptions.map((activity) => (
@@ -3787,10 +3787,11 @@ const photoLightboxTitleStyle: React.CSSProperties = {
   overflowWrap: "anywhere",
 };
 
-const photoLightboxPlacementHeaderLinkStyle: React.CSSProperties = {
-  flex: "0 1 40%",
+const photoLightboxPlacementLinkStyle: React.CSSProperties = {
+  flex: "0 0 auto",
   minWidth: 0,
-  maxWidth: 320,
+  height: "2.25rem",
+  marginBottom: 10,
   display: "inline-flex",
   alignItems: "center",
   gap: 8,
@@ -3800,18 +3801,14 @@ const photoLightboxPlacementHeaderLinkStyle: React.CSSProperties = {
   pointerEvents: "auto",
 };
 
-const photoLightboxPlacementHeaderLogoStyle: React.CSSProperties = {
-  width: 30,
-  height: 30,
-  flex: "0 0 30px",
+const photoLightboxPlacementLogoStyle: React.CSSProperties = {
+  width: "auto",
+  height: "100%",
+  flex: "0 0 auto",
   objectFit: "contain",
-  borderRadius: 3,
-  background: "rgba(255,255,255,0.12)",
-  padding: 2,
-  boxSizing: "border-box",
 };
 
-const photoLightboxPlacementHeaderTextStyle: React.CSSProperties = {
+const photoLightboxPlacementTextStyle: React.CSSProperties = {
   minWidth: 0,
   display: "flex",
   flexDirection: "column",
@@ -3819,13 +3816,13 @@ const photoLightboxPlacementHeaderTextStyle: React.CSSProperties = {
   overflow: "hidden",
 };
 
-const photoLightboxPlacementHeaderPrefixStyle: React.CSSProperties = {
+const photoLightboxPlacementPrefixStyle: React.CSSProperties = {
   color: "#c7ccd6",
   fontSize: 10,
   lineHeight: 1.1,
 };
 
-const photoLightboxPlacementHeaderNameStyle: React.CSSProperties = {
+const photoLightboxPlacementNameStyle: React.CSSProperties = {
   overflow: "hidden",
   color: "#fff",
   fontSize: 12,
