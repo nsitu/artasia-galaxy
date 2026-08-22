@@ -3208,17 +3208,21 @@ const responsiveTopNavStyles = `
       width: 100%;
       margin: 0;
       justify-content: flex-start;
+      align-items: stretch !important;
       flex-wrap: nowrap;
       border-top: 1px solid rgba(255,255,255,0.12);
     }
 
     .atlas-top-controls > div {
       flex: 1 1 220px;
+      align-self: stretch;
+      display: flex;
     }
 
     .atlas-partner-filter-trigger,
     .atlas-educator-filter-trigger {
-      height: auto !important;
+      height: 100% !important;
+      flex: 1 1 auto;
       min-height: 40px;
       padding-top: 8px !important;
       padding-bottom: 8px !important;
