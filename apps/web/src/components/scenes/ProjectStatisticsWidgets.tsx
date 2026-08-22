@@ -36,8 +36,36 @@ export function createProjectStatisticsWidgetLayout(
   statistics: ProjectStatistics | undefined,
   bounds: { minX: number; maxX: number; minY: number; maxY: number },
   z: number,
+  isMobile = false,
 ): ProjectStatisticsWidgetLayout[] {
   if (!statistics) return [];
+
+  if (isMobile) {
+    const terrainWidth = Math.max(1, bounds.maxX - bounds.minX);
+    const columnInset = terrainWidth * 0.18;
+    const columnX = [
+      bounds.minX + columnInset,
+      (bounds.minX + bounds.maxX) / 2,
+      bounds.maxX - columnInset,
+    ];
+    const firstRowY = bounds.maxY + STATISTICS_WIDGET_GAP + PROJECT_STATISTICS_WIDGET_HEIGHT / 2;
+    const secondRowY = firstRowY + PROJECT_STATISTICS_WIDGET_HEIGHT + STATISTICS_WIDGET_GAP;
+    const positions: Array<[number, number]> = [
+      [columnX[0], firstRowY],
+      [columnX[1], firstRowY],
+      [columnX[2], firstRowY],
+      [columnX[0], secondRowY],
+      [columnX[1], secondRowY],
+      [columnX[2], secondRowY],
+    ];
+
+    return STATISTICS_WIDGETS.map(({ key, label }, index) => ({
+      key,
+      label,
+      value: statistics[key],
+      position: [positions[index][0], positions[index][1], z + STATISTICS_WIDGET_Z_OFFSET],
+    }));
+  }
 
   const terrainHeight = Math.max(1, bounds.maxY - bounds.minY);
   const westX = bounds.minX - STATISTICS_WIDGET_GAP - PROJECT_STATISTICS_WIDGET_WIDTH / 2;

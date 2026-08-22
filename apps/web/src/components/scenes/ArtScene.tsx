@@ -750,9 +750,10 @@ export default function ArtScene() {
   const textSearchLightboxHeading = !similarMapOrigin && contextSearchLightboxPhotoId
     ? `Search results for “${contextSearchQuery.trim() || "artwork"}”`
     : null;
-  const similarityLightboxPlacement = contextSearchLightboxResult?.placement;
-  const similarityLightboxPlacementHref = similarityLightboxPlacement
-    ? getContextSearchPlacementHref(similarityLightboxPlacement, selectedProjectSlug)
+  const isContextSearchLightbox = Boolean(contextSearchLightboxPhotoId);
+  const contextLightboxPlacement = contextSearchLightboxResult?.placement;
+  const contextLightboxPlacementHref = contextLightboxPlacement
+    ? getContextSearchPlacementHref(contextLightboxPlacement, selectedProjectSlug)
     : null;
 
   useEffect(() => {
@@ -1030,6 +1031,32 @@ export default function ArtScene() {
   const selectedPhotoHasProcessBadge = selectedPhoto?.assetType === "process";
   const selectedPhotoHasBadges =
     selectedPhotoHasActivityBadges || selectedPhotoHasProcessBadge;
+  const contextLightboxPlacementLink = contextLightboxPlacement && contextLightboxPlacementHref ? (
+    <a
+      className="atlas-lightbox-placement-link"
+      href={contextLightboxPlacementHref}
+      onClick={(event) => event.stopPropagation()}
+      style={photoLightboxPlacementLinkStyle}
+    >
+      {(contextLightboxPlacement.partner_white_logo?.url ||
+        contextLightboxPlacement.partner_logo?.url) && (
+        <img
+          src={contextLightboxPlacement.partner_white_logo?.url || contextLightboxPlacement.partner_logo?.url}
+          alt={contextLightboxPlacement.partner_white_logo?.alt || contextLightboxPlacement.partner_logo?.alt || ""}
+          style={photoLightboxPlacementLogoStyle}
+        />
+      )}
+      <span style={photoLightboxPlacementTextStyle}>
+        <span style={photoLightboxPlacementPrefixStyle}>From</span>
+        <span style={photoLightboxPlacementNameStyle}>
+          {contextLightboxPlacement.placement_name}
+          {contextLightboxPlacement.section?.trim()
+            ? ` - ${contextLightboxPlacement.section.trim()}`
+            : ""}
+        </span>
+      </span>
+    </a>
+  ) : null;
   const selectedActivityDescriptions = selectedPhotoActivities.flatMap((activity) => {
     const description = activity.description?.trim();
     return description ? [{ id: activity.id, description }] : [];
@@ -2155,7 +2182,9 @@ export default function ArtScene() {
                 className="atlas-lightbox-caption-header-content"
                 style={photoLightboxCaptionHeaderContentStyle}
               >
-                {selectedPhotoHasBadges ? (
+                {isContextSearchLightbox ? (
+                  contextLightboxPlacementLink
+                ) : selectedPhotoHasBadges ? (
                   <>
                     <div style={photoLightboxHeaderBadgeListStyle}>
                       {selectedPhotoHasProcessBadge && (
@@ -2219,32 +2248,6 @@ export default function ArtScene() {
             </div>
             {lightboxMetadataExpanded && (
               <div id="atlas-lightbox-caption-details" style={photoLightboxMetadataBodyStyle}>
-            {similarityLightboxPlacement && similarityLightboxPlacementHref && (
-              <a
-                className="atlas-lightbox-placement-link"
-                href={similarityLightboxPlacementHref}
-                onClick={(event) => event.stopPropagation()}
-                style={photoLightboxPlacementLinkStyle}
-              >
-                {(similarityLightboxPlacement.partner_white_logo?.url ||
-                  similarityLightboxPlacement.partner_logo?.url) && (
-                  <img
-                    src={similarityLightboxPlacement.partner_white_logo?.url || similarityLightboxPlacement.partner_logo?.url}
-                    alt={similarityLightboxPlacement.partner_white_logo?.alt || similarityLightboxPlacement.partner_logo?.alt || ""}
-                    style={photoLightboxPlacementLogoStyle}
-                  />
-                )}
-                <span style={photoLightboxPlacementTextStyle}>
-                  <span style={photoLightboxPlacementPrefixStyle}>From</span>
-                  <span style={photoLightboxPlacementNameStyle}>
-                    {similarityLightboxPlacement.placement_name}
-                    {similarityLightboxPlacement.section?.trim()
-                      ? ` - ${similarityLightboxPlacement.section.trim()}`
-                      : ""}
-                  </span>
-                </span>
-              </a>
-            )}
             {selectedActivityDescriptions.length > 0 && (
               <div style={photoLightboxActivityListStyle}>
                 {selectedActivityDescriptions.map((activity) => (
@@ -2257,7 +2260,7 @@ export default function ArtScene() {
                 ))}
               </div>
             )}
-            {selectedDescription && selectedPhotoHasBadges && (
+            {selectedDescription && (selectedPhotoHasBadges || isContextSearchLightbox) && (
               <div
                 style={{
                   ...photoLightboxAssetCaptionStyle,
@@ -3791,7 +3794,6 @@ const photoLightboxPlacementLinkStyle: React.CSSProperties = {
   flex: "0 0 auto",
   minWidth: 0,
   height: "2.25rem",
-  marginBottom: 10,
   display: "inline-flex",
   alignItems: "center",
   gap: 8,

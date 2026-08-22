@@ -647,6 +647,7 @@ export default function TerrainGallery({
       (state as unknown as { controls?: TerrainOrbitControls }).controls,
   );
   const usesTouchPreview = useTouchPreviewMode();
+  const isMobile = useIsMobileBreakpoint();
   const panAnimationFrame = useRef<number | null>(null);
   const photos = useGalleryStore((s) => s.photos);
   const photoScope = useGalleryStore((s) => s.photoScope);
@@ -910,8 +911,9 @@ export default function TerrainGallery({
       projectStatistics,
       regionalTerrainBounds,
       terrainMaxZ ?? 0,
+      isMobile,
     );
-  }, [focusedPlacement, projectStatistics, regionalTerrainBounds, terrainMaxZ]);
+  }, [focusedPlacement, isMobile, projectStatistics, regionalTerrainBounds, terrainMaxZ]);
   const showRegionalStatistics =
     !introEnabled || introPhase === "exiting" || introPhase === "complete";
   const focusedPlacementCenter = useMemo<[number, number, number] | null>(() => {
@@ -3599,7 +3601,8 @@ const mobileSiteDetailsStyle: React.CSSProperties = {
 };
 
 const mobileSiteDetailsCollapsedStyle: React.CSSProperties = {
-  maxHeight: 86,
+  height: "5rem",
+  maxHeight: "5rem",
 };
 
 const placementPreviewSharedPanelStyle: React.CSSProperties = {
