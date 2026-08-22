@@ -17,6 +17,16 @@ const CONTEXT_SEARCH_RESULT_LIMIT = 40;
 export interface ContextSearchResult {
   placementId: number;
   asset: Photo;
+  placement: Pick<
+    ArtasiaMapPlacement,
+    | "placement_id"
+    | "placement_name"
+    | "placement_slug"
+    | "section"
+    | "partner_name"
+    | "partner_logo"
+    | "partner_white_logo"
+  >;
 }
 
 function placementIdFromTag(tag: { name: string; value: string }): number | null {
@@ -29,10 +39,22 @@ function placementIdFromTag(tag: { name: string; value: string }): number | null
   return null;
 }
 
-function mapContextAsset(asset: ImmichAsset, placementId: number): ContextSearchResult {
+function mapContextAsset(asset: ImmichAsset, placement: ArtasiaMapPlacement): ContextSearchResult {
   const photo = assetToPhoto(asset);
-  photo.placementId = placementId;
-  return { placementId, asset: photo };
+  photo.placementId = placement.placement_id;
+  return {
+    placementId: placement.placement_id,
+    asset: photo,
+    placement: {
+      placement_id: placement.placement_id,
+      placement_name: placement.placement_name,
+      ...(placement.placement_slug ? { placement_slug: placement.placement_slug } : {}),
+      ...(placement.section ? { section: placement.section } : {}),
+      ...(placement.partner_name ? { partner_name: placement.partner_name } : {}),
+      ...(placement.partner_logo ? { partner_logo: placement.partner_logo } : {}),
+      ...(placement.partner_white_logo ? { partner_white_logo: placement.partner_white_logo } : {}),
+    },
+  };
 }
 
 export async function searchContextPlacements(query: string): Promise<ContextSearchResult[]> {
@@ -83,5 +105,8 @@ export async function searchContextPlacements(query: string): Promise<ContextSea
 
   return [...firstAssetByPlacementId.entries()]
     .sort(([left], [right]) => left - right)
-    .map(([placementId, asset]) => mapContextAsset(asset, placementId));
+    .flatMap(([placementId, asset]) => {
+      const placement = placementById.get(placementId);
+      return placement ? [mapContextAsset(asset, placement)] : [];
+    });
 }

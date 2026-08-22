@@ -80,7 +80,7 @@ export interface ContextSearchPlacement {
 export interface ContextSearchResult {
   placementId: number;
   asset: Photo;
-  placement?: ContextSearchPlacement;
+  placement: ContextSearchPlacement;
 }
 
 export async function fetchContextSearch(query: string): Promise<ContextSearchResult[]> {
