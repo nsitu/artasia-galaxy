@@ -82,7 +82,7 @@ const ASSET_QUERY_KEY = "asset";
 // and promotes the asset in its orbit instead.
 const ASSET_VIEW_QUERY_KEY = "view";
 const MAP_ASSET_VIEW = "map";
-const SIMILAR_MAP_RESULT_LIMIT = 500;
+const SIMILAR_MAP_RESULT_LIMIT = 20;
 const PROJECT_STORAGE_KEY = "artasia-project";
 const ASSET_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -463,6 +463,10 @@ export default function ArtScene() {
   const [aboutOpen, setAboutOpen] = useState(false);
   const [contextSearchOpen, setContextSearchOpen] = useState(false);
   const [contextSearchQuery, setContextSearchQuery] = useState("");
+  const [contextSearchViewport, setContextSearchViewport] = useState<{
+    height: number;
+    offsetTop: number;
+  } | null>(null);
   const [contextSearchResults, setContextSearchResults] = useState<ContextSearchResult[] | null>(null);
   const [contextSearchLoading, setContextSearchLoading] = useState(false);
   const [contextSearchError, setContextSearchError] = useState<string | null>(null);
@@ -503,6 +507,31 @@ export default function ArtScene() {
   const processGalleryCacheRef = useRef(new Map<number, ProcessGalleryAsset[]>());
   const documentationOverlayPlacementRef = useRef<MapPlacement | null>(null);
   const similarRequestIdRef = useRef(0);
+
+  useEffect(() => {
+    if (!contextSearchOpen) {
+      setContextSearchViewport(null);
+      return;
+    }
+
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+
+    const updateViewport = () => {
+      setContextSearchViewport({
+        height: viewport.height,
+        offsetTop: viewport.offsetTop,
+      });
+    };
+
+    updateViewport();
+    viewport.addEventListener("resize", updateViewport);
+    viewport.addEventListener("scroll", updateViewport);
+    return () => {
+      viewport.removeEventListener("resize", updateViewport);
+      viewport.removeEventListener("scroll", updateViewport);
+    };
+  }, [contextSearchOpen]);
 
   const handleIntroReady = useCallback(() => {
     setIntroTerrainReady(true);
@@ -1834,7 +1863,16 @@ export default function ArtScene() {
           role="dialog"
           aria-modal="true"
           aria-label="Search artwork"
-          style={contextSearchOverlayStyle}
+          style={{
+            ...contextSearchOverlayStyle,
+            ...(contextSearchViewport
+              ? {
+                  inset: "auto 0 auto 0",
+                  top: `${contextSearchViewport.offsetTop}px`,
+                  height: `${contextSearchViewport.height}px`,
+                }
+              : {}),
+          }}
           onClick={(event) => {
             if (event.target === event.currentTarget) setContextSearchOpen(false);
           }}
@@ -2157,6 +2195,32 @@ export default function ArtScene() {
                 ) : selectedDescription ? (
                   <div style={photoLightboxTitleStyle}>{selectedDescription}</div>
                 ) : null}
+                {similarityLightboxPlacement && similarityLightboxPlacementHref && (
+                  <a
+                    className="atlas-lightbox-placement-link"
+                    href={similarityLightboxPlacementHref}
+                    onClick={(event) => event.stopPropagation()}
+                    style={photoLightboxPlacementHeaderLinkStyle}
+                  >
+                    {(similarityLightboxPlacement.partner_white_logo?.url ||
+                      similarityLightboxPlacement.partner_logo?.url) && (
+                      <img
+                        src={similarityLightboxPlacement.partner_white_logo?.url || similarityLightboxPlacement.partner_logo?.url}
+                        alt={similarityLightboxPlacement.partner_white_logo?.alt || similarityLightboxPlacement.partner_logo?.alt || ""}
+                        style={photoLightboxPlacementHeaderLogoStyle}
+                      />
+                    )}
+                    <span style={photoLightboxPlacementHeaderTextStyle}>
+                      <span style={photoLightboxPlacementHeaderPrefixStyle}>From</span>
+                      <span style={photoLightboxPlacementHeaderNameStyle}>
+                        {similarityLightboxPlacement.placement_name}
+                        {similarityLightboxPlacement.section?.trim()
+                          ? ` - ${similarityLightboxPlacement.section.trim()}`
+                          : ""}
+                      </span>
+                    </span>
+                  </a>
+                )}
               </div>
               <button
                 type="button"
@@ -2203,21 +2267,6 @@ export default function ArtScene() {
                 }}
               >
                 {selectedDescription}
-              </div>
-            )}
-            {similarityLightboxPlacement && similarityLightboxPlacementHref && (
-              <div style={photoLightboxPlacementCaptionStyle}>
-                <span>From </span>
-                <a
-                  href={similarityLightboxPlacementHref}
-                  onClick={(event) => event.stopPropagation()}
-                  style={photoLightboxPlacementLinkStyle}
-                >
-                  {similarityLightboxPlacement.placement_name}
-                  {similarityLightboxPlacement.section?.trim()
-                    ? ` - ${similarityLightboxPlacement.section.trim()}`
-                    : ""}
-                </a>
               </div>
             )}
             {selectedPhoto.linkedAudioUrl && (
@@ -2894,6 +2943,15 @@ const responsiveTopNavStyles = `
     opacity: 1;
   }
 
+  .atlas-context-search-input::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath d='M5 5l8 8M13 5l-8 8' fill='none' stroke='%23c7ccd6' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") center / 14px 14px no-repeat;
+  }
+
   .atlas-placement-gallery-action,
   .atlas-placement-gallery-action:hover,
   .atlas-placement-gallery-action:focus-visible {
@@ -3041,6 +3099,11 @@ const responsiveTopNavStyles = `
       align-items: flex-start !important;
       justify-content: center !important;
       gap: 4px !important;
+    }
+
+    .atlas-lightbox-placement-link {
+      flex: 0 1 auto !important;
+      max-width: 100% !important;
     }
 
     .atlas-photo-lightbox-metadata-collapsed .atlas-lightbox-caption-header-content {
@@ -3724,6 +3787,54 @@ const photoLightboxTitleStyle: React.CSSProperties = {
   overflowWrap: "anywhere",
 };
 
+const photoLightboxPlacementHeaderLinkStyle: React.CSSProperties = {
+  flex: "0 1 40%",
+  minWidth: 0,
+  maxWidth: 320,
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 8,
+  color: "#fff",
+  textDecoration: "none",
+  overflow: "hidden",
+  pointerEvents: "auto",
+};
+
+const photoLightboxPlacementHeaderLogoStyle: React.CSSProperties = {
+  width: 30,
+  height: 30,
+  flex: "0 0 30px",
+  objectFit: "contain",
+  borderRadius: 3,
+  background: "rgba(255,255,255,0.12)",
+  padding: 2,
+  boxSizing: "border-box",
+};
+
+const photoLightboxPlacementHeaderTextStyle: React.CSSProperties = {
+  minWidth: 0,
+  display: "flex",
+  flexDirection: "column",
+  gap: 2,
+  overflow: "hidden",
+};
+
+const photoLightboxPlacementHeaderPrefixStyle: React.CSSProperties = {
+  color: "#c7ccd6",
+  fontSize: 10,
+  lineHeight: 1.1,
+};
+
+const photoLightboxPlacementHeaderNameStyle: React.CSSProperties = {
+  overflow: "hidden",
+  color: "#fff",
+  fontSize: 12,
+  fontWeight: 700,
+  lineHeight: 1.2,
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+
 const photoLightboxActionRowStyle: React.CSSProperties = {
   flex: "0 0 auto",
   display: "flex",
@@ -3840,22 +3951,6 @@ const photoLightboxAssetCaptionSeparatedStyle: React.CSSProperties = {
   marginTop: 10,
   paddingTop: 10,
   borderTop: "1px solid rgba(255,255,255,0.12)",
-};
-
-const photoLightboxPlacementCaptionStyle: React.CSSProperties = {
-  marginTop: 10,
-  paddingTop: 10,
-  color: "#c7ccd6",
-  fontSize: 13,
-  lineHeight: 1.45,
-};
-
-const photoLightboxPlacementLinkStyle: React.CSSProperties = {
-  color: "#fff",
-  fontWeight: 700,
-  textDecoration: "underline",
-  textDecorationColor: "rgba(255,255,255,0.65)",
-  textUnderlineOffset: 2,
 };
 
 const photoLightboxActivityBadgeStyle: React.CSSProperties = {

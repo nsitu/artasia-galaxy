@@ -12,6 +12,7 @@ import {
 import { getMapPlacements, type ArtasiaMapPlacement } from "./uploadConfig.service.js";
 
 const PLACEMENT_TAG_PATTERN = /^(?:placement|display-placement):(\d+)$/i;
+const CONTEXT_SEARCH_RESULT_LIMIT = 20;
 
 export interface ContextSearchResult {
   placementId: number;
@@ -68,7 +69,7 @@ export async function searchContextPlacements(query: string): Promise<ContextSea
     query: normalizedQuery,
     albumIds: [publishedAlbum.id],
     type: "IMAGE",
-    size: 500,
+    size: CONTEXT_SEARCH_RESULT_LIMIT,
   });
   const firstAssetByPlacementId = new Map<number, ImmichAsset>();
   for (const asset of assets) {

@@ -27,7 +27,7 @@ const PLACEMENT_TAG_SEARCH_CONCURRENCY = 4;
 
 export interface SimilarAssetRecommendation {
   asset: Photo;
-  placement: Pick<ArtasiaMapPlacement, "placement_id" | "placement_name" | "placement_slug" | "section">;
+  placement: Pick<ArtasiaMapPlacement, "placement_id" | "placement_name" | "placement_slug" | "section" | "partner_name" | "partner_logo" | "partner_white_logo">;
   contextualLabels: string[];
 }
 
@@ -111,6 +111,9 @@ function mapRecommendationAsset(
       placement_name: placement.placement_name,
       ...(placement.placement_slug ? { placement_slug: placement.placement_slug } : {}),
       ...(placement.section ? { section: placement.section } : {}),
+      ...(placement.partner_name ? { partner_name: placement.partner_name } : {}),
+      ...(placement.partner_logo ? { partner_logo: placement.partner_logo } : {}),
+      ...(placement.partner_white_logo ? { partner_white_logo: placement.partner_white_logo } : {}),
     },
     contextualLabels: labels,
   };
@@ -167,7 +170,7 @@ export async function findSimilarAssets(
     assetId,
     albumIds: [publishedAlbum.id],
     type: "IMAGE",
-    size: Math.max(50, normalizedResultLimit),
+    size: normalizedResultLimit,
   });
 
   const eligibleRecommendations: SimilarAssetRecommendation[] = [];

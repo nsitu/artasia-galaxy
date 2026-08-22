@@ -48,12 +48,7 @@ export interface Photo {
 
 export interface SimilarAssetRecommendation {
   asset: Photo;
-  placement: {
-    placement_id: number;
-    placement_name: string;
-    placement_slug?: string;
-    section?: string;
-  };
+  placement: ContextSearchPlacement;
   contextualLabels: string[];
 }
 
@@ -67,6 +62,19 @@ export interface ContextSearchPlacement {
   placement_name: string;
   placement_slug?: string;
   section?: string;
+  partner_name?: string;
+  partner_logo?: {
+    id: number;
+    url: string;
+    mime_type: string;
+    alt: string;
+  } | null;
+  partner_white_logo?: {
+    id: number;
+    url: string;
+    mime_type: string;
+    alt: string;
+  } | null;
 }
 
 export interface ContextSearchResult {
