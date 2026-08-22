@@ -77,7 +77,7 @@ export default function WelcomeOverlay({
         >
           Start Exploring
         </button>}
-        {!ready && <p style={loadingStyle}><span aria-hidden="true" style={spinnerStyle} />Preparing the map…</p>}
+        {!ready && <p style={loadingStyle}><span aria-hidden="true" style={spinnerStyle} />Loading</p>}
       </div>
     </div>
   );
@@ -209,10 +209,11 @@ const disabledButtonStyle: React.CSSProperties = {
 const loadingStyle: React.CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
-  gap: 8,
+  gap: 12,
   margin: 0,
   color: "#ffffff",
-  fontSize: 11,
+  fontSize: 15,
+  fontWeight: 600,
 };
 
 const projectSelectorStyle: React.CSSProperties = {
@@ -237,10 +238,12 @@ const projectSelectorInputStyle: React.CSSProperties = {
 };
 
 const spinnerStyle: React.CSSProperties = {
-  width: 12,
-  height: 12,
-  flex: "0 0 auto",
-  border: "2px solid rgba(132, 144, 163, 0.35)",
+  width: 28,
+  height: 28,
+  flex: "0 0 28px",
+  aspectRatio: "1 / 1",
+  boxSizing: "border-box",
+  border: "3px solid rgba(255, 255, 255, 0.25)",
   borderTopColor: "#c7ec9d",
   borderRadius: "50%",
   animation: "atlas-welcome-spin 800ms linear infinite",

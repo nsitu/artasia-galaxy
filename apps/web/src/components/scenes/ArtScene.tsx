@@ -3000,6 +3000,10 @@ const responsiveTopNavStyles = `
       display: none;
     }
 
+    .atlas-placement-gallery-action .atlas-placement-action-label {
+      display: inline;
+    }
+
     .atlas-placement-actions .atlas-placement-action-link {
       padding-left: 5px !important;
       padding-right: 5px !important;
