@@ -3004,6 +3004,10 @@ const responsiveTopNavStyles = `
       display: inline;
     }
 
+    .atlas-placement-gallery-action {
+      flex: 1.5 1 0 !important;
+    }
+
     .atlas-placement-actions .atlas-placement-action-link {
       padding-left: 5px !important;
       padding-right: 5px !important;
@@ -3086,8 +3090,8 @@ const responsiveTopNavStyles = `
     }
     .atlas-anecdote-lightbox {
       width: 100% !important;
-      height: 100%;
-      max-height: 100% !important;
+      height: auto !important;
+      max-height: calc(100% - 32px) !important;
       overflow-y: auto;
       overscroll-behavior: contain;
       -webkit-overflow-scrolling: touch;
