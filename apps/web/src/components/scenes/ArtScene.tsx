@@ -3066,9 +3066,10 @@ const responsiveTopNavStyles = `
       max-width: 100% !important;
     }
     .atlas-lightbox-similar {
-      flex-basis: 100% !important;
-      width: 100% !important;
-      flex-wrap: wrap !important;
+      flex: 0 1 auto !important;
+      flex-basis: auto !important;
+      width: auto !important;
+      flex-wrap: nowrap !important;
     }
     .atlas-lightbox-similar-result {
       flex-basis: 100% !important;
