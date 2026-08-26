@@ -111,9 +111,6 @@ function artasia_get_supporter_response(WP_Post $supporter): array
         'website'        => get_post_meta($supporter->ID, 'artasia_website', true) ?: '',
         'brand_color_one' => get_post_meta($supporter->ID, 'artasia_brand_color_one', true) ?: '',
         'brand_color_two' => get_post_meta($supporter->ID, 'artasia_brand_color_two', true) ?: '',
-        'project_ids'     => artasia_sanitize_integer_array_meta(
-            get_post_meta($supporter->ID, 'artasia_supporter_project_ids', true)
-        ),
         'logo'           => artasia_get_partner_logo_response($logo_id),
         'white_logo'     => artasia_get_partner_logo_response($white_logo_id),
     ];

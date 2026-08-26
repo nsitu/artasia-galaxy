@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Artasia Locations
  * Description: Custom post types for Artasia placements, projects, activities, places, partners, supporters, recognitions, people, learning anecdotes, and pedagogical documentation with a REST API endpoint for the Node.js backend.
- * Version:     2.2.23
+ * Version:     2.2.24
  * License:     GPL-2.0-or-later
  */
 
@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('ARTASIA_LOCATIONS_VERSION', '2.2.23');
+define('ARTASIA_LOCATIONS_VERSION', '2.2.24');
 define('ARTASIA_LOCATIONS_PATH', plugin_dir_path(__FILE__));
 define('ARTASIA_LOCATIONS_URL', plugin_dir_url(__FILE__));
 
@@ -48,14 +48,14 @@ function artasia_admin_enqueue_assets(string $hook_suffix): void
         filemtime(ARTASIA_LOCATIONS_PATH . 'assets/admin.css')
     );
 
-    if (in_array($screen->post_type, ['artasia_partner', 'artasia_supporter', 'artasia_people', 'artasia_document', 'artasia_placement'], true) && in_array($hook_suffix, ['post.php', 'post-new.php'], true)) {
+    if (in_array($screen->post_type, ['artasia_project', 'artasia_partner', 'artasia_supporter', 'artasia_people', 'artasia_document', 'artasia_placement'], true) && in_array($hook_suffix, ['post.php', 'post-new.php'], true)) {
         if (in_array($screen->post_type, ['artasia_partner', 'artasia_supporter', 'artasia_people'], true)) {
             wp_enqueue_media();
         }
         wp_enqueue_script(
             'artasia-locations-admin',
             ARTASIA_LOCATIONS_URL . 'assets/admin.js',
-            ['jquery'],
+            ['jquery', 'jquery-ui-sortable'],
             $admin_asset_version,
             true
         );

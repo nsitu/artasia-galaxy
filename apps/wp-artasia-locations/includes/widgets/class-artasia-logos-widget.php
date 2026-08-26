@@ -98,7 +98,7 @@ class Artasia_Logos_Elementor_Widget extends \Elementor\Widget_Base
         $this->add_control('logos_instructions', [
             'type' => \Elementor\Controls_Manager::RAW_HTML,
             'raw'  => sprintf(
-                '<p>Manage logos, website links, and project assignments in <a href="%s" target="_blank" rel="noopener noreferrer">Artasia Partners</a> and <a href="%s" target="_blank" rel="noopener noreferrer">Artasia Supporters</a>. Supporters are grouped automatically by their saved type.</p><p>Shortcode equivalent: <code>[artasia_logos project_id="123"]</code></p>',
+                '<p>Manage logos and website links in <a href="%s" target="_blank" rel="noopener noreferrer">Artasia Partners</a> and <a href="%s" target="_blank" rel="noopener noreferrer">Artasia Supporters</a>. Manage this project’s supporter selection and display order from the Project edit screen. Supporters are grouped automatically by their saved type.</p><p>Shortcode equivalent: <code>[artasia_logos project_id="123"]</code></p>',
                 esc_url(admin_url('edit.php?post_type=artasia_partner')),
                 esc_url(admin_url('edit.php?post_type=artasia_supporter'))
             ),

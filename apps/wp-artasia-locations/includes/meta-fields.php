@@ -398,19 +398,6 @@ function artasia_register_meta_fields(): void
         'show_in_rest' => true,
         'sanitize_callback' => 'sanitize_textarea_field',
     ]);
-    register_post_meta('artasia_supporter', 'artasia_supporter_project_ids', [
-        'type'         => 'array',
-        'single'       => true,
-        'default'      => [],
-        'show_in_rest' => [
-            'schema' => [
-                'type'  => 'array',
-                'items' => ['type' => 'integer'],
-            ],
-        ],
-        'sanitize_callback' => 'artasia_sanitize_integer_array_meta',
-    ]);
-
     // --- Artasia People meta ---
     register_post_meta('artasia_people', 'artasia_role', [
         'type'         => 'string',

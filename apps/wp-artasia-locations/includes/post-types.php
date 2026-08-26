@@ -227,7 +227,7 @@ function artasia_register_post_types(): void
         'show_in_rest' => true,
         'rest_base'    => 'artasia_recognition',
         'menu_icon'    => 'dashicons-awards',
-        'supports'     => ['title'],
+        'supports'     => [],
     ]);
 
     register_post_type('artasia_document', [

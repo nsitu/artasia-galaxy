@@ -129,6 +129,51 @@
   margin: 0 0 10px;
 }
 
+.artasia-project-supporters-list {
+  max-width: 640px;
+  margin: 12px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.artasia-project-supporter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  margin: 0;
+  padding: 6px 8px;
+  border: 1px solid #c3c4c7;
+  background: #fff;
+}
+
+.artasia-project-supporter-row + .artasia-project-supporter-row {
+  border-top: 0;
+}
+
+.artasia-project-supporter-row.is-assigned {
+  background: #f0f6fc;
+}
+
+.artasia-project-supporter-row--placeholder {
+  min-height: 40px;
+  border: 1px dashed #2271b1;
+  background: #f0f6fc;
+}
+
+.artasia-project-supporter-handle {
+  color: #646970;
+  cursor: grab;
+}
+
+.artasia-project-supporter-handle:active {
+  cursor: grabbing;
+}
+
+.artasia-project-supporter-row label {
+  flex: 1;
+}
+
 .artasia-documentation-atlas-panel {
   margin-top: 16px;
   padding: 1px 12px 12px;

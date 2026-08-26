@@ -154,6 +154,33 @@ jQuery(function ($) {
     });
   }
 
+  function setupProjectSupporterSorter() {
+    var $lists = $('[data-artasia-project-supporters]');
+
+    if (!$lists.length || !$.fn.sortable) {
+      return;
+    }
+
+    $lists.each(function () {
+      var $list = $(this);
+
+      $list.sortable({
+        axis: 'y',
+        cursor: 'grabbing',
+        handle: '.artasia-project-supporter-handle',
+        items: '> .artasia-project-supporter-row',
+        placeholder: 'artasia-project-supporter-row--placeholder',
+        tolerance: 'pointer'
+      });
+
+      $list.on('change', 'input[type="checkbox"]', function () {
+        $(this).closest('.artasia-project-supporter-row').toggleClass('is-assigned', this.checked);
+      });
+    });
+  }
+
+  setupProjectSupporterSorter();
+
   function setupDocumentationAtlasPreview() {
     var $placement = $('#artasia_documentation_placement_ids');
     var $preview = $('[data-artasia-atlas-preview]');
