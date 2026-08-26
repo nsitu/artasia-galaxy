@@ -15,7 +15,8 @@ env:
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, windows, x64, artasia-dev]
+    # runs-on: ubuntu-latest
 
     steps:
       - name: Check out repository

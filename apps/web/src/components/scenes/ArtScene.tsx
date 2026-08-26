@@ -1453,6 +1453,17 @@ export default function ArtScene() {
     setDocumentationOverlayPlacement(null);
     setProcessLightboxPhotoId(null);
   }, []);
+  const handleDocumentationGalleryOpen = useCallback((placement: MapPlacement) => {
+    handleDocumentationClose();
+    const slug = placement.placement_slug?.trim() || slugifyPartnerName(placement.placement_name);
+    if (!slug) return;
+    const nextPath = withProjectQuery(`/sites/${encodeURIComponent(slug)}`);
+    const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (currentPath !== nextPath) {
+      window.history.pushState(null, "", nextPath);
+    }
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  }, [handleDocumentationClose]);
   const handleProjectChange = useCallback((projectSlug: string) => {
     const project = projectOptions.find(
       (candidate) => candidate.slug.toLocaleLowerCase() === projectSlug.toLocaleLowerCase(),
@@ -2024,6 +2035,7 @@ export default function ArtScene() {
           processAssetsLoading={documentationProcessAssetsLoading}
           processAssetsError={documentationProcessAssetsError}
           onProcessAssetClick={handleProcessAssetClick}
+          onGalleryOpen={handleDocumentationGalleryOpen}
           onClose={handleDocumentationClose}
         />
       )}

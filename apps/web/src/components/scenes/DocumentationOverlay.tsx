@@ -8,6 +8,7 @@ interface DocumentationOverlayProps {
   processAssetsLoading?: boolean;
   processAssetsError?: string | null;
   onProcessAssetClick?: (asset: ProcessGalleryAsset) => void;
+  onGalleryOpen?: (placement: MapPlacement) => void;
   onClose: () => void;
 }
 
@@ -17,6 +18,7 @@ export default function DocumentationOverlay({
   processAssetsLoading = false,
   processAssetsError,
   onProcessAssetClick,
+  onGalleryOpen,
   onClose,
 }: DocumentationOverlayProps) {
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -143,6 +145,20 @@ export default function DocumentationOverlay({
                     </button>
                   ))}
                 </div>
+              )}
+              {onGalleryOpen && (
+                <button
+                  type="button"
+                  className="atlas-documentation-overlay__gallery-action atlas-control-surface"
+                  onClick={() => onGalleryOpen(placement)}
+                  aria-label="View gallery"
+                  title="View gallery"
+                >
+                  <span aria-hidden="true" className="atlas-documentation-overlay__gallery-icon">
+                    photo_prints
+                  </span>
+                  <span>Gallery</span>
+                </button>
               )}
             </aside>
         </div>

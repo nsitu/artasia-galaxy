@@ -123,6 +123,8 @@
 }
 
 .atlas-documentation-overlay__assets {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
@@ -165,6 +167,46 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 14px;
+}
+
+.atlas-documentation-overlay__gallery-action,
+.atlas-documentation-overlay__gallery-action:hover,
+.atlas-documentation-overlay__gallery-action:focus-visible {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 44px;
+  margin-top: auto;
+  padding: 11px 8px;
+  border: 1px solid #c7ec9d !important;
+  border-radius: 0;
+  background: #c7ec9d !important;
+  background-image: none !important;
+  color: #172015 !important;
+  cursor: pointer;
+  font-family: Montserrat, Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.atlas-documentation-overlay__gallery-action:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.9);
+  outline-offset: 4px;
+}
+
+.atlas-documentation-overlay__gallery-icon {
+  flex: 0 0 auto;
+  font-family: "Material Symbols Outlined";
+  font-size: 18px;
+  font-weight: 400;
+  font-style: normal;
+  font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 20;
+  line-height: 1;
 }
 
 .atlas-documentation-overlay__asset {
