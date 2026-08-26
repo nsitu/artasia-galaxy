@@ -13,16 +13,44 @@ function artasia_atlas_base_url(): string
 
 function artasia_register_tools_page(): void
 {
-    add_submenu_page(
-        'edit.php?post_type=artasia_placement',
+    add_menu_page(
         'Artasia Tools',
-        'Tools',
+        'Artasia Tools',
         'edit_posts',
         ARTASIA_TOOLS_PAGE_SLUG,
-        'artasia_render_tools_page'
+        'artasia_render_tools_page',
+        'dashicons-admin-tools',
+        21
     );
 }
 add_action('admin_menu', 'artasia_register_tools_page');
+
+function artasia_tools_url(array $args = []): string
+{
+    return add_query_arg(
+        array_merge(['page' => ARTASIA_TOOLS_PAGE_SLUG], $args),
+        admin_url('admin.php')
+    );
+}
+
+function artasia_redirect_legacy_tools_url(): void
+{
+    $script = isset($_SERVER['PHP_SELF']) ? basename((string) $_SERVER['PHP_SELF']) : '';
+    if ($script !== 'edit.php' || ($_GET['page'] ?? '') !== ARTASIA_TOOLS_PAGE_SLUG || ($_GET['post_type'] ?? '') !== 'artasia_placement') {
+        return;
+    }
+
+    $args = [];
+    foreach (['imported', 'skipped', 'errors', 'settings_saved', 'reconcile', 'message', 'svg_trace', 'applied', 'mutations'] as $key) {
+        if (isset($_GET[$key])) {
+            $args[$key] = sanitize_text_field(wp_unslash((string) $_GET[$key]));
+        }
+    }
+
+    wp_safe_redirect(artasia_tools_url($args));
+    exit;
+}
+add_action('admin_init', 'artasia_redirect_legacy_tools_url');
 
 function artasia_default_reconcile_url(): string
 {
@@ -128,11 +156,7 @@ function artasia_svg_trace_store_result(array $result): void
 
 function artasia_svg_trace_redirect(): void
 {
-    wp_safe_redirect(add_query_arg([
-        'post_type' => 'artasia_placement',
-        'page'      => ARTASIA_TOOLS_PAGE_SLUG,
-        'svg_trace' => '1',
-    ], admin_url('edit.php')));
+    wp_safe_redirect(artasia_tools_url(['svg_trace' => '1']));
     exit;
 }
 
@@ -392,7 +416,7 @@ function artasia_handle_save_reconcile_settings(): void
         update_option('artasia_reconcile_secret', $secret);
     }
 
-    wp_safe_redirect(add_query_arg(['post_type' => 'artasia_placement', 'page' => ARTASIA_TOOLS_PAGE_SLUG, 'settings_saved' => '1'], admin_url('edit.php')));
+    wp_safe_redirect(artasia_tools_url(['settings_saved' => '1']));
     exit;
 }
 add_action('admin_post_artasia_save_reconcile_settings', 'artasia_handle_save_reconcile_settings');
@@ -411,7 +435,7 @@ function artasia_handle_reconcile_run(): void
     $secret = artasia_get_reconcile_secret();
 
     if (!$secret) {
-        wp_safe_redirect(add_query_arg(['post_type' => 'artasia_placement', 'page' => ARTASIA_TOOLS_PAGE_SLUG, 'reconcile' => 'error', 'message' => 'No secret configured'], admin_url('edit.php')));
+        wp_safe_redirect(artasia_tools_url(['reconcile' => 'error', 'message' => 'No secret configured']));
         exit;
     }
 
@@ -425,7 +449,7 @@ function artasia_handle_reconcile_run(): void
 
     if (is_wp_error($response)) {
         $message = $response->get_error_message() ?: 'WP HTTP error';
-        wp_safe_redirect(add_query_arg(['post_type' => 'artasia_placement', 'page' => ARTASIA_TOOLS_PAGE_SLUG, 'reconcile' => 'error', 'message' => rawurlencode($message)], admin_url('edit.php')));
+        wp_safe_redirect(artasia_tools_url(['reconcile' => 'error', 'message' => $message]));
         exit;
     }
 
@@ -435,14 +459,14 @@ function artasia_handle_reconcile_run(): void
 
     if ($status_code < 200 || $status_code >= 300) {
         $message = is_array($decoded) && !empty($decoded['error']) ? (string) $decoded['error'] : sprintf('HTTP %d', $status_code);
-        wp_safe_redirect(add_query_arg(['post_type' => 'artasia_placement', 'page' => ARTASIA_TOOLS_PAGE_SLUG, 'reconcile' => 'error', 'message' => rawurlencode($message)], admin_url('edit.php')));
+        wp_safe_redirect(artasia_tools_url(['reconcile' => 'error', 'message' => $message]));
         exit;
     }
 
     $applied = is_array($decoded) && !empty($decoded['applied']) ? 1 : 0;
     $mutations = is_array($decoded) && isset($decoded['mutations']) && is_array($decoded['mutations']) ? count($decoded['mutations']) : 0;
 
-    wp_safe_redirect(add_query_arg(['post_type' => 'artasia_placement', 'page' => ARTASIA_TOOLS_PAGE_SLUG, 'reconcile' => 'success', 'applied' => $applied, 'mutations' => $mutations], admin_url('edit.php')));
+    wp_safe_redirect(artasia_tools_url(['reconcile' => 'success', 'applied' => $applied, 'mutations' => $mutations]));
     exit;
 }
 add_action('admin_post_artasia_reconcile_run', 'artasia_handle_reconcile_run');
@@ -1817,12 +1841,10 @@ function artasia_import_row_is_empty(array $row): bool
 
 function artasia_redirect_import_page(array $result): void
 {
-    wp_safe_redirect(add_query_arg([
-        'post_type' => 'artasia_placement',
-        'page' => ARTASIA_TOOLS_PAGE_SLUG,
+    wp_safe_redirect(artasia_tools_url([
         'imported' => intval($result['imported'] ?? 0),
         'skipped' => intval($result['skipped'] ?? 0),
         'errors' => intval($result['errors'] ?? 0),
-    ], admin_url('edit.php')));
+    ]));
     exit;
 }
