@@ -1,0 +1,111 @@
+.artasia-logo-sections {
+    --artasia-logo-accent: #8e1d58;
+    --artasia-logo-border: rgba(142, 29, 88, 0.2);
+    color: var(--artasia-logo-accent);
+}
+
+.artasia-logo-sections__inner {
+    box-sizing: border-box;
+    margin: 0 auto;
+    max-width: 1140px;
+    padding: 50px;
+    width: 100%;
+}
+
+.artasia-logo-section + .artasia-logo-section {
+    border-top: 1px solid currentColor;
+    margin-top: 4rem;
+    padding-top: 4rem;
+}
+
+.artasia-logo-section__heading,
+.artasia-logo-group__heading {
+    color: var(--artasia-logo-accent);
+    margin: 0;
+}
+
+.artasia-logo-section__heading {
+    font-size: clamp(1.75rem, 3vw, 2.5rem);
+    font-weight: 900;
+    margin-bottom: 2rem;
+}
+
+.artasia-logo-group + .artasia-logo-group {
+    border-top: 1px solid var(--artasia-logo-border);
+    margin-top: 3rem;
+    padding-top: 3rem;
+}
+
+.artasia-logo-group__heading {
+    font-size: 1.25rem;
+    font-weight: 800;
+    margin-bottom: 1.25rem;
+}
+
+.artasia-logo-grid {
+    align-items: stretch;
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.artasia-logo-grid__item {
+    align-items: center;
+    background: #fff;
+    border: 1px solid var(--artasia-logo-border);
+    display: flex;
+    min-height: 8rem;
+    padding: 1.25rem;
+}
+
+.artasia-logo-grid__item--white {
+    background: #342d38;
+    border-color: #342d38;
+}
+
+.artasia-logo-grid__link {
+    align-items: center;
+    display: flex;
+    height: 100%;
+    justify-content: center;
+    text-decoration: none;
+    width: 100%;
+}
+
+.artasia-logo-grid__image {
+    display: block;
+    height: auto;
+    max-height: 5.5rem;
+    max-width: 100%;
+    object-fit: contain;
+    width: auto;
+}
+
+.artasia-logo-grid__link:hover .artasia-logo-grid__image,
+.artasia-logo-grid__link:focus-visible .artasia-logo-grid__image {
+    opacity: 0.78;
+}
+
+@media (max-width: 900px) {
+    .artasia-logo-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 600px) {
+    .artasia-logo-sections__inner {
+        padding: 2rem 1.25rem;
+    }
+
+    .artasia-logo-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .artasia-logo-grid__item {
+        min-height: 6.5rem;
+        padding: 0.85rem;
+    }
+}

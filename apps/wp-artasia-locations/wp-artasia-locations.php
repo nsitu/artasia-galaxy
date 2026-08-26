@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Artasia Locations
  * Description: Custom post types for Artasia placements, projects, activities, places, partners, supporters, recognitions, people, learning anecdotes, and pedagogical documentation with a REST API endpoint for the Node.js backend.
- * Version:     2.2.21
+ * Version:     2.2.23
  * License:     GPL-2.0-or-later
  */
 
@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('ARTASIA_LOCATIONS_VERSION', '2.2.21');
+define('ARTASIA_LOCATIONS_VERSION', '2.2.23');
 define('ARTASIA_LOCATIONS_PATH', plugin_dir_path(__FILE__));
 define('ARTASIA_LOCATIONS_URL', plugin_dir_url(__FILE__));
 
@@ -23,6 +23,7 @@ require_once ARTASIA_LOCATIONS_PATH . 'includes/admin-columns.php';
 require_once ARTASIA_LOCATIONS_PATH . 'includes/import.php';
 require_once ARTASIA_LOCATIONS_PATH . 'includes/shortcodes.php';
 require_once ARTASIA_LOCATIONS_PATH . 'includes/shortcodes-sites.php';
+require_once ARTASIA_LOCATIONS_PATH . 'includes/shortcodes-logos.php';
 require_once ARTASIA_LOCATIONS_PATH . 'includes/documentation-gallery.php';
 require_once ARTASIA_LOCATIONS_PATH . 'includes/shortcodes-documentation.php';
 require_once ARTASIA_LOCATIONS_PATH . 'includes/elementor.php';
@@ -80,6 +81,12 @@ function artasia_enqueue_public_assets(): void
     wp_enqueue_style(
         'artasia-sites-shortcode',
         ARTASIA_LOCATIONS_URL . 'assets/sites.css',
+        [],
+        ARTASIA_LOCATIONS_VERSION
+    );
+    wp_register_style(
+        'artasia-logos-shortcode',
+        ARTASIA_LOCATIONS_URL . 'assets/logos.css',
         [],
         ARTASIA_LOCATIONS_VERSION
     );
