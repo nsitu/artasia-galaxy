@@ -7,6 +7,7 @@ import {
 } from "./modules/iconLoader";
 
 const coreIconNames = [
+  
   // Keep this subset in sync with every Material Symbol rendered on public pages;
   // an unregistered name falls back to invisible text instead of a glyph.
   "reset_brightness",
