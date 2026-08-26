@@ -40,6 +40,102 @@ function artasia_get_reconcile_secret(): string
     return (string) get_option('artasia_reconcile_secret', '');
 }
 
+function artasia_svg_trace_hooks(): array
+{
+    return [
+        'upload_mimes'                 => 2,
+        'sanitize_file_name'           => 1,
+        'wp_check_filetype_and_ext'    => 5,
+        'wp_handle_upload_overrides'   => 2,
+        'wp_handle_upload_prefilter'   => 1,
+        'upload_dir'                   => 1,
+        'pre_move_uploaded_file'       => 4,
+        'wp_handle_upload'             => 2,
+    ];
+}
+
+function artasia_svg_trace_callback_details($callback): array
+{
+    $label = 'Unknown callback';
+    $file = '';
+    $line = 0;
+
+    try {
+        if (is_string($callback)) {
+            $label = $callback;
+            $reflection = new ReflectionFunction($callback);
+        } elseif (is_array($callback) && count($callback) === 2) {
+            $target = $callback[0];
+            $method = (string) $callback[1];
+            $target_label = is_object($target) ? get_class($target) : (string) $target;
+            $label = $target_label . '::' . $method;
+            $reflection = new ReflectionMethod($target, $method);
+        } elseif ($callback instanceof Closure) {
+            $label = 'Closure';
+            $reflection = new ReflectionFunction($callback);
+        } elseif (is_object($callback) && method_exists($callback, '__invoke')) {
+            $label = get_class($callback) . '::__invoke';
+            $reflection = new ReflectionMethod($callback, '__invoke');
+        } else {
+            $label = is_scalar($callback) ? (string) $callback : gettype($callback);
+            $reflection = null;
+        }
+
+        if ($reflection instanceof ReflectionFunctionAbstract) {
+            $file = (string) $reflection->getFileName();
+            $line = intval($reflection->getStartLine());
+        }
+    } catch (Throwable $exception) {
+        $label .= ' (reflection failed: ' . $exception->getMessage() . ')';
+    }
+
+    return [
+        'label' => $label,
+        'file'  => $file,
+        'line'  => $line,
+    ];
+}
+
+function artasia_svg_trace_registered_callbacks(array $hook_names): array
+{
+    global $wp_filter;
+
+    $registered = [];
+    foreach (array_keys($hook_names) as $hook_name) {
+        $registered[$hook_name] = [];
+        $hook = $wp_filter[$hook_name] ?? null;
+        if (!$hook instanceof WP_Hook) {
+            continue;
+        }
+
+        foreach ($hook->callbacks as $priority => $callbacks) {
+            foreach ($callbacks as $callback_data) {
+                $registered[$hook_name][] = [
+                    'priority' => intval($priority),
+                    'callback' => artasia_svg_trace_callback_details($callback_data['function']),
+                ];
+            }
+        }
+    }
+
+    return $registered;
+}
+
+function artasia_svg_trace_store_result(array $result): void
+{
+    set_transient('artasia_svg_trace_' . get_current_user_id(), $result, 5 * MINUTE_IN_SECONDS);
+}
+
+function artasia_svg_trace_redirect(): void
+{
+    wp_safe_redirect(add_query_arg([
+        'post_type' => 'artasia_placement',
+        'page'      => ARTASIA_TOOLS_PAGE_SLUG,
+        'svg_trace' => '1',
+    ], admin_url('edit.php')));
+    exit;
+}
+
 function artasia_render_tools_page(): void
 {
     if (!current_user_can('edit_posts')) {
@@ -58,6 +154,13 @@ function artasia_render_tools_page(): void
     $settings_saved = isset($_GET['settings_saved']) ? true : false;
     $settings_error = isset($_GET['settings_error']) ? sanitize_text_field((string) $_GET['settings_error']) : '';
 
+    $svg_trace_result = isset($_GET['svg_trace'])
+        ? get_transient('artasia_svg_trace_' . get_current_user_id())
+        : false;
+    if (is_array($svg_trace_result)) {
+        delete_transient('artasia_svg_trace_' . get_current_user_id());
+    }
+
     $reconcile_url = artasia_get_reconcile_url();
     $reconcile_secret_set = (bool) artasia_get_reconcile_secret();
     ?>
@@ -68,6 +171,61 @@ function artasia_render_tools_page(): void
             <div class="notice notice-success is-dismissible">
                 <p><?php echo esc_html(sprintf('Import complete: %d placement rows imported, %d skipped, %d with errors.', $imported, $skipped, $errors)); ?></p>
             </div>
+        <?php endif; ?>
+
+        <?php if (is_array($svg_trace_result)) : ?>
+            <?php if (!empty($svg_trace_result['error'])) : ?>
+                <div class="notice notice-error is-dismissible">
+                    <p><?php echo esc_html($svg_trace_result['error']); ?></p>
+                </div>
+            <?php else : ?>
+                <div class="notice notice-success is-dismissible">
+                    <p>SVG hook trace complete. The diagnostic upload was removed after tracing.</p>
+                </div>
+                <h2>SVG Hook Trace Results</h2>
+                <table class="widefat striped" style="max-width: 1100px;">
+                    <tbody>
+                        <tr><th scope="row">Original file</th><td><?php echo esc_html($svg_trace_result['filename'] ?? '—'); ?></td></tr>
+                        <tr><th scope="row">Original SHA-256</th><td><code><?php echo esc_html($svg_trace_result['original_hash'] ?? '—'); ?></code></td></tr>
+                        <tr><th scope="row">Stored SHA-256</th><td><code><?php echo esc_html($svg_trace_result['stored_hash'] ?? '—'); ?></code></td></tr>
+                        <tr><th scope="row">File changed</th><td><?php echo !empty($svg_trace_result['file_changed']) ? '<strong>Yes</strong>' : 'No'; ?></td></tr>
+                        <tr><th scope="row">Upload result</th><td><?php echo esc_html($svg_trace_result['upload_result'] ?? '—'); ?></td></tr>
+                    </tbody>
+                </table>
+
+                <h3>Hooks invoked</h3>
+                <?php if (!empty($svg_trace_result['invoked_hooks'])) : ?>
+                    <ul>
+                        <?php foreach ($svg_trace_result['invoked_hooks'] as $hook_name) : ?>
+                            <li><code><?php echo esc_html($hook_name); ?></code></li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php else : ?>
+                    <p>No traced hooks reported as invoked.</p>
+                <?php endif; ?>
+
+                <h3>Registered callbacks before upload</h3>
+                <?php foreach (($svg_trace_result['registered_callbacks'] ?? []) as $hook_name => $callbacks) : ?>
+                    <h4><code><?php echo esc_html($hook_name); ?></code></h4>
+                    <?php if ($callbacks) : ?>
+                        <table class="widefat striped" style="max-width: 1100px;">
+                            <thead><tr><th>Priority</th><th>Callback</th><th>Source</th></tr></thead>
+                            <tbody>
+                                <?php foreach ($callbacks as $callback_data) : ?>
+                                    <?php $callback = $callback_data['callback'] ?? []; ?>
+                                    <tr>
+                                        <td><?php echo esc_html((string) ($callback_data['priority'] ?? '')); ?></td>
+                                        <td><code><?php echo esc_html($callback['label'] ?? 'Unknown callback'); ?></code></td>
+                                        <td><?php echo esc_html(($callback['file'] ?? '') . (!empty($callback['line']) ? ':' . $callback['line'] : '')); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    <?php else : ?>
+                        <p>No callbacks registered.</p>
+                    <?php endif; ?>
+                <?php endforeach; ?>
+            <?php endif; ?>
         <?php endif; ?>
 
         <?php if ($settings_saved) : ?>
@@ -132,6 +290,19 @@ function artasia_render_tools_page(): void
                     <button type="submit" class="button button-primary" id="artasia-reconcile-run">Run reconcile now</button>
                     <span class="description">Sends an authenticated POST to the Atlas reconcile endpoint. May take a few seconds depending on the number of placements and assets.</span>
                 </p>
+            </form>
+        <?php endif; ?>
+
+        <?php if (current_user_can('manage_options')) : ?>
+            <hr />
+
+            <h2>SVG Hook Tracer (temporary)</h2>
+            <p>Upload a trusted SVG through the normal WordPress upload path to see which upload hooks and callbacks are registered, which traced hooks run, and whether the stored bytes differ from the original. The diagnostic copy is deleted when the trace finishes.</p>
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" enctype="multipart/form-data">
+                <input type="hidden" name="action" value="artasia_trace_svg_upload" />
+                <?php wp_nonce_field('artasia_trace_svg_upload', 'artasia_svg_trace_nonce'); ?>
+                <p><input type="file" name="artasia_svg_trace_file" accept=".svg,image/svg+xml" required /></p>
+                <?php submit_button('Trace SVG upload hooks', 'secondary', 'submit', false); ?>
             </form>
         <?php endif; ?>
 
@@ -275,6 +446,72 @@ function artasia_handle_reconcile_run(): void
     exit;
 }
 add_action('admin_post_artasia_reconcile_run', 'artasia_handle_reconcile_run');
+
+function artasia_handle_svg_trace_upload(): void
+{
+    if (!current_user_can('manage_options')) {
+        wp_die(esc_html__('You do not have permission to trace SVG uploads.', 'wp-artasia-locations'));
+    }
+
+    if (!isset($_POST['artasia_svg_trace_nonce']) || !wp_verify_nonce($_POST['artasia_svg_trace_nonce'], 'artasia_trace_svg_upload')) {
+        wp_die(esc_html__('Invalid SVG trace request.', 'wp-artasia-locations'));
+    }
+
+    $file = $_FILES['artasia_svg_trace_file'] ?? null;
+    if (!is_array($file) || empty($file['tmp_name']) || !is_uploaded_file($file['tmp_name'])) {
+        artasia_svg_trace_store_result(['error' => 'No valid SVG upload was received.']);
+        artasia_svg_trace_redirect();
+    }
+
+    $filename = sanitize_file_name((string) ($file['name'] ?? ''));
+    if (strtolower(pathinfo($filename, PATHINFO_EXTENSION)) !== 'svg') {
+        artasia_svg_trace_store_result(['error' => 'Please choose an SVG file.']);
+        artasia_svg_trace_redirect();
+    }
+
+    $hook_names = artasia_svg_trace_hooks();
+    $registered_callbacks = artasia_svg_trace_registered_callbacks($hook_names);
+    $invoked_hooks = [];
+    $trace_callbacks = [];
+    foreach (array_keys($hook_names) as $hook_name) {
+        $trace_callbacks[$hook_name] = static function ($value) use (&$invoked_hooks, $hook_name) {
+            $invoked_hooks[] = $hook_name;
+            return $value;
+        };
+        add_filter($hook_name, $trace_callbacks[$hook_name], PHP_INT_MAX, 1);
+    }
+
+    $original_hash = hash_file('sha256', $file['tmp_name']);
+    require_once ABSPATH . 'wp-admin/includes/file.php';
+    $upload = wp_handle_upload($file, [
+        'test_form' => false,
+        'mimes'     => ['svg' => 'image/svg+xml'],
+    ]);
+
+    foreach ($trace_callbacks as $hook_name => $callback) {
+        remove_filter($hook_name, $callback, PHP_INT_MAX);
+    }
+
+    $stored_hash = '';
+    $stored_path = '';
+    if (!empty($upload['file']) && is_string($upload['file']) && is_readable($upload['file'])) {
+        $stored_path = $upload['file'];
+        $stored_hash = hash_file('sha256', $stored_path);
+        wp_delete_file($stored_path);
+    }
+
+    artasia_svg_trace_store_result([
+        'filename'             => $filename,
+        'original_hash'        => $original_hash,
+        'stored_hash'          => $stored_hash,
+        'file_changed'         => $stored_hash !== '' && !hash_equals($original_hash, $stored_hash),
+        'upload_result'        => !empty($upload['error']) ? (string) $upload['error'] : ($stored_path ? 'Uploaded and removed' : 'Upload did not return a stored file'),
+        'invoked_hooks'        => array_values(array_unique($invoked_hooks)),
+        'registered_callbacks' => $registered_callbacks,
+    ]);
+    artasia_svg_trace_redirect();
+}
+add_action('admin_post_artasia_trace_svg_upload', 'artasia_handle_svg_trace_upload');
 
 function artasia_download_import_template(): void
 {
