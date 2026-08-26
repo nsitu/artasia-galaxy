@@ -247,6 +247,65 @@ function artasia_partner_column(string $column, int $post_id): void
 }
 add_action('manage_artasia_partner_posts_custom_column', 'artasia_partner_column', 10, 2);
 
+// --- Artasia Supporter columns ---
+
+function artasia_supporter_columns(array $columns): array
+{
+    $new = [];
+    foreach ($columns as $key => $label) {
+        $new[$key] = $label;
+        if ($key === 'title') {
+            $new['artasia_supporter_logo'] = 'Logo';
+            $new['artasia_supporter_white_logo'] = 'White Logo';
+            $new['artasia_supporter_type'] = 'Type';
+            $new['artasia_supporter_is_individual'] = 'Individual';
+            $new['artasia_supporter_website'] = 'Website';
+        }
+    }
+
+    return $new;
+}
+add_filter('manage_artasia_supporter_posts_columns', 'artasia_supporter_columns');
+
+function artasia_supporter_column(string $column, int $post_id): void
+{
+    switch ($column) {
+        case 'artasia_supporter_logo':
+            $logo_id = intval(get_post_meta($post_id, 'artasia_logo_id', true));
+            if ($logo_id) {
+                $logo = wp_get_attachment_image($logo_id, [200, 150], false, ['class' => 'artasia-admin-logo']);
+                if ($logo) {
+                    echo '<div class="artasia-admin-logo-wrapper">' . $logo . '</div>';
+                    break;
+                }
+            }
+            echo '—';
+            break;
+        case 'artasia_supporter_white_logo':
+            $logo_id = intval(get_post_meta($post_id, 'artasia_white_logo_id', true));
+            if ($logo_id) {
+                $logo = wp_get_attachment_image($logo_id, [200, 150], false, ['class' => 'artasia-admin-logo']);
+                if ($logo) {
+                    echo '<div class="artasia-admin-logo-wrapper artasia-admin-logo-wrapper--dark">' . $logo . '</div>';
+                    break;
+                }
+            }
+            echo '&mdash;';
+            break;
+        case 'artasia_supporter_type':
+            echo esc_html(get_post_meta($post_id, 'artasia_supporter_type', true) ?: '—');
+            break;
+        case 'artasia_supporter_is_individual':
+            echo get_post_meta($post_id, 'artasia_supporter_is_individual', true) ? 'Yes' : 'No';
+            break;
+        case 'artasia_supporter_website':
+            $url = get_post_meta($post_id, 'artasia_website', true);
+            echo $url ? '<a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer">' . esc_html($url) . '</a>' : '—';
+            break;
+    }
+}
+add_action('manage_artasia_supporter_posts_custom_column', 'artasia_supporter_column', 10, 2);
+
 // --- Artasia People columns ---
 
 function artasia_people_columns(array $columns): array
@@ -342,6 +401,42 @@ function artasia_role_column(string $column, int $post_id): void
     }
 }
 add_action('manage_artasia_role_posts_custom_column', 'artasia_role_column', 10, 2);
+
+// --- Artasia Recognition columns ---
+
+function artasia_recognition_columns(array $columns): array
+{
+    $new = [];
+    foreach ($columns as $key => $label) {
+        $new[$key] = $label;
+        if ($key === 'title') {
+            $new['artasia_recognition_supporter'] = 'Supporter';
+            $new['artasia_recognition_project'] = 'Project';
+            $new['artasia_recognition_order'] = 'Display Order';
+        }
+    }
+
+    return $new;
+}
+add_filter('manage_artasia_recognition_posts_columns', 'artasia_recognition_columns');
+
+function artasia_recognition_column(string $column, int $post_id): void
+{
+    switch ($column) {
+        case 'artasia_recognition_supporter':
+            $supporter_id = intval(get_post_meta($post_id, 'artasia_supporter_id', true));
+            echo $supporter_id ? esc_html(get_the_title($supporter_id)) : '—';
+            break;
+        case 'artasia_recognition_project':
+            $project_id = intval(get_post_meta($post_id, 'artasia_project_id', true));
+            echo $project_id ? esc_html(artasia_project_admin_label($project_id)) : '—';
+            break;
+        case 'artasia_recognition_order':
+            echo esc_html((string) intval(get_post_meta($post_id, 'artasia_recognition_order', true)));
+            break;
+    }
+}
+add_action('manage_artasia_recognition_posts_custom_column', 'artasia_recognition_column', 10, 2);
 
 // --- Pedagogical Documentation columns ---
 

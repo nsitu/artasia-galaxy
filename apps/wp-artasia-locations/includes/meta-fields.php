@@ -334,6 +334,71 @@ function artasia_register_meta_fields(): void
         'sanitize_callback' => 'sanitize_textarea_field',
     ]);
 
+    // --- Artasia Supporter meta ---
+    register_post_meta('artasia_supporter', 'artasia_supporter_type', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'sanitize_text_field',
+    ]);
+    register_post_meta('artasia_supporter', 'artasia_supporter_is_individual', [
+        'type'         => 'boolean',
+        'single'       => true,
+        'default'      => false,
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_boolean_meta',
+    ]);
+    register_post_meta('artasia_supporter', 'artasia_supporter_acronym', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'sanitize_text_field',
+    ]);
+    register_post_meta('artasia_supporter', 'artasia_website', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'esc_url_raw',
+    ]);
+    register_post_meta('artasia_supporter', 'artasia_brand_color_one', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_hex_color_meta',
+    ]);
+    register_post_meta('artasia_supporter', 'artasia_brand_color_two', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_hex_color_meta',
+    ]);
+    register_post_meta('artasia_supporter', 'artasia_logo_id', [
+        'type'         => 'integer',
+        'single'       => true,
+        'default'      => 0,
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_integer_meta',
+    ]);
+    register_post_meta('artasia_supporter', 'artasia_white_logo_id', [
+        'type'         => 'integer',
+        'single'       => true,
+        'default'      => 0,
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_integer_meta',
+    ]);
+    register_post_meta('artasia_supporter', 'artasia_notes', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'sanitize_textarea_field',
+    ]);
+
     // --- Artasia People meta ---
     register_post_meta('artasia_people', 'artasia_role', [
         'type'         => 'string',
@@ -415,6 +480,29 @@ function artasia_register_meta_fields(): void
         'sanitize_callback' => 'artasia_sanitize_integer_meta',
     ]);
     register_post_meta('artasia_role', 'artasia_role_order', [
+        'type'         => 'integer',
+        'single'       => true,
+        'default'      => 0,
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_integer_meta',
+    ]);
+
+    // --- Artasia Recognition meta ---
+    register_post_meta('artasia_recognition', 'artasia_project_id', [
+        'type'         => 'integer',
+        'single'       => true,
+        'default'      => 0,
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_integer_meta',
+    ]);
+    register_post_meta('artasia_recognition', 'artasia_supporter_id', [
+        'type'         => 'integer',
+        'single'       => true,
+        'default'      => 0,
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_integer_meta',
+    ]);
+    register_post_meta('artasia_recognition', 'artasia_recognition_order', [
         'type'         => 'integer',
         'single'       => true,
         'default'      => 0,

@@ -121,6 +121,28 @@ jQuery(function ($) {
     });
 
     setupImagePicker({
+      inputSelector: '#artasia_supporter_logo_id',
+      previewSelector: '#artasia_supporter_logo_preview',
+      selectSelector: '#artasia_supporter_logo_select',
+      removeSelector: '#artasia_supporter_logo_remove',
+      title: 'Select Artasia Supporter Logo',
+      buttonText: 'Use this logo',
+      allowedMimeTypes: ['image/png', 'image/svg+xml'],
+      invalidMessage: 'Please choose a PNG or SVG logo.'
+    });
+
+    setupImagePicker({
+      inputSelector: '#artasia_supporter_white_logo_id',
+      previewSelector: '#artasia_supporter_white_logo_preview',
+      selectSelector: '#artasia_supporter_white_logo_select',
+      removeSelector: '#artasia_supporter_white_logo_remove',
+      title: 'Select Artasia Supporter White Logo',
+      buttonText: 'Use this logo',
+      allowedMimeTypes: ['image/png', 'image/svg+xml'],
+      invalidMessage: 'Please choose a PNG or SVG logo.'
+    });
+
+    setupImagePicker({
       inputSelector: '#artasia_people_photo_id',
       previewSelector: '#artasia_people_photo_preview',
       selectSelector: '#artasia_people_photo_select',

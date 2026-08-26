@@ -58,6 +58,14 @@ function artasia_post_type_contexts(): array
                 'Use this record for partner identity, type, website, logo, and notes.',
             ],
         ],
+        'artasia_supporter' => [
+            'title' => 'About Artasia Supporters',
+            'nav_label' => 'Supporters',
+            'paragraphs' => [
+                'An Artasia Supporter is a sponsor, donor, foundation, or government funder that helps make Artasia possible.',
+                'Use this record for supporter identity, type, website, logo, and notes. Connect a supporter to a project through an Artasia Recognition record.',
+            ],
+        ],
         'artasia_place' => [
             'title' => 'About Artasia Places',
             'nav_label' => 'Places',
@@ -89,6 +97,18 @@ function artasia_post_type_contexts(): array
                     artasia_context_post_type_link('artasia_project', 'project')
                 ),
                 'Use the title for the responsibility held in that year, such as Program Coordinator or Photographer.',
+            ],
+        ],
+        'artasia_recognition' => [
+            'title' => 'About Artasia Recognitions',
+            'nav_label' => 'Recognitions',
+            'paragraphs' => [
+                sprintf(
+                    'An Artasia Recognition connects one %s to one annual %s.',
+                    artasia_context_post_type_link('artasia_supporter', 'supporter'),
+                    artasia_context_post_type_link('artasia_project', 'project')
+                ),
+                'Use Display Order to control the order in which supporters are presented for that project. Lower numbers appear first.',
             ],
         ],
         'artasia_placement' => [
@@ -1170,6 +1190,174 @@ function artasia_validate_partner_logo_id(int $attachment_id): int
     return in_array($mime_type, $allowed_mime_types, true) ? $attachment_id : 0;
 }
 
+// --- Artasia Supporter Details meta box ---
+
+function artasia_supporter_meta_box_html(WP_Post $post): void
+{
+    $type = get_post_meta($post->ID, 'artasia_supporter_type', true);
+    $acronym = get_post_meta($post->ID, 'artasia_supporter_acronym', true);
+    $website = get_post_meta($post->ID, 'artasia_website', true);
+    $logo_id = intval(get_post_meta($post->ID, 'artasia_logo_id', true));
+    $logo_url = $logo_id ? wp_get_attachment_url($logo_id) : '';
+    $white_logo_id = intval(get_post_meta($post->ID, 'artasia_white_logo_id', true));
+    $white_logo_url = $white_logo_id ? wp_get_attachment_url($white_logo_id) : '';
+    $notes = get_post_meta($post->ID, 'artasia_notes', true);
+    $brand_color_one = get_post_meta($post->ID, 'artasia_brand_color_one', true);
+    $brand_color_two = get_post_meta($post->ID, 'artasia_brand_color_two', true);
+    $is_individual = (bool) get_post_meta($post->ID, 'artasia_supporter_is_individual', true);
+    $type_options = ['Sponsor', 'Donor', 'Foundation', 'Government'];
+
+    wp_nonce_field('artasia_supporter_meta', 'artasia_supporter_meta_nonce');
+    ?>
+    <table class="form-table">
+        <tr>
+            <th><label for="artasia_supporter_type">Type</label></th>
+            <td>
+                <select id="artasia_supporter_type" name="artasia_supporter_type">
+                    <option value="">— Select Type —</option>
+                    <?php foreach ($type_options as $option) : ?>
+                        <option value="<?php echo esc_attr($option); ?>" <?php selected($type, $option); ?>>
+                            <?php echo esc_html($option); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <th>Supporter Kind</th>
+            <td>
+                <label>
+                    <input type="checkbox" name="artasia_supporter_is_individual" value="1" <?php checked($is_individual); ?> />
+                    This supporter is an individual
+                </label>
+                <p class="description">Leave unchecked for a collective supporter such as an institution, company, or foundation.</p>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_supporter_acronym">Acronym</label></th>
+            <td><input type="text" id="artasia_supporter_acronym" name="artasia_supporter_acronym" value="<?php echo esc_attr($acronym); ?>" class="widefat" /></td>
+        </tr>
+        <tr>
+            <th><label for="artasia_supporter_website">Website</label></th>
+            <td><input type="url" id="artasia_supporter_website" name="artasia_website" value="<?php echo esc_attr($website); ?>" class="widefat" /></td>
+        </tr>
+        <tr>
+            <th><label for="artasia_supporter_brand_color_one">Brand Color One</label></th>
+            <td>
+                <input type="text" id="artasia_supporter_brand_color_one" name="artasia_brand_color_one" value="<?php echo esc_attr($brand_color_one); ?>" placeholder="#ff6600" pattern="#[0-9a-fA-F]{6}" class="regular-text" />
+                <p class="description">Optional hex color used for this supporter's flower heads, e.g. <code>#ff6600</code>.</p>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_supporter_brand_color_two">Brand Color Two</label></th>
+            <td>
+                <input type="text" id="artasia_supporter_brand_color_two" name="artasia_brand_color_two" value="<?php echo esc_attr($brand_color_two); ?>" placeholder="#8b160f" pattern="#[0-9a-fA-F]{6}" class="regular-text" />
+                <p class="description">Optional secondary hex color used for this supporter's flower center, e.g. <code>#8b160f</code>.</p>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_supporter_logo_id">Logo</label></th>
+            <td>
+                <input type="hidden" id="artasia_supporter_logo_id" name="artasia_logo_id" value="<?php echo esc_attr($logo_id); ?>" />
+                <div id="artasia_supporter_logo_preview" class="artasia-logo-preview">
+                    <?php if ($logo_url) : ?>
+                        <img src="<?php echo esc_url($logo_url); ?>" alt="" />
+                    <?php endif; ?>
+                </div>
+                <button type="button" class="button" id="artasia_supporter_logo_select">Select Logo</button>
+                <button type="button" class="button" id="artasia_supporter_logo_remove" <?php disabled(!$logo_id); ?>>Remove Logo</button>
+                <p class="description">SVG files work best with Inline CSS (Presentation Attributes) and explicit dimensions (Non Responsive). Set your Illustrator export settings accordingly.</p>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_supporter_white_logo_id">White Logo</label></th>
+            <td>
+                <input type="hidden" id="artasia_supporter_white_logo_id" name="artasia_white_logo_id" value="<?php echo esc_attr($white_logo_id); ?>" />
+                <div id="artasia_supporter_white_logo_preview" class="artasia-logo-preview artasia-logo-preview--dark">
+                    <?php if ($white_logo_url) : ?>
+                        <img src="<?php echo esc_url($white_logo_url); ?>" alt="" />
+                    <?php endif; ?>
+                </div>
+                <br />
+                <button type="button" class="button" id="artasia_supporter_white_logo_select">Select White Logo</button>
+                <button type="button" class="button" id="artasia_supporter_white_logo_remove" <?php disabled(!$white_logo_id); ?>>Remove White Logo</button>
+                <p class="description">PNG or SVG. The dark preview background is for visibility and is not part of the uploaded logo.</p>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_supporter_notes">Notes</label></th>
+            <td><textarea id="artasia_supporter_notes" name="artasia_notes" rows="4" class="widefat"><?php echo esc_textarea($notes); ?></textarea></td>
+        </tr>
+    </table>
+    <?php
+}
+
+function artasia_register_supporter_meta_box(): void
+{
+    $context = artasia_get_post_type_context('artasia_supporter');
+
+    add_meta_box(
+        'artasia_supporter_details',
+        'Artasia Supporter Details',
+        'artasia_supporter_meta_box_html',
+        'artasia_supporter',
+        'normal',
+        'default'
+    );
+
+    add_meta_box(
+        'artasia_supporter_context',
+        $context['title'],
+        'artasia_supporter_context_meta_box_html',
+        'artasia_supporter',
+        'side',
+        'high'
+    );
+}
+add_action('add_meta_boxes', 'artasia_register_supporter_meta_box');
+
+function artasia_supporter_context_meta_box_html(): void
+{
+    $context = artasia_get_post_type_context('artasia_supporter');
+    if (!$context) {
+        return;
+    }
+
+    artasia_context_meta_box_html($context['paragraphs']);
+}
+
+function artasia_save_supporter_meta(int $post_id): void
+{
+    if (!isset($_POST['artasia_supporter_meta_nonce']) || !wp_verify_nonce($_POST['artasia_supporter_meta_nonce'], 'artasia_supporter_meta')) {
+        return;
+    }
+    if ((defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) || !current_user_can('edit_post', $post_id)) {
+        return;
+    }
+
+    $type_options = ['Sponsor', 'Donor', 'Foundation', 'Government'];
+    $type = sanitize_text_field($_POST['artasia_supporter_type'] ?? '');
+    update_post_meta($post_id, 'artasia_supporter_type', in_array($type, $type_options, true) ? $type : '');
+    update_post_meta($post_id, 'artasia_supporter_is_individual', !empty($_POST['artasia_supporter_is_individual']));
+    update_post_meta($post_id, 'artasia_supporter_acronym', sanitize_text_field($_POST['artasia_supporter_acronym'] ?? ''));
+    update_post_meta($post_id, 'artasia_website', esc_url_raw($_POST['artasia_website'] ?? ''));
+    update_post_meta($post_id, 'artasia_brand_color_one', artasia_sanitize_hex_color_meta($_POST['artasia_brand_color_one'] ?? ''));
+    update_post_meta($post_id, 'artasia_brand_color_two', artasia_sanitize_hex_color_meta($_POST['artasia_brand_color_two'] ?? ''));
+    update_post_meta($post_id, 'artasia_logo_id', artasia_validate_supporter_logo_id(intval($_POST['artasia_logo_id'] ?? 0)));
+    update_post_meta($post_id, 'artasia_white_logo_id', artasia_validate_supporter_logo_id(intval($_POST['artasia_white_logo_id'] ?? 0)));
+    update_post_meta($post_id, 'artasia_notes', sanitize_textarea_field($_POST['artasia_notes'] ?? ''));
+}
+add_action('save_post_artasia_supporter', 'artasia_save_supporter_meta');
+
+function artasia_validate_supporter_logo_id(int $attachment_id): int
+{
+    if (!$attachment_id) {
+        return 0;
+    }
+
+    return in_array(get_post_mime_type($attachment_id), ['image/png', 'image/svg+xml'], true) ? $attachment_id : 0;
+}
+
 // --- Artasia People Details meta box ---
 
 function artasia_people_meta_box_html(WP_Post $post): void
@@ -1413,6 +1601,122 @@ function artasia_save_role_meta(int $post_id): void
     update_post_meta($post_id, 'artasia_role_order', max(0, intval($_POST['artasia_role_order'] ?? 0)));
 }
 add_action('save_post_artasia_role', 'artasia_save_role_meta');
+
+// --- Artasia Recognition Details meta box ---
+
+function artasia_recognition_meta_box_html(WP_Post $post): void
+{
+    $projects = get_posts([
+        'post_type'   => 'artasia_project',
+        'numberposts' => -1,
+        'post_status' => ['publish', 'draft'],
+        'meta_key'    => 'artasia_project_year',
+        'orderby'     => 'meta_value_num',
+        'order'       => 'DESC',
+    ]);
+    $supporters = get_posts([
+        'post_type'   => 'artasia_supporter',
+        'numberposts' => -1,
+        'post_status' => ['publish', 'draft'],
+        'orderby'     => 'title',
+        'order'       => 'ASC',
+    ]);
+    $project_id = intval(get_post_meta($post->ID, 'artasia_project_id', true));
+    $supporter_id = intval(get_post_meta($post->ID, 'artasia_supporter_id', true));
+    $recognition_order = intval(get_post_meta($post->ID, 'artasia_recognition_order', true));
+
+    wp_nonce_field('artasia_recognition_meta', 'artasia_recognition_meta_nonce');
+    ?>
+    <table class="form-table">
+        <tr>
+            <th><label for="artasia_project_id">Project</label></th>
+            <td>
+                <select id="artasia_project_id" name="artasia_project_id" class="widefat" required>
+                    <option value="">Select a project</option>
+                    <?php foreach ($projects as $project) : ?>
+                        <?php $year = get_post_meta($project->ID, 'artasia_project_year', true); ?>
+                        <option value="<?php echo esc_attr($project->ID); ?>" <?php selected($project_id, $project->ID); ?>>
+                            <?php echo esc_html(trim($year . ' - ' . $project->post_title, ' -')); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_supporter_id">Supporter</label></th>
+            <td>
+                <select id="artasia_supporter_id" name="artasia_supporter_id" class="widefat" required>
+                    <option value="">Select a supporter</option>
+                    <?php foreach ($supporters as $supporter) : ?>
+                        <option value="<?php echo esc_attr($supporter->ID); ?>" <?php selected($supporter_id, $supporter->ID); ?>>
+                            <?php echo esc_html($supporter->post_title); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_recognition_order">Display Order</label></th>
+            <td>
+                <input type="number" id="artasia_recognition_order" name="artasia_recognition_order" value="<?php echo esc_attr($recognition_order); ?>" min="0" />
+                <p class="description">Lower numbers appear first when recognitions are listed for a project. Use the same order value only when two recognitions should share a position.</p>
+            </td>
+        </tr>
+    </table>
+    <?php
+}
+
+function artasia_register_recognition_meta_box(): void
+{
+    $context = artasia_get_post_type_context('artasia_recognition');
+
+    add_meta_box(
+        'artasia_recognition_details',
+        'Recognition Assignment',
+        'artasia_recognition_meta_box_html',
+        'artasia_recognition',
+        'normal',
+        'default'
+    );
+
+    add_meta_box(
+        'artasia_recognition_context',
+        $context['title'],
+        'artasia_recognition_context_meta_box_html',
+        'artasia_recognition',
+        'side',
+        'high'
+    );
+}
+add_action('add_meta_boxes', 'artasia_register_recognition_meta_box');
+
+function artasia_recognition_context_meta_box_html(): void
+{
+    $context = artasia_get_post_type_context('artasia_recognition');
+    if (!$context) {
+        return;
+    }
+
+    artasia_context_meta_box_html($context['paragraphs']);
+}
+
+function artasia_save_recognition_meta(int $post_id): void
+{
+    if (!isset($_POST['artasia_recognition_meta_nonce']) || !wp_verify_nonce($_POST['artasia_recognition_meta_nonce'], 'artasia_recognition_meta')) {
+        return;
+    }
+    if ((defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) || !current_user_can('edit_post', $post_id)) {
+        return;
+    }
+
+    $project_id = intval($_POST['artasia_project_id'] ?? 0);
+    $supporter_id = intval($_POST['artasia_supporter_id'] ?? 0);
+
+    update_post_meta($post_id, 'artasia_project_id', get_post_type($project_id) === 'artasia_project' ? $project_id : 0);
+    update_post_meta($post_id, 'artasia_supporter_id', get_post_type($supporter_id) === 'artasia_supporter' ? $supporter_id : 0);
+    update_post_meta($post_id, 'artasia_recognition_order', max(0, intval($_POST['artasia_recognition_order'] ?? 0)));
+}
+add_action('save_post_artasia_recognition', 'artasia_save_recognition_meta');
 
 function artasia_validate_image_attachment_id(int $attachment_id): int
 {
@@ -1868,7 +2172,7 @@ add_action('save_post_artasia_anecdote', 'artasia_save_anecdote_meta');
 
 function artasia_remove_unnecessary_meta_boxes(): void
 {
-    $post_types = ['artasia_project', 'artasia_activity', 'artasia_partner', 'artasia_place', 'artasia_people', 'artasia_role', 'artasia_placement', 'artasia_document', 'artasia_anecdote'];
+    $post_types = ['artasia_project', 'artasia_activity', 'artasia_partner', 'artasia_supporter', 'artasia_place', 'artasia_people', 'artasia_role', 'artasia_recognition', 'artasia_placement', 'artasia_document', 'artasia_anecdote'];
     $meta_box_contexts = ['side', 'normal', 'advanced'];
 
     foreach ($post_types as $post_type) {

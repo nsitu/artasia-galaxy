@@ -17,6 +17,25 @@ add_action('rest_api_init', function () {
         'permission_callback' => '__return_true',
     ]);
 
+    register_rest_route('artasia/v1', '/supporters', [
+        'methods'             => 'GET',
+        'callback'            => 'artasia_get_supporters',
+        'permission_callback' => '__return_true',
+    ]);
+
+    register_rest_route('artasia/v1', '/recognitions', [
+        'methods'             => 'GET',
+        'callback'            => 'artasia_get_recognitions',
+        'permission_callback' => '__return_true',
+        'args'                => [
+            'project_id' => [
+                'type'              => 'integer',
+                'required'          => false,
+                'sanitize_callback' => 'absint',
+            ],
+        ],
+    ]);
+
     register_rest_route('artasia/v1', '/uploaders', [
         'methods'             => 'GET',
         'callback'            => 'artasia_get_uploaders',
@@ -74,6 +93,86 @@ function artasia_get_projects(): WP_REST_Response
             'statistics'  => artasia_get_project_statistics($project->ID),
         ];
     }
+
+    return rest_ensure_response($results);
+}
+
+function artasia_get_supporter_response(WP_Post $supporter): array
+{
+    $logo_id = intval(get_post_meta($supporter->ID, 'artasia_logo_id', true));
+    $white_logo_id = intval(get_post_meta($supporter->ID, 'artasia_white_logo_id', true));
+
+    return [
+        'id'             => $supporter->ID,
+        'name'           => $supporter->post_title,
+        'acronym'        => get_post_meta($supporter->ID, 'artasia_supporter_acronym', true) ?: '',
+        'type'           => get_post_meta($supporter->ID, 'artasia_supporter_type', true) ?: '',
+        'is_individual'  => (bool) get_post_meta($supporter->ID, 'artasia_supporter_is_individual', true),
+        'website'        => get_post_meta($supporter->ID, 'artasia_website', true) ?: '',
+        'brand_color_one' => get_post_meta($supporter->ID, 'artasia_brand_color_one', true) ?: '',
+        'brand_color_two' => get_post_meta($supporter->ID, 'artasia_brand_color_two', true) ?: '',
+        'logo'           => artasia_get_partner_logo_response($logo_id),
+        'white_logo'     => artasia_get_partner_logo_response($white_logo_id),
+    ];
+}
+
+function artasia_get_supporters(): WP_REST_Response
+{
+    $supporters = get_posts([
+        'post_type'   => 'artasia_supporter',
+        'numberposts' => -1,
+        'post_status' => 'publish',
+        'orderby'     => 'title',
+        'order'       => 'ASC',
+    ]);
+
+    return rest_ensure_response(array_map('artasia_get_supporter_response', $supporters));
+}
+
+function artasia_get_recognitions(WP_REST_Request $request): WP_REST_Response
+{
+    $project_filter = absint($request->get_param('project_id'));
+    $recognitions = get_posts([
+        'post_type'   => 'artasia_recognition',
+        'numberposts' => -1,
+        'post_status' => 'publish',
+        'orderby'     => 'title',
+        'order'       => 'ASC',
+    ]);
+    $results = [];
+
+    foreach ($recognitions as $recognition) {
+        $project_id = intval(get_post_meta($recognition->ID, 'artasia_project_id', true));
+        $supporter_id = intval(get_post_meta($recognition->ID, 'artasia_supporter_id', true));
+        if (
+            !$project_id
+            || get_post_type($project_id) !== 'artasia_project'
+            || get_post_status($project_id) !== 'publish'
+            || !$supporter_id
+            || get_post_type($supporter_id) !== 'artasia_supporter'
+            || get_post_status($supporter_id) !== 'publish'
+            || ($project_filter && $project_id !== $project_filter)
+        ) {
+            continue;
+        }
+
+        $results[] = [
+            'id'            => $recognition->ID,
+            'title'         => $recognition->post_title,
+            'project_id'    => $project_id,
+            'supporter'     => artasia_get_supporter_response(get_post($supporter_id)),
+            'display_order' => max(0, intval(get_post_meta($recognition->ID, 'artasia_recognition_order', true))),
+        ];
+    }
+
+    usort($results, static function (array $a, array $b): int {
+        $order_comparison = $a['display_order'] <=> $b['display_order'];
+        if ($order_comparison !== 0) {
+            return $order_comparison;
+        }
+
+        return strcasecmp($a['supporter']['name'], $b['supporter']['name']);
+    });
 
     return rest_ensure_response($results);
 }

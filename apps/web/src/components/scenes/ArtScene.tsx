@@ -73,6 +73,7 @@ type MenuItem = {
   href: string;
   label: string;
   action?: "about";
+  external?: boolean;
 };
 type IntroPhase = "loading" | "ready" | "exiting" | "complete";
 const PARTNER_PATH_PREFIX = "/partners/";
@@ -680,6 +681,7 @@ export default function ArtScene() {
       { href: "#about", label: "About", action: "about" as const },
       { href: "/admin", label: "Admin" },
       { href: "/partners", label: "Partners" },
+      { href: "https://artsforall.co/what-we-do/artasia/", label: "Arts For All", external: true },
     ],
     []
   );
@@ -1831,6 +1833,8 @@ export default function ArtScene() {
                       className="atlas-control-surface"
                       role="menuitem"
                       href={item.href}
+                      target={item.external ? "_blank" : undefined}
+                      rel={item.external ? "noopener noreferrer" : undefined}
                       style={menuItemStyle}
                       onClick={() => setMenuOpen(false)}
                     >
