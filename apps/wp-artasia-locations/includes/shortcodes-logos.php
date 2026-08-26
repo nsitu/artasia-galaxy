@@ -186,11 +186,17 @@ function artasia_group_supporter_logo_items(array $items): array
     }
 
     uksort($groups, static function (string $a, string $b): int {
-        if ($a === 'Other') {
-            return 1;
-        }
-        if ($b === 'Other') {
-            return -1;
+        $type_order = [
+            'Government' => 0,
+            'Foundation' => 1,
+            'Sponsor'    => 2,
+            'Donor'      => 3,
+            'Other'      => 4,
+        ];
+        $a_order = $type_order[$a] ?? 4;
+        $b_order = $type_order[$b] ?? 4;
+        if ($a_order !== $b_order) {
+            return $a_order <=> $b_order;
         }
 
         return strcasecmp($a, $b);
@@ -259,13 +265,6 @@ function artasia_render_logos(array $args = []): string
     ?>
     <section class="artasia-logo-sections artasia-logo-sections--<?php echo esc_attr($variant); ?>">
         <div class="artasia-logo-sections__inner">
-            <?php if ($partners) : ?>
-                <section class="artasia-logo-section artasia-logo-section--partners">
-                    <h2 class="artasia-logo-section__heading"><?php echo esc_html((string) $args['partner_heading']); ?></h2>
-                    <?php artasia_render_logo_grid($partners); ?>
-                </section>
-            <?php endif; ?>
-
             <?php if ($supporter_groups) : ?>
                 <section class="artasia-logo-section artasia-logo-section--supporters">
                     <h2 class="artasia-logo-section__heading"><?php echo esc_html((string) $args['supporter_heading']); ?></h2>
@@ -275,6 +274,13 @@ function artasia_render_logos(array $args = []): string
                             <?php artasia_render_logo_grid($items); ?>
                         </section>
                     <?php endforeach; ?>
+                </section>
+            <?php endif; ?>
+
+            <?php if ($partners) : ?>
+                <section class="artasia-logo-section artasia-logo-section--partners">
+                    <h2 class="artasia-logo-section__heading"><?php echo esc_html((string) $args['partner_heading']); ?></h2>
+                    <?php artasia_render_logo_grid($partners); ?>
                 </section>
             <?php endif; ?>
         </div>
