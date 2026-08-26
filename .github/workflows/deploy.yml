@@ -1,0 +1,191 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect deploy changes
+        id: changes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "image_changed=true" >> "$GITHUB_OUTPUT"
+            echo "compose_changed=true" >> "$GITHUB_OUTPUT"
+            echo "plugin_changed=true" >> "$GITHUB_OUTPUT"
+            echo "deploy_changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          BEFORE="${{ github.event.before }}"
+          AFTER="${{ github.sha }}"
+
+          if [[ -z "$BEFORE" || "$BEFORE" =~ ^0+$ ]]; then
+            changed_files="$(git ls-tree -r --name-only "$AFTER")"
+          else
+            changed_files="$(git diff --name-only "$BEFORE" "$AFTER")"
+          fi
+
+          echo "Changed files:"
+          echo "$changed_files"
+
+          image_changed=false
+          compose_changed=false
+          plugin_changed=false
+          deploy_changed=false
+
+          while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+
+            case "$file" in
+              apps/wp-artasia-locations/*)
+                plugin_changed=true
+                ;;
+              apps/server/*|apps/web/*|Dockerfile|.dockerignore|package.json|package-lock.json)
+                image_changed=true
+                ;;
+              docker-compose.yml)
+                compose_changed=true
+                ;;
+              .github/workflows/deploy.yml)
+                deploy_changed=true
+                ;;
+            esac
+          done <<< "$changed_files"
+
+          echo "image_changed=$image_changed" >> "$GITHUB_OUTPUT"
+          echo "compose_changed=$compose_changed" >> "$GITHUB_OUTPUT"
+          echo "plugin_changed=$plugin_changed" >> "$GITHUB_OUTPUT"
+          echo "deploy_changed=$deploy_changed" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        if: steps.changes.outputs.image_changed == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: steps.changes.outputs.image_changed == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        if: steps.changes.outputs.image_changed == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: |
+            VITE_MAPBOX_TOKEN=${{ secrets.VITE_MAPBOX_TOKEN }}
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Copy Docker Compose file to VM temp
+        if: steps.changes.outputs.compose_changed == 'true'
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          source: docker-compose.yml
+          target: /tmp/artasia-galaxy-deploy
+          overwrite: true
+
+      - name: Install Docker Compose file on VM
+        if: steps.changes.outputs.compose_changed == 'true'
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            sudo mkdir -p /opt/artasia-galaxy
+            sudo mv /tmp/artasia-galaxy-deploy/docker-compose.yml /opt/artasia-galaxy/docker-compose.yml
+            sudo rm -rf /tmp/artasia-galaxy-deploy
+
+      - name: Deploy to VM
+        if: steps.changes.outputs.image_changed == 'true' || steps.changes.outputs.compose_changed == 'true' || steps.changes.outputs.deploy_changed == 'true'
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd /opt/artasia-galaxy
+            sudo ARTASIA_IMAGE=${{ env.IMAGE_NAME }}:latest docker compose pull
+            if ! sudo ARTASIA_IMAGE=${{ env.IMAGE_NAME }}:latest docker compose up -d --remove-orphans; then
+              echo "Docker Compose update failed; removing stale artasia service containers and retrying once."
+              sudo docker ps -a \
+                --filter "label=com.docker.compose.project=artasia-galaxy" \
+                --filter "label=com.docker.compose.service=artasia" \
+                --format "{{.ID}}" \
+                | xargs -r sudo docker rm -f
+              sudo ARTASIA_IMAGE=${{ env.IMAGE_NAME }}:latest docker compose up -d --remove-orphans
+            fi
+            sudo docker image prune -f
+
+      - name: Copy WordPress plugin to VM temp
+        if: steps.changes.outputs.plugin_changed == 'true'
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          source: apps/wp-artasia-locations/*
+          target: /tmp/wp-artasia-locations-deploy
+          strip_components: 2
+          overwrite: true
+
+      - name: Install and activate WordPress plugin
+        if: steps.changes.outputs.plugin_changed == 'true'
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            PLUGINS_DIR=/opt/bitnami/wordpress/wp-content/plugins
+            sudo rm -rf "$PLUGINS_DIR/wp-artasia-locations"
+            sudo cp -r /tmp/wp-artasia-locations-deploy "$PLUGINS_DIR/wp-artasia-locations"
+            sudo chown -R daemon:daemon "$PLUGINS_DIR/wp-artasia-locations"
+            WP_BIN=$(command -v wp || echo /opt/bitnami/wp-cli/bin/wp)
+            sudo "$WP_BIN" plugin activate wp-artasia-locations --path=/opt/bitnami/wordpress --allow-root
+            # Temporary one-time migration: remove this command and its script after this release.
+            sudo "$WP_BIN" eval-file "$PLUGINS_DIR/wp-artasia-locations/scripts/publish-existing-placement-sites.php" --path=/opt/bitnami/wordpress --allow-root
+            sudo rm -rf /tmp/wp-artasia-locations-deploy
+
+      - name: Delete old GHCR image versions
+        if: steps.changes.outputs.image_changed == 'true'
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: ${{ github.event.repository.name }}
+          package-type: container
+          # Increase this later if registry storage allows keeping rollback images.
+          min-versions-to-keep: 1
