@@ -359,14 +359,6 @@ function artasia_register_admin_menu(): void
 
     add_submenu_page(
         'edit.php?post_type=artasia_placement',
-        'Artasia Recognitions',
-        'Recognitions',
-        'edit_posts',
-        'edit.php?post_type=artasia_recognition'
-    );
-
-    add_submenu_page(
-        'edit.php?post_type=artasia_placement',
         'Artasia Placements',
         'Placements',
         'edit_posts',

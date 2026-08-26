@@ -171,7 +171,40 @@
 }
 
 .artasia-project-supporter-row label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   flex: 1;
+}
+
+.artasia-project-supporter-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 108px;
+  width: 108px;
+  height: 48px;
+  padding: 4px 8px;
+  border: 1px solid #c3c4c7;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.artasia-project-supporter-logo--white {
+  border-color: #2c3338;
+  background: #3c434a;
+}
+
+.artasia-project-supporter-logo__image {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.artasia-project-supporter-name {
+  min-width: 0;
 }
 
 .artasia-documentation-atlas-panel {
