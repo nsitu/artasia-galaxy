@@ -188,6 +188,7 @@ function artasia_context_list_header_html(string $current_post_type, array $para
             <img class="artasia-placements-list-logo" src="<?php echo esc_url(ARTASIA_LOCATIONS_URL . 'assets/artasia.svg'); ?>" alt="Artasia" />
             <nav class="artasia-post-type-nav" aria-label="Artasia post types">
                 <?php foreach ($contexts as $post_type => $context) : ?>
+                    <?php if ($post_type === 'artasia_recognition') : continue; endif; ?>
                     <?php $is_current = $post_type === $current_post_type; ?>
                     <a
                         class="artasia-post-type-nav-link<?php echo $is_current ? ' is-active' : ''; ?>"
