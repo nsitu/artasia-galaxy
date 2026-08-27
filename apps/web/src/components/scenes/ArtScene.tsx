@@ -11,6 +11,7 @@ import DocumentationOverlay from "./DocumentationOverlay";
 import { loadMaterialSymbols } from "../../modules/iconLoader";
 import TerrainGallery, {
   FocusedPlacementOverlay,
+  getPartnerAcronym,
   MapContextInfoPanel,
   ProjectInfoPanel,
   type EducatorFilterOption,
@@ -756,6 +757,11 @@ export default function ArtScene() {
   const contextLightboxPlacement = contextSearchLightboxResult?.placement;
   const contextLightboxPlacementHref = contextLightboxPlacement
     ? getContextSearchPlacementHref(contextLightboxPlacement, selectedProjectSlug)
+    : null;
+  const contextLightboxGalleryLabel = contextLightboxPlacement
+    ? `${getPartnerAcronym(
+        contextLightboxPlacement.partner_acronym || contextLightboxPlacement.partner_name,
+      )} Gallery`
     : null;
 
   useEffect(() => {
@@ -2337,26 +2343,43 @@ export default function ArtScene() {
                   </button>
                 )}
                 {selectedPhoto.mediaKind === "image" && (
-                  <div className="atlas-lightbox-similar" style={photoLightboxSimilarStyle}>
-                    <button
-                      type="button"
-                      className="atlas-control-surface"
-                      onClick={handleFindSimilar}
-                      disabled={similarLoading}
-                      style={photoLightboxActionLinkStyle}
-                      aria-label="Find a similar artwork in another placement"
-                    >
-                      <span aria-hidden="true" style={photoLightboxMaterialIconStyle}>
-                        travel_explore
-                      </span>
-                      <span>{similarLoading ? "Loading map…" : "Find Similar"}</span>
-                    </button>
-                    {!similarLoading && similarError && (
-                      <span role="alert" style={photoLightboxSimilarStatusStyle}>
-                        {similarError}
-                      </span>
+                  <>
+                    {similarMapOrigin && contextLightboxPlacementHref && contextLightboxGalleryLabel && (
+                      <a
+                        href={contextLightboxPlacementHref}
+                        className="atlas-control-surface"
+                        onClick={(event) => event.stopPropagation()}
+                        aria-label={`View ${contextLightboxGalleryLabel}`}
+                        title={contextLightboxGalleryLabel}
+                        style={photoLightboxActionLinkStyle}
+                      >
+                        <span aria-hidden="true" style={photoLightboxMaterialIconStyle}>
+                          photo_library
+                        </span>
+                        <span>{contextLightboxGalleryLabel}</span>
+                      </a>
                     )}
-                  </div>
+                    <div className="atlas-lightbox-similar" style={photoLightboxSimilarStyle}>
+                      <button
+                        type="button"
+                        className="atlas-control-surface"
+                        onClick={handleFindSimilar}
+                        disabled={similarLoading}
+                        style={photoLightboxActionLinkStyle}
+                        aria-label="Find a similar artwork in another placement"
+                      >
+                        <span aria-hidden="true" style={photoLightboxMaterialIconStyle}>
+                          travel_explore
+                        </span>
+                        <span>{similarLoading ? "Loading map…" : "Find Similar"}</span>
+                      </button>
+                      {!similarLoading && similarError && (
+                        <span role="alert" style={photoLightboxSimilarStatusStyle}>
+                          {similarError}
+                        </span>
+                      )}
+                    </div>
+                  </>
                 )}
                 <a
                   href={`/api/v1/assets/${selectedPhoto.id}/original`}
