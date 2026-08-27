@@ -76,6 +76,23 @@ export interface SlideshowQuery {
   };
 }
 
+const PLACEMENT_TAG_PATTERN = /^(?:placement|display-placement):(\d+)$/i;
+
+function getAssetPlacementId(asset: ImmichAsset): number | undefined {
+  for (const prefix of ["placement:", "display-placement:"]) {
+    for (const tag of asset.tags ?? []) {
+      for (const value of [tag.name, tag.value]) {
+        const normalized = value.trim().toLocaleLowerCase();
+        if (!normalized.startsWith(prefix)) continue;
+        const match = normalized.match(PLACEMENT_TAG_PATTERN);
+        const placementId = match ? Number(match[1]) : NaN;
+        if (Number.isInteger(placementId) && placementId > 0) return placementId;
+      }
+    }
+  }
+  return undefined;
+}
+
 function resolveDateRange(preset?: string, startDate?: string, endDate?: string) {
   if (preset !== "custom" && preset) {
     const now = new Date();
@@ -111,9 +128,11 @@ export function assetToPhoto(
   customActivities?: string[],
   linkedAudioAssetId?: string,
   assetType: AssetType = "artwork",
+  placementId?: number,
 ): Photo {
   const audio = forceAudio || isAudioAsset(asset);
   const video = !audio && asset.type === "VIDEO";
+  const resolvedPlacementId = placementId ?? getAssetPlacementId(asset);
   const imgW = asset.exifInfo?.exifImageWidth ?? asset.width ?? 1920;
   const imgH = asset.exifInfo?.exifImageHeight ?? asset.height ?? 1080;
   const ratio = imgW / imgH;
@@ -170,6 +189,9 @@ export function assetToPhoto(
       ? {
           linkedAudioUrl: `/api/v1/assets/${linkedAudioAssetId}/original`,
         }
+      : {}),
+    ...(resolvedPlacementId != null
+      ? { placementId: resolvedPlacementId }
       : {}),
   };
 }
@@ -597,6 +619,7 @@ export async function querySlideshow(
       Array.from(customActivitiesByAssetId.get(asset.id) ?? []),
       linkedAudioAssetIdByAssetId.get(asset.id),
       assetTypeByAssetId.get(asset.id) ?? "artwork",
+      query.placementFocus?.placementId,
     ),
   );
 

@@ -67,7 +67,7 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
   const [history, setHistory] = useState<Photo[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [activityOptions, setActivityOptions] = useState<ActivityOption[]>([]);
-  const [placement, setPlacement] = useState<MapPlacement | null>(null);
+  const [placements, setPlacements] = useState<MapPlacement[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const photosRef = useRef<Photo[]>([]);
@@ -177,7 +177,7 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
     setPhotos([]);
     setHistory([]);
     setHistoryIndex(-1);
-    setPlacement(null);
+    setPlacements([]);
 
     void Promise.all([
       loadPhotos(true),
@@ -188,17 +188,13 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
         .catch(() => {
           if (!cancelled) setActivityOptions([]);
         }),
-      placementId == null
-        ? Promise.resolve()
-        : fetchMapPlacements()
-            .then((placements) => {
-              if (!cancelled) {
-                setPlacement(placements.find((candidate) => candidate.placement_id === placementId) ?? null);
-              }
-            })
-            .catch(() => {
-              if (!cancelled) setPlacement(null);
-            }),
+      fetchMapPlacements()
+        .then((nextPlacements) => {
+          if (!cancelled) setPlacements(nextPlacements);
+        })
+        .catch(() => {
+          if (!cancelled) setPlacements([]);
+        }),
     ]);
 
     requestFullscreen();
@@ -328,6 +324,9 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
       colour: CUSTOM_ACTIVITY_COLOURS[index % CUSTOM_ACTIVITY_COLOURS.length],
     })),
   ];
+  const currentPlacement = placements.find(
+    (candidate) => candidate.placement_id === currentPhoto?.placementId,
+  );
 
   if (!currentPhoto && (loading || !error)) {
     return <div className="atlas-slideshow atlas-slideshow-status" role="status">Loading slideshow…</div>;
@@ -340,11 +339,23 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
       onContextMenu={(event) => event.preventDefault()}
     >
       <style>{slideshowStyles}</style>
-      <div className="atlas-slideshow-brand" aria-label={placement?.partner_name || "Artasia Atlas"}>
+      <div
+        className="atlas-slideshow-brand"
+        aria-label={currentPlacement?.partner_name
+          ? `Artasia and ${currentPlacement.partner_name}`
+          : "Artasia"}
+      >
         <img
-          src={placement?.partner_white_logo?.url || "/artasia-atlas.svg"}
-          alt={placement?.partner_white_logo?.alt || placement?.partner_name || "Artasia Atlas"}
+          src="/artasia-white.svg"
+          alt="Artasia"
         />
+        {currentPlacement?.partner_white_logo?.url && (
+          <img
+            className="atlas-slideshow-partner-logo"
+            src={currentPlacement.partner_white_logo.url}
+            alt={currentPlacement.partner_white_logo.alt || currentPlacement.partner_name || "Partner"}
+          />
+        )}
       </div>
       {currentPhoto ? (
         <div className="atlas-slideshow-slide" key={currentPhoto.id}>
@@ -466,12 +477,11 @@ const slideshowStyles = `
     z-index: 3;
     display: flex;
     align-items: center;
-    max-width: min(24vw, 300px);
+    max-width: min(40vw, 520px);
     max-height: 80px;
-    padding: 10px 14px;
+    gap: clamp(16px, 2vw, 34px);
     box-sizing: border-box;
-    background: rgba(8, 7, 10, 0.58);
-    backdrop-filter: blur(8px);
+    filter: drop-shadow(0 3px 10px rgba(0,0,0,0.9));
   }
 
   .atlas-slideshow-brand img {
@@ -482,12 +492,16 @@ const slideshowStyles = `
     object-fit: contain;
   }
 
+  .atlas-slideshow-partner-logo {
+    max-width: min(22vw, 260px) !important;
+  }
+
   .atlas-slideshow-image {
     display: block;
     width: 100%;
     height: 100%;
     object-fit: cover;
-    animation: atlas-slideshow-ken-burns 5s ease-in-out both;
+    animation: atlas-slideshow-ken-burns 10s ease-in-out both;
     filter: saturate(1.02);
   }
 
@@ -504,15 +518,17 @@ const slideshowStyles = `
     left: clamp(28px, 5vw, 96px);
     bottom: clamp(28px, 6vh, 88px);
     z-index: 1;
-    width: min(52vw, 960px);
+    width: fit-content;
+    max-width: min(62vw, 1100px);
     max-height: 42vh;
     overflow: hidden;
     padding: clamp(22px, 2.5vw, 42px);
     box-sizing: border-box;
     border: 0;
-    background: rgba(8, 7, 10, 0.7);
-    box-shadow: 0 18px 60px rgba(0,0,0,0.35);
-    backdrop-filter: blur(12px);
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+    filter: drop-shadow(0 4px 12px rgba(0,0,0,0.9));
   }
 
   .atlas-slideshow-badges,
@@ -541,6 +557,7 @@ const slideshowStyles = `
     line-height: 1.1;
     font-weight: 650;
     text-wrap: balance;
+    text-shadow: 0 3px 14px rgba(0,0,0,0.96);
   }
 
   .atlas-slideshow-metadata p {
@@ -548,6 +565,7 @@ const slideshowStyles = `
     color: #f0edf3;
     font-size: clamp(20px, 1.45vw, 29px);
     line-height: 1.4;
+    text-shadow: 0 3px 12px rgba(0,0,0,0.96);
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 4;
@@ -628,6 +646,7 @@ const slideshowStyles = `
       left: 16px;
       max-width: min(42vw, 240px);
       max-height: 64px;
+      gap: 12px;
     }
 
     .atlas-slideshow-brand img { max-height: 44px; }
