@@ -467,6 +467,7 @@ const slideshowStyles = `
   .atlas-slideshow-slide {
     position: absolute;
     inset: 0;
+    z-index: 0;
     animation: atlas-slideshow-fade-in 900ms ease both;
   }
 
@@ -474,7 +475,7 @@ const slideshowStyles = `
     position: absolute;
     top: clamp(20px, 3.5vh, 48px);
     left: clamp(20px, 3.5vw, 64px);
-    z-index: 3;
+    z-index: 10;
     display: flex;
     align-items: center;
     max-width: min(40vw, 520px);
@@ -482,10 +483,12 @@ const slideshowStyles = `
     gap: clamp(16px, 2vw, 34px);
     box-sizing: border-box;
     filter: drop-shadow(0 3px 10px rgba(0,0,0,0.9));
+    pointer-events: none;
   }
 
   .atlas-slideshow-brand img {
     display: block;
+    flex: 0 0 auto;
     width: auto;
     max-width: 100%;
     max-height: 56px;
