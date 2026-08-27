@@ -363,8 +363,15 @@ function artasia_render_logo_grid(array $items): void
     if (!$items) {
         return;
     }
+    $has_labels = false;
+    foreach ($items as $item) {
+        if (!empty($item['label'])) {
+            $has_labels = true;
+            break;
+        }
+    }
     ?>
-    <ul class="artasia-logo-grid">
+    <ul class="artasia-logo-grid<?php echo $has_labels ? ' artasia-logo-grid--has-labels' : ''; ?>">
         <?php foreach ($items as $item) : ?>
             <li class="artasia-logo-grid__item artasia-logo-grid__item--<?php echo esc_attr($item['variant']); ?>">
                 <?php if ($item['website'] !== '') : ?>
