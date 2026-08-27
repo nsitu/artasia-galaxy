@@ -1,0 +1,92 @@
+.artasia-exhibition {
+    --artasia-exhibition-colour: #8e1d58;
+    color: var(--artasia-exhibition-colour);
+    margin: 0 auto;
+    max-width: 1140px;
+    padding: 50px;
+}
+
+.artasia-exhibition__header {
+    align-items: center;
+    display: grid;
+    gap: clamp(1.5rem, 5vw, 4rem);
+    grid-template-columns: minmax(0, 1fr);
+    margin-bottom: 3rem;
+}
+
+.artasia-exhibition__header.has-host-logo {
+    grid-template-columns: minmax(12rem, 32%) minmax(0, 1fr);
+}
+
+.artasia-exhibition__host-logo {
+    max-width: 20rem;
+}
+
+.artasia-exhibition__host-logo a {
+    display: inline-block;
+}
+
+.artasia-exhibition__host-logo-image {
+    display: block;
+    height: auto;
+    max-height: 14rem;
+    max-width: 100%;
+    object-fit: contain;
+    object-position: left center;
+    width: auto;
+}
+
+.artasia-exhibition__host-name {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin: 0 0 0.5rem;
+}
+
+.artasia-exhibition__host-name a,
+.artasia-exhibition__host-name a:visited {
+    color: inherit;
+}
+
+.artasia-exhibition__title {
+    color: var(--artasia-exhibition-colour);
+    font-size: clamp(2rem, 5vw, 4rem);
+    font-weight: 900;
+    line-height: 1.05;
+    margin: 0;
+}
+
+.artasia-exhibition__date {
+    color: var(--artasia-exhibition-colour);
+    font-size: clamp(1.35rem, 3vw, 2.2rem);
+    font-weight: 900;
+    line-height: 1.15;
+    margin: 1rem 0 0;
+}
+
+.artasia-exhibition__description,
+.artasia-exhibition__description * {
+    color: var(--artasia-exhibition-colour);
+}
+
+.artasia-exhibition__description {
+    font-size: 1.15rem;
+    line-height: 1.55;
+}
+
+.artasia-exhibition__description > :first-child {
+    margin-top: 0;
+}
+
+.artasia-exhibition__description > :last-child {
+    margin-bottom: 0;
+}
+
+@media (max-width: 700px) {
+    .artasia-exhibition {
+        padding: 2rem 1.25rem;
+    }
+
+    .artasia-exhibition__header.has-host-logo {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
