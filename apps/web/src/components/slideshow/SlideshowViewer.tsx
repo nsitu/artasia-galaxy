@@ -7,6 +7,7 @@ const MAX_RECENT_IDS = 12;
 const MAX_HISTORY_LENGTH = 120;
 const UPCOMING_BUFFER_LENGTH = 3;
 const REFRESH_INTERVAL_MS = 10 * 60 * 1_000;
+const ANECDOTE_SLIDE_PROBABILITY = 0.2;
 const CUSTOM_ACTIVITY_COLOURS = ["#8e1d58", "#c45b2c", "#367b76", "#6b5aa8", "#9a7b1f"];
 
 type SlideshowViewerProps = {
@@ -81,7 +82,16 @@ function pickRandomPhoto(
   if (notCurrent.length === 0) return null;
   const notRecent = notCurrent.filter((photo) => !recentIds.includes(photo.id));
   const candidates = notRecent.length > 0 ? notRecent : notCurrent;
-  return candidates[Math.floor(Math.random() * candidates.length)] ?? null;
+  const anecdotes = candidates.filter((photo) => photo.mediaKind === "anecdote");
+  const assets = candidates.filter((photo) => photo.mediaKind !== "anecdote");
+  const pool = anecdotes.length > 0 && (
+    assets.length === 0 || Math.random() < ANECDOTE_SLIDE_PROBABILITY
+  )
+    ? anecdotes
+    : assets.length > 0
+      ? assets
+      : anecdotes;
+  return pool[Math.floor(Math.random() * pool.length)] ?? null;
 }
 
 function mergePhotos(existing: Photo[], incoming: Photo[]): Photo[] {
@@ -934,15 +944,16 @@ const slideshowStyles = `
     display: flex;
     flex-direction: column;
     justify-content: center;
-    width: min(74vw, 1060px);
+    width: 100%;
     height: fit-content;
+    max-width: none;
     max-height: calc(100% - 96px);
     margin: auto;
-    padding: clamp(32px, 5vw, 88px);
+    padding: clamp(28px, 6vw, 64px);
     box-sizing: border-box;
     overflow: auto;
-    border-left: 10px solid var(--atlas-slideshow-accent);
-    background: rgba(8, 7, 10, 0.9);
+    border: 0;
+    background: color-mix(in srgb, var(--atlas-slideshow-accent) 30%, rgba(8, 7, 10, 0.88));
     box-shadow: 0 18px 60px rgba(0,0,0,0.4);
     animation: atlas-slideshow-fade-in 900ms ease both;
   }
@@ -956,10 +967,12 @@ const slideshowStyles = `
   }
 
   .atlas-slideshow-quote-mark {
+    display: block;
     margin-bottom: 8px;
     color: var(--atlas-slideshow-accent);
-    font-family: "Material Symbols Rounded", sans-serif;
+    font-family: "Material Symbols Outlined", sans-serif;
     font-size: clamp(38px, 4vw, 72px);
+    font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 48;
     line-height: 1;
   }
 
@@ -1056,10 +1069,10 @@ const slideshowStyles = `
     }
 
     .atlas-slideshow-anecdote {
-      width: calc(100% - 40px);
+      width: 100%;
       max-height: calc(100% - 40px);
       padding: 28px;
-      border-left-width: 6px;
+      border: 0;
     }
   }
 
@@ -1074,6 +1087,6 @@ const slideshowStyles = `
     }
 
     .atlas-slideshow-metadata p { margin-top: 10px; }
-    .atlas-slideshow-anecdote { width: calc(100% - 24px); max-height: calc(100% - 24px); padding: 22px; }
+    .atlas-slideshow-anecdote { width: 100%; max-height: calc(100% - 24px); padding: 22px; }
   }
 `;

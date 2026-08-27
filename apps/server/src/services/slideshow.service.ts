@@ -681,13 +681,13 @@ export async function querySlideshow(
     photos = photos.filter((photo) => photo.assetType === query.assetType);
   }
 
-  if (query.placementFocus && !query.assetType) {
-    const focusedAnecdotes = query.placementFocus.activityId == null
+  if (!query.assetType) {
+    const eligibleAnecdotes = query.placementFocus?.activityId == null
       ? anecdotes
       : anecdotes.filter(
           (anecdote) => anecdote.activity_id === query.placementFocus?.activityId,
         );
-    photos.push(...focusedAnecdotes.map(anecdoteToPhoto));
+    photos.push(...eligibleAnecdotes.map(anecdoteToPhoto));
   }
 
   if (query.shuffle && query.seed != null) {
@@ -695,8 +695,17 @@ export async function querySlideshow(
   }
 
   const total = photos.length;
+  let assetCount = 0;
+  const resultPhotos = query.assetType
+    ? photos.slice(0, limit)
+    : photos.filter((photo) => {
+        if (photo.mediaKind === "anecdote") return true;
+        if (assetCount >= limit) return false;
+        assetCount += 1;
+        return true;
+      });
 
-  return { photos: photos.slice(0, limit), total };
+  return { photos: resultPhotos, total };
 }
 
 export async function queryViewerAsset(assetId: string): Promise<Photo | null> {
