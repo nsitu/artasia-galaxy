@@ -564,7 +564,14 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
                 </h1>
               )}
               {metadataDescriptions.map((description, index) => (
-                <p key={`${description}-${index}`}>{description}</p>
+                <p
+                  key={`${description}-${index}`}
+                  className={description === documentationParagraph
+                    ? "atlas-slideshow-documentation-paragraph"
+                    : undefined}
+                >
+                  {description}
+                </p>
               ))}
               {documentationAttribution && (
                 <p className="atlas-slideshow-documentation-attribution">— {documentationAttribution}</p>
@@ -641,7 +648,7 @@ const slideshowStyles = `
     display: flex;
     align-items: center;
     width: max-content;
-    max-width: min(75vw, 760px);
+    max-width: min(90vw, 1700px);
     max-height: 80px;
     gap: clamp(16px, 2vw, 34px);
     box-sizing: border-box;
@@ -677,7 +684,7 @@ const slideshowStyles = `
 
   .atlas-slideshow-placement-name {
     display: block;
-    max-width: min(24vw, 320px);
+    max-width: 45vw;
     color: #ffffff;
     font-size: clamp(15px, 1.15vw, 22px);
     font-weight: 700;
@@ -799,6 +806,13 @@ const slideshowStyles = `
     font-style: italic;
   }
 
+  .atlas-slideshow-metadata .atlas-slideshow-documentation-paragraph {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 5;
+    overflow: hidden;
+  }
+
   .atlas-slideshow-anecdote {
     position: absolute;
     inset: 0;
@@ -892,7 +906,7 @@ const slideshowStyles = `
     }
 
     .atlas-slideshow-placement-name {
-      max-width: min(24vw, 180px);
+      max-width: 45vw;
       font-size: 14px;
     }
 
