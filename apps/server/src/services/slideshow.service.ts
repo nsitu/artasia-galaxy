@@ -650,6 +650,18 @@ export async function querySlideshow(
       }
     }
   }
+  if (!query.placementFocus) {
+    const originalAssetCount = assets.length;
+    assets = assets.filter((asset) =>
+      placementIdByAssetId.has(asset.id) || getAssetPlacementId(asset) != null,
+    );
+    const skippedAssetCount = originalAssetCount - assets.length;
+    if (skippedAssetCount > 0) {
+      console.info(
+        `[slideshow] skipped ${skippedAssetCount} asset(s) without a placement tag`,
+      );
+    }
+  }
   let photos = assets.map((asset) =>
     assetToPhoto(
       asset,

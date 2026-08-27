@@ -367,10 +367,17 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
   const documentationParagraph = isProcessAsset
     ? getFirstDocumentationParagraph(currentPlacement?.documentation_content_html)
     : undefined;
+  const documentationPullQuote = isProcessAsset
+    ? currentPlacement?.documentation_pull_quote?.trim()
+    : undefined;
   const documentationAttribution = isProcessAsset
     ? currentPlacement?.documentation_attribution?.trim()
     : undefined;
+  const metadataHeading = documentationPullQuote || caption;
   const metadataDescriptions = [
+    ...(documentationPullQuote && caption && caption !== documentationPullQuote
+      ? [caption]
+      : []),
     ...supportingActivityDescriptions,
     ...(documentationParagraph && !supportingActivityDescriptions.includes(documentationParagraph)
       ? [documentationParagraph]
@@ -523,7 +530,7 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
           )}
 
           {currentPhoto.mediaKind === "image" && (
-            displayBadges.length + metadataDescriptions.length > 0 || Boolean(caption) || Boolean(documentationAttribution)
+            displayBadges.length + metadataDescriptions.length > 0 || Boolean(metadataHeading) || Boolean(documentationAttribution)
           ) ? (
             <section
               className="atlas-slideshow-metadata"
@@ -546,7 +553,11 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
                   ))}
                 </div>
               )}
-              {caption && <h1>{caption}</h1>}
+              {metadataHeading && (
+                <h1 className={documentationPullQuote ? "atlas-slideshow-documentation-pullquote" : undefined}>
+                  {metadataHeading}
+                </h1>
+              )}
               {metadataDescriptions.map((description, index) => (
                 <p key={`${description}-${index}`}>{description}</p>
               ))}
@@ -721,6 +732,10 @@ const slideshowStyles = `
     text-shadow: 0 3px 14px rgba(0,0,0,0.96);
   }
 
+  .atlas-slideshow-metadata .atlas-slideshow-documentation-pullquote {
+    font-weight: 750;
+  }
+
   .atlas-slideshow-metadata p {
     margin: 18px 0 0;
     color: #f0edf3;
@@ -831,16 +846,15 @@ const slideshowStyles = `
     }
 
     .atlas-slideshow-qr-code {
-      right: 16px;
-      bottom: 16px;
-      width: 112px;
+      display: none;
     }
 
     .atlas-slideshow-metadata {
-      left: 20px;
-      right: 20px;
-      bottom: 20px;
-      width: auto;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      width: 100vw;
+      max-width: none;
       max-height: 38vh;
       padding: 18px 20px;
       border-left-width: 5px;
@@ -856,9 +870,10 @@ const slideshowStyles = `
 
   @media (max-width: 640px) {
     .atlas-slideshow-metadata {
-      left: 12px;
-      right: 12px;
-      bottom: 12px;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      width: 100vw;
       padding: 14px 16px;
     }
 
