@@ -13,6 +13,12 @@ type SlideshowViewerProps = {
   placementId?: number;
 };
 
+type SlideshowBadge = {
+  label: string;
+  colour?: string;
+  isProcess?: boolean;
+};
+
 function getUniqueCustomActivities(values?: string[]): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
@@ -24,6 +30,15 @@ function getUniqueCustomActivities(values?: string[]): string[] {
     result.push(label);
   }
   return result;
+}
+
+function getFirstDocumentationParagraph(html?: string): string | undefined {
+  if (!html?.trim()) return undefined;
+  const document = new DOMParser().parseFromString(html, "text/html");
+  const paragraph = Array.from(document.querySelectorAll("p"))
+    .map((element) => element.textContent?.trim() ?? "")
+    .find(Boolean);
+  return paragraph || document.body.textContent?.trim() || undefined;
 }
 
 function getContrastingTextColour(backgroundColour?: string): string {
@@ -143,7 +158,8 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
         .filter((photo) => photo.mediaKind === "image")
         .filter((photo) =>
           !photo.exifInfo?.description?.trim() &&
-          !(photo.activityIds?.length || photo.customActivities?.length),
+          !(photo.activityIds?.length || photo.customActivities?.length) &&
+          photo.assetType !== "process",
         );
       if (metadataMissingPhotos.length > 0) {
         const metadataMissingIds = metadataMissingPhotos
@@ -334,7 +350,7 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
   const activityColour = currentActivities[0]?.colour ?? (
     customActivities.length > 0 ? CUSTOM_ACTIVITY_COLOURS[0] : undefined
   );
-  const activityBadges = [
+  const activityBadges: SlideshowBadge[] = [
     ...currentActivities.map((activity) => ({ label: activity.label, colour: activity.colour })),
     ...customActivities.map((activity, index) => ({
       label: activity,
@@ -344,14 +360,32 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
   const currentPlacement = placements.find(
     (candidate) => candidate.placement_id === currentPhoto?.placementId,
   );
+  const isProcessAsset = currentPhoto?.assetType === "process";
+  const displayBadges: SlideshowBadge[] = isProcessAsset
+    ? [{ label: "Creative Process", isProcess: true }]
+    : activityBadges;
+  const documentationParagraph = isProcessAsset
+    ? getFirstDocumentationParagraph(currentPlacement?.documentation_content_html)
+    : undefined;
+  const documentationAttribution = isProcessAsset
+    ? currentPlacement?.documentation_attribution?.trim()
+    : undefined;
+  const metadataDescriptions = [
+    ...supportingActivityDescriptions,
+    ...(documentationParagraph && !supportingActivityDescriptions.includes(documentationParagraph)
+      ? [documentationParagraph]
+      : []),
+  ];
 
   useEffect(() => {
     if (!currentPhoto || currentPhoto.mediaKind !== "image") return;
 
     const hasRawMetadata = Boolean(
+      isProcessAsset ||
       currentPhoto.exifInfo?.description?.trim() ||
       currentPhoto.activityIds?.length ||
-      currentPhoto.customActivities?.length,
+      currentPhoto.customActivities?.length ||
+      documentationParagraph,
     );
     const activityMetadataUnavailable = Boolean(
       currentPhoto.activityIds?.length &&
@@ -418,10 +452,16 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
       <div
         className="atlas-slideshow-brand"
         aria-label={currentPlacement?.partner_name
-          ? `Artasia and ${currentPlacement.partner_name}`
-          : "Artasia"}
+          ? `Arts for All, Artasia and ${currentPlacement.partner_name}`
+          : "Arts for All and Artasia"}
       >
         <img
+          className="atlas-slideshow-afa-logo"
+          src="/afa.svg"
+          alt="Arts for All"
+        />
+        <img
+          className="atlas-slideshow-artasia-logo"
           src="/artasia-white.svg"
           alt="Artasia"
         />
@@ -433,6 +473,11 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
           />
         )}
       </div>
+      <img
+        className="atlas-slideshow-qr-code"
+        src="/atlas-qr-code.svg"
+        alt="Scan to open the Artasia Atlas"
+      />
       {currentPhoto ? (
         <div className="atlas-slideshow-slide" key={currentPhoto.id}>
           {currentPhoto.mediaKind === "image" ? (
@@ -450,13 +495,13 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
                 "--atlas-slideshow-accent-text": getContrastingTextColour(activityColour),
               } as CSSProperties}
             >
-              {activityBadges.length > 0 && (
+              {displayBadges.length > 0 && (
                 <div className="atlas-slideshow-anecdote-badges" aria-label="Activities">
-                  {activityBadges.map((badge) => (
+                  {displayBadges.map((badge) => (
                     <span
                       key={badge.label}
-                      className="atlas-slideshow-badge"
-                      style={{
+                      className={`atlas-slideshow-badge${badge.isProcess ? " atlas-slideshow-process-badge" : ""}`}
+                      style={badge.isProcess ? undefined : {
                         backgroundColor: badge.colour ?? "#5c626e",
                         color: getContrastingTextColour(badge.colour),
                       }}
@@ -478,20 +523,20 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
           )}
 
           {currentPhoto.mediaKind === "image" && (
-            activityBadges.length + activityDescriptions.length > 0 || Boolean(caption)
+            displayBadges.length + metadataDescriptions.length > 0 || Boolean(caption) || Boolean(documentationAttribution)
           ) ? (
             <section
               className="atlas-slideshow-metadata"
               style={{ "--atlas-slideshow-accent": activityColour ?? "#b7bac3" } as CSSProperties}
               aria-live="polite"
             >
-              {activityBadges.length > 0 && (
+              {displayBadges.length > 0 && (
                 <div className="atlas-slideshow-badges" aria-label="Activities">
-                  {activityBadges.map((badge) => (
+                  {displayBadges.map((badge) => (
                     <span
                       key={badge.label}
-                      className="atlas-slideshow-badge"
-                      style={{
+                      className={`atlas-slideshow-badge${badge.isProcess ? " atlas-slideshow-process-badge" : ""}`}
+                      style={badge.isProcess ? undefined : {
                         backgroundColor: badge.colour ?? "#5c626e",
                         color: getContrastingTextColour(badge.colour),
                       }}
@@ -502,9 +547,12 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
                 </div>
               )}
               {caption && <h1>{caption}</h1>}
-              {supportingActivityDescriptions.map((description, index) => (
+              {metadataDescriptions.map((description, index) => (
                 <p key={`${description}-${index}`}>{description}</p>
               ))}
+              {documentationAttribution && (
+                <p className="atlas-slideshow-documentation-attribution">— {documentationAttribution}</p>
+              )}
             </section>
           ) : null}
         </div>
@@ -555,7 +603,7 @@ const slideshowStyles = `
     display: flex;
     align-items: center;
     width: max-content;
-    max-width: min(40vw, 520px);
+    max-width: min(75vw, 760px);
     max-height: 80px;
     gap: clamp(16px, 2vw, 34px);
     box-sizing: border-box;
@@ -571,16 +619,36 @@ const slideshowStyles = `
     object-fit: contain;
   }
 
-  .atlas-slideshow-brand > img:first-child {
+  .atlas-slideshow-afa-logo {
+    width: clamp(96px, 7vw, 150px);
+    height: 56px;
+    max-width: none !important;
+  }
+
+  .atlas-slideshow-artasia-logo {
     width: clamp(170px, 11.75vw, 226px);
     height: 56px;
-    max-width: none;
+    max-width: none !important;
   }
 
   .atlas-slideshow-partner-logo {
     width: min(22vw, 260px);
     height: 56px;
     max-width: none !important;
+  }
+
+  .atlas-slideshow-qr-code {
+    position: absolute;
+    right: clamp(20px, 3.5vw, 64px);
+    bottom: clamp(20px, 3.5vh, 48px);
+    z-index: 10;
+    display: block;
+    width: clamp(112px, 11vw, 210px);
+    height: auto;
+    aspect-ratio: 1;
+    object-fit: contain;
+    filter: drop-shadow(0 3px 10px rgba(0,0,0,0.9));
+    pointer-events: none;
   }
 
   .atlas-slideshow-image {
@@ -638,6 +706,12 @@ const slideshowStyles = `
     line-height: 1.2;
   }
 
+  .atlas-slideshow-process-badge {
+    background: rgba(199, 236, 157, 0.16);
+    border: 1px solid rgba(199, 236, 157, 0.64);
+    color: #d9f5b7;
+  }
+
   .atlas-slideshow-metadata h1 {
     margin: 0;
     font-size: clamp(22px, 1.84vw, 38px);
@@ -657,6 +731,11 @@ const slideshowStyles = `
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 4;
     overflow: hidden;
+  }
+
+  .atlas-slideshow-metadata .atlas-slideshow-documentation-attribution {
+    color: #ddd7e1;
+    font-style: italic;
   }
 
   .atlas-slideshow-anecdote {
@@ -736,14 +815,25 @@ const slideshowStyles = `
       gap: 12px;
     }
 
-    .atlas-slideshow-brand > img:first-child {
+    .atlas-slideshow-afa-logo {
+      width: 88px;
+      height: 44px;
+    }
+
+    .atlas-slideshow-artasia-logo {
       width: 134px;
       height: 44px;
     }
 
     .atlas-slideshow-partner-logo {
-      width: min(18vw, 150px);
+      width: min(18vw, 120px);
       height: 44px;
+    }
+
+    .atlas-slideshow-qr-code {
+      right: 16px;
+      bottom: 16px;
+      width: 112px;
     }
 
     .atlas-slideshow-metadata {
