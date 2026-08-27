@@ -131,9 +131,25 @@
 
 .artasia-project-supporters-list {
   max-width: 640px;
-  margin: 12px 0;
+  margin: 12px 0 0;
   padding: 0;
   list-style: none;
+}
+
+.artasia-project-supporter-group {
+  max-width: 640px;
+  margin-top: 20px;
+}
+
+.artasia-project-supporter-group-title {
+  margin: 0;
+  padding: 0 0 8px;
+  font-size: 14px;
+}
+
+.artasia-project-supporter-group + .artasia-project-supporter-group {
+  border-top: 1px solid #dcdcde;
+  padding-top: 16px;
 }
 
 .artasia-project-supporter-row {

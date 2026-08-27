@@ -685,21 +685,46 @@ function artasia_project_meta_box_html(WP_Post $post): void
             ];
         }
     }
-    usort($supporters, static function (WP_Post $a, WP_Post $b) use ($recognition_by_supporter): int {
-        $a_assigned = isset($recognition_by_supporter[$a->ID]);
-        $b_assigned = isset($recognition_by_supporter[$b->ID]);
-        if ($a_assigned !== $b_assigned) {
-            return $a_assigned ? -1 : 1;
-        }
-        if ($a_assigned) {
-            $order_comparison = $recognition_by_supporter[$a->ID]['order'] <=> $recognition_by_supporter[$b->ID]['order'];
-            if ($order_comparison !== 0) {
-                return $order_comparison;
-            }
+    $supporter_groups = [];
+    foreach ($supporters as $supporter) {
+        $type = trim((string) get_post_meta($supporter->ID, 'artasia_supporter_type', true));
+        $group_key = $type !== '' ? $type : 'Other';
+        $supporter_groups[$group_key][] = $supporter;
+    }
+    $supporter_type_order = [
+        'Government' => 0,
+        'Foundation' => 1,
+        'Sponsor'    => 2,
+        'Donor'      => 3,
+        'Other'      => 4,
+    ];
+    uksort($supporter_groups, static function (string $a, string $b) use ($supporter_type_order): int {
+        $a_order = $supporter_type_order[$a] ?? 4;
+        $b_order = $supporter_type_order[$b] ?? 4;
+        if ($a_order !== $b_order) {
+            return $a_order <=> $b_order;
         }
 
-        return strcasecmp($a->post_title, $b->post_title);
+        return strcasecmp($a, $b);
     });
+    foreach ($supporter_groups as &$supporter_group) {
+        usort($supporter_group, static function (WP_Post $a, WP_Post $b) use ($recognition_by_supporter): int {
+            $a_assigned = isset($recognition_by_supporter[$a->ID]);
+            $b_assigned = isset($recognition_by_supporter[$b->ID]);
+            if ($a_assigned !== $b_assigned) {
+                return $a_assigned ? -1 : 1;
+            }
+            if ($a_assigned) {
+                $order_comparison = $recognition_by_supporter[$a->ID]['order'] <=> $recognition_by_supporter[$b->ID]['order'];
+                if ($order_comparison !== 0) {
+                    return $order_comparison;
+                }
+            }
+
+            return strcasecmp($a->post_title, $b->post_title);
+        });
+    }
+    unset($supporter_group);
     $documentation_page_id = intval(get_post_meta($post->ID, 'artasia_documentation_page_id', true));
     $documentation_page_url = '';
     if ($documentation_page_id && get_post_type($documentation_page_id) === 'page') {
@@ -748,45 +773,50 @@ function artasia_project_meta_box_html(WP_Post $post): void
             <th scope="row"><label>Supporters</label></th>
             <td>
                 <?php if ($supporters) : ?>
-                    <p class="description">Select the supporters for this project, then drag selected rows into the order they should appear in the logo grid.</p>
-                    <ul class="artasia-project-supporters-list" data-artasia-project-supporters>
-                        <?php foreach ($supporters as $supporter) : ?>
-                            <?php
-                            $assigned = isset($recognition_by_supporter[$supporter->ID]);
-                            $supporter_logo_id = intval(get_post_meta($supporter->ID, 'artasia_logo_id', true));
-                            $supporter_logo_variant = 'colour';
-                            if (!$supporter_logo_id) {
-                                $supporter_logo_id = intval(get_post_meta($supporter->ID, 'artasia_white_logo_id', true));
-                                $supporter_logo_variant = 'white';
-                            }
-                            $supporter_logo = $supporter_logo_id
-                                ? wp_get_attachment_image($supporter_logo_id, [120, 60], false, [
-                                    'class'    => 'artasia-project-supporter-logo__image',
-                                    'alt'      => '',
-                                    'loading'  => 'lazy',
-                                    'decoding' => 'async',
-                                ])
-                                : '';
-                            ?>
-                            <li class="artasia-project-supporter-row<?php echo $assigned ? ' is-assigned' : ''; ?>">
-                                <span class="artasia-project-supporter-handle dashicons dashicons-menu" title="Drag to set display order" aria-hidden="true"></span>
-                                <label>
-                                    <input
-                                        type="checkbox"
-                                        name="artasia_project_supporter_ids[]"
-                                        value="<?php echo esc_attr($supporter->ID); ?>"
-                                        <?php checked($assigned); ?>
-                                    />
-                                    <?php if ($supporter_logo) : ?>
-                                        <span class="artasia-project-supporter-logo artasia-project-supporter-logo--<?php echo esc_attr($supporter_logo_variant); ?>">
-                                            <?php echo $supporter_logo; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Generated by wp_get_attachment_image(). ?>
-                                        </span>
-                                    <?php endif; ?>
-                                    <span class="artasia-project-supporter-name"><?php echo esc_html($supporter->post_title); ?></span>
-                                </label>
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
+                    <p class="description">Select the supporters for this project, then drag selected rows within each type section into the order they should appear in the logo grid.</p>
+                    <?php foreach ($supporter_groups as $supporter_type => $supporter_group) : ?>
+                        <section class="artasia-project-supporter-group">
+                            <h3 class="artasia-project-supporter-group-title"><?php echo esc_html($supporter_type); ?></h3>
+                            <ul class="artasia-project-supporters-list" data-artasia-project-supporters>
+                                <?php foreach ($supporter_group as $supporter) : ?>
+                                    <?php
+                                    $assigned = isset($recognition_by_supporter[$supporter->ID]);
+                                    $supporter_logo_id = intval(get_post_meta($supporter->ID, 'artasia_logo_id', true));
+                                    $supporter_logo_variant = 'colour';
+                                    if (!$supporter_logo_id) {
+                                        $supporter_logo_id = intval(get_post_meta($supporter->ID, 'artasia_white_logo_id', true));
+                                        $supporter_logo_variant = 'white';
+                                    }
+                                    $supporter_logo = $supporter_logo_id
+                                        ? wp_get_attachment_image($supporter_logo_id, [120, 60], false, [
+                                            'class'    => 'artasia-project-supporter-logo__image',
+                                            'alt'      => '',
+                                            'loading'  => 'lazy',
+                                            'decoding' => 'async',
+                                        ])
+                                        : '';
+                                    ?>
+                                    <li class="artasia-project-supporter-row<?php echo $assigned ? ' is-assigned' : ''; ?>">
+                                        <span class="artasia-project-supporter-handle dashicons dashicons-menu" title="Drag to set display order" aria-hidden="true"></span>
+                                        <label>
+                                            <input
+                                                type="checkbox"
+                                                name="artasia_project_supporter_ids[]"
+                                                value="<?php echo esc_attr($supporter->ID); ?>"
+                                                <?php checked($assigned); ?>
+                                            />
+                                            <?php if ($supporter_logo) : ?>
+                                                <span class="artasia-project-supporter-logo artasia-project-supporter-logo--<?php echo esc_attr($supporter_logo_variant); ?>">
+                                                    <?php echo $supporter_logo; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Generated by wp_get_attachment_image(). ?>
+                                                </span>
+                                            <?php endif; ?>
+                                            <span class="artasia-project-supporter-name"><?php echo esc_html($supporter->post_title); ?></span>
+                                        </label>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ul>
+                        </section>
+                    <?php endforeach; ?>
                     <p class="description">
                         Recognition records are created or updated automatically when this project is saved. Unchecked supporters are removed from this project’s public recognition list.
                         <a href="<?php echo esc_url(admin_url('edit.php?post_type=artasia_recognition')); ?>">View Recognition records</a>.
