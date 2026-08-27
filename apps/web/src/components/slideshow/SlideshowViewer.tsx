@@ -479,6 +479,11 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
             alt={currentPlacement.partner_white_logo.alt || currentPlacement.partner_name || "Partner"}
           />
         )}
+        {currentPlacement?.placement_name && (
+          <span className="atlas-slideshow-placement-name">
+            {currentPlacement.placement_name}
+          </span>
+        )}
       </div>
       <img
         className="atlas-slideshow-qr-code"
@@ -489,7 +494,7 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
         <div className="atlas-slideshow-slide" key={currentPhoto.id}>
           {currentPhoto.mediaKind === "image" ? (
             <img
-              className="atlas-slideshow-image"
+              className={`atlas-slideshow-image atlas-slideshow-image-${currentPhoto.orientation}`}
               src={currentPhoto.previewUrl}
               alt={caption || currentPhoto.fileName}
               style={{ animationDuration: `${IMAGE_DWELL_MS}ms` }}
@@ -585,6 +590,28 @@ const slideshowStyles = `
     to { transform: scale(1.13) translate3d(0.4%, 0.3%, 0); }
   }
 
+  @keyframes atlas-slideshow-pan-vertical {
+    from {
+      object-position: 50% 0%;
+      transform: scale(1.03);
+    }
+    to {
+      object-position: 50% 100%;
+      transform: scale(1.13);
+    }
+  }
+
+  @keyframes atlas-slideshow-pan-horizontal {
+    from {
+      object-position: 0% 50%;
+      transform: scale(1.03);
+    }
+    to {
+      object-position: 100% 50%;
+      transform: scale(1.13);
+    }
+  }
+
   .atlas-slideshow {
     position: fixed;
     inset: 0;
@@ -648,6 +675,17 @@ const slideshowStyles = `
     max-width: none !important;
   }
 
+  .atlas-slideshow-placement-name {
+    display: block;
+    max-width: min(24vw, 320px);
+    color: #ffffff;
+    font-size: clamp(15px, 1.15vw, 22px);
+    font-weight: 700;
+    line-height: 1.15;
+    text-wrap: balance;
+    text-shadow: 0 3px 10px rgba(0,0,0,0.9);
+  }
+
   .atlas-slideshow-qr-code {
     position: absolute;
     right: clamp(20px, 3.5vw, 64px);
@@ -671,6 +709,18 @@ const slideshowStyles = `
     filter: saturate(1.02);
   }
 
+  @media (orientation: landscape) {
+    .atlas-slideshow-image-portrait {
+      animation-name: atlas-slideshow-pan-vertical;
+    }
+  }
+
+  @media (orientation: portrait) {
+    .atlas-slideshow-image-landscape {
+      animation-name: atlas-slideshow-pan-horizontal;
+    }
+  }
+
   .atlas-slideshow-slide::after {
     content: "";
     position: absolute;
@@ -686,8 +736,8 @@ const slideshowStyles = `
     z-index: 1;
     width: fit-content;
     max-width: min(62vw, 1100px);
-    max-height: 42vh;
-    overflow: hidden;
+    max-height: none;
+    overflow: visible;
     padding: clamp(22px, 2.5vw, 42px);
     box-sizing: border-box;
     border: 0;
@@ -742,10 +792,6 @@ const slideshowStyles = `
     font-size: clamp(20px, 1.45vw, 29px);
     line-height: 1.4;
     text-shadow: 0 3px 12px rgba(0,0,0,0.96);
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 4;
-    overflow: hidden;
   }
 
   .atlas-slideshow-metadata .atlas-slideshow-documentation-attribution {
@@ -845,6 +891,11 @@ const slideshowStyles = `
       height: 44px;
     }
 
+    .atlas-slideshow-placement-name {
+      max-width: min(24vw, 180px);
+      font-size: 14px;
+    }
+
     .atlas-slideshow-qr-code {
       display: none;
     }
@@ -855,7 +906,8 @@ const slideshowStyles = `
       bottom: 0;
       width: 100vw;
       max-width: none;
-      max-height: 38vh;
+      max-height: none;
+      overflow: visible;
       padding: 18px 20px;
       border-left-width: 5px;
     }
@@ -874,6 +926,7 @@ const slideshowStyles = `
       right: 0;
       bottom: 0;
       width: 100vw;
+      max-height: none;
       padding: 14px 16px;
     }
 
