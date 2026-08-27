@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { fetchSlideshow, fetchUploadOptions, type ActivityOption, type Photo } from "../../api/client";
+import { fetchMapPlacements, fetchSlideshow, fetchUploadOptions, type ActivityOption, type MapPlacement, type Photo } from "../../api/client";
 
-const IMAGE_DWELL_MS = 5_000;
+const IMAGE_DWELL_MS = 10_000;
 const ANECDOTE_DWELL_MS = 10_000;
 const MAX_RECENT_IDS = 12;
 const MAX_HISTORY_LENGTH = 120;
@@ -67,6 +67,7 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
   const [history, setHistory] = useState<Photo[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [activityOptions, setActivityOptions] = useState<ActivityOption[]>([]);
+  const [placement, setPlacement] = useState<MapPlacement | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const photosRef = useRef<Photo[]>([]);
@@ -176,6 +177,7 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
     setPhotos([]);
     setHistory([]);
     setHistoryIndex(-1);
+    setPlacement(null);
 
     void Promise.all([
       loadPhotos(true),
@@ -186,13 +188,24 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
         .catch(() => {
           if (!cancelled) setActivityOptions([]);
         }),
+      placementId == null
+        ? Promise.resolve()
+        : fetchMapPlacements()
+            .then((placements) => {
+              if (!cancelled) {
+                setPlacement(placements.find((candidate) => candidate.placement_id === placementId) ?? null);
+              }
+            })
+            .catch(() => {
+              if (!cancelled) setPlacement(null);
+            }),
     ]);
 
     requestFullscreen();
     return () => {
       cancelled = true;
     };
-  }, [loadPhotos, requestFullscreen]);
+  }, [loadPhotos, placementId, requestFullscreen]);
 
   useEffect(() => {
     const refresh = window.setInterval(() => {
@@ -300,7 +313,11 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
   const activityDescriptions = currentActivities
     .map((activity) => activity.description?.trim())
     .filter((description): description is string => Boolean(description));
-  const caption = currentPhoto?.exifInfo?.description?.trim();
+  const assetCaption = currentPhoto?.exifInfo?.description?.trim();
+  const caption = assetCaption || activityDescriptions[0];
+  const supportingActivityDescriptions = assetCaption
+    ? activityDescriptions
+    : activityDescriptions.slice(1);
   const activityColour = currentActivities[0]?.colour ?? (
     customActivities.length > 0 ? CUSTOM_ACTIVITY_COLOURS[0] : undefined
   );
@@ -323,6 +340,12 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
       onContextMenu={(event) => event.preventDefault()}
     >
       <style>{slideshowStyles}</style>
+      <div className="atlas-slideshow-brand" aria-label={placement?.partner_name || "Artasia Atlas"}>
+        <img
+          src={placement?.partner_white_logo?.url || "/artasia-atlas.svg"}
+          alt={placement?.partner_white_logo?.alt || placement?.partner_name || "Artasia Atlas"}
+        />
+      </div>
       {currentPhoto ? (
         <div className="atlas-slideshow-slide" key={currentPhoto.id}>
           {currentPhoto.mediaKind === "image" ? (
@@ -392,7 +415,7 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
                 </div>
               )}
               {caption && <h1>{caption}</h1>}
-              {activityDescriptions.map((description, index) => (
+              {supportingActivityDescriptions.map((description, index) => (
                 <p key={`${description}-${index}`}>{description}</p>
               ))}
             </section>
@@ -436,6 +459,29 @@ const slideshowStyles = `
     animation: atlas-slideshow-fade-in 900ms ease both;
   }
 
+  .atlas-slideshow-brand {
+    position: absolute;
+    top: clamp(20px, 3.5vh, 48px);
+    left: clamp(20px, 3.5vw, 64px);
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    max-width: min(24vw, 300px);
+    max-height: 80px;
+    padding: 10px 14px;
+    box-sizing: border-box;
+    background: rgba(8, 7, 10, 0.58);
+    backdrop-filter: blur(8px);
+  }
+
+  .atlas-slideshow-brand img {
+    display: block;
+    width: auto;
+    max-width: 100%;
+    max-height: 56px;
+    object-fit: contain;
+  }
+
   .atlas-slideshow-image {
     display: block;
     width: 100%;
@@ -458,13 +504,13 @@ const slideshowStyles = `
     left: clamp(28px, 5vw, 96px);
     bottom: clamp(28px, 6vh, 88px);
     z-index: 1;
-    width: min(38vw, 680px);
+    width: min(52vw, 960px);
     max-height: 42vh;
     overflow: hidden;
     padding: clamp(22px, 2.5vw, 42px);
     box-sizing: border-box;
-    border-left: 8px solid var(--atlas-slideshow-accent);
-    background: rgba(8, 7, 10, 0.88);
+    border: 0;
+    background: rgba(8, 7, 10, 0.7);
     box-shadow: 0 18px 60px rgba(0,0,0,0.35);
     backdrop-filter: blur(12px);
   }
@@ -491,7 +537,7 @@ const slideshowStyles = `
 
   .atlas-slideshow-metadata h1 {
     margin: 0;
-    font-size: clamp(27px, 2.3vw, 48px);
+    font-size: clamp(22px, 1.84vw, 38px);
     line-height: 1.1;
     font-weight: 650;
     text-wrap: balance;
@@ -577,6 +623,15 @@ const slideshowStyles = `
   }
 
   @media (max-width: 900px) {
+    .atlas-slideshow-brand {
+      top: 16px;
+      left: 16px;
+      max-width: min(42vw, 240px);
+      max-height: 64px;
+    }
+
+    .atlas-slideshow-brand img { max-height: 44px; }
+
     .atlas-slideshow-metadata {
       left: 20px;
       right: 20px;
