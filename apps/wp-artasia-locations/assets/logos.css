@@ -69,19 +69,28 @@
 .artasia-logo-grid__link {
     align-items: center;
     display: flex;
-    height: 100%;
     justify-content: center;
     text-decoration: none;
     width: 100%;
 }
 
+.artasia-logo-grid__stage {
+    align-items: center;
+    aspect-ratio: 5 / 3;
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+
 .artasia-logo-grid__image {
     display: block;
-    height: auto;
-    max-height: 5.5rem;
-    max-width: 100%;
+    height: 100%;
+    max-height: none;
+    max-width: none;
     object-fit: contain;
-    width: auto;
+    transform: scale(var(--artasia-logo-optical-scale, 1));
+    transform-origin: center;
+    width: 100%;
 }
 
 .artasia-logo-grid__link:hover .artasia-logo-grid__image,

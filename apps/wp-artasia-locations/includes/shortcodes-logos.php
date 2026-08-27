@@ -35,6 +35,91 @@ function artasia_normalize_logo_variant(string $variant): string
     return $variant === 'white' ? 'white' : 'colour';
 }
 
+/**
+ * Get an attachment's artwork aspect ratio.
+ *
+ * WordPress usually provides dimensions for raster images. SVG uploads do not
+ * consistently have attachment metadata, so fall back to the SVG viewBox (or
+ * width/height) when necessary.
+ */
+function artasia_get_logo_aspect_ratio(int $attachment_id): float
+{
+    $cache_key = 'logo_aspect_ratio_' . $attachment_id;
+    $cached_ratio = wp_cache_get($cache_key, 'artasia_logos');
+    if ($cached_ratio !== false) {
+        return (float) $cached_ratio;
+    }
+
+    $image = wp_get_attachment_image_src($attachment_id, 'full');
+    if (is_array($image) && !empty($image[1]) && !empty($image[2])) {
+        $ratio = (float) $image[1] / (float) $image[2];
+        wp_cache_set($cache_key, $ratio, 'artasia_logos', HOUR_IN_SECONDS);
+
+        return $ratio;
+    }
+
+    $metadata = wp_get_attachment_metadata($attachment_id);
+    if (is_array($metadata) && !empty($metadata['width']) && !empty($metadata['height'])) {
+        $ratio = (float) $metadata['width'] / (float) $metadata['height'];
+        wp_cache_set($cache_key, $ratio, 'artasia_logos', HOUR_IN_SECONDS);
+
+        return $ratio;
+    }
+
+    if (get_post_mime_type($attachment_id) === 'image/svg+xml') {
+        $file = get_attached_file($attachment_id);
+        if ($file && is_readable($file)) {
+            $svg = file_get_contents($file, false, null, 0, 65536);
+            if (is_string($svg)) {
+                $number = '[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?';
+                $viewbox_pattern = '/<svg\\b[^>]*\\bviewBox\\s*=\\s*["\\\']\\s*(' . $number . ')\\s+('
+                    . $number . ')\\s+(' . $number . ')\\s+(' . $number . ')["\\\']/i';
+
+                if (preg_match($viewbox_pattern, $svg, $matches) && (float) $matches[3] > 0 && (float) $matches[4] > 0) {
+                    $ratio = (float) $matches[3] / (float) $matches[4];
+                    wp_cache_set($cache_key, $ratio, 'artasia_logos', HOUR_IN_SECONDS);
+
+                    return $ratio;
+                }
+
+                $dimension_pattern = '/<svg\\b[^>]*\\bwidth\\s*=\\s*["\\\']\\s*(' . $number . ')[^"\\\']*["\\\'][^>]*\\bheight\\s*=\\s*["\\\']\\s*('
+                    . $number . ')[^"\\\']*["\\\']/i';
+                if (preg_match($dimension_pattern, $svg, $matches) && (float) $matches[1] > 0 && (float) $matches[2] > 0) {
+                    $ratio = (float) $matches[1] / (float) $matches[2];
+                    wp_cache_set($cache_key, $ratio, 'artasia_logos', HOUR_IN_SECONDS);
+
+                    return $ratio;
+                }
+            }
+        }
+    }
+
+    // A square fallback keeps rendering safe when an attachment has no usable dimensions.
+    wp_cache_set($cache_key, 1.0, 'artasia_logos', HOUR_IN_SECONDS);
+
+    return 1.0;
+}
+
+/**
+ * Calculate the default optical reduction for a logo in the fixed stage.
+ */
+function artasia_get_logo_optical_scale(float $logo_ratio): float
+{
+    $stage_ratio = 5 / 3;
+    if ($logo_ratio <= 0) {
+        return 1.0;
+    }
+
+    // This is the maximum area utilization when the logo is fitted with contain.
+    $similarity = min($logo_ratio / $stage_ratio, $stage_ratio / $logo_ratio);
+    $similarity = max(0.0, min(1.0, $similarity));
+
+    // Logos whose aspect ratio closely matches the stage have greater apparent weight.
+    $scale = 1 - (0.16 * pow($similarity, 2));
+
+    return max(0.84, min(1.0, $scale));
+}
+
 function artasia_get_logo_grid_item(WP_Post $post, string $variant): ?array
 {
     $colour_logo_id = intval(get_post_meta($post->ID, 'artasia_logo_id', true));
@@ -66,11 +151,12 @@ function artasia_get_logo_grid_item(WP_Post $post, string $variant): ?array
     }
 
     return [
-        'id'      => $post->ID,
-        'name'    => $post->post_title,
-        'image'   => $image,
-        'variant' => $actual_variant,
-        'website' => (string) get_post_meta($post->ID, 'artasia_website', true),
+        'id'             => $post->ID,
+        'name'           => $post->post_title,
+        'image'          => $image,
+        'variant'        => $actual_variant,
+        'website'        => (string) get_post_meta($post->ID, 'artasia_website', true),
+        'optical_scale'  => artasia_get_logo_optical_scale(artasia_get_logo_aspect_ratio($logo_id)),
     ];
 }
 
@@ -216,11 +302,15 @@ function artasia_render_logo_grid(array $items): void
             <li class="artasia-logo-grid__item artasia-logo-grid__item--<?php echo esc_attr($item['variant']); ?>">
                 <?php if ($item['website'] !== '') : ?>
                     <a class="artasia-logo-grid__link" href="<?php echo esc_url($item['website']); ?>" target="_blank" rel="noopener noreferrer">
-                        <?php echo $item['image']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Generated by wp_get_attachment_image(). ?>
+                        <span class="artasia-logo-grid__stage" style="--artasia-logo-optical-scale: <?php echo esc_attr(number_format((float) $item['optical_scale'], 4, '.', '')); ?>;">
+                            <?php echo $item['image']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Generated by wp_get_attachment_image(). ?>
+                        </span>
                     </a>
                 <?php else : ?>
                     <span class="artasia-logo-grid__link">
-                        <?php echo $item['image']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Generated by wp_get_attachment_image(). ?>
+                        <span class="artasia-logo-grid__stage" style="--artasia-logo-optical-scale: <?php echo esc_attr(number_format((float) $item['optical_scale'], 4, '.', '')); ?>;">
+                            <?php echo $item['image']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Generated by wp_get_attachment_image(). ?>
+                        </span>
                     </span>
                 <?php endif; ?>
             </li>
