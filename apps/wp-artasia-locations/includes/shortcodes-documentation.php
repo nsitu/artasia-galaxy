@@ -211,19 +211,21 @@ function artasia_render_documentation_article(WP_Post $document, string $partner
             <?php endif; ?>
             <?php if ($gallery_url) : ?>
                 <p class="artasia-documentation__actions">
-                    <span class="artasia-documentation__action-prefix">This site is featured on:</span>
-                    <a
-                        class="artasia-documentation__action artasia-documentation__action--atlas"
-                        href="<?php echo esc_url($gallery_url); ?>"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label="View this site on Artasia Atlas"
-                    >
-                        <img
-                            src="<?php echo esc_url(ARTASIA_LOCATIONS_URL . 'assets/artasia-atlas-button.svg'); ?>"
-                            alt="Artasia Atlas"
+                    <span class="artasia-documentation__atlas-link">
+                        <span class="artasia-documentation__action-prefix">This site is featured on:</span>
+                        <a
+                            class="artasia-documentation__action artasia-documentation__action--atlas"
+                            href="<?php echo esc_url($gallery_url); ?>"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label="View this site on Artasia Atlas"
                         >
-                    </a>
+                            <img
+                                src="<?php echo esc_url(ARTASIA_LOCATIONS_URL . 'assets/artasia-atlas-button.svg'); ?>"
+                                alt="Artasia Atlas"
+                            >
+                        </a>
+                    </span>
                 </p>
             <?php endif; ?>
             <?php if ($pull_quote) : ?>

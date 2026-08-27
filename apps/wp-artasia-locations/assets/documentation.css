@@ -214,8 +214,19 @@
   margin: 0 0 1.5rem;
 }
 
+.artasia-documentation__atlas-link {
+  align-items: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
 .artasia-documentation__action-prefix {
+  font-size: 0.7rem;
   font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-transform: uppercase;
 }
 
 .artasia-documentation__action {
@@ -226,7 +237,12 @@
 }
 
 .artasia-documentation__action--atlas {
-  max-width: min(100%, 12rem);
+  box-sizing: border-box;
+  width: 8rem;
+  padding: 0 1.5rem 1rem 1.5rem;
+  border: 0;
+  border-radius: 0.75rem;
+  background: linear-gradient(90deg, #8e1d58 0%, #f28b20 100%);
   overflow: hidden;
   line-height: 0;
 }
