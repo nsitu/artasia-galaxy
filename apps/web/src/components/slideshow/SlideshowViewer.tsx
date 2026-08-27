@@ -48,8 +48,14 @@ function getFirstDocumentationParagraph(html?: string): string | undefined {
 function getFirstSentence(text?: string): string | undefined {
   const value = text?.trim();
   if (!value) return undefined;
-  const match = value.match(/^.+?(?:[.!?](?=\s|$)|$)/u);
-  return match?.[0]?.trim() || value;
+  const sentenceEndPattern = /[.!?](?=\s|$)/gu;
+  let match: RegExpExecArray | null;
+  while ((match = sentenceEndPattern.exec(value))) {
+    const sentence = value.slice(0, match.index + 1).trim();
+    if (/\bSt\.$/iu.test(sentence)) continue;
+    return sentence;
+  }
+  return value;
 }
 
 function removeLeadingSentence(text: string | undefined, sentence: string | undefined): string | undefined {
@@ -388,20 +394,23 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
   const activityDescriptions = currentActivities
     .map((activity) => activity.description?.trim())
     .filter((description): description is string => Boolean(description));
+  const isProcessAsset = currentPhoto?.assetType === "process";
   const assetCaption = currentPhoto?.exifInfo?.description?.trim();
-  const caption = assetCaption || activityDescriptions[0];
-  const activityDescriptionHeading = assetCaption
+  const caption = assetCaption || (isProcessAsset ? undefined : activityDescriptions[0]);
+  const activityDescriptionHeading = assetCaption || isProcessAsset
     ? undefined
     : getFirstSentence(activityDescriptions[0]);
-  const activityDescriptionBody = assetCaption
+  const activityDescriptionBody = assetCaption || isProcessAsset
     ? undefined
     : removeLeadingSentence(activityDescriptions[0], activityDescriptionHeading);
-  const supportingActivityDescriptions = assetCaption
-    ? activityDescriptions
-    : [
-        ...(activityDescriptionBody ? [activityDescriptionBody] : []),
-        ...activityDescriptions.slice(1),
-      ];
+  const supportingActivityDescriptions = isProcessAsset
+    ? []
+    : assetCaption
+      ? activityDescriptions
+      : [
+          ...(activityDescriptionBody ? [activityDescriptionBody] : []),
+          ...activityDescriptions.slice(1),
+        ];
   const activityColour = currentActivities[0]?.colour ?? (
     customActivities.length > 0 ? CUSTOM_ACTIVITY_COLOURS[0] : undefined
   );
@@ -422,7 +431,6 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
   const placementPeopleLabel =
     placementPeople.length > 1 ? "Artist Educators" : "Artist Educator";
   const placementAgeRange = currentPlacement?.participant_age?.trim();
-  const isProcessAsset = currentPhoto?.assetType === "process";
   const displayBadges: SlideshowBadge[] = isProcessAsset
     ? [{ label: "Creative Process", isProcess: true }]
     : activityBadges;
