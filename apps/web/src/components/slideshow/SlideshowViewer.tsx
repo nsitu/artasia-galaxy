@@ -388,6 +388,7 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
   ].filter((person): person is string => Boolean(person));
   const placementPeopleLabel =
     placementPeople.length > 1 ? "Artist Educators" : "Artist Educator";
+  const placementAgeRange = currentPlacement?.participant_age?.trim();
   const isProcessAsset = currentPhoto?.assetType === "process";
   const displayBadges: SlideshowBadge[] = isProcessAsset
     ? [{ label: "Creative Process", isProcess: true }]
@@ -536,6 +537,14 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
                 <span>
                   {placementPeopleLabel}: {placementPeople.join(", ")}
                 </span>
+              </div>
+            )}
+            {placementAgeRange && (
+              <div className="atlas-slideshow-placement-age">
+                <span className="atlas-slideshow-meta-icon" aria-hidden="true">
+                  child_hat
+                </span>
+                <span>Age range: {placementAgeRange}</span>
               </div>
             )}
           </div>
@@ -771,12 +780,14 @@ const slideshowStyles = `
   }
 
   .atlas-slideshow-placement-name > span:last-child,
-  .atlas-slideshow-placement-people > span:last-child {
+  .atlas-slideshow-placement-people > span:last-child,
+  .atlas-slideshow-placement-age > span:last-child {
     min-width: 0;
     text-wrap: balance;
   }
 
-  .atlas-slideshow-placement-people {
+  .atlas-slideshow-placement-people,
+  .atlas-slideshow-placement-age {
     display: flex;
     align-items: flex-start;
     gap: 6px;
@@ -988,9 +999,12 @@ const slideshowStyles = `
     .atlas-slideshow-brand {
       top: 16px;
       left: 16px;
+      width: calc(100vw - 32px);
       max-width: calc(100vw - 32px);
       max-height: none;
-      gap: 12px;
+      flex-wrap: wrap;
+      column-gap: 12px;
+      row-gap: 6px;
     }
 
     .atlas-slideshow-afa-logo {
@@ -1013,13 +1027,15 @@ const slideshowStyles = `
     }
 
     .atlas-slideshow-placement-details {
+      flex: 0 0 100%;
       gap: 4px;
-      width: 45vw;
-      max-width: 45vw;
+      width: 100%;
+      max-width: none;
       padding-top: 0;
     }
 
-    .atlas-slideshow-placement-people {
+    .atlas-slideshow-placement-people,
+    .atlas-slideshow-placement-age {
       font-size: 11px;
     }
 
@@ -1035,7 +1051,7 @@ const slideshowStyles = `
       max-width: none;
       max-height: none;
       overflow: visible;
-      padding: 0;
+      padding: 16px 20px 20px;
       border-left-width: 5px;
     }
 
@@ -1054,7 +1070,7 @@ const slideshowStyles = `
       bottom: 0;
       width: 100vw;
       max-height: none;
-      padding: 0;
+      padding: 14px 16px 18px;
     }
 
     .atlas-slideshow-metadata p { margin-top: 10px; }
