@@ -338,6 +338,34 @@ async function mapTagBasedActivityMetadata(
   allTags: ImmichTag[],
 ) {
   const config = await getUploadConfig();
+  const placementTagsById = new Map<string, { placementId: number; priority: number }>();
+  for (const tag of allTags) {
+    for (const value of [tag.name, tag.value]) {
+      const normalized = value.trim().toLowerCase();
+      const match = normalized.match(PLACEMENT_TAG_PATTERN);
+      if (!match) continue;
+      const placementId = Number(match[1]);
+      if (!Number.isInteger(placementId) || placementId <= 0) continue;
+      const priority = normalized.startsWith("placement:") ? 0 : 1;
+      const existing = placementTagsById.get(tag.id);
+      if (!existing || priority < existing.priority) {
+        placementTagsById.set(tag.id, { placementId, priority });
+      }
+    }
+  }
+  const placementIdByAssetId = new Map<string, number>();
+  const assetIdsByPlacementTag = await searchAssetIdsByTags(placementTagsById.keys());
+  for (const [tagId, assetIds] of assetIdsByPlacementTag) {
+    const placementTag = placementTagsById.get(tagId);
+    if (!placementTag) continue;
+    for (const assetId of assetIds) {
+      const existingPlacementId = placementIdByAssetId.get(assetId);
+      if (existingPlacementId == null || placementTag.priority === 0) {
+        placementIdByAssetId.set(assetId, placementTag.placementId);
+      }
+    }
+  }
+
   const activityAssignments = config.activities.map((activity) => {
     const anchorTagName = activityAnchorTag(activity.id).toLowerCase();
     const labelNorm = activity.label.trim().toLowerCase();
@@ -395,7 +423,11 @@ async function mapTagBasedActivityMetadata(
     }
   }
 
-  return { activityIdsByAssetId, customActivitiesByAssetId };
+  return {
+    activityIdsByAssetId,
+    customActivitiesByAssetId,
+    placementIdByAssetId,
+  };
 }
 
 export async function querySlideshow(
@@ -434,6 +466,7 @@ export async function querySlideshow(
   let iconNameByAssetId = new Map<string, string>();
   let linkedAudioAssetIdByAssetId = new Map<string, string>();
   let assetTypeByAssetId = new Map<string, AssetType>();
+  let placementIdByAssetId = new Map<string, number>();
   let usesEmbeddedMetadata = false;
 
   if (query.placementFocus) {
@@ -588,6 +621,7 @@ export async function querySlideshow(
     gpsDisabledAssetIds = enrichment[1];
     activityIdsByAssetId = enrichment[5].activityIdsByAssetId;
     customActivitiesByAssetId = enrichment[5].customActivitiesByAssetId;
+    placementIdByAssetId = enrichment[5].placementIdByAssetId;
     for (const assignment of enrichment[2]) {
       for (const assetId of assignment.assetIds) {
         if (assetIdSet.has(assetId) && !iconNameByAssetId.has(assetId)) {
@@ -627,7 +661,7 @@ export async function querySlideshow(
       Array.from(customActivitiesByAssetId.get(asset.id) ?? []),
       linkedAudioAssetIdByAssetId.get(asset.id),
       assetTypeByAssetId.get(asset.id) ?? "artwork",
-      query.placementFocus?.placementId,
+      query.placementFocus?.placementId ?? placementIdByAssetId.get(asset.id),
     ),
   );
 

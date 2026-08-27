@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { fetchMapPlacements, fetchSlideshow, fetchUploadOptions, type ActivityOption, type MapPlacement, type Photo } from "../../api/client";
+import { fetchSlideshow, fetchUploadOptions, type ActivityOption, type Photo, type UploadPlacement } from "../../api/client";
 
 const IMAGE_DWELL_MS = 10_000;
 const ANECDOTE_DWELL_MS = 10_000;
@@ -67,7 +67,7 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
   const [history, setHistory] = useState<Photo[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [activityOptions, setActivityOptions] = useState<ActivityOption[]>([]);
-  const [placements, setPlacements] = useState<MapPlacement[]>([]);
+  const [placements, setPlacements] = useState<UploadPlacement[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const photosRef = useRef<Photo[]>([]);
@@ -77,6 +77,8 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
   const upcomingRef = useRef<Photo[]>([]);
   const preloadCacheRef = useRef(new Map<string, Promise<void>>());
   const fullscreenRequestedRef = useRef(false);
+  const metadataDiagnosticsLoggedRef = useRef(new Set<string>());
+  const placementDiagnosticsLoggedRef = useRef(new Set<string>());
 
   const setHistoryPosition = useCallback((nextHistory: Photo[], nextIndex: number) => {
     historyRef.current = nextHistory;
@@ -137,6 +139,22 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
       const incoming = result.photos.filter(
         (photo) => photo.mediaKind === "image" || photo.mediaKind === "anecdote",
       );
+      const metadataMissingPhotos = incoming
+        .filter((photo) => photo.mediaKind === "image")
+        .filter((photo) =>
+          !photo.exifInfo?.description?.trim() &&
+          !(photo.activityIds?.length || photo.customActivities?.length),
+        );
+      if (metadataMissingPhotos.length > 0) {
+        const metadataMissingIds = metadataMissingPhotos
+          .map((photo) => photo.id)
+          .slice(0, 10);
+        console.info("[slideshow] images without caption or activity metadata", {
+          count: metadataMissingPhotos.length,
+          sampleAssetIds: metadataMissingIds,
+          placementId,
+        });
+      }
       const nextPhotos = replace ? incoming : mergePhotos(photosRef.current, incoming);
       photosRef.current = nextPhotos;
       setPhotos(nextPhotos);
@@ -183,17 +201,16 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
       loadPhotos(true),
       fetchUploadOptions()
         .then((options) => {
-          if (!cancelled) setActivityOptions(options.activities);
+          if (!cancelled) {
+            setActivityOptions(options.activities);
+            setPlacements(options.placements);
+          }
         })
         .catch(() => {
-          if (!cancelled) setActivityOptions([]);
-        }),
-      fetchMapPlacements()
-        .then((nextPlacements) => {
-          if (!cancelled) setPlacements(nextPlacements);
-        })
-        .catch(() => {
-          if (!cancelled) setPlacements([]);
+          if (!cancelled) {
+            setActivityOptions([]);
+            setPlacements([]);
+          }
         }),
     ]);
 
@@ -327,6 +344,65 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
   const currentPlacement = placements.find(
     (candidate) => candidate.placement_id === currentPhoto?.placementId,
   );
+
+  useEffect(() => {
+    if (!currentPhoto || currentPhoto.mediaKind !== "image") return;
+
+    const hasRawMetadata = Boolean(
+      currentPhoto.exifInfo?.description?.trim() ||
+      currentPhoto.activityIds?.length ||
+      currentPhoto.customActivities?.length,
+    );
+    const activityMetadataUnavailable = Boolean(
+      currentPhoto.activityIds?.length &&
+      activityOptions.length > 0 &&
+      activityBadges.length === 0,
+    );
+    if (
+      (!hasRawMetadata || activityMetadataUnavailable) &&
+      !metadataDiagnosticsLoggedRef.current.has(currentPhoto.id)
+    ) {
+      metadataDiagnosticsLoggedRef.current.add(currentPhoto.id);
+      console.warn("[slideshow] current image has no renderable metadata", {
+        assetId: currentPhoto.id,
+        fileName: currentPhoto.fileName,
+        caption: currentPhoto.exifInfo?.description ?? null,
+        activityIds: currentPhoto.activityIds ?? [],
+        customActivities: currentPhoto.customActivities ?? [],
+        resolvedActivityBadges: activityBadges.map((badge) => badge.label),
+      });
+    }
+
+    if (currentPhoto.placementId == null) {
+      if (!placementDiagnosticsLoggedRef.current.has(currentPhoto.id)) {
+        placementDiagnosticsLoggedRef.current.add(currentPhoto.id);
+        console.info("[slideshow] current image has no placement mapping", {
+          assetId: currentPhoto.id,
+          fileName: currentPhoto.fileName,
+        });
+      }
+    } else if (placements.length > 0 && !currentPlacement) {
+      if (!placementDiagnosticsLoggedRef.current.has(currentPhoto.id)) {
+        placementDiagnosticsLoggedRef.current.add(currentPhoto.id);
+        console.warn("[slideshow] placement data was not found for current image", {
+          assetId: currentPhoto.id,
+          placementId: currentPhoto.placementId,
+          loadedPlacementCount: placements.length,
+        });
+      }
+    } else if (
+      currentPlacement &&
+      !currentPlacement.partner_white_logo?.url &&
+      !placementDiagnosticsLoggedRef.current.has(currentPhoto.id)
+    ) {
+      placementDiagnosticsLoggedRef.current.add(currentPhoto.id);
+      console.info("[slideshow] current placement has no white partner logo", {
+        assetId: currentPhoto.id,
+        placementId: currentPhoto.placementId,
+        partnerName: currentPlacement.partner_name ?? null,
+      });
+    }
+  }, [activityBadges, activityOptions.length, currentPhoto, currentPlacement, placements.length]);
 
   if (!currentPhoto && (loading || !error)) {
     return <div className="atlas-slideshow atlas-slideshow-status" role="status">Loading slideshow…</div>;
