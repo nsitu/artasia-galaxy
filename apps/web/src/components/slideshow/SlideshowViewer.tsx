@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { fetchSlideshow, fetchUploadOptions, type ActivityOption, type Photo, type UploadPlacement } from "../../api/client";
 
-const IMAGE_DWELL_MS = 10_000;
 const ANECDOTE_DWELL_MS = 10_000;
+const MIN_IMAGE_DWELL_MS = 5_000;
+const MAX_IMAGE_DWELL_MS = 15_000;
+const MIN_DWELL_CHARACTER_COUNT = 200;
+const MAX_DWELL_CHARACTER_COUNT = 500;
 const MAX_RECENT_IDS = 12;
 const MAX_HISTORY_LENGTH = 120;
 const UPCOMING_BUFFER_LENGTH = 3;
@@ -53,6 +56,20 @@ function removeLeadingSentence(text: string | undefined, sentence: string | unde
   if (!text || !sentence) return text;
   const remainder = text.slice(sentence.length).trim();
   return remainder || undefined;
+}
+
+function getImageDwellMs(characterCount: number): number {
+  const progress = Math.min(
+    1,
+    Math.max(
+      0,
+      (characterCount - MIN_DWELL_CHARACTER_COUNT) /
+        (MAX_DWELL_CHARACTER_COUNT - MIN_DWELL_CHARACTER_COUNT),
+    ),
+  );
+  return Math.round(
+    MIN_IMAGE_DWELL_MS + progress * (MAX_IMAGE_DWELL_MS - MIN_IMAGE_DWELL_MS),
+  );
 }
 
 function getContrastingTextColour(backgroundColour?: string): string {
@@ -310,15 +327,6 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
   }, []);
 
   useEffect(() => {
-    if (!currentPhoto) return;
-    const dwell = currentPhoto.mediaKind === "anecdote"
-      ? ANECDOTE_DWELL_MS
-      : IMAGE_DWELL_MS;
-    const timer = window.setTimeout(selectNext, dwell);
-    return () => window.clearTimeout(timer);
-  }, [currentPhoto, selectNext]);
-
-  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -432,6 +440,24 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
       ? [documentationBody]
       : []),
   ];
+  const metadataCharacterCount = [
+    metadataHeading,
+    ...metadataDescriptions,
+    documentationAttribution,
+  ]
+    .filter((text): text is string => Boolean(text))
+    .join(" ")
+    .length;
+  const imageDwellMs = getImageDwellMs(metadataCharacterCount);
+
+  useEffect(() => {
+    if (!currentPhoto) return;
+    const dwell = currentPhoto.mediaKind === "anecdote"
+      ? ANECDOTE_DWELL_MS
+      : imageDwellMs;
+    const timer = window.setTimeout(selectNext, dwell);
+    return () => window.clearTimeout(timer);
+  }, [currentPhoto, imageDwellMs, selectNext]);
 
   useEffect(() => {
     if (!currentPhoto || currentPhoto.mediaKind !== "image") return;
@@ -572,7 +598,7 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
               className={`atlas-slideshow-image atlas-slideshow-image-${currentPhoto.orientation}`}
               src={currentPhoto.previewUrl}
               alt={caption || currentPhoto.fileName}
-              style={{ animationDuration: `${IMAGE_DWELL_MS}ms` }}
+              style={{ animationDuration: `${imageDwellMs}ms` }}
             />
           ) : (
             <article
@@ -713,8 +739,9 @@ const slideshowStyles = `
   .atlas-slideshow::before {
     content: "";
     position: absolute;
-    inset: 0;
+    inset: 0 0 auto;
     z-index: 1;
+    height: 15vh;
     pointer-events: none;
     background: linear-gradient(180deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 100%);
   }
@@ -945,10 +972,10 @@ const slideshowStyles = `
     flex-direction: column;
     justify-content: center;
     width: 100%;
-    height: fit-content;
+    height: 100%;
     max-width: none;
-    max-height: calc(100% - 96px);
-    margin: auto;
+    max-height: none;
+    margin: 0;
     padding: clamp(28px, 6vw, 64px);
     box-sizing: border-box;
     overflow: auto;
@@ -1070,7 +1097,9 @@ const slideshowStyles = `
 
     .atlas-slideshow-anecdote {
       width: 100%;
-      max-height: calc(100% - 40px);
+      height: 100%;
+      max-height: none;
+      margin: 0;
       padding: 28px;
       border: 0;
     }
@@ -1087,6 +1116,6 @@ const slideshowStyles = `
     }
 
     .atlas-slideshow-metadata p { margin-top: 10px; }
-    .atlas-slideshow-anecdote { width: 100%; max-height: calc(100% - 24px); padding: 22px; }
+    .atlas-slideshow-anecdote { width: 100%; height: 100%; max-height: none; margin: 0; padding: 22px; }
   }
 `;
