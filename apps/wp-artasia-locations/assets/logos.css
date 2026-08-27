@@ -113,9 +113,36 @@
 .artasia-logo-grid__link {
     align-items: center;
     display: flex;
+    flex-direction: column;
     justify-content: center;
     text-decoration: none;
     width: 100%;
+}
+
+.artasia-logo-grid__content {
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+.artasia-logo-grid__label {
+    background: rgba(142, 29, 88, 0.08);
+    border-radius: 999px;
+    color: var(--artasia-logo-accent);
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    line-height: 1.2;
+    margin-bottom: 0.35rem;
+    padding: 0.25rem 0.5rem;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+.artasia-logo-sections--white .artasia-logo-grid__label {
+    background: rgba(255, 255, 255, 0.18);
+    color: #fff;
 }
 
 .artasia-logo-grid__stage {

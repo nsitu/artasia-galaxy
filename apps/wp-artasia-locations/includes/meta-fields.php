@@ -284,6 +284,13 @@ function artasia_register_meta_fields(): void
         'show_in_rest' => true,
         'sanitize_callback' => 'sanitize_text_field',
     ]);
+    register_post_meta('artasia_partner', 'artasia_partner_label', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'sanitize_text_field',
+    ]);
     register_post_meta('artasia_partner', 'artasia_partner_acronym', [
         'type'         => 'string',
         'single'       => true,

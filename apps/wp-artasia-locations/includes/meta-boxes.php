@@ -1459,6 +1459,7 @@ add_action('save_post_artasia_place', 'artasia_save_place_meta');
 function artasia_partner_meta_box_html(WP_Post $post): void
 {
     $type      = get_post_meta($post->ID, 'artasia_partner_type', true);
+    $label     = get_post_meta($post->ID, 'artasia_partner_label', true);
     $acronym   = get_post_meta($post->ID, 'artasia_partner_acronym', true);
     $website   = get_post_meta($post->ID, 'artasia_website', true);
     $logo_id   = intval(get_post_meta($post->ID, 'artasia_logo_id', true));
@@ -1485,6 +1486,13 @@ function artasia_partner_meta_box_html(WP_Post $post): void
                         </option>
                     <?php endforeach; ?>
                 </select>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_partner_label">Partnership Label</label></th>
+            <td>
+                <input type="text" id="artasia_partner_label" name="artasia_partner_label" value="<?php echo esc_attr($label); ?>" class="widefat" placeholder="Founding Partner" />
+                <p class="description">Optional label displayed above this partner's logo in recognition grids.</p>
             </td>
         </tr>
         <tr>
@@ -1593,6 +1601,7 @@ function artasia_save_partner_meta(int $post_id): void
     }
 
     update_post_meta($post_id, 'artasia_partner_type', sanitize_text_field($_POST['artasia_partner_type'] ?? ''));
+    update_post_meta($post_id, 'artasia_partner_label', sanitize_text_field($_POST['artasia_partner_label'] ?? ''));
     update_post_meta($post_id, 'artasia_partner_acronym', sanitize_text_field($_POST['artasia_partner_acronym'] ?? ''));
     update_post_meta($post_id, 'artasia_website', esc_url_raw($_POST['artasia_website'] ?? ''));
     update_post_meta($post_id, 'artasia_brand_color_one', artasia_sanitize_hex_color_meta($_POST['artasia_brand_color_one'] ?? ''));

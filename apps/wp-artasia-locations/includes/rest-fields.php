@@ -124,6 +124,7 @@ function artasia_get_partner_response(WP_Post $partner): array
     return [
         'id'              => $partner->ID,
         'name'            => $partner->post_title,
+        'label'           => get_post_meta($partner->ID, 'artasia_partner_label', true) ?: '',
         'acronym'         => get_post_meta($partner->ID, 'artasia_partner_acronym', true) ?: '',
         'type'            => get_post_meta($partner->ID, 'artasia_partner_type', true) ?: '',
         'website'         => get_post_meta($partner->ID, 'artasia_website', true) ?: '',
