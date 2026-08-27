@@ -10,6 +10,12 @@
         #8E1D58 0%,
         #F28B20 100%
     );
+    color: #fff;
+}
+
+.artasia-logo-sections--white .artasia-logo-section__heading,
+.artasia-logo-sections--white .artasia-logo-group__heading {
+    color: #fff;
 }
 
 .artasia-logo-sections__inner {
