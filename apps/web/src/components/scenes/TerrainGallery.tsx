@@ -2641,8 +2641,9 @@ export function ProjectInfoPanel({
 }) {
   const isMobile = useIsMobileBreakpoint();
   const [expanded, setExpanded] = useState(!isMobile);
+  const tagline = project.tagline?.trim() ?? "";
   const description = project.description?.trim() ?? "";
-  const hasDescription = Boolean(description);
+  const hasProjectContent = Boolean(tagline || description);
   const projectHeading = `Artasia ${project.year} - ${project.name}`;
 
   useEffect(() => {
@@ -2650,7 +2651,7 @@ export function ProjectInfoPanel({
   }, [isMobile, project.slug]);
 
   const toggleExpanded = () => {
-    if (hasDescription) setExpanded((current) => !current);
+    if (hasProjectContent) setExpanded((current) => !current);
   };
 
   return (
@@ -2670,12 +2671,12 @@ export function ProjectInfoPanel({
       >
         <button
           type="button"
-          aria-expanded={hasDescription ? expanded : undefined}
+          aria-expanded={hasProjectContent ? expanded : undefined}
           aria-label={
-            hasDescription
+            hasProjectContent
               ? expanded
-                ? "Collapse project description"
-                : "Expand project description"
+                ? "Collapse project information"
+                : "Expand project information"
               : undefined
           }
           onClick={toggleExpanded}
@@ -2683,15 +2684,15 @@ export function ProjectInfoPanel({
         >
           <div style={siteNameStyle}>{projectHeading}</div>
         </button>
-        {hasDescription && (
+        {hasProjectContent && (
           <button
             type="button"
             className="atlas-control-surface"
             aria-expanded={expanded}
             aria-label={
               expanded
-                ? "Collapse project description"
-                : "Expand project description"
+                ? "Collapse project information"
+                : "Expand project information"
             }
             onClick={toggleExpanded}
             style={siteDetailsToggleStyle}
@@ -2701,14 +2702,15 @@ export function ProjectInfoPanel({
         )}
       </div>
 
-      {expanded && hasDescription && (
+      {expanded && hasProjectContent && (
         <div
           style={{
             ...siteDetailsBodyStyle,
             ...(isMobile ? mobileSiteDetailsBodyStyle : {}),
           }}
         >
-          <p style={projectDescriptionStyle}>{description}</p>
+          {tagline && <p style={projectTaglineStyle}>{tagline}</p>}
+          {description && <p style={projectDescriptionStyle}>{description}</p>}
         </div>
       )}
 
@@ -3789,6 +3791,16 @@ const projectDescriptionStyle: React.CSSProperties = {
   fontWeight: 400,
   lineHeight: 1.6,
   whiteSpace: "pre-line",
+};
+
+const projectTaglineStyle: React.CSSProperties = {
+  margin: "0 0 8px",
+  color: "#f4f7fb",
+  fontSize: 11,
+  fontWeight: 700,
+  letterSpacing: "0.14em",
+  lineHeight: 1.3,
+  textTransform: "uppercase",
 };
 
 const mapContextThumbnailStyle: React.CSSProperties = {

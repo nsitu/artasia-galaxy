@@ -89,6 +89,7 @@ function artasia_get_projects(): WP_REST_Response
             'slug'        => $project->post_name,
             'name'        => $project->post_title,
             'year'        => intval(get_post_meta($project->ID, 'artasia_project_year', true)),
+            'tagline'     => get_post_meta($project->ID, 'artasia_project_tagline', true) ?: '',
             'description' => get_post_meta($project->ID, 'artasia_project_description', true) ?: '',
             'statistics'  => artasia_get_project_statistics($project->ID),
         ];

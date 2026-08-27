@@ -49,6 +49,7 @@ export interface WpProject {
   slug?: string;
   name: string;
   year: number;
+  tagline?: string;
   description: string;
   statistics?: {
     children: number;

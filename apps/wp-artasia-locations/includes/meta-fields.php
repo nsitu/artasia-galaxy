@@ -75,6 +75,13 @@ function artasia_register_meta_fields(): void
         'show_in_rest' => true,
         'sanitize_callback' => 'artasia_sanitize_integer_meta',
     ]);
+    register_post_meta('artasia_project', 'artasia_project_tagline', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'sanitize_text_field',
+    ]);
     register_post_meta('artasia_project', 'artasia_project_description', [
         'type'         => 'string',
         'single'       => true,

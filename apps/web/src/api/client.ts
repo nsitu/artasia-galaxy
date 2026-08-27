@@ -310,6 +310,7 @@ export interface ProjectOption {
   slug: string;
   name: string;
   year: number;
+  tagline?: string;
   description?: string;
   statistics?: {
     children: number;

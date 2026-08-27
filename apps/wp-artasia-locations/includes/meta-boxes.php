@@ -621,6 +621,7 @@ function artasia_project_meta_box_html(WP_Post $post): void
     if (!$project_year) {
         $project_year = date('Y');
     }
+    $tagline = get_post_meta($post->ID, 'artasia_project_tagline', true);
     $description = get_post_meta($post->ID, 'artasia_project_description', true);
     $impact_statistics = [
         'children' => [
@@ -779,6 +780,10 @@ function artasia_project_meta_box_html(WP_Post $post): void
         <tr>
             <th><label for="artasia_project_year">Year</label></th>
             <td><input type="number" id="artasia_project_year" name="artasia_project_year" value="<?php echo esc_attr($project_year); ?>" /></td>
+        </tr>
+        <tr>
+            <th><label for="artasia_project_tagline">Tagline</label></th>
+            <td><input type="text" id="artasia_project_tagline" name="artasia_project_tagline" value="<?php echo esc_attr($tagline); ?>" class="widefat" /></td>
         </tr>
         <tr>
             <th><label for="artasia_project_description">Description</label></th>
@@ -988,6 +993,7 @@ function artasia_save_project_meta(int $post_id): void
     }
 
     update_post_meta($post_id, 'artasia_project_year', intval($_POST['artasia_project_year'] ?? 0));
+    update_post_meta($post_id, 'artasia_project_tagline', sanitize_text_field($_POST['artasia_project_tagline'] ?? ''));
     update_post_meta($post_id, 'artasia_project_description', sanitize_textarea_field($_POST['artasia_project_description'] ?? ''));
     foreach ([
         'artasia_project_children_count',
