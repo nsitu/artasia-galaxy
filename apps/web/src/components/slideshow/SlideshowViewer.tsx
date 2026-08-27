@@ -41,6 +41,19 @@ function getFirstDocumentationParagraph(html?: string): string | undefined {
   return paragraph || document.body.textContent?.trim() || undefined;
 }
 
+function getFirstSentence(text?: string): string | undefined {
+  const value = text?.trim();
+  if (!value) return undefined;
+  const match = value.match(/^.+?(?:[.!?](?=\s|$)|$)/u);
+  return match?.[0]?.trim() || value;
+}
+
+function removeLeadingSentence(text: string | undefined, sentence: string | undefined): string | undefined {
+  if (!text || !sentence) return text;
+  const remainder = text.slice(sentence.length).trim();
+  return remainder || undefined;
+}
+
 function getContrastingTextColour(backgroundColour?: string): string {
   const hex = backgroundColour?.trim().replace(/^#/, "") ?? "";
   const expanded = /^[0-9a-f]{3}$/i.test(hex)
@@ -344,9 +357,18 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
     .filter((description): description is string => Boolean(description));
   const assetCaption = currentPhoto?.exifInfo?.description?.trim();
   const caption = assetCaption || activityDescriptions[0];
+  const activityDescriptionHeading = assetCaption
+    ? undefined
+    : getFirstSentence(activityDescriptions[0]);
+  const activityDescriptionBody = assetCaption
+    ? undefined
+    : removeLeadingSentence(activityDescriptions[0], activityDescriptionHeading);
   const supportingActivityDescriptions = assetCaption
     ? activityDescriptions
-    : activityDescriptions.slice(1);
+    : [
+        ...(activityDescriptionBody ? [activityDescriptionBody] : []),
+        ...activityDescriptions.slice(1),
+      ];
   const activityColour = currentActivities[0]?.colour ?? (
     customActivities.length > 0 ? CUSTOM_ACTIVITY_COLOURS[0] : undefined
   );
@@ -360,6 +382,12 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
   const currentPlacement = placements.find(
     (candidate) => candidate.placement_id === currentPhoto?.placementId,
   );
+  const placementPeople = [
+    currentPlacement?.team_member_name?.trim(),
+    currentPlacement?.secondary_team_member_name?.trim(),
+  ].filter((person): person is string => Boolean(person));
+  const placementPeopleLabel =
+    placementPeople.length > 1 ? "Artist Educators" : "Artist Educator";
   const isProcessAsset = currentPhoto?.assetType === "process";
   const displayBadges: SlideshowBadge[] = isProcessAsset
     ? [{ label: "Creative Process", isProcess: true }]
@@ -370,17 +398,27 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
   const documentationPullQuote = isProcessAsset
     ? currentPlacement?.documentation_pull_quote?.trim()
     : undefined;
+  const documentationFirstSentence = isProcessAsset
+    ? getFirstSentence(documentationParagraph)
+    : undefined;
   const documentationAttribution = isProcessAsset
     ? currentPlacement?.documentation_attribution?.trim()
     : undefined;
-  const metadataHeading = documentationPullQuote || caption;
+  const documentationBody = documentationPullQuote
+    ? documentationParagraph
+    : removeLeadingSentence(documentationParagraph, documentationFirstSentence);
+  const metadataHeading =
+    documentationPullQuote ||
+    documentationFirstSentence ||
+    activityDescriptionHeading ||
+    assetCaption;
   const metadataDescriptions = [
     ...(documentationPullQuote && caption && caption !== documentationPullQuote
       ? [caption]
       : []),
     ...supportingActivityDescriptions,
-    ...(documentationParagraph && !supportingActivityDescriptions.includes(documentationParagraph)
-      ? [documentationParagraph]
+    ...(documentationBody && !supportingActivityDescriptions.includes(documentationBody)
+      ? [documentationBody]
       : []),
   ];
 
@@ -458,9 +496,12 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
       <style>{slideshowStyles}</style>
       <div
         className="atlas-slideshow-brand"
-        aria-label={currentPlacement?.partner_name
-          ? `Arts for All, Artasia and ${currentPlacement.partner_name}`
-          : "Arts for All and Artasia"}
+        aria-label={[
+          "Arts for All",
+          "Artasia",
+          currentPlacement?.partner_name,
+          currentPlacement?.placement_name,
+        ].filter(Boolean).join(", ")}
       >
         <img
           className="atlas-slideshow-afa-logo"
@@ -480,9 +521,24 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
           />
         )}
         {currentPlacement?.placement_name && (
-          <span className="atlas-slideshow-placement-name">
-            {currentPlacement.placement_name}
-          </span>
+          <div className="atlas-slideshow-placement-details">
+            <div className="atlas-slideshow-placement-name">
+              <span className="atlas-slideshow-meta-icon" aria-hidden="true">
+                location_on
+              </span>
+              <span>{currentPlacement.placement_name}</span>
+            </div>
+            {placementPeople.length > 0 && (
+              <div className="atlas-slideshow-placement-people">
+                <span className="atlas-slideshow-meta-icon" aria-hidden="true">
+                  person
+                </span>
+                <span>
+                  {placementPeopleLabel}: {placementPeople.join(", ")}
+                </span>
+              </div>
+            )}
+          </div>
         )}
       </div>
       <img
@@ -559,14 +615,16 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
                 </div>
               )}
               {metadataHeading && (
-                <h1 className={documentationPullQuote ? "atlas-slideshow-documentation-pullquote" : undefined}>
+                <h1 className={documentationPullQuote || documentationFirstSentence
+                  ? "atlas-slideshow-documentation-pullquote"
+                  : undefined}>
                   {metadataHeading}
                 </h1>
               )}
               {metadataDescriptions.map((description, index) => (
                 <p
                   key={`${description}-${index}`}
-                  className={description === documentationParagraph
+                  className={description === documentationBody
                     ? "atlas-slideshow-documentation-paragraph"
                     : undefined}
                 >
@@ -633,6 +691,15 @@ const slideshowStyles = `
     font-family: inherit;
   }
 
+  .atlas-slideshow::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 100%);
+  }
+
   .atlas-slideshow-slide {
     position: absolute;
     inset: 0;
@@ -646,13 +713,12 @@ const slideshowStyles = `
     left: clamp(20px, 3.5vw, 64px);
     z-index: 10;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     width: max-content;
     max-width: min(90vw, 1700px);
-    max-height: 80px;
+    max-height: none;
     gap: clamp(16px, 2vw, 34px);
     box-sizing: border-box;
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 100%);
     filter: drop-shadow(0 3px 10px rgba(0,0,0,0.9));
     pointer-events: none;
   }
@@ -684,14 +750,50 @@ const slideshowStyles = `
   }
 
   .atlas-slideshow-placement-name {
-    display: block;
-    max-width: 45vw;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
     color: #ffffff;
     font-size: clamp(15px, 1.15vw, 22px);
     font-weight: 700;
     line-height: 1.15;
-    text-wrap: balance;
     text-shadow: 0 3px 10px rgba(0,0,0,0.9);
+  }
+
+  .atlas-slideshow-placement-details {
+    display: flex;
+    flex: 0 1 auto;
+    flex-direction: column;
+    gap: 7px;
+    width: min(45vw, 760px);
+    max-width: 45vw;
+    padding-top: 2px;
+  }
+
+  .atlas-slideshow-placement-name > span:last-child,
+  .atlas-slideshow-placement-people > span:last-child {
+    min-width: 0;
+    text-wrap: balance;
+  }
+
+  .atlas-slideshow-placement-people {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    color: #ffffff;
+    font-size: clamp(13px, 0.95vw, 18px);
+    font-weight: 600;
+    line-height: 1.2;
+    text-shadow: 0 3px 10px rgba(0,0,0,0.9);
+  }
+
+  .atlas-slideshow-meta-icon {
+    flex: 0 0 auto;
+    font-family: "Material Symbols Outlined", sans-serif;
+    font-size: 1.05em;
+    font-style: normal;
+    font-variation-settings: "FILL" 0, "wght" 500, "GRAD" 0, "opsz" 20;
+    line-height: 1.05;
   }
 
   .atlas-slideshow-qr-code {
@@ -887,7 +989,7 @@ const slideshowStyles = `
       top: 16px;
       left: 16px;
       max-width: calc(100vw - 32px);
-      max-height: 64px;
+      max-height: none;
       gap: 12px;
     }
 
@@ -907,8 +1009,18 @@ const slideshowStyles = `
     }
 
     .atlas-slideshow-placement-name {
-      max-width: 45vw;
       font-size: 14px;
+    }
+
+    .atlas-slideshow-placement-details {
+      gap: 4px;
+      width: 45vw;
+      max-width: 45vw;
+      padding-top: 0;
+    }
+
+    .atlas-slideshow-placement-people {
+      font-size: 11px;
     }
 
     .atlas-slideshow-qr-code {
