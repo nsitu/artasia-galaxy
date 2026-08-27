@@ -17,6 +17,7 @@ function artasia_logos_shortcode($attributes): string
         'partner_intro'     => 'Arts For All recognizes the invaluable work of our community partners. Artasia would not exist without you. Thank you!',
         'supporter_heading' => 'Supporters',
         'supporter_intro'   => 'Arts For All is grateful to our sponsors and supporters at all levels. Thank you!',
+        'type'              => 'supporters',
         'variant'           => 'colour',
         'project_id'        => '',
     ], $attributes, 'artasia_logos');
@@ -26,6 +27,7 @@ function artasia_logos_shortcode($attributes): string
         'partner_intro'     => (string) $attributes['partner_intro'],
         'supporter_heading' => (string) $attributes['supporter_heading'],
         'supporter_intro'   => (string) $attributes['supporter_intro'],
+        'logo_type'         => (string) $attributes['type'],
         'variant'           => (string) $attributes['variant'],
         'project_id'        => absint($attributes['project_id']),
     ]);
@@ -37,6 +39,11 @@ function artasia_normalize_logo_variant(string $variant): string
     $variant = strtolower(trim($variant));
 
     return $variant === 'white' ? 'white' : 'colour';
+}
+
+function artasia_normalize_logo_type(string $type): string
+{
+    return strtolower(trim($type)) === 'partners' ? 'partners' : 'supporters';
 }
 
 /**
@@ -297,55 +304,19 @@ function artasia_get_project_partner_ids(int $project_id): array
         ];
     }
 
-    if ($partner_rows) {
-        usort($partner_rows, static function (array $a, array $b): int {
-            $order_comparison = $a['order'] <=> $b['order'];
-            if ($order_comparison !== 0) {
-                return $order_comparison;
-            }
-
-            return strcasecmp(get_the_title($a['id']), get_the_title($b['id']));
-        });
-
-        $partner_ids = [];
-        foreach ($partner_rows as $row) {
-            if (!in_array($row['id'], $partner_ids, true)) {
-                $partner_ids[] = $row['id'];
-            }
+    usort($partner_rows, static function (array $a, array $b): int {
+        $order_comparison = $a['order'] <=> $b['order'];
+        if ($order_comparison !== 0) {
+            return $order_comparison;
         }
 
-        return $partner_ids;
-    }
+        return strcasecmp(get_the_title($a['id']), get_the_title($b['id']));
+    });
 
-    // Preserve the former placement-based output until this project has been
-    // saved with the explicit partner recognition checklist.
-    if (get_post_meta($project_id, 'artasia_project_partner_recognitions_initialized', true)) {
-        return [];
-    }
-
-    $placements = get_posts([
-        'post_type'      => 'artasia_placement',
-        'posts_per_page' => -1,
-        'post_status'    => 'publish',
-        'meta_query'     => [[
-            'key'     => 'artasia_project_id',
-            'value'   => $project_id,
-            'compare' => '=',
-        ]],
-        'orderby'        => 'title',
-        'order'          => 'ASC',
-        'no_found_rows'  => true,
-    ]);
     $partner_ids = [];
-    foreach ($placements as $placement) {
-        $partner_id = intval(get_post_meta($placement->ID, 'artasia_partner_id', true));
-        if (
-            $partner_id
-            && get_post_type($partner_id) === 'artasia_partner'
-            && get_post_status($partner_id) === 'publish'
-            && !in_array($partner_id, $partner_ids, true)
-        ) {
-            $partner_ids[] = $partner_id;
+    foreach ($partner_rows as $row) {
+        if (!in_array($row['id'], $partner_ids, true)) {
+            $partner_ids[] = $row['id'];
         }
     }
 
@@ -432,10 +403,12 @@ function artasia_render_logos(array $args = []): string
         'partner_intro'     => 'Arts For All recognizes the invaluable work of our community partners. Artasia would not exist without you. Thank you!',
         'supporter_heading' => 'Supporters',
         'supporter_intro'   => 'Arts For All is grateful to our sponsors and supporters at all levels. Thank you!',
+        'logo_type'         => 'supporters',
         'variant'           => 'colour',
         'project_id'        => 0,
     ]);
 
+    $logo_type = artasia_normalize_logo_type((string) $args['logo_type']);
     $variant = artasia_normalize_logo_variant((string) $args['variant']);
     $project_id = absint($args['project_id']);
     $partner_intro = trim((string) $args['partner_intro']);
@@ -450,10 +423,14 @@ function artasia_render_logos(array $args = []): string
         return '';
     }
 
-    $partners = artasia_get_logo_grid_items('artasia_partner', $variant);
-    $supporter_groups = artasia_group_supporter_logo_items(
-        artasia_get_logo_grid_items('artasia_supporter', $variant, $project_id)
-    );
+    $partners = $logo_type === 'partners'
+        ? artasia_get_logo_grid_items('artasia_partner', $variant, $project_id)
+        : [];
+    $supporter_groups = $logo_type === 'supporters'
+        ? artasia_group_supporter_logo_items(
+            artasia_get_logo_grid_items('artasia_supporter', $variant, $project_id)
+        )
+        : [];
 
     if (!$partners && !$supporter_groups) {
         return '';
@@ -463,7 +440,7 @@ function artasia_render_logos(array $args = []): string
 
     ob_start();
     ?>
-    <section class="artasia-logo-sections artasia-logo-sections--<?php echo esc_attr($variant); ?>">
+    <section class="artasia-logo-sections artasia-logo-sections--<?php echo esc_attr($variant); ?> artasia-logo-sections--type-<?php echo esc_attr($logo_type); ?>">
         <div class="artasia-logo-sections__inner">
             <?php if ($supporter_groups) : ?>
                 <section class="artasia-logo-section artasia-logo-section--supporters">

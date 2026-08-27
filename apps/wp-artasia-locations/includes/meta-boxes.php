@@ -747,42 +747,14 @@ function artasia_project_meta_box_html(WP_Post $post): void
         });
     }
     unset($supporter_group);
-    $legacy_partner_order = [];
-    if (!$recognition_by_partner && !get_post_meta($post->ID, 'artasia_project_partner_recognitions_initialized', true)) {
-        $legacy_placement_ids = get_posts([
-            'post_type'      => 'artasia_placement',
-            'posts_per_page' => -1,
-            'post_status'    => ['publish', 'draft'],
-            'meta_query'     => [[
-                'key'     => 'artasia_project_id',
-                'value'   => $post->ID,
-                'compare' => '=',
-            ]],
-            'orderby'        => 'title',
-            'order'          => 'ASC',
-            'fields'         => 'ids',
-            'no_found_rows'  => true,
-        ]);
-        foreach ($legacy_placement_ids as $placement_id) {
-            $partner_id = intval(get_post_meta($placement_id, 'artasia_partner_id', true));
-            if ($partner_id && !isset($legacy_partner_order[$partner_id])) {
-                $legacy_partner_order[$partner_id] = count($legacy_partner_order) + 1;
-            }
-        }
-    }
-    usort($partners, static function (WP_Post $a, WP_Post $b) use ($recognition_by_partner, $legacy_partner_order): int {
-        $a_assigned = isset($recognition_by_partner[$a->ID]) || isset($legacy_partner_order[$a->ID]);
-        $b_assigned = isset($recognition_by_partner[$b->ID]) || isset($legacy_partner_order[$b->ID]);
+    usort($partners, static function (WP_Post $a, WP_Post $b) use ($recognition_by_partner): int {
+        $a_assigned = isset($recognition_by_partner[$a->ID]);
+        $b_assigned = isset($recognition_by_partner[$b->ID]);
         if ($a_assigned !== $b_assigned) {
             return $a_assigned ? -1 : 1;
         }
         if (isset($recognition_by_partner[$a->ID]) && isset($recognition_by_partner[$b->ID])) {
             $order_comparison = $recognition_by_partner[$a->ID]['order'] <=> $recognition_by_partner[$b->ID]['order'];
-            if ($order_comparison !== 0) {
-                return $order_comparison;
-            }
-        } elseif (isset($legacy_partner_order[$a->ID]) && isset($legacy_partner_order[$b->ID])) {
-            $order_comparison = $legacy_partner_order[$a->ID] <=> $legacy_partner_order[$b->ID];
             if ($order_comparison !== 0) {
                 return $order_comparison;
             }
@@ -899,7 +871,7 @@ function artasia_project_meta_box_html(WP_Post $post): void
                     <ul class="artasia-project-supporters-list artasia-project-partners-list" data-artasia-project-supporters>
                         <?php foreach ($partners as $partner) : ?>
                             <?php
-                            $assigned = isset($recognition_by_partner[$partner->ID]) || isset($legacy_partner_order[$partner->ID]);
+                            $assigned = isset($recognition_by_partner[$partner->ID]);
                             $partner_logo_id = intval(get_post_meta($partner->ID, 'artasia_logo_id', true));
                             $partner_logo_variant = 'colour';
                             if (!$partner_logo_id) {
@@ -934,7 +906,6 @@ function artasia_project_meta_box_html(WP_Post $post): void
                             </li>
                         <?php endforeach; ?>
                     </ul>
-                    <input type="hidden" name="artasia_project_partner_recognitions_initialized" value="1" />
                     <p class="description">
                         Recognition records are created or updated automatically when this project is saved. Unchecked partners are removed from this project’s public recognition list.
                         <a href="<?php echo esc_url(admin_url('edit.php?post_type=artasia_recognition')); ?>">View Recognition records</a>.
@@ -1208,7 +1179,6 @@ function artasia_save_project_partner_recognitions(int $post_id): void
     }));
 
     artasia_sync_project_partner_recognitions($post_id, $partner_ids);
-    update_post_meta($post_id, 'artasia_project_partner_recognitions_initialized', 1);
 }
 add_action('save_post_artasia_project', 'artasia_save_project_partner_recognitions', 12);
 

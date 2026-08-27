@@ -68,7 +68,7 @@ class Artasia_Logos_Elementor_Widget extends \Elementor\Widget_Base
             'options'     => $project_options,
             'default'     => $project_option_ids[0] ?? '',
             'label_block' => true,
-            'description' => 'Choose the annual Artasia project whose supporters should appear.',
+            'description' => 'Choose the annual Artasia project whose recognized logos should appear.',
         ]);
 
         $this->add_control('partner_heading', [
@@ -76,6 +76,19 @@ class Artasia_Logos_Elementor_Widget extends \Elementor\Widget_Base
             'type'        => \Elementor\Controls_Manager::TEXT,
             'default'     => 'Partners',
             'label_block' => true,
+            'condition'   => ['logo_type' => 'partners'],
+        ]);
+
+        $this->add_control('logo_type', [
+            'label'       => 'Logo type',
+            'type'        => \Elementor\Controls_Manager::SELECT,
+            'options'     => [
+                'supporters' => 'Supporters',
+                'partners'   => 'Partners',
+            ],
+            'default'     => 'supporters',
+            'label_block' => true,
+            'description' => 'Choose which category of logos this widget should display.',
         ]);
 
         $this->add_control('partner_intro', [
@@ -84,6 +97,7 @@ class Artasia_Logos_Elementor_Widget extends \Elementor\Widget_Base
             'default'     => 'Arts For All recognizes the invaluable work of our community partners. Artasia would not exist without you. Thank you!',
             'rows'        => 3,
             'label_block' => true,
+            'condition'   => ['logo_type' => 'partners'],
         ]);
 
         $this->add_control('supporter_heading', [
@@ -91,6 +105,7 @@ class Artasia_Logos_Elementor_Widget extends \Elementor\Widget_Base
             'type'        => \Elementor\Controls_Manager::TEXT,
             'default'     => 'Supporters',
             'label_block' => true,
+            'condition'   => ['logo_type' => 'supporters'],
         ]);
 
         $this->add_control('supporter_intro', [
@@ -99,6 +114,7 @@ class Artasia_Logos_Elementor_Widget extends \Elementor\Widget_Base
             'default'     => 'Arts For All is grateful to our sponsors and supporters at all levels. Thank you!',
             'rows'        => 3,
             'label_block' => true,
+            'condition'   => ['logo_type' => 'supporters'],
         ]);
 
         $this->add_control('logo_variant', [
@@ -114,7 +130,7 @@ class Artasia_Logos_Elementor_Widget extends \Elementor\Widget_Base
         $this->add_control('logos_instructions', [
             'type' => \Elementor\Controls_Manager::RAW_HTML,
             'raw'  => sprintf(
-                '<p>Manage logos and website links in <a href="%s" target="_blank" rel="noopener noreferrer">Artasia Partners</a> and <a href="%s" target="_blank" rel="noopener noreferrer">Artasia Supporters</a>. Manage this project’s partner and supporter recognition selections and display order from the Project edit screen. Supporters are grouped automatically by their saved type.</p><p>Shortcode equivalent: <code>[artasia_logos project_id="123"]</code></p>',
+                '<p>Manage logos and website links in <a href="%s" target="_blank" rel="noopener noreferrer">Artasia Partners</a> and <a href="%s" target="_blank" rel="noopener noreferrer">Artasia Supporters</a>. Manage this project’s partner and supporter recognition selections and display order from the Project edit screen. Supporters are grouped automatically by their saved type.</p><p>Shortcode equivalent: <code>[artasia_logos type="supporters" project_id="123"]</code></p>',
                 esc_url(admin_url('edit.php?post_type=artasia_partner')),
                 esc_url(admin_url('edit.php?post_type=artasia_supporter'))
             ),
@@ -136,6 +152,7 @@ class Artasia_Logos_Elementor_Widget extends \Elementor\Widget_Base
         }
 
         $output = artasia_render_logos([
+            'logo_type'         => (string) ($settings['logo_type'] ?? 'supporters'),
             'partner_heading'   => (string) ($settings['partner_heading'] ?? 'Partners'),
             'partner_intro'     => (string) ($settings['partner_intro'] ?? 'Arts For All recognizes the invaluable work of our community partners. Artasia would not exist without you. Thank you!'),
             'supporter_heading' => (string) ($settings['supporter_heading'] ?? 'Supporters'),
