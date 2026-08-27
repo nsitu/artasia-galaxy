@@ -652,6 +652,7 @@ const slideshowStyles = `
     max-height: 80px;
     gap: clamp(16px, 2vw, 34px);
     box-sizing: border-box;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 100%);
     filter: drop-shadow(0 3px 10px rgba(0,0,0,0.9));
     pointer-events: none;
   }
@@ -745,7 +746,7 @@ const slideshowStyles = `
     max-width: min(62vw, 1100px);
     max-height: none;
     overflow: visible;
-    padding: clamp(22px, 2.5vw, 42px);
+    padding: 0;
     box-sizing: border-box;
     border: 0;
     background: transparent;
@@ -922,7 +923,7 @@ const slideshowStyles = `
       max-width: none;
       max-height: none;
       overflow: visible;
-      padding: 18px 20px;
+      padding: 0;
       border-left-width: 5px;
     }
 
@@ -941,7 +942,7 @@ const slideshowStyles = `
       bottom: 0;
       width: 100vw;
       max-height: none;
-      padding: 14px 16px;
+      padding: 0;
     }
 
     .atlas-slideshow-metadata p { margin-top: 10px; }
