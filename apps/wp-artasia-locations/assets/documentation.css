@@ -207,33 +207,39 @@
 }
 
 .artasia-documentation__actions {
+  align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
   margin: 0 0 1.5rem;
 }
 
+.artasia-documentation__action-prefix {
+  font-weight: 700;
+}
+
 .artasia-documentation__action {
   display: inline-block;
-  padding: 0.4rem 0.85rem;
   border: 2px solid #8e1d58;
   border-radius: 3px;
-  background: #8e1d58;
-  color: #fff !important;
-  font-weight: 700;
-  line-height: 1.2;
   text-decoration: none;
+}
+
+.artasia-documentation__action--atlas {
+  max-width: min(100%, 12rem);
+  overflow: hidden;
+  line-height: 0;
+}
+
+.artasia-documentation__action--atlas img {
+  display: block;
+  height: auto;
+  width: 100%;
 }
 
 .artasia-documentation__action:hover,
 .artasia-documentation__action:focus-visible {
   border-color: #ec008c;
-  background: #ec008c;
-  color: #fff !important;
-}
-
-.artasia-documentation__action:visited {
-  color: #fff !important;
 }
 
 .artasia-documentation__title {
