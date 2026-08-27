@@ -115,9 +115,9 @@ function artasia_get_logo_optical_scale(float $logo_ratio): float
     $similarity = max(0.0, min(1.0, $similarity));
 
     // Logos whose aspect ratio closely matches the stage have greater apparent weight.
-    $scale = 1 - (0.16 * pow($similarity, 2));
+    $scale = 1 - (0.25 * pow($similarity, 2));
 
-    return max(0.84, min(1.0, $scale));
+    return max(0.75, min(1.0, $scale));
 }
 
 function artasia_get_logo_grid_item(WP_Post $post, string $variant): ?array

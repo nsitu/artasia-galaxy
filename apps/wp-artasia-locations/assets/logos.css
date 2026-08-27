@@ -4,6 +4,14 @@
     color: var(--artasia-logo-accent);
 }
 
+.artasia-logo-sections--white {
+    background-image: linear-gradient(
+        130deg,
+        #8E1D58 0%,
+        #F28B20 100%
+    );
+}
+
 .artasia-logo-sections__inner {
     box-sizing: border-box;
     margin: 0 auto;
@@ -55,15 +63,14 @@
 .artasia-logo-grid__item {
     align-items: center;
     background: #fff;
-    border: 1px solid var(--artasia-logo-border);
     display: flex;
     min-height: 8rem;
     padding: 1.25rem;
 }
 
 .artasia-logo-grid__item--white {
-    background: #342d38;
-    border-color: #342d38;
+    background: transparent;
+    border-color: transparent;
 }
 
 .artasia-logo-grid__link {
