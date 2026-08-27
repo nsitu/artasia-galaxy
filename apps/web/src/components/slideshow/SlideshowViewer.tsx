@@ -478,6 +478,7 @@ const slideshowStyles = `
     z-index: 10;
     display: flex;
     align-items: center;
+    width: max-content;
     max-width: min(40vw, 520px);
     max-height: 80px;
     gap: clamp(16px, 2vw, 34px);
@@ -489,14 +490,21 @@ const slideshowStyles = `
   .atlas-slideshow-brand img {
     display: block;
     flex: 0 0 auto;
-    width: auto;
     max-width: 100%;
     max-height: 56px;
     object-fit: contain;
   }
 
+  .atlas-slideshow-brand > img:first-child {
+    width: clamp(170px, 11.75vw, 226px);
+    height: 56px;
+    max-width: none;
+  }
+
   .atlas-slideshow-partner-logo {
-    max-width: min(22vw, 260px) !important;
+    width: min(22vw, 260px);
+    height: 56px;
+    max-width: none !important;
   }
 
   .atlas-slideshow-image {
@@ -647,12 +655,20 @@ const slideshowStyles = `
     .atlas-slideshow-brand {
       top: 16px;
       left: 16px;
-      max-width: min(42vw, 240px);
+      max-width: calc(100vw - 32px);
       max-height: 64px;
       gap: 12px;
     }
 
-    .atlas-slideshow-brand img { max-height: 44px; }
+    .atlas-slideshow-brand > img:first-child {
+      width: 134px;
+      height: 44px;
+    }
+
+    .atlas-slideshow-partner-logo {
+      width: min(18vw, 150px);
+      height: 44px;
+    }
 
     .atlas-slideshow-metadata {
       left: 20px;

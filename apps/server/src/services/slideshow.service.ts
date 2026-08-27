@@ -1,4 +1,4 @@
-import { getAsset, getPublishedAlbum, listTags, searchAssetIdsByTag, searchAssetIdsByTags, searchAssets, ImmichAsset } from "../infra/ImmichClient.js";
+import { getAsset, getPublishedAlbum, listTags, searchAssetIdsByTag, searchAssetIdsByTags, searchAssets, type ImmichAsset, type ImmichTag } from "../infra/ImmichClient.js";
 import { DEFAULT_ASSET_ADJUSTMENTS, getAssetAdjustmentMap, type AssetAdjustments } from "./assetAdjustments.service.js";
 import {
   activityAnchorTag,
@@ -333,6 +333,71 @@ async function mapEmbeddedFocusedMetadata(assets: ImmichAsset[]) {
   };
 }
 
+async function mapTagBasedActivityMetadata(
+  assets: ImmichAsset[],
+  allTags: ImmichTag[],
+) {
+  const config = await getUploadConfig();
+  const activityAssignments = config.activities.map((activity) => {
+    const anchorTagName = activityAnchorTag(activity.id).toLowerCase();
+    const labelNorm = activity.label.trim().toLowerCase();
+    const tagIds = allTags
+      .filter((tag) => {
+        const tagKeys = [tag.name, tag.value].map((value) =>
+          value.trim().toLowerCase(),
+        );
+        return tagKeys.includes(anchorTagName) || tagKeys.includes(labelNorm);
+      })
+      .map((tag) => tag.id);
+    return { activityId: activity.id, tagIds: [...new Set(tagIds)] };
+  });
+
+  const activityIdsByAssetId = new Map<string, Set<number>>();
+  const assetIdSet = new Set(assets.map((asset) => asset.id));
+  const activityMemberships = await Promise.all(
+    activityAssignments.map(async ({ activityId, tagIds }) => {
+      const assetIdsByTag = await searchAssetIdsByTags(tagIds);
+      return {
+        activityId,
+        assetIds: tagIds.flatMap((tagId) => assetIdsByTag.get(tagId) ?? []),
+      };
+    }),
+  );
+  for (const membership of activityMemberships) {
+    for (const assetId of membership.assetIds) {
+      if (!assetIdSet.has(assetId)) continue;
+      const activityIds = activityIdsByAssetId.get(assetId) ?? new Set<number>();
+      activityIds.add(membership.activityId);
+      activityIdsByAssetId.set(assetId, activityIds);
+    }
+  }
+
+  const customActivitiesByAssetId = new Map<string, Set<string>>();
+  const customActivityAssignments = allTags.flatMap((tag) => {
+    const customActivity = [tag.name, tag.value]
+      .map((value) => getCustomActivityTagValue(value))
+      .find((value): value is string => Boolean(value));
+    return customActivity ? [{ tagId: tag.id, customActivity }] : [];
+  });
+  const customActivityMemberships = await Promise.all(
+    customActivityAssignments.map(async ({ tagId, customActivity }) => ({
+      customActivity,
+      assetIds: await searchAssetIdsByTag(tagId),
+    })),
+  );
+  for (const membership of customActivityMemberships) {
+    for (const assetId of membership.assetIds) {
+      if (!assetIdSet.has(assetId)) continue;
+      const customActivities =
+        customActivitiesByAssetId.get(assetId) ?? new Set<string>();
+      customActivities.add(membership.customActivity);
+      customActivitiesByAssetId.set(assetId, customActivities);
+    }
+  }
+
+  return { activityIdsByAssetId, customActivitiesByAssetId };
+}
+
 export async function querySlideshow(
   query: SlideshowQuery
 ): Promise<{ photos: Photo[]; total: number }> {
@@ -418,66 +483,6 @@ export async function querySlideshow(
         ? await searchAssetIdsByTag(audioTag.id)
         : [];
       audioIdSet = new Set(audioAssetIds);
-
-      const config = await getUploadConfig();
-      const activityAssignments = config.activities.map((activity) => {
-        const anchorTagName = activityAnchorTag(activity.id).toLowerCase();
-        const labelNorm = activity.label.trim().toLowerCase();
-        const tagIds = allTags
-          .filter((tag) => {
-            const tagKeys = [tag.name, tag.value].map((value) =>
-              value.trim().toLowerCase(),
-            );
-            return (
-              tagKeys.includes(anchorTagName) || tagKeys.includes(labelNorm)
-            );
-          })
-          .map((tag) => tag.id);
-        return { activityId: activity.id, tagIds: [...new Set(tagIds)] };
-      });
-      const activityMemberships = await Promise.all(
-        activityAssignments.map(async ({ activityId, tagIds }) => {
-          const assetIdsByTag = await searchAssetIdsByTags(tagIds);
-          return {
-            activityId,
-            assetIds: tagIds.flatMap((tagId) => assetIdsByTag.get(tagId) ?? []),
-          };
-        }),
-      );
-      const placementAssetIds = new Set(assets.map((asset) => asset.id));
-      for (const membership of activityMemberships) {
-        for (const assetId of membership.assetIds) {
-          if (!placementAssetIds.has(assetId)) continue;
-          const activityIds =
-            activityIdsByAssetId.get(assetId) ?? new Set<number>();
-          activityIds.add(membership.activityId);
-          activityIdsByAssetId.set(assetId, activityIds);
-        }
-      }
-
-      const customActivityAssignments = allTags.flatMap((tag) => {
-        const customActivity = [tag.name, tag.value]
-          .map((value) => getCustomActivityTagValue(value))
-          .find((value): value is string => Boolean(value));
-        return customActivity
-          ? [{ tagId: tag.id, customActivity }]
-          : [];
-      });
-      const customActivityMemberships = await Promise.all(
-        customActivityAssignments.map(async ({ tagId, customActivity }) => ({
-          customActivity,
-          assetIds: await searchAssetIdsByTag(tagId),
-        })),
-      );
-      for (const membership of customActivityMemberships) {
-        for (const assetId of membership.assetIds) {
-          if (!placementAssetIds.has(assetId)) continue;
-          const customActivities =
-            customActivitiesByAssetId.get(assetId) ?? new Set<string>();
-          customActivities.add(membership.customActivity);
-          customActivitiesByAssetId.set(assetId, customActivities);
-        }
-      }
     }
 
     assets = assets.filter(
@@ -577,9 +582,12 @@ export async function querySlideshow(
           assetIds: assetIdsByTag.get(assetTypeTag.tagId) ?? [],
         }));
       })(),
+      mapTagBasedActivityMetadata(assets, allTags),
     ]);
     adjustmentMap = enrichment[0];
     gpsDisabledAssetIds = enrichment[1];
+    activityIdsByAssetId = enrichment[5].activityIdsByAssetId;
+    customActivitiesByAssetId = enrichment[5].customActivitiesByAssetId;
     for (const assignment of enrichment[2]) {
       for (const assetId of assignment.assetIds) {
         if (assetIdSet.has(assetId) && !iconNameByAssetId.has(assetId)) {
