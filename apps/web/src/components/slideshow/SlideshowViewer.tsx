@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { fetchSlideshow, fetchUploadOptions, type ActivityOption, type Photo, type UploadPlacement } from "../../api/client";
+import LoadingIndicator from "../ui/LoadingIndicator";
 
 const ANECDOTE_DWELL_MS = 10_000;
 const MIN_IMAGE_DWELL_MS = 10_000;
@@ -548,7 +549,12 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
   }, [activityBadges, activityOptions.length, currentPhoto, currentPlacement, placements.length]);
 
   if (!currentPhoto && (loading || !error)) {
-    return <div className="atlas-slideshow atlas-slideshow-status" role="status">Loading slideshow…</div>;
+    return (
+      <div className="atlas-slideshow atlas-slideshow-status" role="status" aria-label="Loading slideshow">
+        <style>{slideshowStyles}</style>
+        <LoadingIndicator label="Loading slideshow…" />
+      </div>
+    );
   }
 
   return (
