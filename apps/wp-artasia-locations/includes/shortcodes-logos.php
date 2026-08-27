@@ -14,14 +14,18 @@ function artasia_logos_shortcode($attributes): string
 {
     $attributes = shortcode_atts([
         'partner_heading'   => 'Partners',
+        'partner_intro'     => 'Arts For All recognizes the invaluable work of our community partners. Artasia would not exist without you. Thank you!',
         'supporter_heading' => 'Supporters',
+        'supporter_intro'   => 'Arts For All is grateful to our sponsors and supporters at all levels. Thank you!',
         'variant'           => 'colour',
         'project_id'        => '',
     ], $attributes, 'artasia_logos');
 
     return artasia_render_logos([
         'partner_heading'   => (string) $attributes['partner_heading'],
+        'partner_intro'     => (string) $attributes['partner_intro'],
         'supporter_heading' => (string) $attributes['supporter_heading'],
+        'supporter_intro'   => (string) $attributes['supporter_intro'],
         'variant'           => (string) $attributes['variant'],
         'project_id'        => absint($attributes['project_id']),
     ]);
@@ -323,13 +327,17 @@ function artasia_render_logos(array $args = []): string
 {
     $args = wp_parse_args($args, [
         'partner_heading'   => 'Partners',
+        'partner_intro'     => 'Arts For All recognizes the invaluable work of our community partners. Artasia would not exist without you. Thank you!',
         'supporter_heading' => 'Supporters',
+        'supporter_intro'   => 'Arts For All is grateful to our sponsors and supporters at all levels. Thank you!',
         'variant'           => 'colour',
         'project_id'        => 0,
     ]);
 
     $variant = artasia_normalize_logo_variant((string) $args['variant']);
     $project_id = absint($args['project_id']);
+    $partner_intro = trim((string) $args['partner_intro']);
+    $supporter_intro = trim((string) $args['supporter_intro']);
     if (
         $project_id
         && (
@@ -358,9 +366,12 @@ function artasia_render_logos(array $args = []): string
             <?php if ($supporter_groups) : ?>
                 <section class="artasia-logo-section artasia-logo-section--supporters">
                     <h2 class="artasia-logo-section__heading"><?php echo esc_html((string) $args['supporter_heading']); ?></h2>
+                    <?php if ($supporter_intro !== '') : ?>
+                        <p class="artasia-logo-section__intro"><?php echo esc_html($supporter_intro); ?></p>
+                    <?php endif; ?>
                     <?php foreach ($supporter_groups as $type => $items) : ?>
                         <section class="artasia-logo-group">
-                            <h3 class="artasia-logo-group__heading"><?php echo esc_html($type); ?></h3>
+                            <h3 class="artasia-logo-group__heading"><?php echo esc_html($type . ' Support'); ?></h3>
                             <?php artasia_render_logo_grid($items); ?>
                         </section>
                     <?php endforeach; ?>
@@ -370,6 +381,9 @@ function artasia_render_logos(array $args = []): string
             <?php if ($partners) : ?>
                 <section class="artasia-logo-section artasia-logo-section--partners">
                     <h2 class="artasia-logo-section__heading"><?php echo esc_html((string) $args['partner_heading']); ?></h2>
+                    <?php if ($partner_intro !== '') : ?>
+                        <p class="artasia-logo-section__intro"><?php echo esc_html($partner_intro); ?></p>
+                    <?php endif; ?>
                     <?php artasia_render_logo_grid($partners); ?>
                 </section>
             <?php endif; ?>

@@ -78,10 +78,26 @@ class Artasia_Logos_Elementor_Widget extends \Elementor\Widget_Base
             'label_block' => true,
         ]);
 
+        $this->add_control('partner_intro', [
+            'label'       => 'Partners intro text',
+            'type'        => \Elementor\Controls_Manager::TEXTAREA,
+            'default'     => 'Arts For All recognizes the invaluable work of our community partners. Artasia would not exist without you. Thank you!',
+            'rows'        => 3,
+            'label_block' => true,
+        ]);
+
         $this->add_control('supporter_heading', [
             'label'       => 'Supporters heading',
             'type'        => \Elementor\Controls_Manager::TEXT,
             'default'     => 'Supporters',
+            'label_block' => true,
+        ]);
+
+        $this->add_control('supporter_intro', [
+            'label'       => 'Supporters intro text',
+            'type'        => \Elementor\Controls_Manager::TEXTAREA,
+            'default'     => 'Arts For All is grateful to our sponsors and supporters at all levels. Thank you!',
+            'rows'        => 3,
             'label_block' => true,
         ]);
 
@@ -121,7 +137,9 @@ class Artasia_Logos_Elementor_Widget extends \Elementor\Widget_Base
 
         $output = artasia_render_logos([
             'partner_heading'   => (string) ($settings['partner_heading'] ?? 'Partners'),
+            'partner_intro'     => (string) ($settings['partner_intro'] ?? 'Arts For All recognizes the invaluable work of our community partners. Artasia would not exist without you. Thank you!'),
             'supporter_heading' => (string) ($settings['supporter_heading'] ?? 'Supporters'),
+            'supporter_intro'   => (string) ($settings['supporter_intro'] ?? 'Arts For All is grateful to our sponsors and supporters at all levels. Thank you!'),
             'variant'           => (string) ($settings['logo_variant'] ?? 'colour'),
             'project_id'        => $project_id,
         ]);

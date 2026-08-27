@@ -47,14 +47,26 @@
     background: currentColor;
     content: '';
     flex: 1 1 0;
-    height: 2px;
+    height: 1px;
     min-width: 0;
 }
 
 .artasia-logo-section__heading {
     font-size: clamp(1.75rem, 3vw, 2.5rem);
     font-weight: 900;
-    margin-bottom: 2rem;
+    margin-bottom: 0.85rem;
+}
+
+.artasia-logo-section__intro {
+    color: var(--artasia-logo-accent);
+    line-height: 1.6;
+    margin: 0 auto 2rem;
+    max-width: 48rem;
+    text-align: center;
+}
+
+.artasia-logo-sections--white .artasia-logo-section__intro {
+    color: #fff;
 }
 
 .artasia-logo-group + .artasia-logo-group {
@@ -62,9 +74,12 @@
 }
 
 .artasia-logo-group__heading {
-    font-size: 1.25rem;
-    font-weight: 800;
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    line-height: 1.4;
     margin-bottom: 1.25rem;
+    text-transform: uppercase;
 }
 
 .artasia-logo-grid {
