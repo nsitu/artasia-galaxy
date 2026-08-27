@@ -166,9 +166,12 @@ function artasia_get_logo_grid_item(WP_Post $post, string $variant): ?array
 
 function artasia_get_logo_grid_items(string $post_type, string $variant, int $project_id = 0): array
 {
-    $project_supporter_ids = $post_type === 'artasia_supporter' && $project_id
-        ? artasia_get_project_supporter_ids($project_id)
-        : [];
+    $project_item_ids = [];
+    if ($project_id && $post_type === 'artasia_supporter') {
+        $project_item_ids = artasia_get_project_supporter_ids($project_id);
+    } elseif ($project_id && $post_type === 'artasia_partner') {
+        $project_item_ids = artasia_get_project_partner_ids($project_id);
+    }
     $posts = get_posts([
         'post_type'      => $post_type,
         'posts_per_page' => -1,
@@ -182,16 +185,16 @@ function artasia_get_logo_grid_items(string $post_type, string $variant, int $pr
     $items_by_id = [];
     foreach ($posts as $post) {
         if (
-            $post_type === 'artasia_supporter'
+            in_array($post_type, ['artasia_supporter', 'artasia_partner'], true)
             && $project_id
-            && !in_array($post->ID, $project_supporter_ids, true)
+            && !in_array($post->ID, $project_item_ids, true)
         ) {
             continue;
         }
 
         $item = artasia_get_logo_grid_item($post, $variant);
         if ($item !== null) {
-            if ($post_type === 'artasia_supporter' && $project_id) {
+            if (in_array($post_type, ['artasia_supporter', 'artasia_partner'], true) && $project_id) {
                 $items_by_id[$post->ID] = $item;
             } else {
                 $items[] = $item;
@@ -199,10 +202,10 @@ function artasia_get_logo_grid_items(string $post_type, string $variant, int $pr
         }
     }
 
-    if ($post_type === 'artasia_supporter' && $project_id) {
-        foreach ($project_supporter_ids as $supporter_id) {
-            if (isset($items_by_id[$supporter_id])) {
-                $items[] = $items_by_id[$supporter_id];
+    if (in_array($post_type, ['artasia_supporter', 'artasia_partner'], true) && $project_id) {
+        foreach ($project_item_ids as $item_id) {
+            if (isset($items_by_id[$item_id])) {
+                $items[] = $items_by_id[$item_id];
             }
         }
     }
@@ -258,6 +261,92 @@ function artasia_get_project_supporter_ids(int $project_id): array
     }
 
     return $supporter_ids;
+}
+
+function artasia_get_project_partner_ids(int $project_id): array
+{
+    $recognitions = get_posts([
+        'post_type'      => 'artasia_recognition',
+        'posts_per_page' => -1,
+        'post_status'    => 'publish',
+        'meta_query'     => [[
+            'key'     => 'artasia_project_id',
+            'value'   => $project_id,
+            'compare' => '=',
+        ]],
+        'fields'         => 'ids',
+        'no_found_rows'  => true,
+    ]);
+    $partner_rows = [];
+    foreach ($recognitions as $recognition_id) {
+        $partner_id = intval(get_post_meta($recognition_id, 'artasia_partner_id', true));
+        if (
+            !$partner_id
+            || get_post_type($partner_id) !== 'artasia_partner'
+            || get_post_status($partner_id) !== 'publish'
+        ) {
+            continue;
+        }
+
+        $partner_rows[] = [
+            'id'    => $partner_id,
+            'order' => intval(get_post_meta($recognition_id, 'artasia_recognition_order', true)),
+        ];
+    }
+
+    if ($partner_rows) {
+        usort($partner_rows, static function (array $a, array $b): int {
+            $order_comparison = $a['order'] <=> $b['order'];
+            if ($order_comparison !== 0) {
+                return $order_comparison;
+            }
+
+            return strcasecmp(get_the_title($a['id']), get_the_title($b['id']));
+        });
+
+        $partner_ids = [];
+        foreach ($partner_rows as $row) {
+            if (!in_array($row['id'], $partner_ids, true)) {
+                $partner_ids[] = $row['id'];
+            }
+        }
+
+        return $partner_ids;
+    }
+
+    // Preserve the former placement-based output until this project has been
+    // saved with the explicit partner recognition checklist.
+    if (get_post_meta($project_id, 'artasia_project_partner_recognitions_initialized', true)) {
+        return [];
+    }
+
+    $placements = get_posts([
+        'post_type'      => 'artasia_placement',
+        'posts_per_page' => -1,
+        'post_status'    => 'publish',
+        'meta_query'     => [[
+            'key'     => 'artasia_project_id',
+            'value'   => $project_id,
+            'compare' => '=',
+        ]],
+        'orderby'        => 'title',
+        'order'          => 'ASC',
+        'no_found_rows'  => true,
+    ]);
+    $partner_ids = [];
+    foreach ($placements as $placement) {
+        $partner_id = intval(get_post_meta($placement->ID, 'artasia_partner_id', true));
+        if (
+            $partner_id
+            && get_post_type($partner_id) === 'artasia_partner'
+            && get_post_status($partner_id) === 'publish'
+            && !in_array($partner_id, $partner_ids, true)
+        ) {
+            $partner_ids[] = $partner_id;
+        }
+    }
+
+    return $partner_ids;
 }
 
 function artasia_group_supporter_logo_items(array $items): array

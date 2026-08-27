@@ -410,6 +410,7 @@ function artasia_recognition_columns(array $columns): array
     foreach ($columns as $key => $label) {
         $new[$key] = $label;
         if ($key === 'title') {
+            $new['artasia_recognition_partner'] = 'Partner';
             $new['artasia_recognition_supporter'] = 'Supporter';
             $new['artasia_recognition_project'] = 'Project';
             $new['artasia_recognition_order'] = 'Display Order';
@@ -423,6 +424,10 @@ add_filter('manage_artasia_recognition_posts_columns', 'artasia_recognition_colu
 function artasia_recognition_column(string $column, int $post_id): void
 {
     switch ($column) {
+        case 'artasia_recognition_partner':
+            $partner_id = intval(get_post_meta($post_id, 'artasia_partner_id', true));
+            echo $partner_id ? esc_html(get_the_title($partner_id)) : '—';
+            break;
         case 'artasia_recognition_supporter':
             $supporter_id = intval(get_post_meta($post_id, 'artasia_supporter_id', true));
             echo $supporter_id ? esc_html(get_the_title($supporter_id)) : '—';

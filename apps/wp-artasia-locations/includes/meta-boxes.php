@@ -659,6 +659,13 @@ function artasia_project_meta_box_html(WP_Post $post): void
         'orderby'     => 'title',
         'order'       => 'ASC',
     ]);
+    $partners = get_posts([
+        'post_type'   => 'artasia_partner',
+        'numberposts' => -1,
+        'post_status' => ['publish', 'draft'],
+        'orderby'     => 'title',
+        'order'       => 'ASC',
+    ]);
     $recognitions = get_posts([
         'post_type'   => 'artasia_recognition',
         'numberposts' => -1,
@@ -680,6 +687,21 @@ function artasia_project_meta_box_html(WP_Post $post): void
         $order = intval(get_post_meta($recognition_id, 'artasia_recognition_order', true));
         if (!isset($recognition_by_supporter[$supporter_id]) || $order < $recognition_by_supporter[$supporter_id]['order']) {
             $recognition_by_supporter[$supporter_id] = [
+                'id'    => $recognition_id,
+                'order' => $order,
+            ];
+        }
+    }
+    $recognition_by_partner = [];
+    foreach ($recognitions as $recognition_id) {
+        $partner_id = intval(get_post_meta($recognition_id, 'artasia_partner_id', true));
+        if (!$partner_id) {
+            continue;
+        }
+
+        $order = intval(get_post_meta($recognition_id, 'artasia_recognition_order', true));
+        if (!isset($recognition_by_partner[$partner_id]) || $order < $recognition_by_partner[$partner_id]['order']) {
+            $recognition_by_partner[$partner_id] = [
                 'id'    => $recognition_id,
                 'order' => $order,
             ];
@@ -725,6 +747,49 @@ function artasia_project_meta_box_html(WP_Post $post): void
         });
     }
     unset($supporter_group);
+    $legacy_partner_order = [];
+    if (!$recognition_by_partner && !get_post_meta($post->ID, 'artasia_project_partner_recognitions_initialized', true)) {
+        $legacy_placement_ids = get_posts([
+            'post_type'      => 'artasia_placement',
+            'posts_per_page' => -1,
+            'post_status'    => ['publish', 'draft'],
+            'meta_query'     => [[
+                'key'     => 'artasia_project_id',
+                'value'   => $post->ID,
+                'compare' => '=',
+            ]],
+            'orderby'        => 'title',
+            'order'          => 'ASC',
+            'fields'         => 'ids',
+            'no_found_rows'  => true,
+        ]);
+        foreach ($legacy_placement_ids as $placement_id) {
+            $partner_id = intval(get_post_meta($placement_id, 'artasia_partner_id', true));
+            if ($partner_id && !isset($legacy_partner_order[$partner_id])) {
+                $legacy_partner_order[$partner_id] = count($legacy_partner_order) + 1;
+            }
+        }
+    }
+    usort($partners, static function (WP_Post $a, WP_Post $b) use ($recognition_by_partner, $legacy_partner_order): int {
+        $a_assigned = isset($recognition_by_partner[$a->ID]) || isset($legacy_partner_order[$a->ID]);
+        $b_assigned = isset($recognition_by_partner[$b->ID]) || isset($legacy_partner_order[$b->ID]);
+        if ($a_assigned !== $b_assigned) {
+            return $a_assigned ? -1 : 1;
+        }
+        if (isset($recognition_by_partner[$a->ID]) && isset($recognition_by_partner[$b->ID])) {
+            $order_comparison = $recognition_by_partner[$a->ID]['order'] <=> $recognition_by_partner[$b->ID]['order'];
+            if ($order_comparison !== 0) {
+                return $order_comparison;
+            }
+        } elseif (isset($legacy_partner_order[$a->ID]) && isset($legacy_partner_order[$b->ID])) {
+            $order_comparison = $legacy_partner_order[$a->ID] <=> $legacy_partner_order[$b->ID];
+            if ($order_comparison !== 0) {
+                return $order_comparison;
+            }
+        }
+
+        return strcasecmp($a->post_title, $b->post_title);
+    });
     $documentation_page_id = intval(get_post_meta($post->ID, 'artasia_documentation_page_id', true));
     $documentation_page_url = '';
     if ($documentation_page_id && get_post_type($documentation_page_id) === 'page') {
@@ -823,6 +888,59 @@ function artasia_project_meta_box_html(WP_Post $post): void
                     </p>
                 <?php else : ?>
                     <p class="description">Create an Artasia Supporter before assigning supporters to this project.</p>
+                <?php endif; ?>
+            </td>
+        </tr>
+        <tr>
+            <th scope="row"><label>Partners</label></th>
+            <td>
+                <?php if ($partners) : ?>
+                    <p class="description">Select the partners to recognize for this project, then drag selected rows into the order they should appear in the logo grid.</p>
+                    <ul class="artasia-project-supporters-list artasia-project-partners-list" data-artasia-project-supporters>
+                        <?php foreach ($partners as $partner) : ?>
+                            <?php
+                            $assigned = isset($recognition_by_partner[$partner->ID]) || isset($legacy_partner_order[$partner->ID]);
+                            $partner_logo_id = intval(get_post_meta($partner->ID, 'artasia_logo_id', true));
+                            $partner_logo_variant = 'colour';
+                            if (!$partner_logo_id) {
+                                $partner_logo_id = intval(get_post_meta($partner->ID, 'artasia_white_logo_id', true));
+                                $partner_logo_variant = 'white';
+                            }
+                            $partner_logo = $partner_logo_id
+                                ? wp_get_attachment_image($partner_logo_id, [120, 60], false, [
+                                    'class'    => 'artasia-project-supporter-logo__image',
+                                    'alt'      => '',
+                                    'loading'  => 'lazy',
+                                    'decoding' => 'async',
+                                ])
+                                : '';
+                            ?>
+                            <li class="artasia-project-supporter-row artasia-project-partner-row<?php echo $assigned ? ' is-assigned' : ''; ?>">
+                                <span class="artasia-project-supporter-handle dashicons dashicons-menu" title="Drag to set display order" aria-hidden="true"></span>
+                                <label>
+                                    <input
+                                        type="checkbox"
+                                        name="artasia_project_partner_ids[]"
+                                        value="<?php echo esc_attr($partner->ID); ?>"
+                                        <?php checked($assigned); ?>
+                                    />
+                                    <?php if ($partner_logo) : ?>
+                                        <span class="artasia-project-supporter-logo artasia-project-supporter-logo--<?php echo esc_attr($partner_logo_variant); ?>">
+                                            <?php echo $partner_logo; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Generated by wp_get_attachment_image(). ?>
+                                        </span>
+                                    <?php endif; ?>
+                                    <span class="artasia-project-supporter-name"><?php echo esc_html($partner->post_title); ?></span>
+                                </label>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <input type="hidden" name="artasia_project_partner_recognitions_initialized" value="1" />
+                    <p class="description">
+                        Recognition records are created or updated automatically when this project is saved. Unchecked partners are removed from this project’s public recognition list.
+                        <a href="<?php echo esc_url(admin_url('edit.php?post_type=artasia_recognition')); ?>">View Recognition records</a>.
+                    </p>
+                <?php else : ?>
+                    <p class="description">Create an Artasia Partner before assigning partners to this project.</p>
                 <?php endif; ?>
             </td>
         </tr>
@@ -964,12 +1082,16 @@ function artasia_sync_project_supporter_recognitions(int $project_id, array $sup
         }
 
         update_post_meta($recognition_id, 'artasia_project_id', $project_id);
+        update_post_meta($recognition_id, 'artasia_partner_id', 0);
         update_post_meta($recognition_id, 'artasia_supporter_id', $supporter_id);
         update_post_meta($recognition_id, 'artasia_recognition_order', $index + 1);
         $used_recognition_ids[$recognition_id] = true;
     }
 
     foreach ($recognition_ids as $recognition_id) {
+        if (!intval(get_post_meta($recognition_id, 'artasia_supporter_id', true))) {
+            continue;
+        }
         if (!isset($used_recognition_ids[$recognition_id]) && get_post_status($recognition_id) !== 'draft') {
             wp_update_post([
                 'ID'          => $recognition_id,
@@ -1001,6 +1123,94 @@ function artasia_save_project_supporter_recognitions(int $post_id): void
     artasia_sync_project_supporter_recognitions($post_id, $supporter_ids);
 }
 add_action('save_post_artasia_project', 'artasia_save_project_supporter_recognitions', 11);
+
+function artasia_sync_project_partner_recognitions(int $project_id, array $partner_ids): void
+{
+    $recognition_ids = get_posts([
+        'post_type'      => 'artasia_recognition',
+        'posts_per_page' => -1,
+        'post_status'    => 'any',
+        'meta_query'     => [[
+            'key'     => 'artasia_project_id',
+            'value'   => $project_id,
+            'compare' => '=',
+        ]],
+        'fields'         => 'ids',
+        'no_found_rows'  => true,
+    ]);
+    $existing_by_partner = [];
+    foreach ($recognition_ids as $recognition_id) {
+        $partner_id = intval(get_post_meta($recognition_id, 'artasia_partner_id', true));
+        if ($partner_id) {
+            $existing_by_partner[$partner_id][] = $recognition_id;
+        }
+    }
+
+    $used_recognition_ids = [];
+    foreach ($partner_ids as $index => $partner_id) {
+        $recognition_id = 0;
+        if (!empty($existing_by_partner[$partner_id])) {
+            $recognition_id = array_shift($existing_by_partner[$partner_id]);
+        }
+        if (!$recognition_id) {
+            $recognition_id = wp_insert_post([
+                'post_type'   => 'artasia_recognition',
+                'post_status' => 'publish',
+                'post_title'  => get_the_title($partner_id),
+            ], true);
+            if (is_wp_error($recognition_id)) {
+                continue;
+            }
+        } elseif (get_post_status($recognition_id) !== 'publish') {
+            wp_update_post([
+                'ID'          => $recognition_id,
+                'post_status' => 'publish',
+            ]);
+        }
+
+        update_post_meta($recognition_id, 'artasia_project_id', $project_id);
+        update_post_meta($recognition_id, 'artasia_partner_id', $partner_id);
+        update_post_meta($recognition_id, 'artasia_supporter_id', 0);
+        update_post_meta($recognition_id, 'artasia_recognition_order', $index + 1);
+        $used_recognition_ids[$recognition_id] = true;
+    }
+
+    foreach ($recognition_ids as $recognition_id) {
+        if (!intval(get_post_meta($recognition_id, 'artasia_partner_id', true))) {
+            continue;
+        }
+        if (!isset($used_recognition_ids[$recognition_id]) && get_post_status($recognition_id) !== 'draft') {
+            wp_update_post([
+                'ID'          => $recognition_id,
+                'post_status' => 'draft',
+            ]);
+        }
+    }
+}
+
+function artasia_save_project_partner_recognitions(int $post_id): void
+{
+    if (!isset($_POST['artasia_project_supporters_meta_nonce']) || !wp_verify_nonce($_POST['artasia_project_supporters_meta_nonce'], 'artasia_project_supporters_meta')) {
+        return;
+    }
+    if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
+        return;
+    }
+    if (!current_user_can('edit_post', $post_id)) {
+        return;
+    }
+
+    $partner_ids = isset($_POST['artasia_project_partner_ids']) && is_array($_POST['artasia_project_partner_ids'])
+        ? artasia_sanitize_integer_array_meta($_POST['artasia_project_partner_ids'])
+        : [];
+    $partner_ids = array_values(array_filter($partner_ids, static function (int $partner_id): bool {
+        return get_post_type($partner_id) === 'artasia_partner';
+    }));
+
+    artasia_sync_project_partner_recognitions($post_id, $partner_ids);
+    update_post_meta($post_id, 'artasia_project_partner_recognitions_initialized', 1);
+}
+add_action('save_post_artasia_project', 'artasia_save_project_partner_recognitions', 12);
 
 // --- Activity Details meta box ---
 
@@ -1836,8 +2046,16 @@ function artasia_recognition_meta_box_html(WP_Post $post): void
         'orderby'     => 'title',
         'order'       => 'ASC',
     ]);
+    $partners = get_posts([
+        'post_type'   => 'artasia_partner',
+        'numberposts' => -1,
+        'post_status' => ['publish', 'draft'],
+        'orderby'     => 'title',
+        'order'       => 'ASC',
+    ]);
     $project_id = intval(get_post_meta($post->ID, 'artasia_project_id', true));
     $supporter_id = intval(get_post_meta($post->ID, 'artasia_supporter_id', true));
+    $partner_id = intval(get_post_meta($post->ID, 'artasia_partner_id', true));
     $recognition_order = intval(get_post_meta($post->ID, 'artasia_recognition_order', true));
 
     wp_nonce_field('artasia_recognition_meta', 'artasia_recognition_meta_nonce');
@@ -1858,9 +2076,22 @@ function artasia_recognition_meta_box_html(WP_Post $post): void
             </td>
         </tr>
         <tr>
+            <th><label for="artasia_partner_id">Partner</label></th>
+            <td>
+                <select id="artasia_partner_id" name="artasia_partner_id" class="widefat">
+                    <option value="">Select a partner</option>
+                    <?php foreach ($partners as $partner) : ?>
+                        <option value="<?php echo esc_attr($partner->ID); ?>" <?php selected($partner_id, $partner->ID); ?>>
+                            <?php echo esc_html($partner->post_title); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </td>
+        </tr>
+        <tr>
             <th><label for="artasia_supporter_id">Supporter</label></th>
             <td>
-                <select id="artasia_supporter_id" name="artasia_supporter_id" class="widefat" required>
+                <select id="artasia_supporter_id" name="artasia_supporter_id" class="widefat">
                     <option value="">Select a supporter</option>
                     <?php foreach ($supporters as $supporter) : ?>
                         <option value="<?php echo esc_attr($supporter->ID); ?>" <?php selected($supporter_id, $supporter->ID); ?>>
@@ -1868,6 +2099,7 @@ function artasia_recognition_meta_box_html(WP_Post $post): void
                         </option>
                     <?php endforeach; ?>
                 </select>
+                <p class="description">Choose either a partner or a supporter for this recognition.</p>
             </td>
         </tr>
         <tr>
@@ -1925,10 +2157,20 @@ function artasia_save_recognition_meta(int $post_id): void
     }
 
     $project_id = intval($_POST['artasia_project_id'] ?? 0);
+    $partner_id = intval($_POST['artasia_partner_id'] ?? 0);
     $supporter_id = intval($_POST['artasia_supporter_id'] ?? 0);
 
     update_post_meta($post_id, 'artasia_project_id', get_post_type($project_id) === 'artasia_project' ? $project_id : 0);
-    update_post_meta($post_id, 'artasia_supporter_id', get_post_type($supporter_id) === 'artasia_supporter' ? $supporter_id : 0);
+    if (get_post_type($partner_id) === 'artasia_partner') {
+        update_post_meta($post_id, 'artasia_partner_id', $partner_id);
+        update_post_meta($post_id, 'artasia_supporter_id', 0);
+    } elseif (get_post_type($supporter_id) === 'artasia_supporter') {
+        update_post_meta($post_id, 'artasia_partner_id', 0);
+        update_post_meta($post_id, 'artasia_supporter_id', $supporter_id);
+    } else {
+        update_post_meta($post_id, 'artasia_partner_id', 0);
+        update_post_meta($post_id, 'artasia_supporter_id', 0);
+    }
     update_post_meta($post_id, 'artasia_recognition_order', max(0, intval($_POST['artasia_recognition_order'] ?? 0)));
 }
 add_action('save_post_artasia_recognition', 'artasia_save_recognition_meta');
