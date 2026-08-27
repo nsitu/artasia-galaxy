@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import ArtScene from "./components/scenes/ArtScene";
+import SlideshowViewer from "./components/slideshow/SlideshowViewer";
 import PartnerUploadPanel from "./components/ui/PartnerUploadPanel";
 import ToolsPanel from "./components/ui/ToolsPanel";
 import UploadPanel from "./components/ui/UploadPanel";
@@ -96,6 +97,14 @@ export default function App() {
 
   if (path === "/partners") {
     return <PartnerUploadPanel />;
+  }
+
+  if (path === "/slideshow") {
+    const placementValue = new URLSearchParams(search).get("placement")?.trim();
+    const placementId = placementValue && /^\d+$/.test(placementValue)
+      ? Number(placementValue)
+      : undefined;
+    return <SlideshowViewer placementId={placementId} />;
   }
 
   return <ArtScene />;

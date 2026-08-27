@@ -188,9 +188,9 @@ export async function fetchSlideshow(params: {
   limit?: number;
   placementFocus?: {
     placementId: number;
-    lat: number;
-    lng: number;
-    radiusKm: number;
+    lat?: number;
+    lng?: number;
+    radiusKm?: number;
     activityId?: number;
   };
 }): Promise<{ photos: Photo[]; total: number }> {

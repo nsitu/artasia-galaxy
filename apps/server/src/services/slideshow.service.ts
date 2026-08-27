@@ -69,9 +69,9 @@ export interface SlideshowQuery {
   assetType?: AssetType;
   placementFocus?: {
     placementId: number;
-    lat: number;
-    lng: number;
-    radiusKm: number;
+    lat?: number;
+    lng?: number;
+    radiusKm?: number;
     activityId?: number;
   };
 }
@@ -324,8 +324,8 @@ export async function querySlideshow(
   const [publishedAlbum, allTags, anecdotes] = await Promise.all([
     getPublishedAlbum(),
     listTags(),
-    query.placementFocus && !query.assetType
-      ? getArtasiaAnecdotes({ placementId: query.placementFocus.placementId })
+    !query.assetType
+      ? getArtasiaAnecdotes({ placementId: query.placementFocus?.placementId })
           .catch((err) => {
             console.warn(`[slideshow] continuing without anecdotes: ${(err as Error).message}`);
             return [];

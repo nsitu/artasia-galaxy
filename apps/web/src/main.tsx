@@ -40,6 +40,7 @@ const coreIconNames = [
   "close",
   "play_arrow",
   "pause",
+  "format_quote",
 ];
 
 if (

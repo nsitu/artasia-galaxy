@@ -72,7 +72,7 @@ const MAP_STYLE_STORAGE_KEY = "artasia-map-style";
 type MenuItem = {
   href: string;
   label: string;
-  action?: "about";
+  action?: "about" | "slideshow";
   external?: boolean;
 };
 type IntroPhase = "loading" | "ready" | "exiting" | "complete";
@@ -116,6 +116,18 @@ function withProjectQuery(path: string, projectSlug?: string | null): string {
   const slug = projectSlug ?? getProjectSlugFromSearch(window.location.search);
   if (slug) target.searchParams.set(PROJECT_QUERY_KEY, slug);
   return `${target.pathname}${target.search}${target.hash}`;
+}
+
+function getSlideshowPath(projectSlug?: string | null, placementId?: number | null): string {
+  const target = new URL("/slideshow", window.location.origin);
+  if (projectSlug) target.searchParams.set(PROJECT_QUERY_KEY, projectSlug);
+  if (placementId != null) target.searchParams.set("placement", String(placementId));
+  return `${target.pathname}${target.search}`;
+}
+
+function requestAppFullscreen() {
+  if (document.fullscreenElement || !document.documentElement.requestFullscreen) return;
+  void document.documentElement.requestFullscreen().catch(() => undefined);
 }
 
 function getContrastingTextColour(backgroundColour: string): string | undefined {
@@ -678,12 +690,13 @@ export default function ArtScene() {
 
   const menuItems = useMemo(
     (): MenuItem[] => [
+      { href: getSlideshowPath(selectedProjectSlug, focusedPlacementDetails?.placement_id), label: "Slideshow", action: "slideshow" },
       { href: "#about", label: "About", action: "about" as const },
       { href: "/admin", label: "Admin" },
       { href: "/partners", label: "Partners" },
       { href: "https://artsforall.co/what-we-do/artasia/", label: "Arts For All", external: true },
     ],
-    []
+    [focusedPlacementDetails?.placement_id, selectedProjectSlug],
   );
   const handleContextSearchSubmit = useCallback((event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -1017,6 +1030,14 @@ export default function ArtScene() {
     (selectedPhoto.placementId == null ||
       selectedPhoto.placementId === focusedPlacementDetails.placement_id)
     ? focusedPlacementDetails.documentation_content_html?.trim()
+      ? focusedPlacementDetails
+      : undefined
+    : undefined;
+  const selectedProcessDocumentationPlacement = selectedPhoto?.assetType === "process"
+    ? focusedPlacementDetails &&
+        (selectedPhoto.placementId == null ||
+          selectedPhoto.placementId === focusedPlacementDetails.placement_id) &&
+        focusedPlacementDetails.documentation_content_html?.trim()
       ? focusedPlacementDetails
       : undefined
     : undefined;
@@ -1838,6 +1859,23 @@ export default function ArtScene() {
                       </button>
                     );
                   }
+                  if (item.action === "slideshow") {
+                    return (
+                      <a
+                        key={item.href}
+                        className="atlas-control-surface"
+                        role="menuitem"
+                        href={item.href}
+                        style={menuItemStyle}
+                        onClick={() => {
+                          setMenuOpen(false);
+                          requestAppFullscreen();
+                        }}
+                      >
+                        {item.label}
+                      </a>
+                    );
+                  }
                   return (
                     <a
                       key={item.href}
@@ -2328,6 +2366,21 @@ export default function ArtScene() {
                     onClick={handleReturnToDocumentation}
                     aria-label="Return to documentation"
                     title="Return to documentation"
+                    style={photoLightboxActionLinkStyle}
+                  >
+                    <span aria-hidden="true" style={photoLightboxMaterialIconStyle}>
+                      menu_book
+                    </span>
+                    <span>Documentation</span>
+                  </button>
+                )}
+                {selectedProcessDocumentationPlacement && !isProcessLightbox && (
+                  <button
+                    type="button"
+                    className="atlas-control-surface"
+                    onClick={() => handleDocumentationOpen(selectedProcessDocumentationPlacement)}
+                    aria-label="View documentation"
+                    title="View documentation"
                     style={photoLightboxActionLinkStyle}
                   >
                     <span aria-hidden="true" style={photoLightboxMaterialIconStyle}>
