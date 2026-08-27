@@ -552,7 +552,7 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
     return (
       <div className="atlas-slideshow atlas-slideshow-status" role="status" aria-label="Loading slideshow">
         <style>{slideshowStyles}</style>
-        <LoadingIndicator label="Loading slideshow…" />
+        <LoadingIndicator label="Loading" borderless />
       </div>
     );
   }

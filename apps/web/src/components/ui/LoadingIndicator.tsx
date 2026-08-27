@@ -5,6 +5,7 @@ interface LoadingIndicatorProps {
   detail?: string;
   tone?: "loading" | "error" | "muted";
   busy?: boolean;
+  borderless?: boolean;
 }
 
 export default function LoadingIndicator({
@@ -12,11 +13,16 @@ export default function LoadingIndicator({
   detail,
   tone = "loading",
   busy = tone === "loading",
+  borderless = false,
 }: LoadingIndicatorProps) {
   return (
     <div style={overlayStyle}>
       <style>{loadingKeyframes}</style>
-      <div style={{ ...panelStyle, ...(tone === "error" ? errorPanelStyle : {}) }}>
+      <div style={{
+        ...panelStyle,
+        ...(tone === "error" ? errorPanelStyle : {}),
+        ...(borderless ? borderlessPanelStyle : {}),
+      }}>
         <div style={headerStyle}>
           {busy && <span style={spinnerStyle} />}
           <span style={{ ...labelStyle, ...(tone === "error" ? errorLabelStyle : {}) }}>{label}</span>
@@ -57,6 +63,10 @@ const panelStyle: CSSProperties = {
 const errorPanelStyle: CSSProperties = {
   background: "rgba(10,10,20,0.76)",
   borderRadius: 6,
+};
+
+const borderlessPanelStyle: CSSProperties = {
+  border: "none",
 };
 
 const headerStyle: CSSProperties = {
