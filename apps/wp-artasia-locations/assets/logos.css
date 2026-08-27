@@ -84,10 +84,10 @@
 
 .artasia-logo-grid {
     align-items: stretch;
-    display: grid;
+    display: flex;
+    flex-wrap: wrap;
     gap: 1rem;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    justify-items: center;
+    justify-content: center;
     list-style: none;
     margin: 0;
     padding: 0;
@@ -96,11 +96,13 @@
 .artasia-logo-grid__item {
     align-items: center;
     background: #fff;
+    box-sizing: border-box;
     display: flex;
+    flex: 0 0 calc((100% - 3rem) / 4);
     min-height: 8rem;
     padding: 1.25rem;
     justify-content: center;
-    width: 100%;
+    min-width: 0;
 }
 
 .artasia-logo-grid__item--white {
@@ -141,8 +143,8 @@
 }
 
 @media (max-width: 900px) {
-    .artasia-logo-grid {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+    .artasia-logo-grid__item {
+        flex-basis: calc((100% - 2rem) / 3);
     }
 }
 
@@ -151,11 +153,8 @@
         padding: 2rem 1.25rem;
     }
 
-    .artasia-logo-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
     .artasia-logo-grid__item {
+        flex-basis: calc((100% - 1rem) / 2);
         min-height: 6.5rem;
         padding: 0.85rem;
     }
