@@ -11,7 +11,6 @@ import DocumentationOverlay from "./DocumentationOverlay";
 import { loadMaterialSymbols } from "../../modules/iconLoader";
 import TerrainGallery, {
   FocusedPlacementOverlay,
-  getPartnerAcronym,
   MapContextInfoPanel,
   ProjectInfoPanel,
   type EducatorFilterOption,
@@ -757,11 +756,6 @@ export default function ArtScene() {
   const contextLightboxPlacement = contextSearchLightboxResult?.placement;
   const contextLightboxPlacementHref = contextLightboxPlacement
     ? getContextSearchPlacementHref(contextLightboxPlacement, selectedProjectSlug)
-    : null;
-  const contextLightboxGalleryLabel = contextLightboxPlacement
-    ? `${getPartnerAcronym(
-        contextLightboxPlacement.partner_acronym || contextLightboxPlacement.partner_name,
-      )} Gallery`
     : null;
 
   useEffect(() => {
@@ -2344,19 +2338,19 @@ export default function ArtScene() {
                 )}
                 {selectedPhoto.mediaKind === "image" && (
                   <>
-                    {similarMapOrigin && contextLightboxPlacementHref && contextLightboxGalleryLabel && (
+                    {similarMapOrigin && contextLightboxPlacementHref && (
                       <a
                         href={contextLightboxPlacementHref}
                         className="atlas-control-surface"
                         onClick={(event) => event.stopPropagation()}
-                        aria-label={`View ${contextLightboxGalleryLabel}`}
-                        title={contextLightboxGalleryLabel}
+                        aria-label="View Gallery"
+                        title="Gallery"
                         style={photoLightboxActionLinkStyle}
                       >
                         <span aria-hidden="true" style={photoLightboxMaterialIconStyle}>
                           photo_library
                         </span>
-                        <span>{contextLightboxGalleryLabel}</span>
+                        <span>Gallery</span>
                       </a>
                     )}
                     <div className="atlas-lightbox-similar" style={photoLightboxSimilarStyle}>

@@ -9,7 +9,9 @@ import {
 const coreIconNames = [
   
   // Keep this subset in sync with every Material Symbol rendered on public pages;
-  // an unregistered name falls back to invisible text instead of a glyph.
+  // an unregistered name falls back to invisible text instead of a glyph. We
+  // previously added photo_library in the UI without adding it here, so keep
+  // new icon changes together with this list.
   "reset_brightness",
   "reset_colors",
   "reset_shadow",
@@ -25,6 +27,7 @@ const coreIconNames = [
   "menu_book",
   "travel_explore",
   "open_in_new",
+  "photo_library",
   "photo_prints",
   "add_to_drive",
   "browse",

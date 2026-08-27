@@ -17,6 +17,19 @@ add_action('rest_api_init', function () {
         'permission_callback' => '__return_true',
     ]);
 
+    register_rest_route('artasia/v1', '/exhibitions', [
+        'methods'             => 'GET',
+        'callback'            => 'artasia_get_exhibitions',
+        'permission_callback' => '__return_true',
+        'args'                => [
+            'project_id' => [
+                'type'              => 'integer',
+                'required'          => false,
+                'sanitize_callback' => 'absint',
+            ],
+        ],
+    ]);
+
     register_rest_route('artasia/v1', '/supporters', [
         'methods'             => 'GET',
         'callback'            => 'artasia_get_supporters',
@@ -92,6 +105,82 @@ function artasia_get_projects(): WP_REST_Response
             'tagline'     => get_post_meta($project->ID, 'artasia_project_tagline', true) ?: '',
             'description' => get_post_meta($project->ID, 'artasia_project_description', true) ?: '',
             'statistics'  => artasia_get_project_statistics($project->ID),
+        ];
+    }
+
+    return rest_ensure_response($results);
+}
+
+function artasia_format_exhibition_date_range(string $start_date, string $end_date): string
+{
+    $timezone = wp_timezone();
+    $start = $start_date !== '' ? DateTimeImmutable::createFromFormat('!Y-m-d', $start_date, $timezone) : false;
+    $end = $end_date !== '' ? DateTimeImmutable::createFromFormat('!Y-m-d', $end_date, $timezone) : false;
+
+    if (!$start && !$end) {
+        return '';
+    }
+    if (!$start) {
+        return wp_date('F j, Y', $end->getTimestamp(), $timezone);
+    }
+    if (!$end) {
+        return wp_date('F j, Y', $start->getTimestamp(), $timezone);
+    }
+    if ($start->format('Y-m-d') === $end->format('Y-m-d')) {
+        return wp_date('F j, Y', $start->getTimestamp(), $timezone);
+    }
+    if ($start->format('Y-m') === $end->format('Y-m')) {
+        return wp_date('F j', $start->getTimestamp(), $timezone) . '–' . wp_date('j, Y', $end->getTimestamp(), $timezone);
+    }
+    if ($start->format('Y') === $end->format('Y')) {
+        return wp_date('F j', $start->getTimestamp(), $timezone) . '–' . wp_date('F j, Y', $end->getTimestamp(), $timezone);
+    }
+
+    return wp_date('F j, Y', $start->getTimestamp(), $timezone) . '–' . wp_date('F j, Y', $end->getTimestamp(), $timezone);
+}
+
+function artasia_get_exhibitions(WP_REST_Request $request): WP_REST_Response
+{
+    $project_filter = absint($request->get_param('project_id'));
+    $exhibitions = get_posts([
+        'post_type'      => 'artasia_exhibition',
+        'posts_per_page' => -1,
+        'post_status'    => 'publish',
+        'orderby'        => 'title',
+        'order'          => 'ASC',
+    ]);
+    $results = [];
+
+    foreach ($exhibitions as $exhibition) {
+        $project_id = intval(get_post_meta($exhibition->ID, 'artasia_project_id', true));
+        if (
+            !$project_id
+            || get_post_type($project_id) !== 'artasia_project'
+            || get_post_status($project_id) !== 'publish'
+            || ($project_filter && $project_id !== $project_filter)
+        ) {
+            continue;
+        }
+
+        $start_date = (string) get_post_meta($exhibition->ID, 'artasia_exhibition_start_date', true);
+        $end_date = (string) get_post_meta($exhibition->ID, 'artasia_exhibition_end_date', true);
+        $host_logo_id = intval(get_post_meta($exhibition->ID, 'artasia_exhibition_host_logo_id', true));
+        $host_white_logo_id = intval(get_post_meta($exhibition->ID, 'artasia_exhibition_host_white_logo_id', true));
+
+        $results[] = [
+            'id'             => $exhibition->ID,
+            'slug'           => $exhibition->post_name,
+            'name'           => $exhibition->post_title,
+            'project_id'     => $project_id,
+            'project_name'   => get_the_title($project_id),
+            'description'    => get_post_meta($exhibition->ID, 'artasia_exhibition_description', true) ?: '',
+            'host_name'      => get_post_meta($exhibition->ID, 'artasia_exhibition_host_name', true) ?: '',
+            'host_url'       => get_post_meta($exhibition->ID, 'artasia_exhibition_host_url', true) ?: '',
+            'host_logo'      => artasia_get_partner_logo_response($host_logo_id),
+            'host_white_logo' => artasia_get_partner_logo_response($host_white_logo_id),
+            'start_date'     => $start_date,
+            'end_date'       => $end_date,
+            'date_range'     => artasia_format_exhibition_date_range($start_date, $end_date),
         ];
     }
 

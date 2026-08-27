@@ -143,6 +143,28 @@ jQuery(function ($) {
     });
 
     setupImagePicker({
+      inputSelector: '#artasia_exhibition_host_logo_id',
+      previewSelector: '#artasia_exhibition_host_logo_preview',
+      selectSelector: '#artasia_exhibition_host_logo_select',
+      removeSelector: '#artasia_exhibition_host_logo_remove',
+      title: 'Select Artasia Exhibition Host Logo',
+      buttonText: 'Use this logo',
+      allowedMimeTypes: ['image/png', 'image/svg+xml'],
+      invalidMessage: 'Please choose a PNG or SVG logo.'
+    });
+
+    setupImagePicker({
+      inputSelector: '#artasia_exhibition_host_white_logo_id',
+      previewSelector: '#artasia_exhibition_host_white_logo_preview',
+      selectSelector: '#artasia_exhibition_host_white_logo_select',
+      removeSelector: '#artasia_exhibition_host_white_logo_remove',
+      title: 'Select Artasia Exhibition Host White Logo',
+      buttonText: 'Use this logo',
+      allowedMimeTypes: ['image/png', 'image/svg+xml'],
+      invalidMessage: 'Please choose a PNG or SVG logo.'
+    });
+
+    setupImagePicker({
       inputSelector: '#artasia_people_photo_id',
       previewSelector: '#artasia_people_photo_preview',
       selectSelector: '#artasia_people_photo_select',

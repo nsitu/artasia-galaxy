@@ -37,6 +37,7 @@ function artasia_post_type_contexts(): array
                     artasia_context_post_type_link('artasia_placement', 'placements')
                 ),
                 'Published projects are available in the project selectors of the Artasia Team, Artasia Sites, and Artasia Documentation Elementor widgets. The same features can be added with the <code>[artasia_team year="2026"]</code>, <code>[artasia_sites year="2026"]</code>, and <code>[artasia_documentation year="2026"]</code> shortcodes. Select the annual Documentation Landing Page in Project Details so Documentation links open in the correct annual viewer.',
+                'Project Details includes a Sites widget setting that can enable dynamic Gallery and Documentation availability lookup while authoring. Leave it unchecked when the content should be treated as ready and the links should be shown whenever their target URLs can be constructed.',
             ],
         ],
         'artasia_activity' => [
@@ -109,6 +110,17 @@ function artasia_post_type_contexts(): array
                     artasia_context_post_type_link('artasia_project', 'project')
                 ),
                 'Recognition records connect one supporter to one annual project and store its display order. They are managed from the Project edit screen’s Supporters panel.',
+            ],
+        ],
+        'artasia_exhibition' => [
+            'title' => 'About Artasia Exhibitions',
+            'nav_label' => 'Exhibitions',
+            'paragraphs' => [
+                sprintf(
+                    'An Artasia Exhibition describes a public show connected to an annual %s.',
+                    artasia_context_post_type_link('artasia_project', 'project')
+                ),
+                'Use this record for the exhibition description, date range, host or venue details, host website, and host logos.',
             ],
         ],
         'artasia_placement' => [
@@ -623,6 +635,7 @@ function artasia_project_meta_box_html(WP_Post $post): void
     }
     $tagline = get_post_meta($post->ID, 'artasia_project_tagline', true);
     $description = get_post_meta($post->ID, 'artasia_project_description', true);
+    $use_dynamic_sites_lookup = (bool) get_post_meta($post->ID, 'artasia_project_use_dynamic_sites_lookup', true);
     $impact_statistics = [
         'children' => [
             'label' => 'Children',
@@ -942,6 +955,16 @@ function artasia_project_meta_box_html(WP_Post $post): void
                 </p>
             </td>
         </tr>
+        <tr>
+            <th scope="row">Sites widget</th>
+            <td>
+                <label for="artasia_project_use_dynamic_sites_lookup">
+                    <input type="checkbox" id="artasia_project_use_dynamic_sites_lookup" name="artasia_project_use_dynamic_sites_lookup" value="1" <?php checked($use_dynamic_sites_lookup); ?> />
+                    Use dynamic lookup for Sites widget
+                </label>
+                <p class="description">When enabled, Gallery and Documentation links are shown only when their current availability can be confirmed. When unchecked, the Sites widget assumes the content is ready and shows the links whenever their target URLs can be constructed.</p>
+            </td>
+        </tr>
     </table>
 <?php
 }
@@ -1011,6 +1034,7 @@ function artasia_save_project_meta(int $post_id): void
         'artasia_documentation_page_id',
         get_post_type($documentation_page_id) === 'page' ? $documentation_page_id : 0
     );
+    update_post_meta($post_id, 'artasia_project_use_dynamic_sites_lookup', !empty($_POST['artasia_project_use_dynamic_sites_lookup']));
 }
 add_action('save_post_artasia_project', 'artasia_save_project_meta');
 
@@ -2160,6 +2184,176 @@ function artasia_save_recognition_meta(int $post_id): void
 }
 add_action('save_post_artasia_recognition', 'artasia_save_recognition_meta');
 
+// --- Artasia Exhibition Details meta box ---
+
+function artasia_exhibition_meta_box_html(WP_Post $post): void
+{
+    $projects = get_posts([
+        'post_type'   => 'artasia_project',
+        'numberposts' => -1,
+        'post_status' => ['publish', 'draft'],
+        'meta_key'    => 'artasia_project_year',
+        'orderby'     => 'meta_value_num',
+        'order'       => 'DESC',
+    ]);
+    $project_id = intval(get_post_meta($post->ID, 'artasia_project_id', true));
+    $description = get_post_meta($post->ID, 'artasia_exhibition_description', true);
+    $host_name = get_post_meta($post->ID, 'artasia_exhibition_host_name', true);
+    $host_url = get_post_meta($post->ID, 'artasia_exhibition_host_url', true);
+    $host_logo_id = intval(get_post_meta($post->ID, 'artasia_exhibition_host_logo_id', true));
+    $host_logo_url = $host_logo_id ? wp_get_attachment_url($host_logo_id) : '';
+    $host_white_logo_id = intval(get_post_meta($post->ID, 'artasia_exhibition_host_white_logo_id', true));
+    $host_white_logo_url = $host_white_logo_id ? wp_get_attachment_url($host_white_logo_id) : '';
+    $start_date = get_post_meta($post->ID, 'artasia_exhibition_start_date', true);
+    $end_date = get_post_meta($post->ID, 'artasia_exhibition_end_date', true);
+
+    wp_nonce_field('artasia_exhibition_meta', 'artasia_exhibition_meta_nonce');
+    ?>
+    <table class="form-table">
+        <tr>
+            <th><label for="artasia_exhibition_project_id">Project</label></th>
+            <td>
+                <select id="artasia_exhibition_project_id" name="artasia_project_id" class="widefat" required>
+                    <option value="">— Select Project —</option>
+                    <?php foreach ($projects as $project) : ?>
+                        <?php $year = get_post_meta($project->ID, 'artasia_project_year', true); ?>
+                        <option value="<?php echo esc_attr($project->ID); ?>" <?php selected($project_id, $project->ID); ?>>
+                            <?php echo esc_html(trim($year . ' - ' . $project->post_title, ' -')); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <p class="description">The annual Artasia project this exhibition is associated with.</p>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_exhibition_description_editor">Description</label></th>
+            <td>
+                <?php
+                wp_editor($description, 'artasia_exhibition_description_editor', [
+                    'textarea_name' => 'artasia_exhibition_description',
+                    'textarea_rows' => 10,
+                    'media_buttons' => false,
+                    'teeny'         => false,
+                ]);
+                ?>
+                <p class="description">A rich-text description of the exhibition or show.</p>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_exhibition_host_name">Host / Venue / Context</label></th>
+            <td>
+                <input type="text" id="artasia_exhibition_host_name" name="artasia_exhibition_host_name" value="<?php echo esc_attr($host_name); ?>" class="widefat" placeholder="Gallery, venue, or other host organization" />
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_exhibition_host_url">Host URL</label></th>
+            <td>
+                <input type="url" id="artasia_exhibition_host_url" name="artasia_exhibition_host_url" value="<?php echo esc_attr($host_url); ?>" class="widefat" placeholder="https://example.org" />
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_exhibition_host_logo_id">Host Logo</label></th>
+            <td>
+                <input type="hidden" id="artasia_exhibition_host_logo_id" name="artasia_exhibition_host_logo_id" value="<?php echo esc_attr($host_logo_id); ?>" />
+                <div id="artasia_exhibition_host_logo_preview" class="artasia-logo-preview">
+                    <?php if ($host_logo_url) : ?>
+                        <img src="<?php echo esc_url($host_logo_url); ?>" alt="" />
+                    <?php endif; ?>
+                </div>
+                <button type="button" class="button" id="artasia_exhibition_host_logo_select">Select Host Logo</button>
+                <button type="button" class="button" id="artasia_exhibition_host_logo_remove" <?php disabled(!$host_logo_id); ?>>Remove Host Logo</button>
+                <p class="description">PNG or SVG.</p>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="artasia_exhibition_host_white_logo_id">Host White Logo</label></th>
+            <td>
+                <input type="hidden" id="artasia_exhibition_host_white_logo_id" name="artasia_exhibition_host_white_logo_id" value="<?php echo esc_attr($host_white_logo_id); ?>" />
+                <div id="artasia_exhibition_host_white_logo_preview" class="artasia-logo-preview artasia-logo-preview--dark">
+                    <?php if ($host_white_logo_url) : ?>
+                        <img src="<?php echo esc_url($host_white_logo_url); ?>" alt="" />
+                    <?php endif; ?>
+                </div>
+                <br />
+                <button type="button" class="button" id="artasia_exhibition_host_white_logo_select">Select Host White Logo</button>
+                <button type="button" class="button" id="artasia_exhibition_host_white_logo_remove" <?php disabled(!$host_white_logo_id); ?>>Remove Host White Logo</button>
+                <p class="description">PNG or SVG. The dark preview background is for visibility and is not part of the uploaded logo.</p>
+            </td>
+        </tr>
+        <tr>
+            <th scope="row">Date range</th>
+            <td>
+                <label for="artasia_exhibition_start_date">Start date</label>
+                <input type="date" id="artasia_exhibition_start_date" name="artasia_exhibition_start_date" value="<?php echo esc_attr($start_date); ?>" />
+                <label for="artasia_exhibition_end_date" style="margin-left:12px;">End date</label>
+                <input type="date" id="artasia_exhibition_end_date" name="artasia_exhibition_end_date" value="<?php echo esc_attr($end_date); ?>" />
+                <p class="description">Enter the dates for the show, for example September 10–12, 2026.</p>
+            </td>
+        </tr>
+    </table>
+    <?php
+}
+
+function artasia_register_exhibition_meta_box(): void
+{
+    $context = artasia_get_post_type_context('artasia_exhibition');
+
+    add_meta_box(
+        'artasia_exhibition_details',
+        'Artasia Exhibition Details',
+        'artasia_exhibition_meta_box_html',
+        'artasia_exhibition',
+        'normal',
+        'default'
+    );
+
+    if ($context) {
+        add_meta_box(
+            'artasia_exhibition_context',
+            $context['title'],
+            'artasia_exhibition_context_meta_box_html',
+            'artasia_exhibition',
+            'side',
+            'high'
+        );
+    }
+}
+add_action('add_meta_boxes', 'artasia_register_exhibition_meta_box');
+
+function artasia_exhibition_context_meta_box_html(): void
+{
+    $context = artasia_get_post_type_context('artasia_exhibition');
+    if (!$context) {
+        return;
+    }
+
+    artasia_context_meta_box_html($context['paragraphs']);
+}
+
+function artasia_save_exhibition_meta(int $post_id): void
+{
+    if (!isset($_POST['artasia_exhibition_meta_nonce']) || !wp_verify_nonce($_POST['artasia_exhibition_meta_nonce'], 'artasia_exhibition_meta')) {
+        return;
+    }
+    if ((defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) || !current_user_can('edit_post', $post_id)) {
+        return;
+    }
+
+    $project_id = intval($_POST['artasia_project_id'] ?? 0);
+    update_post_meta($post_id, 'artasia_project_id', get_post_type($project_id) === 'artasia_project' ? $project_id : 0);
+    update_post_meta($post_id, 'artasia_exhibition_description', wp_kses_post(wp_unslash($_POST['artasia_exhibition_description'] ?? '')));
+    update_post_meta($post_id, 'artasia_exhibition_host_name', sanitize_text_field($_POST['artasia_exhibition_host_name'] ?? ''));
+    update_post_meta($post_id, 'artasia_exhibition_host_url', esc_url_raw($_POST['artasia_exhibition_host_url'] ?? ''));
+    update_post_meta($post_id, 'artasia_exhibition_host_logo_id', artasia_validate_partner_logo_id(intval($_POST['artasia_exhibition_host_logo_id'] ?? 0)));
+    update_post_meta($post_id, 'artasia_exhibition_host_white_logo_id', artasia_validate_partner_logo_id(intval($_POST['artasia_exhibition_host_white_logo_id'] ?? 0)));
+
+    $start_date = artasia_sanitize_exhibition_date($_POST['artasia_exhibition_start_date'] ?? '');
+    $end_date = artasia_sanitize_exhibition_date($_POST['artasia_exhibition_end_date'] ?? '');
+    update_post_meta($post_id, 'artasia_exhibition_start_date', $start_date);
+    update_post_meta($post_id, 'artasia_exhibition_end_date', $end_date);
+}
+add_action('save_post_artasia_exhibition', 'artasia_save_exhibition_meta');
+
 function artasia_validate_image_attachment_id(int $attachment_id): int
 {
     if (!$attachment_id) {
@@ -2614,7 +2808,7 @@ add_action('save_post_artasia_anecdote', 'artasia_save_anecdote_meta');
 
 function artasia_remove_unnecessary_meta_boxes(): void
 {
-    $post_types = ['artasia_project', 'artasia_activity', 'artasia_partner', 'artasia_supporter', 'artasia_place', 'artasia_people', 'artasia_role', 'artasia_recognition', 'artasia_placement', 'artasia_document', 'artasia_anecdote'];
+    $post_types = ['artasia_project', 'artasia_activity', 'artasia_partner', 'artasia_supporter', 'artasia_place', 'artasia_people', 'artasia_role', 'artasia_recognition', 'artasia_exhibition', 'artasia_placement', 'artasia_document', 'artasia_anecdote'];
     $meta_box_contexts = ['side', 'normal', 'advanced'];
 
     foreach ($post_types as $post_type) {

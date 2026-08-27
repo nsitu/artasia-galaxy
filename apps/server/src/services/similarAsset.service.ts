@@ -27,7 +27,7 @@ const PLACEMENT_TAG_SEARCH_CONCURRENCY = 4;
 
 export interface SimilarAssetRecommendation {
   asset: Photo;
-  placement: Pick<ArtasiaMapPlacement, "placement_id" | "placement_name" | "placement_slug" | "section" | "partner_name" | "partner_acronym" | "partner_logo" | "partner_white_logo">;
+  placement: Pick<ArtasiaMapPlacement, "placement_id" | "placement_name" | "placement_slug" | "section" | "partner_name" | "partner_logo" | "partner_white_logo">;
   contextualLabels: string[];
 }
 
@@ -112,7 +112,6 @@ function mapRecommendationAsset(
       ...(placement.placement_slug ? { placement_slug: placement.placement_slug } : {}),
       ...(placement.section ? { section: placement.section } : {}),
       ...(placement.partner_name ? { partner_name: placement.partner_name } : {}),
-      ...(placement.partner_acronym ? { partner_acronym: placement.partner_acronym } : {}),
       ...(placement.partner_logo ? { partner_logo: placement.partner_logo } : {}),
       ...(placement.partner_white_logo ? { partner_white_logo: placement.partner_white_logo } : {}),
     },

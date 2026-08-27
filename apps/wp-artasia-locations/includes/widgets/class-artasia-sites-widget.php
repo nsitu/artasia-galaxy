@@ -75,7 +75,7 @@ class Artasia_Sites_Elementor_Widget extends \Elementor\Widget_Base
         $this->add_control('sites_instructions', [
             'type' => \Elementor\Controls_Manager::RAW_HTML,
             'raw'  => sprintf(
-                '<p>Manage site assignments in <a href="%s" target="_blank" rel="noopener noreferrer">Artasia Placements</a>. Each placement must be connected to the selected project and a partner, and its <strong>Publish this placement in Artasia site listings</strong> checkbox must be active.</p>',
+                '<p>Manage site assignments in <a href="%s" target="_blank" rel="noopener noreferrer">Artasia Placements</a>. Each placement must be connected to the selected project and a partner, and its <strong>Publish this placement in Artasia site listings</strong> checkbox must be active. The selected Project controls whether Gallery and Documentation links use dynamic availability lookup.</p>',
                 esc_url(admin_url('edit.php?post_type=artasia_placement'))
             ),
             'content_classes' => 'elementor-panel-alert elementor-panel-alert-info',

@@ -4115,7 +4115,7 @@ function getPlacementSignAngle(
   );
 }
 
-export function getPartnerAcronym(value?: string) {
+function getPartnerAcronym(value?: string) {
   const name = value?.trim().replace(/\s+/g, " ");
   if (!name) return "SITE";
   if (

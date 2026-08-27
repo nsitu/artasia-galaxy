@@ -63,7 +63,6 @@ export interface ContextSearchPlacement {
   placement_slug?: string;
   section?: string;
   partner_name?: string;
-  partner_acronym?: string;
   partner_logo?: {
     id: number;
     url: string;

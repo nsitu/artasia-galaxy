@@ -24,7 +24,6 @@ export interface ContextSearchResult {
     | "placement_slug"
     | "section"
     | "partner_name"
-    | "partner_acronym"
     | "partner_logo"
     | "partner_white_logo"
   >;
@@ -52,7 +51,6 @@ function mapContextAsset(asset: ImmichAsset, placement: ArtasiaMapPlacement): Co
       ...(placement.placement_slug ? { placement_slug: placement.placement_slug } : {}),
       ...(placement.section ? { section: placement.section } : {}),
       ...(placement.partner_name ? { partner_name: placement.partner_name } : {}),
-      ...(placement.partner_acronym ? { partner_acronym: placement.partner_acronym } : {}),
       ...(placement.partner_logo ? { partner_logo: placement.partner_logo } : {}),
       ...(placement.partner_white_logo ? { partner_white_logo: placement.partner_white_logo } : {}),
     },

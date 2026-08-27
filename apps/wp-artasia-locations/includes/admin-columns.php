@@ -443,6 +443,44 @@ function artasia_recognition_column(string $column, int $post_id): void
 }
 add_action('manage_artasia_recognition_posts_custom_column', 'artasia_recognition_column', 10, 2);
 
+// --- Artasia Exhibition columns ---
+
+function artasia_exhibition_columns(array $columns): array
+{
+    $new = [];
+    foreach ($columns as $key => $label) {
+        $new[$key] = $label;
+        if ($key === 'title') {
+            $new['artasia_exhibition_project'] = 'Project';
+            $new['artasia_exhibition_host'] = 'Host / Venue';
+            $new['artasia_exhibition_dates'] = 'Date Range';
+        }
+    }
+
+    return $new;
+}
+add_filter('manage_artasia_exhibition_posts_columns', 'artasia_exhibition_columns');
+
+function artasia_exhibition_column(string $column, int $post_id): void
+{
+    switch ($column) {
+        case 'artasia_exhibition_project':
+            $project_id = intval(get_post_meta($post_id, 'artasia_project_id', true));
+            echo $project_id ? esc_html(artasia_project_admin_label($project_id)) : '—';
+            break;
+        case 'artasia_exhibition_host':
+            echo esc_html(get_post_meta($post_id, 'artasia_exhibition_host_name', true) ?: '—');
+            break;
+        case 'artasia_exhibition_dates':
+            echo esc_html(artasia_format_exhibition_date_range(
+                (string) get_post_meta($post_id, 'artasia_exhibition_start_date', true),
+                (string) get_post_meta($post_id, 'artasia_exhibition_end_date', true)
+            ) ?: '—');
+            break;
+    }
+}
+add_action('manage_artasia_exhibition_posts_custom_column', 'artasia_exhibition_column', 10, 2);
+
 // --- Pedagogical Documentation columns ---
 
 function artasia_documentation_columns(array $columns): array

@@ -161,6 +161,13 @@ function artasia_register_meta_fields(): void
         'show_in_rest' => true,
         'sanitize_callback' => 'artasia_sanitize_integer_meta',
     ]);
+    register_post_meta('artasia_project', 'artasia_project_use_dynamic_sites_lookup', [
+        'type'         => 'boolean',
+        'single'       => true,
+        'default'      => false,
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_boolean_meta',
+    ]);
     register_post_meta('artasia_activity', 'artasia_activity_colour', [
         'type'         => 'string',
         'single'       => true,
@@ -530,6 +537,64 @@ function artasia_register_meta_fields(): void
         'sanitize_callback' => 'artasia_sanitize_integer_meta',
     ]);
 
+    // --- Artasia Exhibition meta ---
+    register_post_meta('artasia_exhibition', 'artasia_project_id', [
+        'type'         => 'integer',
+        'single'       => true,
+        'default'      => 0,
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_integer_meta',
+    ]);
+    register_post_meta('artasia_exhibition', 'artasia_exhibition_description', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'wp_kses_post',
+    ]);
+    register_post_meta('artasia_exhibition', 'artasia_exhibition_host_name', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'sanitize_text_field',
+    ]);
+    register_post_meta('artasia_exhibition', 'artasia_exhibition_host_url', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'esc_url_raw',
+    ]);
+    register_post_meta('artasia_exhibition', 'artasia_exhibition_host_logo_id', [
+        'type'         => 'integer',
+        'single'       => true,
+        'default'      => 0,
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_integer_meta',
+    ]);
+    register_post_meta('artasia_exhibition', 'artasia_exhibition_host_white_logo_id', [
+        'type'         => 'integer',
+        'single'       => true,
+        'default'      => 0,
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_integer_meta',
+    ]);
+    register_post_meta('artasia_exhibition', 'artasia_exhibition_start_date', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_exhibition_date',
+    ]);
+    register_post_meta('artasia_exhibition', 'artasia_exhibition_end_date', [
+        'type'         => 'string',
+        'single'       => true,
+        'default'      => '',
+        'show_in_rest' => true,
+        'sanitize_callback' => 'artasia_sanitize_exhibition_date',
+    ]);
+
     // --- Pedagogical Documentation meta ---
     register_post_meta('artasia_document', 'artasia_documentation_people_ids', [
         'type'         => 'array',
@@ -613,6 +678,14 @@ function artasia_sanitize_float_meta($value, string $meta_key = '', string $obje
 function artasia_sanitize_boolean_meta($value, string $meta_key = '', string $object_type = '', string $object_subtype = ''): bool
 {
     return filter_var($value, FILTER_VALIDATE_BOOLEAN);
+}
+
+function artasia_sanitize_exhibition_date($value, string $meta_key = '', string $object_type = '', string $object_subtype = ''): string
+{
+    $date = sanitize_text_field((string) $value);
+    $parsed = DateTimeImmutable::createFromFormat('!Y-m-d', $date);
+
+    return $parsed && $parsed->format('Y-m-d') === $date ? $date : '';
 }
 
 function artasia_anecdote_displays_in_atlas(int $post_id): bool
