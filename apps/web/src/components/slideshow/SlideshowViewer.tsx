@@ -681,8 +681,8 @@ const slideshowStyles = `
 
   .atlas-slideshow-metadata {
     position: absolute;
-    left: clamp(28px, 5vw, 96px);
-    bottom: clamp(28px, 6vh, 88px);
+    left: clamp(20px, 3.5vw, 64px);
+    bottom: clamp(20px, 3.5vh, 48px);
     z-index: 1;
     width: fit-content;
     max-width: min(62vw, 1100px);
