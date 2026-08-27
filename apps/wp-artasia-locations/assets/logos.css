@@ -65,7 +65,19 @@
     text-align: center;
 }
 
+.artasia-logo-section__intro p {
+    margin: 0 0 1em;
+}
+
+.artasia-logo-section__intro p:last-child {
+    margin-bottom: 0;
+}
+
 .artasia-logo-sections--white .artasia-logo-section__intro {
+    color: #fff;
+}
+
+.artasia-logo-sections--white .artasia-logo-section__intro a {
     color: #fff;
 }
 

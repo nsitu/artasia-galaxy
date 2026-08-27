@@ -446,7 +446,7 @@ function artasia_render_logos(array $args = []): string
                 <section class="artasia-logo-section artasia-logo-section--supporters">
                     <h2 class="artasia-logo-section__heading"><?php echo esc_html((string) $args['supporter_heading']); ?></h2>
                     <?php if ($supporter_intro !== '') : ?>
-                        <p class="artasia-logo-section__intro"><?php echo esc_html($supporter_intro); ?></p>
+                        <div class="artasia-logo-section__intro"><?php echo wp_kses_post(wpautop($supporter_intro)); ?></div>
                     <?php endif; ?>
                     <?php foreach ($supporter_groups as $type => $items) : ?>
                         <section class="artasia-logo-group">
@@ -461,7 +461,7 @@ function artasia_render_logos(array $args = []): string
                 <section class="artasia-logo-section artasia-logo-section--partners">
                     <h2 class="artasia-logo-section__heading"><?php echo esc_html((string) $args['partner_heading']); ?></h2>
                     <?php if ($partner_intro !== '') : ?>
-                        <p class="artasia-logo-section__intro"><?php echo esc_html($partner_intro); ?></p>
+                        <div class="artasia-logo-section__intro"><?php echo wp_kses_post(wpautop($partner_intro)); ?></div>
                     <?php endif; ?>
                     <?php artasia_render_logo_grid($partners); ?>
                 </section>

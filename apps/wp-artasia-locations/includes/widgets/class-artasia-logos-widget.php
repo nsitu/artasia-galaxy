@@ -93,11 +93,14 @@ class Artasia_Logos_Elementor_Widget extends \Elementor\Widget_Base
 
         $this->add_control('partner_intro', [
             'label'       => 'Partners intro text',
-            'type'        => \Elementor\Controls_Manager::TEXTAREA,
+            'type'        => \Elementor\Controls_Manager::WYSIWYG,
             'default'     => 'Arts For All recognizes the invaluable work of our community partners. Artasia would not exist without you. Thank you!',
-            'rows'        => 3,
             'label_block' => true,
             'condition'   => ['logo_type' => 'partners'],
+            'editor_options' => [
+                'media_buttons' => false,
+                'textarea_rows' => 5,
+            ],
         ]);
 
         $this->add_control('supporter_heading', [
@@ -110,11 +113,14 @@ class Artasia_Logos_Elementor_Widget extends \Elementor\Widget_Base
 
         $this->add_control('supporter_intro', [
             'label'       => 'Supporters intro text',
-            'type'        => \Elementor\Controls_Manager::TEXTAREA,
+            'type'        => \Elementor\Controls_Manager::WYSIWYG,
             'default'     => 'Arts For All is grateful to our sponsors and supporters at all levels. Thank you!',
-            'rows'        => 3,
             'label_block' => true,
             'condition'   => ['logo_type' => 'supporters'],
+            'editor_options' => [
+                'media_buttons' => false,
+                'textarea_rows' => 5,
+            ],
         ]);
 
         $this->add_control('logo_variant', [
