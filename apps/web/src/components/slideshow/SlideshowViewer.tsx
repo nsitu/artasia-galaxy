@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import { fetchSlideshow, fetchUploadOptions, type ActivityOption, type Photo, type UploadPlacement } from "../../api/client";
 
 const ANECDOTE_DWELL_MS = 10_000;
-const MIN_IMAGE_DWELL_MS = 5_000;
-const MAX_IMAGE_DWELL_MS = 15_000;
+const MIN_IMAGE_DWELL_MS = 10_000;
+const MAX_IMAGE_DWELL_MS = 16_000;
 const MIN_DWELL_CHARACTER_COUNT = 200;
 const MAX_DWELL_CHARACTER_COUNT = 500;
 const MAX_RECENT_IDS = 12;
@@ -70,6 +70,21 @@ function getImageDwellMs(characterCount: number): number {
   return Math.round(
     MIN_IMAGE_DWELL_MS + progress * (MAX_IMAGE_DWELL_MS - MIN_IMAGE_DWELL_MS),
   );
+}
+
+function getHtmlTextLength(html?: string): number {
+  if (!html?.trim()) return 0;
+  const document = new DOMParser().parseFromString(html, "text/html");
+  return document.body.textContent?.replace(/\s+/g, " ").trim().length ?? 0;
+}
+
+function getAnecdoteFontSizing(characterCount: number) {
+  if (characterCount <= 500) {
+    return { floor: "28px", cap: "52px" };
+  }
+
+  const cap = Math.max(22, Math.min(52, (52 * 500) / characterCount));
+  return { floor: "22px", cap: `${cap}px` };
 }
 
 function getContrastingTextColour(backgroundColour?: string): string {
@@ -449,6 +464,10 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
     .join(" ")
     .length;
   const imageDwellMs = getImageDwellMs(metadataCharacterCount);
+  const anecdoteCharacterCount = currentPhoto?.mediaKind === "anecdote"
+    ? getHtmlTextLength(currentPhoto.anecdoteHtml) + (currentPhoto.attribution?.trim().length ?? 0)
+    : 0;
+  const anecdoteFontSizing = getAnecdoteFontSizing(anecdoteCharacterCount);
 
   useEffect(() => {
     if (!currentPhoto) return;
@@ -606,6 +625,8 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
               style={{
                 "--atlas-slideshow-accent": activityColour ?? "#b7bac3",
                 "--atlas-slideshow-accent-text": getContrastingTextColour(activityColour),
+                "--atlas-slideshow-anecdote-font-floor": anecdoteFontSizing.floor,
+                "--atlas-slideshow-anecdote-font-cap": anecdoteFontSizing.cap,
               } as CSSProperties}
             >
               {displayBadges.length > 0 && (
@@ -978,7 +999,7 @@ const slideshowStyles = `
     margin: 0;
     padding: clamp(28px, 6vw, 64px);
     box-sizing: border-box;
-    overflow: auto;
+    overflow: hidden;
     border: 0;
     background: color-mix(in srgb, var(--atlas-slideshow-accent) 30%, rgba(8, 7, 10, 0.88));
     box-shadow: 0 18px 60px rgba(0,0,0,0.4);
@@ -1005,8 +1026,13 @@ const slideshowStyles = `
 
   .atlas-slideshow-anecdote-content {
     color: #ffffff;
-    font-size: clamp(28px, 2.5vw, 52px);
+    font-size: clamp(
+      var(--atlas-slideshow-anecdote-font-floor, 28px),
+      2.5vw,
+      var(--atlas-slideshow-anecdote-font-cap, 52px)
+    );
     line-height: 1.25;
+    overflow: hidden;
   }
 
   .atlas-slideshow-anecdote-content p { margin: 0 0 0.75em; }
@@ -1117,5 +1143,6 @@ const slideshowStyles = `
 
     .atlas-slideshow-metadata p { margin-top: 10px; }
     .atlas-slideshow-anecdote { width: 100%; height: 100%; max-height: none; margin: 0; padding: 22px; }
+    .atlas-slideshow-anecdote-content { font-size: clamp(var(--atlas-slideshow-anecdote-font-floor, 28px), 4vw, var(--atlas-slideshow-anecdote-font-cap, 52px)); }
   }
 `;
