@@ -59,6 +59,33 @@ test("scanner finds deep activities, inherits tags, excludes root media and conf
   assert.equal(job.results.find((item) => item.fileId === "document")?.status, "excluded");
 });
 
+test("scanner inherits case-insensitive Process folder types without affecting siblings or activity exclusions", async () => {
+  for (const name of ["Process", "process", "PROCESS", "Work in PrOcEsS photos", "Postprocessing"]) {
+    const job = makeJob();
+    const client = makeClient({
+      root: [folder("org", "PROCESS documentation")],
+      org: [folder("week", "Week 1"), media("unmatched", "org")],
+      week: [media("direct"), media("process-filename"), folder("photos", "Photos"), folder("sibling", "Finished artwork")],
+      photos: [folder("process", name)], sibling: [media("normal", "sibling")],
+      process: [media("in-process", "process"), folder("deep", "Details"), folder("conflict", "Week 2"),
+        media("document", "process", "application/pdf")],
+      deep: [media("nested-video", "deep", "video/mp4")], conflict: [media("wrong", "conflict")],
+    }, { getFolder: async () => ({ ...folder("root", "Process placement"), driveId: "shared" }) });
+    await scanDrivePlacement({ client, config, job, signal: signal(), progress: async () => {} });
+    assert.equal(job.eligible, 5, name);
+    const pending = job.results.filter((item) => item.status === "pending");
+    assert.deepEqual(pending.filter((item) => item.assetType === "process").map((item) => item.fileId), ["in-process", "nested-video"], name);
+    assert.ok(pending.every((item) => item.activityId === 10), name);
+    for (const id of ["direct", "process-filename", "normal"]) {
+      assert.equal(pending.find((item) => item.fileId === id)?.assetType, undefined, `${name}: ${id}`);
+    }
+    for (const id of ["unmatched", "wrong", "document"]) {
+      assert.equal(job.results.find((item) => item.fileId === id)?.status, "excluded", `${name}: ${id}`);
+    }
+    assert.equal(job.results.find((item) => item.fileId === "conflict")?.status, "needs_review");
+  }
+});
+
 test("scanner follows short/empty pages, preserves Shared Drive scope, and deduplicates IDs", async () => {
   const job = makeJob();
   const calls: string[] = [];
@@ -160,6 +187,69 @@ test("manager imports once, skips archived and trashed IDs, and succeeds on an u
   assert.equal(imported.length, 1);
 });
 
+test("manager writes and verifies Process tags on new imports, persists their type, and skips existing sources", async (t) => {
+  const remoteAssets = new Map<string, ImmichAsset>([
+    ["archive", asset("archive", "archived", { isArchived: true })],
+    ["trash", asset("trash", "trashed", { isTrashed: true })],
+  ]);
+  const writtenTags = new Map<string, string[]>();
+  let processReadsAfterWrite = 0;
+  const mediaDeps = {
+    uploadAsset: async ({ deviceAssetId }: { deviceAssetId?: string }) => {
+      const id = deviceAssetId!.split(":").at(-1)!;
+      remoteAssets.set(id, asset(id, "", { tags: [] }));
+      return { id, status: "created" };
+    },
+    getAsset: async (id: string) => {
+      const value = structuredClone(remoteAssets.get(id)!);
+      // A successful import must wait until Immich actually exposes the Process tag.
+      if (id === "new" && writtenTags.has(id) && ++processReadsAfterWrite === 1) {
+        value.tags = value.tags!.filter((tag) => tag.name !== "asset_type:process");
+      }
+      return value;
+    },
+    tagAsset: async (id: string, names: string[]) => {
+      writtenTags.set(id, names);
+      remoteAssets.get(id)!.tags = names.map((name) => ({ id: name, name, value: name }));
+    },
+    prepareAudioAsVideo: async () => { throw new Error("Unexpected audio conversion"); },
+  };
+  const { manager, directory } = await fixture(t, {
+    loadDriveSourceIndex: async () => {
+      const index: SourceIndex = new Map();
+      for (const value of remoteAssets.values()) addSourceAsset(index, value);
+      return index;
+    },
+    importNewDriveFile: (params) => importNewDriveFile(params, mediaDeps),
+  });
+  const files = [media("regular"), media("new", "process"), media("deep", "details", "video/mp4")];
+  const client = makeClient({ root: [folder("week", "Week 1")], week: [files[0], folder("process", "PrOcEsS photos")],
+    process: [files[1], media("archived", "process"), media("trashed", "process"), folder("details", "Details")], details: [files[2]] }, {
+    getFile: async (id: string) => files.find((file) => file.id === id)!,
+    downloadFile: async () => Readable.from([Buffer.from("test")]),
+  });
+  const first = await manager.start(1, config, "test", client); await manager.waitForIdle();
+  const status = await manager.status(1, config);
+  assert.equal(status.latest?.status, "completed");
+  assert.equal(status.latest?.counts.imported, 3);
+  assert.equal(status.latest?.counts.existing, 2);
+  assert.equal(processReadsAfterWrite, 2, "Process must be verified, not just submitted");
+  for (const id of ["regular", "new", "deep"]) {
+    const tags = writtenTags.get(id)!;
+    assert.ok(tags.includes("placement:1")); assert.ok(tags.includes("activity:10"));
+    assert.ok(tags.includes(`source:drive:${id}`));
+    assert.equal(tags.includes("asset_type:process"), id !== "regular");
+    assert.ok(!tags.includes("asset_type:artwork"));
+  }
+  assert.equal(writtenTags.size, 3, "archived and trashed sources must remain untouched");
+  const saved = JSON.parse(await readFile(join(directory, `${first.jobId}.json`), "utf8")) as DriveImportJob;
+  assert.equal(saved.results.find((item) => item.fileId === "new")?.assetType, "process");
+  assert.equal(saved.results.find((item) => item.fileId === "deep")?.assetType, "process");
+  await manager.start(1, config, "test", client); await manager.waitForIdle();
+  assert.equal((await manager.status(1, config)).latest?.counts.existing, 5);
+  assert.equal(writtenTags.size, 3);
+});
+
 test("failures preserve the prior success timestamp; changed configuration is marked stale", async (t) => {
   const { manager } = await fixture(t);
   await manager.start(1, config, "test", makeClient({ root: [folder("week", "Week 1")], week: [] })); await manager.waitForIdle();
@@ -220,6 +310,50 @@ test("partial tagging is resumed with the owned asset ID rather than skipped as 
   assert.equal(recovery, "owned"); assert.equal((await manager.status(1, config)).latest?.status, "completed");
 });
 
+test("incomplete Process imports retain their type through restart and tagging recovery", async (t) => {
+  const { manager, directory } = await fixture(t, { importNewDriveFile: async (params) => {
+    assert.ok(params.tags.includes("asset_type:process"));
+    await params.checkpoint("owned");
+    throw new Error("tag write failed");
+  } });
+  const client = makeClient({ root: [folder("week", "Week 1")], week: [folder("process", "PROCESS")], process: [media("new", "process")] });
+  await manager.start(1, config, "test", client); await manager.waitForIdle();
+  let recoveries = 0;
+  const reloaded = new DriveAutoImportManager(new DriveJobStore(directory), {
+    loadDriveSourceIndex: async () => new Map(), findDriveSourceAssets: async () => [],
+    importNewDriveFile: async (params) => {
+      assert.equal(params.recoveryAssetId, "owned");
+      assert.ok(params.tags.includes("asset_type:process"));
+      recoveries++;
+      return { status: "imported", assetId: "owned" };
+    },
+  });
+  const rerun = await reloaded.start(1, config, "test", client); await reloaded.waitForIdle();
+  assert.equal(recoveries, 1);
+  assert.equal((await reloaded.get(rerun.jobId))?.status, "completed");
+  assert.equal((await reloaded.get(rerun.jobId))?.results[0].assetType, "process");
+});
+
+test("changed Process classification of an incomplete upload requires review instead of retagging", async (t) => {
+  for (const initialFolder of ["Process", "Photos"]) {
+    let calls = 0;
+    const { manager } = await fixture(t, { importNewDriveFile: async (params) => {
+      calls++;
+      await params.checkpoint("owned");
+      throw new Error("tag write failed");
+    } });
+    const client = (name: string) => makeClient({ root: [folder("week", "Week 1")],
+      week: [folder("nested", name)], nested: [media("new", "nested")] });
+    await manager.start(1, config, "test", client(initialFolder)); await manager.waitForIdle();
+    const rerun = await manager.start(1, config, "test", client(initialFolder === "Process" ? "Photos" : "Process"));
+    await manager.waitForIdle();
+    const result = (await manager.get(rerun.jobId))?.results[0];
+    assert.equal(calls, 1, "changed type must not cause a second upload or tag write");
+    assert.equal(result?.status, "needs_review");
+    assert.match(result?.detail ?? "", /asset type changed/);
+  }
+});
+
 test("different placement source ownership is flagged and never reassigned", () => {
   assert.match(sourceConflict([asset("a", "id", { tags: [{ id: "p", name: "placement:2", value: "placement:2" }] })], 1)!, /another placement/);
   assert.match(sourceConflict([asset("a", "id"), asset("b", "id")], 1)!, /Multiple/);
@@ -234,23 +368,89 @@ test("bounded spool removes partial files when the actual byte limit is exceeded
   assert.deepEqual(await readdir(directory), []);
 });
 
-test("additive upload never tags a checksum duplicate and checkpoints before tagging a new asset", async (t) => {
+test("duplicate uploads never claim ownership; only newly created assets receive full tagging", async (t) => {
   const { directory } = await fixture(t);
   const file = media("new"); const events: string[] = [];
-  let duplicate = true;
+  let uploadStatus = "duplicate";
   const deps = {
-    uploadAsset: async () => ({ id: "asset", status: duplicate ? "duplicate" : "created" }),
+    uploadAsset: async () => ({ id: "asset", status: uploadStatus }),
     getAsset: async () => asset("asset", "new", { tags: [{ id: "s", name: "source:drive:new", value: "source:drive:new" }] }),
+    findDriveSourceAssets: async () => [],
     tagAsset: async () => { events.push("tags"); },
     prepareAudioAsVideo: async () => { throw new Error("Unexpected audio conversion"); },
   };
   const params = { client: { getFile: async () => file, downloadFile: async () => Readable.from([Buffer.from("test")]) }, file, tags: [],
+    sourceLinkContext: { config, placementId: 1, activityId: 10 },
     tempDirectory: directory, signal: signal(), checkpoint: async () => { events.push("checkpoint"); } };
+  assert.equal((await importNewDriveFile(params, deps)).status, "existing");
+  assert.deepEqual(events, []);
+  uploadStatus = "unknown-status";
   assert.equal((await importNewDriveFile(params, deps)).status, "needs_review");
   assert.deepEqual(events, []);
-  duplicate = false;
+  uploadStatus = "created";
   assert.equal((await importNewDriveFile(params, deps)).status, "imported");
   assert.deepEqual(events, ["checkpoint", "tags"]);
+});
+
+test("manager persists linked-existing success without upload ownership or Process type changes and skips it on rerun", async (t) => {
+  const existing = asset("existing", "", { isTrashed: true, tags: [
+    { id: "p", name: "placement:1", value: "placement:1" }, { id: "a", name: "activity:10", value: "activity:10" },
+  ] });
+  let uploads = 0;
+  const writtenTags: string[][] = [];
+  const mediaDeps = {
+    getAsset: async () => structuredClone(existing),
+    findDriveSourceAssets: async (id: string) => driveSourceIds(existing).includes(id) ? [existing] : [],
+    tagAsset: async (_id: string, names: string[]) => {
+      writtenTags.push(names);
+      existing.tags!.push(...names.map((name) => ({ id: "source", name, value: name })));
+    },
+    uploadAsset: async () => { uploads++; return { id: existing.id, status: "duplicate" }; },
+    prepareAudioAsVideo: async () => { throw new Error("must not convert"); },
+  };
+  const { manager, directory } = await fixture(t, {
+    loadDriveSourceIndex: async () => { const index: SourceIndex = new Map(); addSourceAsset(index, existing); return index; },
+    findDriveSourceAssets: mediaDeps.findDriveSourceAssets,
+    importNewDriveFile: (params) => importNewDriveFile(params, mediaDeps),
+  });
+  const client = makeClient({ root: [folder("week", "Week 1")], week: [folder("process", "Process photos")], process: [media("AbC", "process")] }, {
+    getFile: async () => media("AbC", "process"), downloadFile: async () => Readable.from([Buffer.from("test")]),
+  });
+  const first = await manager.start(1, config, "test", client); await manager.waitForIdle();
+  const status = await manager.status(1, config);
+  assert.equal(status.latest?.status, "completed");
+  assert.equal(status.latest?.counts.linked, 1);
+  assert.equal(status.latest?.counts.imported, 0);
+  assert.equal(status.latest?.counts.existing, 0);
+  assert.equal(status.lastSuccessful?.jobId, first.jobId);
+  assert.deepEqual(writtenTags, [["source:drive:AbC"]]);
+  assert.equal(existing.isTrashed, true);
+  const stored = JSON.parse(await readFile(join(directory, `${first.jobId}.json`), "utf8")) as DriveImportJob;
+  assert.equal(stored.results[0].status, "linked");
+  assert.equal(stored.results[0].assetId, "existing");
+  assert.equal(stored.results[0].createdAssetId, undefined, "never run new-upload recovery against a checksum duplicate");
+  const reloaded = new DriveJobStore(directory); await reloaded.initialize();
+  assert.equal(reloaded.jobs.get(first.jobId)?.results[0].status, "linked");
+  await manager.start(1, config, "test", client); await manager.waitForIdle();
+  assert.equal((await manager.status(1, config)).latest?.counts.existing, 1);
+  assert.equal((await manager.status(1, config)).latest?.counts.linked, 0);
+  assert.equal(uploads, 1); assert.equal(writtenTags.length, 1);
+});
+
+test("an interrupted source-link verification never creates an owned-upload recovery record", async (t) => {
+  let owned = false;
+  const { directory } = await fixture(t);
+  const file = media("new");
+  const result = await importNewDriveFile({ client: { getFile: async () => file, downloadFile: async () => Readable.from([Buffer.from("test")]) },
+    file, tags: ["placement:1", "activity:10"], sourceLinkContext: { config, placementId: 1, activityId: 10 },
+    tempDirectory: directory, signal: signal(), checkpoint: async () => { owned = true; } }, {
+    uploadAsset: async () => ({ id: "existing", status: "duplicate" }),
+    getAsset: async () => asset("existing", "", { tags: [] }),
+    findDriveSourceAssets: async () => [],
+    tagAsset: async () => { throw new Error("Connection dropped"); },
+    prepareAudioAsVideo: async () => { throw new Error("must not convert"); },
+  });
+  assert.equal(result.status, "needs_review"); assert.equal(result.assetId, "existing"); assert.equal(owned, false);
 });
 
 test("additive recovery never changes an archived or trashed asset", async () => {

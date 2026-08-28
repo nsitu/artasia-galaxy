@@ -4,8 +4,10 @@ import {
   updateAssetDescription,
 } from "../infra/ImmichClient.js";
 import { getAuthContext } from "../services/auth.service.js";
+import driveProcessBackfillRoutes from "./driveProcessBackfill.js";
 
 const router = Router();
+router.use("/drive-process-backfill", driveProcessBackfillRoutes);
 
 const ASSET_PAGE_SIZE = 500;
 

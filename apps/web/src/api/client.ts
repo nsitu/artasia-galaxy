@@ -1296,7 +1296,7 @@ export interface DriveAutoImportJob {
   matchedFolders: number;
   eligible: number;
   resultCount: number;
-  counts: { discovered: number; imported: number; existing: number; excluded: number; needsReview: number; failed: number; pending: number };
+  counts: { discovered: number; imported: number; linked?: number; existing: number; excluded: number; needsReview: number; failed: number; pending: number };
   error?: string;
 }
 
@@ -1312,7 +1312,7 @@ export interface DriveAutoImportResult {
   name: string;
   path: string;
   activityLabel?: string;
-  status: "pending" | "imported" | "existing" | "excluded" | "needs_review" | "failed";
+  status: "pending" | "imported" | "linked" | "existing" | "excluded" | "needs_review" | "failed";
   detail?: string;
   assetId?: string;
 }
@@ -1384,6 +1384,40 @@ export interface ScreenshotCaptionCleanupResult {
   status: "cleared" | "failed";
   error?: string;
 }
+
+export interface DriveProcessResult {
+  assetId: string;
+  fileName: string;
+  fileId?: string;
+  folderId?: string;
+  folderName?: string;
+  status: "tagged" | "already_process" | "not_process" | "needs_review" | "failed";
+  detail?: string;
+}
+export interface DriveProcessJob {
+  jobId: string;
+  initiatedBy: string;
+  startedAt: string;
+  finishedAt?: string;
+  status: "running" | "completed" | "completed_with_issues" | "cancelled" | "failed";
+  phase: "indexing" | "checking" | "done";
+  cancelRequested: boolean;
+  current?: string;
+  error?: string;
+  counts: { scanned: number; checked: number; tagged: number; alreadyProcess: number; noSource: number; notProcess: number; needsReview: number; failed: number };
+  resultCount: number;
+}
+async function requestDriveProcess<T>(path = "", method = "GET"): Promise<T> {
+  const res = await fetch(`/api/v1/tools/drive-process-backfill${path}`, { method, cache: "no-store" });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
+  return body as T;
+}
+export const fetchDriveProcessStatus = () => requestDriveProcess<{ latest: DriveProcessJob | null }>();
+export const startDriveProcessBackfill = () => requestDriveProcess<DriveProcessJob>("", "POST");
+export const cancelDriveProcessBackfill = (jobId: string) => requestDriveProcess<DriveProcessJob>(`/${encodeURIComponent(jobId)}/cancel`, "POST");
+export const fetchDriveProcessResults = (jobId: string, cursor: number) =>
+  requestDriveProcess<{ results: DriveProcessResult[]; nextCursor: number | null }>(`/${encodeURIComponent(jobId)}/results?cursor=${cursor}`);
 
 export interface ScreenshotCaptionCleanupSummary {
   scanned: number;

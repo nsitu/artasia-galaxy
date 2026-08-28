@@ -403,7 +403,7 @@ export default function UploadPanel({
   );
   const [mediaRefreshAttempt, setMediaRefreshAttempt] = useState(0);
   const [assetsLoading, setAssetsLoading] = useState(false);
-  const [routeSelectionResolved, setRouteSelectionResolved] = useState(false);
+  const [resolvedSelectionRoute, setResolvedSelectionRoute] = useState<string | null>(null);
   const [directAssetLoading, setDirectAssetLoading] = useState(
     Boolean(initialAssetId),
   );
@@ -421,6 +421,8 @@ export default function UploadPanel({
 
   const appPath = adminPath ?? window.location.pathname;
   const appSearch = adminSearch ?? window.location.search;
+  // A previous route's selection must not start Drive work for a new URL.
+  const routeSelectionResolved = resolvedSelectionRoute === `${appPath}${appSearch}`;
 
   function routeWorkspaceMode(path: string): WorkspaceMode {
     if (path === "/admin" || path === "/admin/sites") return "sites";
@@ -439,7 +441,7 @@ export default function UploadPanel({
       nextMode === "upload" ||
       nextMode === "import"
     ) {
-      setRouteSelectionResolved(false);
+      setResolvedSelectionRoute(null);
     }
     if (nextMode === workspaceMode) {
       return;
@@ -671,7 +673,7 @@ export default function UploadPanel({
     setItems([]);
     setNotice(null);
     setError(null);
-    setRouteSelectionResolved(true);
+    setResolvedSelectionRoute(`${appPath}${appSearch}`);
   }, [appPath, appSearch, options]);
 
   useEffect(() => {
@@ -838,7 +840,7 @@ export default function UploadPanel({
 
   // Load Drive folders when switching to Import tab or changing drive type
   useEffect(() => {
-    if (workspaceMode !== "import") return;
+    if (workspaceMode !== "import" || !routeSelectionResolved) return;
     if (driveDefaultOpening) return;
     if (driveType === "chooser") {
       setDriveFolders([
@@ -859,9 +861,11 @@ export default function UploadPanel({
       return;
     }
 
+    let cancelled = false;
     setDriveLoading(true);
     fetchDriveFolders(driveType, selectedDriveFolder, currentDriveId)
       .then((response) => {
+        if (cancelled) return;
         if (driveType === "myDrive") {
           setDriveFolders(response.subfolders ?? response.folders ?? []);
         } else {
@@ -870,10 +874,12 @@ export default function UploadPanel({
         }
         setSelectedDriveFiles(new Set()); // Clear selection when navigating
       })
-      .catch((err) => setError((err as Error).message))
-      .finally(() => setDriveLoading(false));
+      .catch((err) => { if (!cancelled) setError((err as Error).message); })
+      .finally(() => { if (!cancelled) setDriveLoading(false); });
+    return () => { cancelled = true; };
   }, [
     workspaceMode,
+    routeSelectionResolved,
     driveType,
     selectedDriveFolder,
     currentDriveId,
@@ -936,7 +942,7 @@ export default function UploadPanel({
 
   // Load files for current Drive folder
   useEffect(() => {
-    if (workspaceMode !== "import") return;
+    if (workspaceMode !== "import" || !routeSelectionResolved) return;
     if (driveDefaultOpening) return;
     if (driveType === "chooser") {
       setDriveFiles([]);
@@ -949,15 +955,18 @@ export default function UploadPanel({
       return;
     }
 
+    let cancelled = false;
     setDriveLoading(true);
     fetchDriveFiles(selectedDriveFolder, undefined, currentDriveId)
-      .then(({ files }) =>
-        setDriveFiles(files.filter((file) => !file.isFolder)),
-      )
-      .catch((err) => setError((err as Error).message))
-      .finally(() => setDriveLoading(false));
+      .then(({ files }) => {
+        if (!cancelled) setDriveFiles(files.filter((file) => !file.isFolder));
+      })
+      .catch((err) => { if (!cancelled) setError((err as Error).message); })
+      .finally(() => { if (!cancelled) setDriveLoading(false); });
+    return () => { cancelled = true; };
   }, [
     workspaceMode,
+    routeSelectionResolved,
     driveType,
     selectedDriveFolder,
     currentDriveId,
@@ -1263,34 +1272,6 @@ export default function UploadPanel({
     return matches.length === 1 ? matches[0] : null;
   }, [options, selectedDriveFolder]);
 
-  useEffect(() => {
-    if (
-      workspaceMode !== "import" ||
-      !routeSelectionResolved ||
-      !driveFolderPlacement ||
-      driveFolderPlacement.placement_id === selectedPlacement?.placement_id
-    ) {
-      return;
-    }
-
-    const placementId = String(driveFolderPlacement.placement_id);
-    setPlacementKey(placementId);
-    setSiteScope("placement");
-    setActivityTagFilter("");
-    setSelectedAsset(null);
-    setItems([]);
-    setNotice(null);
-    setError(null);
-    setApplicationPath(
-      `/admin/import?site=${encodeURIComponent(placementId)}`,
-    );
-  }, [
-    driveFolderPlacement,
-    routeSelectionResolved,
-    selectedPlacement?.placement_id,
-    workspaceMode,
-  ]);
-
   useLayoutEffect(() => {
     if (workspaceMode !== "import" || !routeSelectionResolved) return;
     void openDriveImportDefault(
@@ -1298,6 +1279,8 @@ export default function UploadPanel({
       selectedPlacement?.placement_id ?? null,
       selectedActivity,
     );
+    // Invalidate late folder resolution on route/activity changes or leaving Import.
+    return () => { driveDefaultRequestRef.current += 1; };
   }, [
     routeSelectionResolved,
     selectedActivity?.id,
@@ -2971,7 +2954,7 @@ export default function UploadPanel({
 
       closeAssetManager();
       setWorkspaceMode("browse");
-      setRouteSelectionResolved(false);
+      setResolvedSelectionRoute(null);
       setApplicationPath(
         destinationPlacementKey
           ? `/admin/browse?site=${encodeURIComponent(destinationPlacementKey)}`
@@ -3826,32 +3809,46 @@ export default function UploadPanel({
     });
   }
 
+  function selectDriveBrowserFolder(folderId: string) {
+    driveDefaultRequestRef.current += 1;
+    setDriveDefaultOpening(false);
+    setSelectedDriveFolder(folderId);
+    // Only explicit browser navigation may infer a different placement. Restored
+    // state and late responses must not override a site card or URL selection.
+    const matches = folderId === "root" ? [] : options?.placements.filter(
+      (placement) => placement.google_drive_folder_id?.trim() === folderId,
+    ) ?? [];
+    if (matches.length === 1 && matches[0].placement_id !== selectedPlacement?.placement_id) {
+      importToPlacement(matches[0]);
+    }
+  }
+
   function navigateToDriveFolder(folder: DriveFolder) {
     if (folder.id === "__my_drive__") {
       setDriveType("myDrive");
       setCurrentDriveId(undefined);
-      setSelectedDriveFolder("root");
+      selectDriveBrowserFolder("root");
       setFolderPath([{ id: "root", name: "My Drive" }]);
       return;
     }
     if (folder.id === "__shared_drives__") {
       setDriveType("sharedDrives");
       setCurrentDriveId(undefined);
-      setSelectedDriveFolder("root");
+      selectDriveBrowserFolder("root");
       setFolderPath([{ id: "__shared_drives__", name: "Shared Drives" }]);
       return;
     }
     if (folder.driveId) {
       // Clicking on a Shared Drive from the list
       setCurrentDriveId(folder.driveId);
-      setSelectedDriveFolder("root");
+      selectDriveBrowserFolder("root");
       setFolderPath((current) => [
         ...current,
         { id: folder.id, name: folder.name },
       ]);
     } else {
       // Clicking on a folder within My Drive or within a Shared Drive
-      setSelectedDriveFolder(folder.id);
+      selectDriveBrowserFolder(folder.id);
       setFolderPath((current) => [
         ...current,
         { id: folder.id, name: folder.name },
@@ -3861,6 +3858,7 @@ export default function UploadPanel({
 
   function navigateUpDriveFolder() {
     if (folderPath.length <= 1) {
+      selectDriveBrowserFolder("root");
       resetDriveFolderPath();
       return;
     }
@@ -3868,12 +3866,12 @@ export default function UploadPanel({
     setFolderPath(newPath);
     if (driveType === "sharedDrives" && newPath.length === 1) {
       setCurrentDriveId(undefined);
-      setSelectedDriveFolder("root");
+      selectDriveBrowserFolder("root");
     } else if (driveType === "sharedDrives" && newPath.length === 2) {
       setCurrentDriveId(newPath[1].id);
-      setSelectedDriveFolder("root");
+      selectDriveBrowserFolder("root");
     } else {
-      setSelectedDriveFolder(newPath[newPath.length - 1].id);
+      selectDriveBrowserFolder(newPath[newPath.length - 1].id);
     }
   }
 
@@ -4530,11 +4528,11 @@ export default function UploadPanel({
                     onClick={() => {
                       if (index === 0) {
                         if (driveType === "myDrive") {
-                          setSelectedDriveFolder("root");
+                          selectDriveBrowserFolder("root");
                           setFolderPath([{ id: "root", name: "My Drive" }]);
                         } else {
                           setCurrentDriveId(undefined);
-                          setSelectedDriveFolder("root");
+                          selectDriveBrowserFolder("root");
                           setFolderPath([
                             { id: "__shared_drives__", name: "Shared Drives" },
                           ]);
@@ -4544,9 +4542,9 @@ export default function UploadPanel({
                         setFolderPath(newPath);
                         if (driveType === "sharedDrives" && index === 1) {
                           setCurrentDriveId(breadcrumb.id);
-                          setSelectedDriveFolder("root");
+                          selectDriveBrowserFolder("root");
                         } else {
-                          setSelectedDriveFolder(newPath[newPath.length - 1].id);
+                          selectDriveBrowserFolder(newPath[newPath.length - 1].id);
                         }
                       }
                     }}

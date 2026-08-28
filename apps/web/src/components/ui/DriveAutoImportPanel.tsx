@@ -105,7 +105,7 @@ export default function DriveAutoImportPanel(props: {
   return <section aria-label="Placement auto-import" style={{ border: "1px solid #cbd5e1", background: "#f8fafc", borderRadius: 12, padding: 18, color: "#172033", display: "grid", gap: 12 }}>
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
       <div><h3 style={{ margin: 0, fontSize: 16 }}>Placement auto-import</h3>
-        <p style={{ margin: "6px 0 0", fontSize: 13, maxWidth: 680 }}>Import new media from all matching activity folders and their subfolders. Existing sources—including archive and trash—are skipped. Nothing is replaced or published.</p>
+        <p style={{ margin: "6px 0 0", fontSize: 13, maxWidth: 680 }}>Import new media from all matching activity folders and their subfolders. Existing sources—including archive and trash—are skipped. Matching existing files can receive a missing Drive source link when there are no assignment conflicts. Nothing is replaced or published.</p>
       </div>
       {running ? <button type="button" style={buttonStyle} onClick={() => void cancel()} disabled={acting || job.cancelRequested}>
         {job.cancelRequested ? "Cancelling…" : "Cancel auto-import"}
@@ -129,7 +129,7 @@ export default function DriveAutoImportPanel(props: {
         <span style={{ fontSize: 12 }}>{completed} of {job.eligible} eligible files processed (file count, not bytes)</span>
       </>}
       {job.current && <div style={{ fontSize: 12, overflowWrap: "anywhere" }}>{job.current}</div>}
-      <div style={{ fontSize: 13 }}>{job.counts.imported} imported · {job.counts.existing} already present · {job.counts.excluded} excluded · {job.counts.needsReview} need review · {job.counts.failed} failed</div>
+      <div style={{ fontSize: 13 }}>{job.counts.imported} imported · {job.counts.linked ?? 0} linked existing · {job.counts.existing} already present · {job.counts.excluded} excluded · {job.counts.needsReview} need review · {job.counts.failed} failed</div>
       {job.status === "no_matches" && <div style={{ fontSize: 13 }}>No activity folders matched the existing week-number rules. Check the folder names and activity configuration.</div>}
       {job.status === "completed_with_issues" && <div style={{ fontSize: 13 }}>Review the results below. The last successful sync has not been changed.</div>}
       {job.error && <div role="alert" style={{ color: "#9b1c1c", fontSize: 13 }}>{job.error}</div>}
@@ -138,7 +138,7 @@ export default function DriveAutoImportPanel(props: {
         <ul style={{ listStyle: "none", padding: 0, maxHeight: 360, overflow: "auto" }}>
           {results.map((item, index) => <li key={`${item.fileId}-${index}`} style={{ borderBottom: "1px solid #dbe2ea", padding: "9px 0", fontSize: 12, overflowWrap: "anywhere" }}>
             <a href={`https://drive.google.com/open?id=${encodeURIComponent(item.fileId)}`} target="_blank" rel="noopener noreferrer">{item.path}</a>
-            <div>{item.status.replaceAll("_", " ")}{item.activityLabel ? ` · ${item.activityLabel}` : ""}{item.detail ? ` — ${item.detail}` : ""}</div>
+            <div>{item.status === "linked" ? "Linked existing asset" : item.status.replaceAll("_", " ")}{item.activityLabel ? ` · ${item.activityLabel}` : ""}{item.detail ? ` — ${item.detail}` : ""}</div>
           </li>)}
         </ul>
         {nextCursor !== null && <button type="button" style={buttonStyle} disabled={resultsLoading} onClick={() => void loadResults()}>{resultsLoading ? "Loading…" : "Load results"}</button>}

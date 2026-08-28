@@ -10,6 +10,7 @@ import { GoogleDriveClient, ensureDriveFileExtension, type DriveFile } from "./g
 import { prepareAudioAsVideo } from "./audioToVideo.service.js";
 import { parseImmichDuration } from "./audioAsset.service.js";
 import { UPLOAD_LIMITS } from "./uploadLimits.js";
+import { linkDriveChecksumDuplicate, type DriveDuplicateLinkContext } from "./driveDuplicateLink.service.js";
 
 export type SourceIndex = Map<string, ImmichAsset[]>;
 // Locked assets require an elevated Immich user session; API keys cannot search them.
@@ -96,7 +97,7 @@ export async function spoolDriveFile(stream: NodeJS.ReadableStream, directory: s
 }
 
 const defaultMediaDeps = { getAsset, tagAsset, uploadAsset, prepareAudioAsVideo };
-export type AdditiveImportResult = { status: "imported" | "needs_review"; assetId: string; detail?: string };
+export type AdditiveImportResult = { status: "imported" | "linked" | "existing" | "needs_review"; assetId: string; detail?: string };
 
 /** No replacement/deletion/relationship-copying path exists in this entry point. */
 export async function importNewDriveFile(params: {
@@ -106,8 +107,9 @@ export async function importNewDriveFile(params: {
   tempDirectory: string;
   signal: AbortSignal;
   recoveryAssetId?: string;
+  sourceLinkContext?: DriveDuplicateLinkContext;
   checkpoint: (assetId: string) => Promise<void>;
-}, deps = defaultMediaDeps): Promise<AdditiveImportResult> {
+}, deps: typeof defaultMediaDeps & { findDriveSourceAssets?: typeof findDriveSourceAssets } = defaultMediaDeps): Promise<AdditiveImportResult> {
   const audio = GoogleDriveClient.isAudio(params.file.mimeType);
   let assetId = params.recoveryAssetId;
   if (!assetId) {
@@ -134,8 +136,13 @@ export async function importNewDriveFile(params: {
         modifiedAt: current.modifiedTime ? new Date(current.modifiedTime) : undefined, signal,
       });
       if (!result.id) throw new Error("Immich did not return an asset ID.");
+      if (result.status === "duplicate") {
+        return await linkDriveChecksumDuplicate({ assetId: result.id, fileId: current.id, context: params.sourceLinkContext, signal }, {
+          getAsset: deps.getAsset, tagAsset: deps.tagAsset, findSources: deps.findDriveSourceAssets ?? findDriveSourceAssets,
+        });
+      }
       if (result.status !== "created") {
-        return { status: "needs_review", assetId: result.id, detail: "Immich returned an existing checksum duplicate. No tags were changed; reconcile its Drive source link manually." };
+        return { status: "needs_review", assetId: result.id, detail: "Immich returned an unrecognized upload status. No tags were changed; inspect the asset before retrying." };
       }
       assetId = result.id;
       // Persist ownership before any metadata writes; retries only repair our own uploads.

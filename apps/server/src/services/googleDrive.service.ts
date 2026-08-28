@@ -130,6 +130,10 @@ export interface DriveFolder {
   driveId?: string;
 }
 
+export function isProcessDriveFolderName(name: string): boolean {
+  return /process/i.test(name);
+}
+
 export interface DriveActivityCandidate {
   id: number;
   label: string;

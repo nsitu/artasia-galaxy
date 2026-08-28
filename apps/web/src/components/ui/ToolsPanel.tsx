@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import DriveProcessBackfillPanel from "./DriveProcessBackfillPanel";
 import {
   clearScreenshotAssetCaptions,
   fetchAuthUser,
@@ -26,6 +27,7 @@ export default function ToolsPanel({ initialError }: { initialError?: string | n
     message: string;
   } | null>(null);
   const [driveLookupRunning, setDriveLookupRunning] = useState(false);
+  const [processBackfillRunning, setProcessBackfillRunning] = useState(false);
   const [screenshotCleanupRunning, setScreenshotCleanupRunning] = useState(false);
 
   useEffect(() => {
@@ -170,7 +172,7 @@ export default function ToolsPanel({ initialError }: { initialError?: string | n
               <button
                 type="button"
                 onClick={() => void lookupMissingDriveSources()}
-                disabled={driveLookupRunning}
+                disabled={driveLookupRunning || processBackfillRunning}
                 title="Look up Drive files for all assets that do not have a known Drive ID"
                 style={secondaryButtonStyle}
               >
@@ -179,6 +181,8 @@ export default function ToolsPanel({ initialError }: { initialError?: string | n
               </button>
             )}
           </section>
+
+          <DriveProcessBackfillPanel authenticated={Boolean(authUser?.authenticated)} otherDriveToolRunning={driveLookupRunning} onRunningChange={setProcessBackfillRunning} />
 
           <section style={toolSectionStyle}>
             <p style={eyebrowStyle}>Caption maintenance</p>

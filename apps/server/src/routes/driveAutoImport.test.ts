@@ -44,8 +44,12 @@ test("all auto-import APIs require authentication, results are bounded, and stat
   const jobId = "11111111-1111-4111-8111-111111111111";
   await store.save({ version: 1, jobId, placementId: 1, placementName: "Test", rootFolderId: "root", configurationHash: "test", initiatedBy: "test",
     startedAt: new Date().toISOString(), status: "completed", phase: "done", cancelRequested: false, eligible: 101, foldersScanned: 1, matchedFolders: 1,
-    results: Array.from({ length: 101 }, (_, i) => ({ kind: "file", fileId: `file${i}`, name: "file", path: "Week 1/file", status: "imported", createdAssetId: "private-checkpoint" })) });
+    results: Array.from({ length: 101 }, (_, i) => ({ kind: "file", fileId: `file${i}`, name: "file", path: "Week 1/file",
+      status: i === 0 ? "linked" : "imported", ...(i === 0 ? { assetId: "existing-asset" } : { createdAssetId: "private-checkpoint" }) })) });
   const results = await fetch(`${base}/auto-import-jobs/${jobId}/results`, { headers }).then((response) => response.json()) as { results: unknown[]; nextCursor: number };
   assert.equal(results.results.length, 100); assert.equal(results.nextCursor, 100);
   assert.equal(JSON.stringify(results).includes("private-checkpoint"), false);
+  assert.deepEqual(results.results[0], { kind: "file", fileId: "file0", name: "file", path: "Week 1/file", status: "linked", assetId: "existing-asset" });
+  const summary = await fetch(`${base}/auto-import-jobs/${jobId}`, { headers }).then((response) => response.json()) as { counts: { linked: number; imported: number } };
+  assert.equal(summary.counts.linked, 1); assert.equal(summary.counts.imported, 100);
 });

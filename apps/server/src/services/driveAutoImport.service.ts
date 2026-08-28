@@ -2,8 +2,9 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { GoogleDriveClient, folderActivityMatchScore, type DriveFile, type DriveFolder } from "./googleDrive.service.js";
+import { GoogleDriveClient, folderActivityMatchScore, isProcessDriveFolderName, type DriveFile, type DriveFolder } from "./googleDrive.service.js";
 import type { ActivityConfig, UploadConfig } from "./uploadConfig.service.js";
+import { assetTypeTag, type AssetType } from "./assetType.service.js";
 import { acquireDriveWriter } from "./driveSource.service.js";
 import { findDriveSourceAssets, importNewDriveFile, loadDriveSourceIndex, sourceConflict } from "./driveImport.service.js";
 
@@ -13,9 +14,10 @@ export interface DriveImportItem {
   fileId: string;
   name: string;
   path: string;
-  status: "pending" | "imported" | "existing" | "excluded" | "needs_review" | "failed";
+  status: "pending" | "imported" | "linked" | "existing" | "excluded" | "needs_review" | "failed";
   activityId?: number;
   activityLabel?: string;
+  assetType?: AssetType;
   detail?: string;
   assetId?: string;
   createdAssetId?: string;
@@ -47,7 +49,7 @@ export function summarizeDriveJob(job: DriveImportJob) {
   const { results, ...summary } = job;
   const count = (status: DriveImportItem["status"]) => results.filter((item) => item.status === status).length;
   return { ...summary, counts: { discovered: results.filter((item) => item.kind === "file").length,
-    imported: count("imported"), existing: count("existing"), excluded: count("excluded"),
+    imported: count("imported"), linked: count("linked"), existing: count("existing"), excluded: count("excluded"),
     needsReview: count("needs_review"), failed: count("failed"), pending: count("pending") }, resultCount: results.length };
 }
 
@@ -57,7 +59,7 @@ export function driveConfigurationHash(config: UploadConfig, placementId: number
     placement: placement && { id: placement.placement_id, root: placement.google_drive_folder_id?.trim(), name: placement.placement_name, partner: placement.partner_name },
     roots: config.placements.map((p) => [p.placement_id, p.google_drive_folder_id]).sort((a, b) => Number(a[0]) - Number(b[0])),
     activities: config.activities.map(({ id, label, week }) => ({ id, label, week })).sort((a, b) => a.id - b.id),
-    policy: "recursive-inherit-conflicts-excluded-v1",
+    policy: "recursive-inherit-conflicts-excluded-source-link-process-v3",
   })).digest("hex");
 }
 
@@ -97,7 +99,7 @@ export async function scanDrivePlacement(params: {
   const { client, config, job, signal } = params;
   const root = await retryRead(() => client.getFolder(job.rootFolderId), signal);
   if (!GoogleDriveClient.isFolder(root.mimeType)) throw new Error("The placement's Drive root is not a folder.");
-  const queue: Array<{ folder: DriveFolder; path: string; activity?: ActivityConfig; blocked?: string }> = [{ folder: root, path: root.name }];
+  const queue: Array<{ folder: DriveFolder; path: string; activity?: ActivityConfig; assetType?: AssetType; blocked?: string }> = [{ folder: root, path: root.name }];
   const folders = new Set<string>();
   const scheduledFolders = new Set([root.id]);
   const files = new Set<string>();
@@ -126,6 +128,8 @@ export async function scanDrivePlacement(params: {
         job.matchedFolders++;
       }
     }
+    // Only folders beneath a matched activity classify media; descendants inherit it.
+    const assetType = current.assetType ?? (current.activity && isProcessDriveFolderName(current.folder.name) ? "process" : undefined);
     const tokens = new Set<string>();
     let pageToken: string | undefined;
     let tokenRestarted = false;
@@ -147,7 +151,7 @@ export async function scanDrivePlacement(params: {
             if (!scheduledFolders.has(file.id)) {
               if (scheduledFolders.size >= (params.maxFolders ?? 2000)) throw new Error("Drive scan exceeded the folder safety limit; the scan is incomplete.");
               scheduledFolders.add(file.id);
-              queue.push({ folder: file, path: `${current.path}/${file.name}`, activity, blocked });
+              queue.push({ folder: file, path: `${current.path}/${file.name}`, activity, assetType, blocked });
             }
             continue;
           }
@@ -159,7 +163,7 @@ export async function scanDrivePlacement(params: {
           if (eligible) job.eligible++;
           job.results.push({ kind: "file", fileId: file.id, name: file.name, path: `${current.path}/${file.name}`,
             status: eligible ? "pending" : "excluded", activityId: activity?.id, activityLabel: activity?.label,
-            ...(eligible ? { file } : { detail: blocked ?? (!supported ? "Unsupported format or Drive shortcut." : "No matching activity folder in this path.") }) });
+            ...(eligible ? { file, assetType } : { detail: blocked ?? (!supported ? "Unsupported format or Drive shortcut." : "No matching activity folder in this path.") }) });
         }
         pageToken = page.nextPageToken;
         if (pageToken && tokens.has(pageToken)) throw new Error("Drive repeated a page token; this folder scan is incomplete.");
@@ -311,12 +315,15 @@ export class DriveAutoImportManager {
             item.status = conflict ? "needs_review" : "existing";
             item.detail = conflict ?? "Drive source already exists in Immich (including archived/trashed assets).";
             item.assetId = existing[0].id;
-          } else if (recovery && (recovery.file?.modifiedTime !== item.file?.modifiedTime || recovery.activityId !== item.activityId)) {
-            item.status = "needs_review"; item.detail = "A pending upload exists, but its source or activity changed. Reconcile it manually.";
+          } else if (recovery && (recovery.file?.modifiedTime !== item.file?.modifiedTime || recovery.activityId !== item.activityId ||
+              (recovery.assetType ?? "artwork") !== (item.assetType ?? "artwork"))) {
+            item.status = "needs_review"; item.detail = "A pending upload exists, but its source, activity, or asset type changed. Reconcile it manually.";
           } else {
             await this.store.save(job);
             const result = await this.deps.importNewDriveFile({ client, file: item.file!,
-              tags: [`placement:${job.placementId}`, placement.partner_name, placement.placement_name, `activity:${item.activityId}`, item.activityLabel!].filter(Boolean),
+              sourceLinkContext: { config, placementId: job.placementId, activityId: item.activityId! },
+              tags: [`placement:${job.placementId}`, placement.partner_name, placement.placement_name, `activity:${item.activityId}`, item.activityLabel!,
+                ...(item.assetType ? [assetTypeTag(item.assetType)] : [])].filter(Boolean),
               tempDirectory: join(this.store.directory, "tmp"), signal, recoveryAssetId: recovery?.createdAssetId,
               checkpoint: async (assetId) => { item.createdAssetId = assetId; item.assetId = assetId; job.phase = "verifying"; await this.store.save(job); } });
             item.status = result.status; item.assetId = result.assetId; item.detail = result.detail;
