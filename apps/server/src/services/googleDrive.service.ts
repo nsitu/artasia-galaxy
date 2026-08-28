@@ -162,7 +162,7 @@ function driveFilenameSearchStem(filename: string) {
   return stem.trim();
 }
 
-function folderActivityMatchScore(
+export function folderActivityMatchScore(
   folderName: string,
   activity: DriveActivityCandidate,
 ) {
@@ -271,7 +271,7 @@ export class GoogleDriveClient {
       q: `'${parentId}' in parents and trashed = false and ${supportedTypesQuery}`,
       pageSize: 100,
       pageToken,
-      fields: "files(id,name,mimeType,size,createdTime,modifiedTime,md5Checksum,sha1Checksum,parents,webViewLink,thumbnailLink)",
+      fields: "nextPageToken,incompleteSearch,files(id,name,mimeType,size,createdTime,modifiedTime,md5Checksum,sha1Checksum,parents,webViewLink,thumbnailLink)",
       orderBy: "name",
     };
 
@@ -285,7 +285,8 @@ export class GoogleDriveClient {
       listParams.spaces = "drive";
     }
 
-    const res = await this.drive.files.list(listParams);
+    const res = await this.drive.files.list(listParams, { timeout: 60_000 });
+    if (res.data.incompleteSearch) throw new Error("Drive returned an incomplete folder listing.");
 
     const files = (res.data.files ?? []) as DriveFile[];
     return {
@@ -305,7 +306,7 @@ export class GoogleDriveClient {
       fileId,
       fields: "id,name,mimeType,size,createdTime,modifiedTime,md5Checksum,sha1Checksum,parents,webViewLink,thumbnailLink",
       supportsAllDrives: true,
-    });
+    }, { timeout: 60_000 });
 
     if (!res.data.id) {
       throw new Error(`File ${fileId} not found`);
@@ -324,7 +325,7 @@ export class GoogleDriveClient {
     const listParams: any = {
       q: query,
       pageSize: 100,
-      fields: "files(id,name,mimeType,parents)",
+      fields: "nextPageToken,incompleteSearch,files(id,name,mimeType,parents)",
       orderBy: "name",
     };
 
@@ -338,9 +339,33 @@ export class GoogleDriveClient {
       listParams.spaces = "drive";
     }
 
-    const res = await this.drive.files.list(listParams);
+    const folders = new Map<string, DriveFolder>();
+    const tokens = new Set<string>();
+    do {
+      const res = await this.drive.files.list(listParams, { timeout: 60_000 });
+      if (res.data.incompleteSearch) throw new Error("Drive returned an incomplete folder listing.");
+      for (const folder of (res.data.files ?? []) as DriveFolder[]) folders.set(folder.id, folder);
+      listParams.pageToken = res.data.nextPageToken;
+      if (listParams.pageToken && tokens.has(listParams.pageToken)) throw new Error("Drive repeated a page token.");
+      if (listParams.pageToken) tokens.add(listParams.pageToken);
+    } while (listParams.pageToken);
+    return [...folders.values()];
+  }
 
-    return (res.data.files ?? []) as DriveFolder[];
+  /** Unfiltered children: auto-import must account for unsupported files too. */
+  async listChildren(folderId: string, pageToken?: string, driveId?: string) {
+    const res = await this.drive.files.list({
+      q: `'${escapeDriveQueryValue(folderId)}' in parents and trashed = false`,
+      pageSize: 1000,
+      pageToken,
+      fields: "nextPageToken,incompleteSearch,files(id,name,mimeType,size,modifiedTime,parents)",
+      ...(driveId ? { corpora: "drive", driveId, includeItemsFromAllDrives: true, supportsAllDrives: true } : { spaces: "drive" }),
+    }, { timeout: 60_000 });
+    if (res.data.incompleteSearch) throw new Error("Drive returned an incomplete folder listing.");
+    return {
+      files: (res.data.files ?? []).map((file) => ({ ...file, size: file.size == null ? undefined : Number(file.size) })) as DriveFile[],
+      nextPageToken: res.data.nextPageToken ?? undefined,
+    };
   }
 
   private async getAllFolderChildren(folderId: string, driveId?: string) {
@@ -451,10 +476,10 @@ export class GoogleDriveClient {
   /**
    * Download file content as a stream
    */
-  async downloadFile(fileId: string): Promise<NodeJS.ReadableStream> {
+  async downloadFile(fileId: string, signal?: AbortSignal): Promise<NodeJS.ReadableStream> {
     const res = await this.drive.files.get(
       { fileId, alt: "media", supportsAllDrives: true },
-      { responseType: "stream" }
+      { responseType: "stream", timeout: 60_000, signal }
     );
     return res.data as NodeJS.ReadableStream;
   }
@@ -713,7 +738,7 @@ export class GoogleDriveClient {
         fileId: folderId,
         fields: "id,name,mimeType,parents,driveId",
         supportsAllDrives: true,
-      });
+      }, { timeout: 60_000 });
       if (!res.data.id || res.data.mimeType !== GOOGLE_MIME_TYPE_FOLDER) {
         throw new Error(`Google Drive folder ${folderId} not found`);
       }

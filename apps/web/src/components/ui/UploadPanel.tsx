@@ -64,6 +64,7 @@ import {
 import AudioTrimEditor from "./AudioTrimEditor";
 import MaterialIconPicker from "./MaterialIconPicker";
 import RetryableUploadThumbnail from "./RetryableUploadThumbnail";
+import DriveAutoImportPanel from "./DriveAutoImportPanel";
 
 interface UploadItem {
   id: string;
@@ -482,6 +483,7 @@ export default function UploadPanel({
     new Set(),
   );
   const [driveSyncing, setDriveSyncing] = useState(false);
+  const [driveAutoImportRunning, setDriveAutoImportRunning] = useState(false);
   const [driveSyncProgress, setDriveSyncProgress] = useState<{
     current: number;
     total: number;
@@ -4753,6 +4755,7 @@ export default function UploadPanel({
                 disabled={
                   selectedDriveFiles.size === 0 ||
                   driveSyncing ||
+                  driveAutoImportRunning ||
                   !authUser?.authenticated
                 }
                 style={primaryActionButtonStyle}
@@ -6791,6 +6794,19 @@ export default function UploadPanel({
                     </div>
                   </div>
 
+                  <DriveAutoImportPanel
+                    key={selectedPlacement.placement_id}
+                    placementId={selectedPlacement.placement_id}
+                    folderId={selectedPlacement.google_drive_folder_id}
+                    authenticated={Boolean(authUser?.authenticated)}
+                    manualImportRunning={driveSyncing}
+                    onRunningChange={setDriveAutoImportRunning}
+                    onCompleted={(id) => {
+                      void fetchPlacementAssets(id).then((assets) => {
+                        if (drivePlacementIdRef.current === id) setPlacementAssets(assets);
+                      }).catch((err) => setError((err as Error).message));
+                    }}
+                  />
                   {renderDriveBrowser()}
                   {renderUploadItems()}
                 </>

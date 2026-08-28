@@ -8,6 +8,8 @@ apps/*/*.tsbuildinfo
 .env.*
 !.env.example
 *.log
+data/drive-auto-import
+data/upload-tmp
 Dockerfile
 docker-compose.yml
 README.md

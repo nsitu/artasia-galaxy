@@ -52,12 +52,13 @@ function runProcess(
   command: string,
   args: string[],
   timeout: number,
+  signal?: AbortSignal,
 ): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolvePromise, rejectPromise) => {
     execFile(
       command,
       args,
-      { timeout, maxBuffer: 10 * 1024 * 1024 },
+      { timeout, maxBuffer: 10 * 1024 * 1024, signal },
       (error, stdout, stderr) => {
         if (error) {
           const detail = stderr.trim().split(/\r?\n/).slice(-8).join("\n");
@@ -72,7 +73,7 @@ function runProcess(
   });
 }
 
-async function probeDuration(inputPath: string) {
+async function probeDuration(inputPath: string, signal?: AbortSignal) {
   const { stdout } = await runProcess(
     "ffprobe",
     [
@@ -84,7 +85,7 @@ async function probeDuration(inputPath: string) {
       "default=noprint_wrappers=1:nokey=1",
       inputPath,
     ],
-    30_000,
+    30_000, signal,
   );
   const duration = Number.parseFloat(stdout.trim());
   if (!Number.isFinite(duration) || duration <= 0) {
@@ -93,7 +94,7 @@ async function probeDuration(inputPath: string) {
   return duration;
 }
 
-async function probeInitialVideoPacketCount(inputPath: string) {
+async function probeInitialVideoPacketCount(inputPath: string, signal?: AbortSignal) {
   const { stdout } = await runProcess(
     "ffprobe",
     [
@@ -110,7 +111,7 @@ async function probeInitialVideoPacketCount(inputPath: string) {
       "default=noprint_wrappers=1:nokey=1",
       inputPath,
     ],
-    30_000,
+    30_000, signal,
   );
   const packetCount = Number.parseInt(stdout.trim(), 10);
   return Number.isFinite(packetCount) ? packetCount : 0;
@@ -119,8 +120,10 @@ async function probeInitialVideoPacketCount(inputPath: string) {
 export async function prepareAudioAsVideo(params: {
   stream: NodeJS.ReadableStream;
   originalName: string;
+  signal?: AbortSignal;
+  workRoot?: string;
 }): Promise<PreparedAudioVideo> {
-  const workDir = await mkdtemp(join(tmpdir(), "artasia-drive-audio-"));
+  const workDir = await mkdtemp(join(params.workRoot ?? tmpdir(), "artasia-drive-audio-"));
   const inputPath = join(workDir, "source.audio");
   const filename = outputFilename(params.originalName);
   const outputPath = join(workDir, filename);
@@ -130,9 +133,9 @@ export async function prepareAudioAsVideo(params: {
     await access(framePath).catch(() => {
       throw new Error(`Audio frame image not found at ${framePath}`);
     });
-    await pipeline(params.stream as NodeJS.ReadableStream & AsyncIterable<Uint8Array>, createWriteStream(inputPath));
+    await pipeline(params.stream as NodeJS.ReadableStream & AsyncIterable<Uint8Array>, createWriteStream(inputPath), { signal: params.signal });
 
-    const durationSeconds = await probeDuration(inputPath);
+    const durationSeconds = await probeDuration(inputPath, params.signal);
     if (durationSeconds > MAX_DURATION_SECONDS) {
       throw new Error(
         `Audio duration exceeds the ${Math.round(MAX_DURATION_SECONDS / 60)} minute limit`,
@@ -175,7 +178,7 @@ export async function prepareAudioAsVideo(params: {
         "+faststart",
         outputPath,
       ],
-      FFMPEG_TIMEOUT_MS,
+      FFMPEG_TIMEOUT_MS, params.signal,
     );
 
     const outputStats = await stat(outputPath);
@@ -183,14 +186,14 @@ export async function prepareAudioAsVideo(params: {
       throw new Error("Audio conversion produced an empty video");
     }
 
-    const initialVideoPacketCount = await probeInitialVideoPacketCount(outputPath);
+    const initialVideoPacketCount = await probeInitialVideoPacketCount(outputPath, params.signal);
     if (initialVideoPacketCount < 2) {
       throw new Error(
         `Audio conversion produced too few video frames (${initialVideoPacketCount})`,
       );
     }
 
-    const outputDurationSeconds = await probeDuration(outputPath);
+    const outputDurationSeconds = await probeDuration(outputPath, params.signal);
     if (
       Math.abs(outputDurationSeconds - durationSeconds) >
       durationTolerance(durationSeconds)

@@ -32,9 +32,19 @@ import {
 import { prepareAudioAsVideo } from "../services/audioToVideo.service.js";
 import { isAudioAsset, parseImmichDuration } from "../services/audioAsset.service.js";
 import { UPLOAD_LIMITS } from "../services/uploadLimits.js";
+import { acquireDriveWriter } from "../services/driveSource.service.js";
 
 const router = Router();
 const DRIVE_SOURCE_TAG_PREFIX = "source:drive:";
+
+function withDriveWrite(handler: (req: Request, res: Response) => Promise<void>) {
+  return async (req: Request, res: Response) => {
+    if (!readAuthSession(req)) { res.status(401).json({ error: "Not authenticated" }); return; }
+    const release = acquireDriveWriter(randomUUID());
+    if (!release) { res.status(409).json({ error: "Another Drive import or maintenance operation is running." }); return; }
+    try { await handler(req, res); } finally { release(); }
+  };
+}
 
 function driveSourceTag(fileId: string) {
   return `${DRIVE_SOURCE_TAG_PREFIX}${fileId}`;
@@ -672,6 +682,8 @@ router.post("/assets/lookup-missing", async (req: Request, res: Response) => {
     }
 
     const jobId = randomUUID();
+    const release = acquireDriveWriter(jobId);
+    if (!release) { res.status(409).json({ error: "Another Drive import or maintenance operation is running." }); return; }
     const job: DriveBulkLookupJob = { status: "running" };
     driveBulkLookupJobs.set(jobId, job);
     activeDriveBulkLookupJobId = jobId;
@@ -703,6 +715,7 @@ router.post("/assets/lookup-missing", async (req: Request, res: Response) => {
       })
       .finally(() => {
         activeDriveBulkLookupJobId = null;
+        release();
         setTimeout(() => driveBulkLookupJobs.delete(jobId), 15 * 60_000);
       });
 
@@ -1091,7 +1104,7 @@ async function importDriveFile(params: {
 }
 
 /** Link a legacy Immich asset to its uniquely matching file in its placement's Drive folder. */
-router.post("/assets/:assetId/lookup", async (req: Request, res: Response) => {
+router.post("/assets/:assetId/lookup", withDriveWrite(async (req: Request, res: Response) => {
   try {
     const client = getDriveClient(req);
     const assetId = Array.isArray(req.params.assetId) ? req.params.assetId[0] : req.params.assetId;
@@ -1174,10 +1187,10 @@ router.post("/assets/:assetId/lookup", async (req: Request, res: Response) => {
       .status(err instanceof Error && err.message.includes("Not authenticated") ? 401 : 500)
       .json({ error: (err as Error).message });
   }
-});
+}));
 
 /** Reimport one Drive-linked asset, preserving its relationships and replacing its old copy. */
-router.post("/assets/:assetId/reimport", async (req: Request, res: Response) => {
+router.post("/assets/:assetId/reimport", withDriveWrite(async (req: Request, res: Response) => {
   try {
     const client = getDriveClient(req);
     const assetId = Array.isArray(req.params.assetId) ? req.params.assetId[0] : req.params.assetId;
@@ -1252,14 +1265,14 @@ router.post("/assets/:assetId/reimport", async (req: Request, res: Response) => 
       .status(err instanceof Error && err.message.includes("Not authenticated") ? 401 : 500)
       .json({ error: (err as Error).message });
   }
-});
+}));
 
 /**
  * POST /api/v1/drive/sync
  * Download and import selected files from Google Drive
  * Body: { fileIds: string[], placementId?: number, activityId?: number }
  */
-router.post("/sync", async (req: Request, res: Response) => {
+router.post("/sync", withDriveWrite(async (req: Request, res: Response) => {
   try {
     const session = readAuthSession(req);
     if (!session) {
@@ -1322,6 +1335,6 @@ router.post("/sync", async (req: Request, res: Response) => {
       .status(err instanceof Error && err.message.includes("Not authenticated") ? 401 : 500)
       .json({ error: (err as Error).message });
   }
-});
+}));
 
 export default router;

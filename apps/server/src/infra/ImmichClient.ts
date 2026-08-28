@@ -1,6 +1,7 @@
 import { openAsBlob } from "node:fs";
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
+import { driveSourceIds } from "../services/driveSource.service.js";
 
 const IMMICH_URL = process.env.IMMICH_URL ?? "https://photos.artsforall.co";
 const IMMICH_API_KEY = process.env.IMMICH_API_KEY ?? "";
@@ -100,7 +101,8 @@ async function immichRequest(
     res = await fetch(url, {
       ...init,
       headers,
-      signal: init?.signal,
+      // Keep legacy long uploads unchanged; metadata requests must not hang a job forever.
+      signal: init?.signal ?? (path === "/assets" && init?.method === "POST" ? undefined : AbortSignal.timeout(120_000)),
     });
   } catch (err) {
     throw new Error(
@@ -300,6 +302,8 @@ export async function searchAssets(params: {
   size?: number;
   withExif?: boolean;
   withPeople?: boolean;
+  withDeleted?: boolean;
+  withStacked?: boolean;
   visibility?: "archive" | "timeline" | "hidden" | "locked";
   takenAfter?: string;
   takenBefore?: string;
@@ -312,6 +316,8 @@ export async function searchAssets(params: {
   };
 
   if (params.type) body.type = params.type;
+  if (params.withDeleted !== undefined) body.withDeleted = params.withDeleted;
+  if (params.withStacked !== undefined) body.withStacked = params.withStacked;
   if (params.albumId) body.albumId = params.albumId;
   if (params.albumIds?.length) body.albumIds = params.albumIds;
   if (params.personIds?.length) body.personIds = params.personIds;
@@ -586,7 +592,11 @@ export async function removeAssetsFromAlbum(albumId: string, assetIds: string[])
   });
 }
 
-export async function listTags(): Promise<ImmichTag[]> {
+export async function listTags(fresh = false): Promise<ImmichTag[]> {
+  if (fresh) {
+    const res = await immichRequest("/tags");
+    return res.json();
+  }
   if (tagsCache && tagsCache.expiresAt > Date.now()) return tagsCache.value;
   if (tagsRequest) return tagsRequest;
 
@@ -605,11 +615,12 @@ export async function listTags(): Promise<ImmichTag[]> {
 
 export async function ensureTag(name: string, cachedTags?: ImmichTag[]): Promise<ImmichTag> {
   const normalized = name.trim().toLowerCase();
+  const sourceId = driveSourceIds({ tags: [{ name, value: name }] })[0];
   const tags = cachedTags ?? await listTags();
   const existing = tags.find(
     (tag) =>
-      tag.name.trim().toLowerCase() === normalized ||
-      tag.value.trim().toLowerCase() === normalized
+      sourceId ? driveSourceIds({ tags: [tag] }).includes(sourceId) :
+        tag.name.trim().toLowerCase() === normalized || tag.value.trim().toLowerCase() === normalized
   );
   if (existing) return existing;
 
@@ -736,6 +747,7 @@ export async function uploadAsset(params: {
   deviceAssetId?: string;
   createdAt?: Date;
   modifiedAt?: Date;
+  signal?: AbortSignal;
 }): Promise<ImmichUploadResponse> {
   const createdAt = params.createdAt ?? new Date();
   const modifiedAt = params.modifiedAt ?? createdAt;
@@ -750,6 +762,7 @@ export async function uploadAsset(params: {
     createdAt,
     modifiedAt,
     legacyDeviceAssetId: deviceAssetId,
+    signal: params.signal,
   });
 }
 
@@ -842,12 +855,14 @@ async function uploadAssetBlob(params: {
   createdAt: Date;
   modifiedAt: Date;
   legacyDeviceAssetId: string;
+  signal?: AbortSignal;
 }): Promise<ImmichUploadResponse> {
   const modernResponse = await immichRequest(
     "/assets",
     {
       method: "POST",
       headers: { "x-immich-checksum": params.checksum },
+      signal: params.signal,
       body: createAssetUploadForm({
         blob: params.blob,
         filename: params.filename,
@@ -872,6 +887,7 @@ async function uploadAssetBlob(params: {
   const legacyResponse = await immichRequest("/assets", {
     method: "POST",
     headers: { "x-immich-checksum": params.checksum },
+    signal: params.signal,
     body: createAssetUploadForm({
       ...params,
       legacyDeviceAssetId: params.legacyDeviceAssetId,

@@ -13,6 +13,8 @@ import projectRoutes from "./routes/projects.js";
 import reconcileRoutes from "./routes/reconcile.js";
 import settingsRoutes, { mountSSE } from "./routes/settings.js";
 import driveRoutes from "./routes/drive.js";
+import driveAutoImportRoutes from "./routes/driveAutoImport.js";
+import { driveAutoImport } from "./services/driveAutoImport.service.js";
 import toolsRoutes from "./routes/tools.js";
 import { checkImmichHealth, getImmichConfig } from "./infra/ImmichClient.js";
 import { readAuthSession } from "./services/auth.service.js";
@@ -64,6 +66,7 @@ app.use("/api/v1/placements", placementRoutes);
 app.use("/api/v1/projects", projectRoutes);
 app.use("/api/v1/reconcile", reconcileRoutes);
 app.use("/api/v1/settings", settingsRoutes);
+app.use("/api/v1/drive", driveAutoImportRoutes);
 app.use("/api/v1/drive", driveRoutes);
 app.use("/api/v1/tools", toolsRoutes);
 mountSSE(app);
@@ -132,6 +135,10 @@ app.listen(PORT, () => {
 
 initializeImmichStructure().catch((err) => {
   console.warn(`[startup] Immich structure initialization failed: ${(err as Error).message}`);
+});
+
+void driveAutoImport.initialize().catch(() => {
+  console.error("[Drive auto-import] Could not initialize durable history. Auto-import is unavailable until the store is repaired.");
 });
 
 logReconcileDriftAtBoot().catch((err) => {

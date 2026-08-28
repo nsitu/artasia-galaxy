@@ -6,4 +6,5 @@ dist/
 .DS_Store
 /.env
 data/upload-tmp/
+data/drive-auto-import/
 data/settings.*.json

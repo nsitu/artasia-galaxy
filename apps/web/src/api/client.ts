@@ -1281,6 +1281,64 @@ export interface DriveLookupResult {
   detail?: string;
 }
 
+export interface DriveAutoImportJob {
+  jobId: string;
+  placementId: number;
+  placementName: string;
+  rootFolderId: string;
+  startedAt: string;
+  finishedAt?: string;
+  status: "running" | "completed" | "completed_with_issues" | "no_matches" | "failed" | "cancelled" | "interrupted";
+  phase: "scanning" | "indexing" | "importing" | "verifying" | "done";
+  cancelRequested: boolean;
+  current?: string;
+  foldersScanned: number;
+  matchedFolders: number;
+  eligible: number;
+  resultCount: number;
+  counts: { discovered: number; imported: number; existing: number; excluded: number; needsReview: number; failed: number; pending: number };
+  error?: string;
+}
+
+export interface DriveAutoImportStatus {
+  latest: DriveAutoImportJob | null;
+  lastSuccessful: DriveAutoImportJob | null;
+  configurationChanged: boolean;
+}
+
+export interface DriveAutoImportResult {
+  kind: "folder" | "file";
+  fileId: string;
+  name: string;
+  path: string;
+  activityLabel?: string;
+  status: "pending" | "imported" | "existing" | "excluded" | "needs_review" | "failed";
+  detail?: string;
+  assetId?: string;
+}
+
+async function driveAutoImportRequest<T>(path: string, method = "GET"): Promise<T> {
+  const response = await fetch(`/api/v1/drive/${path}`, { method, cache: "no-store" });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(response.status === 401 ? "Sign in again to manage Drive imports." : body.error ?? `Drive request failed (${response.status}).`);
+  }
+  return response.json();
+}
+
+export function startDriveAutoImport(placementId: number) {
+  return driveAutoImportRequest<DriveAutoImportJob>(`placements/${placementId}/auto-import`, "POST");
+}
+export function fetchDriveAutoImportStatus(placementId: number) {
+  return driveAutoImportRequest<DriveAutoImportStatus>(`placements/${placementId}/sync-status`);
+}
+export function cancelDriveAutoImport(jobId: string) {
+  return driveAutoImportRequest<DriveAutoImportJob>(`auto-import-jobs/${encodeURIComponent(jobId)}/cancel`, "POST");
+}
+export function fetchDriveAutoImportResults(jobId: string, cursor = 0) {
+  return driveAutoImportRequest<{ results: DriveAutoImportResult[]; nextCursor: number | null }>(`auto-import-jobs/${encodeURIComponent(jobId)}/results?cursor=${cursor}`);
+}
+
 export async function lookupUploadAssetDriveSource(assetId: string): Promise<DriveLookupResult> {
   const res = await fetch(`/api/v1/drive/assets/${encodeURIComponent(assetId)}/lookup`, {
     method: "POST",

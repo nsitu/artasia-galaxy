@@ -1322,9 +1322,7 @@ function mapEmbeddedAssetMetadata(
       if (linkedAudioMatch) {
         assignment.linkedAudioAssetId = linkedAudioMatch[1];
       }
-      if (key.startsWith(DRIVE_SOURCE_TAG_PREFIX)) {
-        assignment.driveFileId = key.slice(DRIVE_SOURCE_TAG_PREFIX.length);
-      }
+      // Drive IDs must be extracted from raw tags, not these lowercased keys.
       if (key === "media:audio") assignment.isAudio = true;
       if (key === "artasia:gps:disabled") gpsDisabledAssetIds.add(asset.id);
 
@@ -1342,6 +1340,10 @@ function mapEmbeddedAssetMetadata(
       }
     }
 
+    assignment.driveFileId = (asset.tags ?? []).flatMap((tag) => [tag.name, tag.value])
+      .map((value) => value.trim())
+      .find((value) => value.toLowerCase().startsWith(DRIVE_SOURCE_TAG_PREFIX))
+      ?.slice(DRIVE_SOURCE_TAG_PREFIX.length);
     assignments.set(asset.id, assignment);
     if (hasAdjustments) adjustments.set(asset.id, assetAdjustments);
   }
