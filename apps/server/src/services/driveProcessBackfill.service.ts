@@ -97,7 +97,10 @@ export class DriveProcessBackfillManager {
       if (folder.id !== parents[0] || !GoogleDriveClient.isFolder(folder.mimeType)) return { ...result, detail: "The Drive parent could not be verified as a folder; no tags were changed." };
       folders.set(folder.id, folder);
       result.folderName = folder.name;
-      if (!isProcessDriveFolderName(folder.name)) return { ...result, status: "not_process", detail: "The immediate parent folder name does not contain process." };
+      // Final folders qualify for this maintenance tool without changing auto-import's Process-only rule.
+      if (!isProcessDriveFolderName(folder.name) && !/final/i.test(folder.name)) {
+        return { ...result, status: "not_process", detail: "The immediate parent folder name does not contain process or final." };
+      }
 
       // The inventory may be stale. Never use a changed Drive link to classify an asset.
       const current = await this.deps.getAsset(asset.id);

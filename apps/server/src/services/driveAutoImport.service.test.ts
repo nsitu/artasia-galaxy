@@ -65,7 +65,7 @@ test("scanner inherits case-insensitive Process folder types without affecting s
     const client = makeClient({
       root: [folder("org", "PROCESS documentation")],
       org: [folder("week", "Week 1"), media("unmatched", "org")],
-      week: [media("direct"), media("process-filename"), folder("photos", "Photos"), folder("sibling", "Finished artwork")],
+      week: [media("direct"), media("process-filename"), folder("photos", "Photos"), folder("sibling", "Final artwork")],
       photos: [folder("process", name)], sibling: [media("normal", "sibling")],
       process: [media("in-process", "process"), folder("deep", "Details"), folder("conflict", "Week 2"),
         media("document", "process", "application/pdf")],

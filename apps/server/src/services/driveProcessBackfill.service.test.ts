@@ -32,8 +32,8 @@ async function run(f: ReturnType<typeof fixture>) {
   return f.manager.get(started.jobId)!;
 }
 
-test("backfill matches parent names case-insensitively, adds only Process, and is idempotent", async () => {
-  for (const name of ["Process", "process", "PROCESS", "Work in PrOcEsS", "Postprocessing"]) {
+test("backfill matches Process and Final parent names case-insensitively, adds only Process, and is idempotent", async () => {
+  for (const name of ["Process", "process", "PROCESS", "Work in PrOcEsS", "Postprocessing", "Final", "final", "FINAL", "FiNaL photos", "Finalized artwork"]) {
     const original = asset("AbC", ["SOURCE:DRIVE:AbC", "placement:1", "activity:10", "published", "asset_type:artwork", "custom"],
       { exifInfo: { description: "Keep caption" } as ImmichAsset["exifInfo"] });
     const f = fixture([original]); f.client.getFolder = async (id) => folder(id, name);
@@ -49,12 +49,15 @@ test("backfill matches parent names case-insensitively, adds only Process, and i
 });
 
 test("backfill only checks the immediate parent, not ancestors or media names", async () => {
-  const f = fixture();
-  f.client.getFile = async (id) => ({ id, name: "process photo.jpg", mimeType: "image/jpeg", parents: ["details"] });
-  f.client.getFolder = async (id) => { assert.equal(id, "details"); return { ...folder(id, "Details"), parents: ["PROCESS"] }; };
-  const job = await run(f);
-  assert.equal(job.counts.notProcess, 1); assert.equal(f.writes.length, 0);
-  assert.equal(job.results[0].folderName, "Details");
+  for (const name of ["PROCESS", "FINAL"]) {
+    const f = fixture();
+    f.client.getFile = async (id) => ({ id, name: `${name} photo.jpg`, mimeType: "image/jpeg", parents: ["details"] });
+    f.client.getFolder = async (id) => { assert.equal(id, "details"); return { ...folder(id, "Details"), parents: [name] }; };
+    const job = await run(f);
+    assert.equal(job.counts.notProcess, 1); assert.equal(f.writes.length, 0);
+    assert.equal(job.results[0].folderName, "Details");
+    assert.match(job.results[0].detail!, /does not contain process or final/);
+  }
 });
 
 test("backfill preserves archive, trash, and hidden status and handles shared source derivatives", async () => {

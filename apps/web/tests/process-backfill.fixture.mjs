@@ -8,7 +8,7 @@ let latest = null;
 let runs = 0;
 let startedAt = 0;
 const results = Array.from({ length: 103 }, (_, i) => ({ assetId: `asset-${i}`, fileName: `Legacy photo ${i}.jpg`, fileId: i < 2 ? undefined : `drive-${i}`,
-  folderName: i === 3 ? "Finished artwork" : "Work in PrOcEsS", status: i < 2 ? "needs_review" : i === 2 ? "failed" : i === 3 ? "not_process" : "tagged",
+  folderName: i === 3 ? "Finished artwork" : i % 2 === 0 ? "FiNaL photos" : "Work in PrOcEsS", status: i < 2 ? "needs_review" : i === 2 ? "failed" : i === 3 ? "not_process" : "tagged",
   detail: i < 2 ? "Multiple Drive IDs; no tags were changed." : i === 2 ? "Drive lookup failed: permission denied." : undefined }));
 function status() {
   if (latest?.status === "running" && !latest.cancelRequested) {

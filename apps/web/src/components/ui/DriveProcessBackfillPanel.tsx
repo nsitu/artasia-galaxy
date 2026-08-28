@@ -3,7 +3,7 @@ import { cancelDriveProcessBackfill, fetchDriveProcessResults, fetchDriveProcess
   type DriveProcessJob, type DriveProcessResult } from "../../api/client";
 
 const statusLabels = { running: "In progress", completed: "Completed successfully", completed_with_issues: "Completed with issues", cancelled: "Cancelled", failed: "Failed" };
-const resultLabels = { tagged: "Tagged Process", already_process: "Already Process", not_process: "Not a Process folder", needs_review: "Needs review", failed: "Failed" };
+const resultLabels = { tagged: "Tagged Process", already_process: "Already Process", not_process: "No matching folder name", needs_review: "Needs review", failed: "Failed" };
 
 export default function DriveProcessBackfillPanel(props: {
   authenticated: boolean;
@@ -75,7 +75,7 @@ export default function DriveProcessBackfillPanel(props: {
 
   return <section aria-label="Tag existing Process assets" style={sectionStyle}>
     <h3 style={{ margin: "0 0 8px", fontSize: 20, color: "#f3f5fa" }}>Tag existing Process assets</h3>
-    <p style={descriptionStyle}>Check assets with a Drive ID that are not already Process. If their immediate parent folder name contains <strong>process</strong> (any casing), add the Process asset type. This checks the parent folder only, not higher ancestors.</p>
+    <p style={descriptionStyle}>Check assets with a Drive ID that are not already Process. If their immediate parent folder name contains <strong>process</strong> or <strong>final</strong> (any casing), add the Process asset type. This checks the parent folder only, not higher ancestors.</p>
     <p style={descriptionStyle}>Includes archived, trashed, and hidden assets accessible to Atlas. Other tags, activity assignments, and publication stay unchanged. No files are imported or restored.</p>
     {running ? <button type="button" style={buttonStyle} disabled={acting || job.cancelRequested} onClick={() => void act(true)}>{job.cancelRequested ? "Cancelling…" : "Cancel Process tagging"}</button>
       : <button type="button" style={buttonStyle} disabled={!props.authenticated || !ready || acting || props.otherDriveToolRunning || confirming} onClick={() => setConfirming(true)}>{acting ? "Starting…" : "Tag Process assets from Drive"}</button>}
@@ -91,7 +91,7 @@ export default function DriveProcessBackfillPanel(props: {
       <div>{job.counts.scanned} scanned · {job.counts.checked} checked</div>
       {running && job.phase === "checking" && <progress aria-label="Assets checked for Process type" max={Math.max(job.counts.scanned, 1)} value={job.counts.checked} style={{ width: "100%" }} />}
       {job.current && <div style={{ overflowWrap: "anywhere", fontSize: 13 }}>{job.current}</div>}
-      <div style={{ fontSize: 13 }}>{job.counts.tagged} tagged Process · {job.counts.alreadyProcess} already Process · {job.counts.noSource} without Drive ID · {job.counts.notProcess} non-Process folders · {job.counts.needsReview} need review · {job.counts.failed} failed</div>
+      <div style={{ fontSize: 13 }}>{job.counts.tagged} tagged Process · {job.counts.alreadyProcess} already Process · {job.counts.noSource} without Drive ID · {job.counts.notProcess} nonmatching folders · {job.counts.needsReview} need review · {job.counts.failed} failed</div>
       {job.status === "cancelled" && <p style={descriptionStyle}>Stopped early. Completed tag changes remain. A tag in flight may have completed; rerun to check remaining assets.</p>}
       {job.error && <div role="alert" style={errorStyle}>{job.error}</div>}
       {!running && job.resultCount > 0 && <details key={`${job.jobId}-${job.status}`} onToggle={(event) => { if (event.currentTarget.open && results.length === 0) void loadResults(); }}>
