@@ -9,7 +9,7 @@ import { DriveAutoImportManager, DriveJobStore, driveConfigurationHash, matchDri
 import { GoogleDriveClient, type DriveFile } from "./googleDrive.service.js";
 import { acquireDriveWriter, driveSourceIds } from "./driveSource.service.js";
 import { addSourceAsset, importNewDriveFile, sourceAssets, sourceConflict, spoolDriveFile, type SourceIndex } from "./driveImport.service.js";
-import type { ImmichAsset } from "../infra/ImmichClient.js";
+import { searchAssets, type ImmichAsset } from "../infra/ImmichClient.js";
 import type { UploadConfig } from "./uploadConfig.service.js";
 
 const folder = (id: string, name = id): DriveFile => ({ id, name, mimeType: "application/vnd.google-apps.folder" });
@@ -264,19 +264,64 @@ test("additive recovery never changes an archived or trashed asset", async () =>
   }
 });
 
-test("Immich source inventory explicitly includes trash, stacked children, all visibilities, and every page", async (t) => {
+test("Immich source inventory includes trash, stacked children, API-key-accessible visibilities, and every page", async (t) => {
   const queries: Array<{ visibility: string; page: number }> = [];
   t.mock.method(globalThis, "fetch", async (_url: unknown, init: RequestInit) => {
     const body = JSON.parse(String(init.body));
     assert.equal(body.withDeleted, true);
     assert.equal(body.withStacked, true);
     queries.push(body);
+    // Immich v3 requires an elevated user session for locked assets, even with a valid API key.
+    if (body.visibility === "locked") {
+      return Response.json({ message: "Elevated permission is required" }, { status: 401 });
+    }
     return new Response(JSON.stringify({ assets: { items: [asset(`${body.visibility}-${body.page}`, `${body.visibility}-${body.page}`)],
       nextPage: body.page === 1 ? "2" : null } }), { status: 200, headers: { "Content-Type": "application/json" } });
   });
-  assert.equal((await sourceAssets()).length, 8);
-  assert.deepEqual([...new Set(queries.map((query) => query.visibility))], ["timeline", "archive", "hidden", "locked"]);
+  assert.equal((await sourceAssets()).length, 6);
+  assert.deepEqual([...new Set(queries.map((query) => query.visibility))], ["timeline", "archive", "hidden"]);
   assert.ok(queries.every((query) => query.page === 1 || query.page === 2));
+});
+
+test("source-specific rechecks include archive and trash without requesting locked assets", async (t) => {
+  const visibilities: string[] = [];
+  t.mock.method(globalThis, "fetch", async (_url: unknown, init: RequestInit) => {
+    const body = JSON.parse(String(init.body));
+    assert.deepEqual(body.tagIds, ["source-tag"]);
+    assert.equal(body.withDeleted, true);
+    assert.equal(body.withStacked, true);
+    assert.notEqual(body.visibility, "locked");
+    visibilities.push(body.visibility);
+    return Response.json({ assets: { items: body.visibility === "archive"
+      ? [asset("archived", "existing", { isArchived: true }), asset("trashed", "existing", { isTrashed: true })]
+      : [], nextPage: null } });
+  });
+  assert.deepEqual((await sourceAssets(["source-tag"])).map((item) => item.id), ["archived", "trashed"]);
+  assert.deepEqual(visibilities, ["timeline", "archive", "hidden"]);
+});
+
+test("Immich elevated-session rejection is not misreported as a stale API key", async (t) => {
+  t.mock.method(globalThis, "fetch", async () => Response.json({ message: "Elevated permission is required" }, { status: 401 }));
+  await assert.rejects(searchAssets({ visibility: "locked" }), (error: Error) => {
+    assert.match(error.message, /elevated user session/i);
+    assert.match(error.message, /401/);
+    assert.doesNotMatch(error.message, /invalid|expired|stale/);
+    return true;
+  });
+});
+
+test("source inventory fails closed on ordinary authentication errors, including during archive lookup", async (t) => {
+  for (const responseBody of [JSON.stringify({ message: "Invalid API key" }), "Unauthorized"]) {
+    const requests: string[] = [];
+    t.mock.method(globalThis, "fetch", async (_url: unknown, init: RequestInit) => {
+      const body = JSON.parse(String(init.body));
+      requests.push(body.visibility);
+      return body.visibility === "timeline" ? Response.json({ assets: { items: [], nextPage: null } })
+        : new Response(responseBody, { status: 401 });
+    });
+    await assert.rejects(sourceAssets(), /Immich authentication failed \(401\)/);
+    assert.deepEqual(requests, ["timeline", "archive"]);
+  }
 });
 
 test("failed final history write cannot establish a successful sync", async (t) => {

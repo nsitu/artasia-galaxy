@@ -112,6 +112,12 @@ async function immichRequest(
 
   if (!res.ok && !options?.allowErrorStatus) {
     if (res.status === 401) {
+      const body = await res.json().catch(() => null);
+      if (body?.message === "Elevated permission is required") {
+        throw new Error(
+          `Immich requires an elevated user session (401) for ${init?.method ?? "GET"} ${path} — this operation is not available with an API key`,
+        );
+      }
       throw new Error(
         `Immich authentication failed (401) for ${init?.method ?? "GET"} ${path} — the running Atlas container may have an invalid, expired, or stale IMMICH_API_KEY`,
       );

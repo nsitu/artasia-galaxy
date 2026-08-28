@@ -12,7 +12,8 @@ import { parseImmichDuration } from "./audioAsset.service.js";
 import { UPLOAD_LIMITS } from "./uploadLimits.js";
 
 export type SourceIndex = Map<string, ImmichAsset[]>;
-const VISIBILITIES = ["timeline", "archive", "hidden", "locked"] as const;
+// Locked assets require an elevated Immich user session; API keys cannot search them.
+const VISIBILITIES = ["timeline", "archive", "hidden"] as const;
 
 export function addSourceAsset(index: SourceIndex, asset: ImmichAsset) {
   for (const id of driveSourceIds(asset)) {
@@ -21,7 +22,7 @@ export function addSourceAsset(index: SourceIndex, asset: ImmichAsset) {
   }
 }
 
-/** withDeleted includes trash; every visibility and stacked child must be considered. */
+/** Include trash and stacked children across all API-key-accessible visibilities. */
 export async function sourceAssets(tagIds?: string[], signal?: AbortSignal, progress?: (count: number) => Promise<void>) {
   const assets = new Map<string, ImmichAsset>();
   for (const visibility of VISIBILITIES) {
