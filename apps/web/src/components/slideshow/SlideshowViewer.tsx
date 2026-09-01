@@ -1227,4 +1227,26 @@ const slideshowStyles = `
     .atlas-slideshow-anecdote { width: 100%; height: 100%; max-height: none; margin: 0; padding: 22px; }
     .atlas-slideshow-anecdote-content { font-size: clamp(var(--atlas-slideshow-anecdote-font-floor, 28px), 4cqw, var(--atlas-slideshow-anecdote-font-cap, 52px)); }
   }
+
+  .atlas-slideshow--rotated .atlas-slideshow-brand {
+    width: calc(100% - clamp(40px, 7cqw, 128px));
+    max-width: none;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .atlas-slideshow--rotated .atlas-slideshow-placement-details {
+    flex: 0 1 auto;
+    width: auto;
+    max-width: min(50cqw, 600px);
+    padding-top: 4px;
+    align-items: flex-end;
+    text-align: right;
+  }
+
+  .atlas-slideshow--rotated .atlas-slideshow-placement-name,
+  .atlas-slideshow--rotated .atlas-slideshow-placement-people,
+  .atlas-slideshow--rotated .atlas-slideshow-placement-age {
+    justify-content: flex-end;
+  }
 `;
