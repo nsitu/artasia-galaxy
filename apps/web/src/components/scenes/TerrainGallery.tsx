@@ -2058,10 +2058,11 @@ export default function TerrainGallery({
       placementOrbitFitPlacementRef.current = null;
       return;
     }
-    // Wait for the placement gallery before fitting the orbit camera. If the
-    // fit runs while the artwork request is still in flight, it can lock in a
-    // fallback center/radius and leave the newly loaded orbits outside the
-    // initial view until an activity filter causes another fit.
+    // Wait for both the placement gallery and terrain request before fitting
+    // the orbit camera. The terrain camera effect runs again when loading
+    // finishes; fitting sooner lets that final terrain frame overwrite the
+    // orbit frame and leaves the artwork outside the initial view. Cached
+    // revisits hide that race because their terrain is already settled.
     if (!focusedPlacementGalleryReady) {
       placementOrbitFitPlacementRef.current = null;
       return;
@@ -2070,6 +2071,7 @@ export default function TerrainGallery({
       placementOrbitFitPlacementRef.current === focusedPlacement.placement_id ||
       !sceneReadyForMarkers ||
       galleryLoading ||
+      loading ||
       (
         activityOrbitRings.length === 0 &&
         placementLayout.length === 0 &&
@@ -2151,6 +2153,7 @@ export default function TerrainGallery({
     focusedPlacementCenter,
     focusedPlacementGalleryReady,
     galleryLoading,
+    loading,
     placementSigns,
     placementLayout,
     sceneReadyForMarkers,
