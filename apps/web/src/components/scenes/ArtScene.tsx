@@ -1080,6 +1080,25 @@ export default function ArtScene() {
       </span>
     </a>
   ) : null;
+  const contextLightboxPlacementLogoLink = contextLightboxPlacement && contextLightboxPlacementHref ? (
+    <a
+      className="atlas-lightbox-placement-link"
+      href={contextLightboxPlacementHref}
+      onClick={(event) => event.stopPropagation()}
+      aria-label={`View ${contextLightboxPlacement.placement_name}`}
+      title={contextLightboxPlacement.placement_name}
+      style={photoLightboxPlacementLinkStyle}
+    >
+      {(contextLightboxPlacement.partner_white_logo?.url ||
+        contextLightboxPlacement.partner_logo?.url) && (
+        <img
+          src={contextLightboxPlacement.partner_white_logo?.url || contextLightboxPlacement.partner_logo?.url}
+          alt={contextLightboxPlacement.partner_white_logo?.alt || contextLightboxPlacement.partner_logo?.alt || ""}
+          style={photoLightboxPlacementLogoStyle}
+        />
+      )}
+    </a>
+  ) : null;
   const selectedActivityDescriptions = selectedPhotoActivities.flatMap((activity) => {
     const description = activity.description?.trim();
     return description ? [{ id: activity.id, description }] : [];
@@ -2244,7 +2263,7 @@ export default function ArtScene() {
                 style={photoLightboxCaptionHeaderContentStyle}
               >
                 {isContextSearchLightbox ? (
-                  contextLightboxPlacementLink
+                  similarMapOrigin ? contextLightboxPlacementLogoLink : contextLightboxPlacementLink
                 ) : selectedPhotoHasBadges ? (
                   <>
                     <div style={photoLightboxHeaderBadgeListStyle}>
@@ -2361,6 +2380,21 @@ export default function ArtScene() {
                 </button>
               </div>
             )}
+                {similarMapOrigin && contextLightboxPlacement && contextLightboxPlacementHref && (
+                  <div style={photoLightboxPlacementContentRowStyle}>
+                    <span style={photoLightboxPlacementPrefixStyle}>Curated from:</span>
+                    <a
+                      href={contextLightboxPlacementHref}
+                      onClick={(event) => event.stopPropagation()}
+                      style={photoLightboxPlacementContentLinkStyle}
+                    >
+                      {contextLightboxPlacement.placement_name}
+                      {contextLightboxPlacement.section?.trim()
+                        ? ` - ${contextLightboxPlacement.section.trim()}`
+                        : ""}
+                    </a>
+                  </div>
+                )}
                 <div style={photoLightboxActionRowStyle}>
                 {isProcessLightbox && documentationOverlayPlacement && (
                   <button
@@ -3978,6 +4012,24 @@ const photoLightboxPlacementNameStyle: React.CSSProperties = {
   lineHeight: 1.2,
   textOverflow: "ellipsis",
   whiteSpace: "nowrap",
+};
+
+const photoLightboxPlacementContentRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  flexWrap: "wrap",
+  gap: 6,
+  width: "100%",
+  marginTop: 10,
+};
+
+const photoLightboxPlacementContentLinkStyle: React.CSSProperties = {
+  ...photoLightboxPlacementNameStyle,
+  flex: "0 1 auto",
+  color: "#fff",
+  textDecoration: "underline",
+  textDecorationColor: "rgba(255,255,255,0.38)",
+  textUnderlineOffset: 3,
 };
 
 const photoLightboxActionRowStyle: React.CSSProperties = {
