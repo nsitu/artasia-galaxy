@@ -367,4 +367,8 @@
     background: transparent;
   }
 
+  .atlas-documentation-overlay__gallery-action {
+    margin-top: 24px;
+  }
+
 }
