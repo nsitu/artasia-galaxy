@@ -1393,9 +1393,6 @@ export default function TerrainGallery({
       (introEnabled && introPhase !== "complete")
     ) return;
 
-    previousPartnerFilterRef.current = selectedPartnerFilter;
-    previousEducatorFilterRef.current = selectedEducatorFilter;
-
     const bounds = new THREE.Box3();
     for (const item of placementLayout) {
       bounds.expandByPoint(new THREE.Vector3(...item.position));
@@ -1431,9 +1428,21 @@ export default function TerrainGallery({
       camera.position.lerpVectors(startPosition, endPosition, eased);
       camera.lookAt(controls.target!);
       controls.update?.();
-      partnerFitAnimationRef.current = progress < 1
-        ? requestAnimationFrame(animateFit)
-        : null;
+      if (progress < 1) {
+        partnerFitAnimationRef.current = requestAnimationFrame(animateFit);
+      } else {
+        partnerFitAnimationRef.current = null;
+        // Terrain and projection updates can rerun this effect while the
+        // regional view is settling. Only consume the filter change after the
+        // camera reaches the filtered flowers so a cancelled fit is retried.
+        previousPartnerFilterRef.current = selectedPartnerFilter;
+        previousEducatorFilterRef.current = selectedEducatorFilter;
+        console.info(
+          `[viewer:regional-filter-fit] complete partner=${selectedPartnerFilter || "all"}` +
+          ` educator=${selectedEducatorFilter || "all"}` +
+          ` placements=${placementLayout.length}`,
+        );
+      }
     };
     partnerFitAnimationRef.current = requestAnimationFrame(animateFit);
     return () => {

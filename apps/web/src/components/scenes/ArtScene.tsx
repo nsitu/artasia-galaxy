@@ -1570,7 +1570,10 @@ export default function ArtScene() {
   }, [handlePartnerNavigation]);
 
   useEffect(() => {
-    if (!selectedPartnerFilter) return;
+    // TerrainGallery publishes an empty option list while its placement data
+    // is being rebuilt. Do not interpret that transient state as an invalid
+    // route/filter selection.
+    if (!selectedPartnerFilter || partnerFilterOptions.length === 0) return;
     if (!partnerFilterOptions.some((option) => option.value === selectedPartnerFilter)) {
       setSelectedEducatorFilter("");
       setSelectedPartnerFilter("");
@@ -1578,7 +1581,7 @@ export default function ArtScene() {
   }, [partnerFilterOptions, selectedPartnerFilter]);
 
   useEffect(() => {
-    if (!selectedEducatorFilter) return;
+    if (!selectedEducatorFilter || educatorFilterOptions.length === 0) return;
     if (!educatorFilterOptions.some((option) => option.value === selectedEducatorFilter)) {
       setSelectedEducatorFilter("");
     }
