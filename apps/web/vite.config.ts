@@ -8,15 +8,20 @@ const buildLabelFormatter = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric",
 });
+const buildTime = process.env.VITE_ARTASIA_BUILD_TIME;
 const buildLabelParts = buildLabelFormatter.formatToParts(new Date());
 const buildLabelPart = (type: Intl.DateTimeFormatPartTypes) =>
   buildLabelParts.find((part) => part.type === type)?.value ?? "";
-const buildLabel = `Built at ${buildLabelPart("hour")}:${buildLabelPart("minute")}${buildLabelPart("dayPeriod").toLowerCase()} on ${buildLabelPart("month")} ${buildLabelPart("day")}`;
+const buildLabel = buildTime
+  ? `Built at ${buildLabelFormatter.format(new Date(buildTime))}`
+  : `Built at ${buildLabelPart("hour")}:${buildLabelPart("minute")}${buildLabelPart("dayPeriod").toLowerCase()} on ${buildLabelPart("month")} ${buildLabelPart("day")}`;
+const buildId = process.env.VITE_ARTASIA_BUILD_ID ?? "dev";
 
 export default defineConfig({
   plugins: [react()],
   define: {
     __ARTASIA_BUILD_LABEL__: JSON.stringify(buildLabel),
+    __ARTASIA_BUILD_ID__: JSON.stringify(buildId),
   },
   envDir: "../..",
   server: {

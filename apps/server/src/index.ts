@@ -22,6 +22,13 @@ import { initializeImmichStructure, logReconcileDriftAtBoot } from "./services/s
 import { getArtasiaAnecdotes } from "./infra/WordPressClient.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const buildId = process.env.ARTASIA_BUILD_ID ?? "dev";
+const buildTime = process.env.ARTASIA_BUILD_TIME ?? null;
+const noCacheHeaders = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+  Pragma: "no-cache",
+  Expires: "0",
+};
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -82,7 +89,16 @@ app.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
 });
 
 app.get("/api/v1/meta", (_req, res) => {
-  res.json({ apiVersion: "1.0.0", contractVersion: "1.0.0" });
+  res.set({
+    ...noCacheHeaders,
+    "X-Artasia-Build-Id": buildId,
+  });
+  res.json({
+    buildId,
+    buildTime,
+    apiVersion: "1.0.0",
+    contractVersion: "1.0.0",
+  });
 });
 
 app.get("/api/v1/health", async (_req, res) => {
@@ -101,7 +117,18 @@ app.get("/api/v1/health", async (_req, res) => {
 
 const publicDir = path.resolve(__dirname, "../../public");
 if (existsSync(publicDir)) {
-  app.use(express.static(publicDir));
+  app.use(express.static(publicDir, {
+    setHeaders: (res, filePath) => {
+      if (path.basename(filePath) === "index.html") {
+        res.set(noCacheHeaders);
+      }
+    },
+  }));
+
+  const sendIndex = (_req: Request, res: Response) => {
+    res.set(noCacheHeaders);
+    res.sendFile(path.join(publicDir, "index.html"));
+  };
 
   app.get(/^\/admin(?:\/.*)?$/, (req, res) => {
     if (!readAuthSession(req)) {
@@ -109,7 +136,7 @@ if (existsSync(publicDir)) {
       return;
     }
 
-    res.sendFile(path.join(publicDir, "index.html"));
+    sendIndex(req, res);
   });
 
   app.get(/^\/edit\/[0-9a-f-]{36}$/i, (req, res) => {
@@ -119,12 +146,12 @@ if (existsSync(publicDir)) {
       return;
     }
 
-    res.sendFile(path.join(publicDir, "index.html"));
+    sendIndex(req, res);
   });
 
   app.get(/.*/, (req, res) => {
     if (req.path.startsWith("/api")) return;
-    res.sendFile(path.join(publicDir, "index.html"));
+    sendIndex(req, res);
   });
 }
 

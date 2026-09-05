@@ -4,6 +4,7 @@ import SlideshowViewer from "./components/slideshow/SlideshowViewer";
 import PartnerUploadPanel from "./components/ui/PartnerUploadPanel";
 import ToolsPanel from "./components/ui/ToolsPanel";
 import UploadPanel from "./components/ui/UploadPanel";
+import UpdateAvailableBanner from "./components/system/UpdateAvailableBanner";
 
 function getAdminAuthError() {
   const params = new URLSearchParams(window.location.search);
@@ -12,6 +13,15 @@ function getAdminAuthError() {
 }
 
 export default function App() {
+  return (
+    <>
+      <UpdateAvailableBanner />
+      <AppContent />
+    </>
+  );
+}
+
+function AppContent() {
   const [location, setLocation] = useState(() => ({
     path: window.location.pathname,
     search: window.location.search,

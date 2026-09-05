@@ -15,6 +15,12 @@ COPY apps/web apps/web
 
 ARG VITE_MAPBOX_TOKEN
 ENV VITE_MAPBOX_TOKEN=$VITE_MAPBOX_TOKEN
+ARG ARTASIA_BUILD_ID=dev
+ARG ARTASIA_BUILD_TIME
+ENV ARTASIA_BUILD_ID=$ARTASIA_BUILD_ID
+ENV ARTASIA_BUILD_TIME=$ARTASIA_BUILD_TIME
+ENV VITE_ARTASIA_BUILD_ID=$ARTASIA_BUILD_ID
+ENV VITE_ARTASIA_BUILD_TIME=$ARTASIA_BUILD_TIME
 
 RUN npm run build --workspace @artasia/web
 RUN npm run build --workspace @artasia/server
@@ -22,9 +28,14 @@ RUN npm prune --omit=dev --workspaces --include-workspace-root
 
 FROM node:22-alpine AS runtime
 
+ARG ARTASIA_BUILD_ID=dev
+ARG ARTASIA_BUILD_TIME
+
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV DATA_DIR=/data
+ENV ARTASIA_BUILD_ID=$ARTASIA_BUILD_ID
+ENV ARTASIA_BUILD_TIME=$ARTASIA_BUILD_TIME
 
 RUN apk add --no-cache imagemagick libheif libde265 ffmpeg
 

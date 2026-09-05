@@ -4,6 +4,23 @@ export interface AssetAdjustments {
   saturation: number;
 }
 
+export interface BuildMeta {
+  buildId: string;
+  buildTime: string | null;
+  apiVersion: string;
+  contractVersion: string;
+}
+
+export async function fetchBuildMeta(signal?: AbortSignal): Promise<BuildMeta> {
+  const res = await fetch("/api/v1/meta", {
+    cache: "no-store",
+    headers: { "Cache-Control": "no-cache" },
+    signal,
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json() as Promise<BuildMeta>;
+}
+
 export type AssetType = "artwork" | "process";
 
 export interface Photo {
