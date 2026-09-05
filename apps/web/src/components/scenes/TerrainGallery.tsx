@@ -880,6 +880,9 @@ export default function TerrainGallery({
   const projectionMatchesRequest = Boolean(
     request && requestKey && projectionRequestKey === requestKey,
   );
+  const terrainMatchesRequest = Boolean(
+    request && requestKey && renderedTerrainKey === requestKey,
+  );
   const terrainElevationScale = focusedPlacement
     ? LOCAL_TERRAIN_ELEVATION_SCALE
     : REGIONAL_TERRAIN_ELEVATION_SCALE;
@@ -917,11 +920,15 @@ export default function TerrainGallery({
   const showRegionalStatistics =
     !introEnabled || introPhase === "exiting" || introPhase === "complete";
   const focusedPlacementCenter = useMemo<[number, number, number] | null>(() => {
-    if (!focusedPlacement || !projection || !projectionMatchesRequest) return null;
-    const [placementX, placementY, placementZ = 0] = projection.proj([
-      focusedPlacement.lat,
-      focusedPlacement.lng,
-    ]);
+    if (!focusedPlacement || !terrainMatchesRequest) return null;
+    // A local terrain request is centered on its placement, so the orbit can
+    // still be positioned safely while React publishes the matching
+    // projection. This prevents a transient projection-state mismatch from
+    // hiding every placement marker even though the current terrain is ready.
+    const [placementX, placementY, placementZ = 0] =
+      projection && projectionMatchesRequest
+        ? projection.proj([focusedPlacement.lat, focusedPlacement.lng])
+        : [0, 0, 0];
     return [
       placementX,
       placementY,
@@ -929,7 +936,13 @@ export default function TerrainGallery({
         ? (sampleTerrainZ(terrain, placementX, placementY) ?? placementZ)
         : placementZ,
     ];
-  }, [focusedPlacement, projection, projectionMatchesRequest, terrain]);
+  }, [
+    focusedPlacement,
+    projection,
+    projectionMatchesRequest,
+    terrain,
+    terrainMatchesRequest,
+  ]);
   const localPhotoLayout = useMemo<LocalPhotoLayoutItem[]>(() => {
     if (!focusedPlacementCenter) return [];
     const standardActivityOptions = activityOptions.filter(
@@ -1208,6 +1221,15 @@ export default function TerrainGallery({
   ]);
 
   const placementLayout = useMemo(() => {
+    if (focusedPlacement && focusedPlacementCenter) {
+      return [{
+        placement: focusedPlacement,
+        isForked: false,
+        clusterIndex: 0,
+        clusterCount: 1,
+        position: focusedPlacementCenter,
+      }];
+    }
     if (!projection || !projectionMatchesRequest) return [];
     const projected = visiblePlacements.flatMap((placement) => {
       if (!Number.isFinite(placement.lat) || !Number.isFinite(placement.lng))
@@ -1260,7 +1282,14 @@ export default function TerrainGallery({
         ] as [number, number, number],
       };
     });
-  }, [focusedPlacement, projection, projectionMatchesRequest, terrain, visiblePlacements]);
+  }, [
+    focusedPlacement,
+    focusedPlacementCenter,
+    projection,
+    projectionMatchesRequest,
+    terrain,
+    visiblePlacements,
+  ]);
 
   const contextSearchByPlacementId = useMemo(
     () => new Map(
@@ -1277,7 +1306,7 @@ export default function TerrainGallery({
 
   const placementSigns = useMemo(() => {
     const signsByPlacementId = new Map<number, PlacementSign[]>();
-    const signTargets = focusedPlacement && projection
+    const signTargets = focusedPlacement && projection && projectionMatchesRequest
       ? projectPlacements
         .filter((placement) => Number.isFinite(placement.lat) && Number.isFinite(placement.lng))
         .map((placement) => {
@@ -1936,11 +1965,8 @@ export default function TerrainGallery({
     };
   }, []);
 
-  const terrainMatchesRequest = Boolean(
-    request && requestKey && renderedTerrainKey === requestKey,
-  );
   const sceneReadyForMarkers =
-    projectionMatchesRequest &&
+    (focusedPlacement ? Boolean(focusedPlacementCenter) : projectionMatchesRequest) &&
     (terrainMatchesRequest || phase === "flat") &&
     (!focusedPlacement || focusedPlacementGalleryReady);
   const showPhotoPins = Boolean(focusedPlacement);
@@ -2122,7 +2148,7 @@ export default function TerrainGallery({
     if (placementOrbitFitAnimationRef.current !== null) {
       cancelAnimationFrame(placementOrbitFitAnimationRef.current);
     }
-    placementOrbitFitPlacementRef.current = focusedPlacement.placement_id;
+    const placementId = focusedPlacement.placement_id;
     const animateFit = (timestamp: number) => {
       const progress = Math.min(
         1,
@@ -2133,9 +2159,15 @@ export default function TerrainGallery({
       camera.position.lerpVectors(startPosition, endPosition, eased);
       camera.lookAt(controls.target!);
       controls.update?.();
-      placementOrbitFitAnimationRef.current = progress < 1
-        ? requestAnimationFrame(animateFit)
-        : null;
+      if (progress < 1) {
+        placementOrbitFitAnimationRef.current = requestAnimationFrame(animateFit);
+      } else {
+        placementOrbitFitAnimationRef.current = null;
+        // Only suppress future fits after the camera actually reaches its
+        // destination. If an intervening render cancels the animation, the
+        // next effect run must retry it.
+        placementOrbitFitPlacementRef.current = placementId;
+      }
     };
     placementOrbitFitAnimationRef.current = requestAnimationFrame(animateFit);
 
@@ -2270,13 +2302,22 @@ export default function TerrainGallery({
 
   useEffect(() => {
     if (!focusedPlacement) return;
+    if (isMatchingPlacementPhotoScope(photoScope, focusedPlacement.placement_id)) {
+      return;
+    }
+    console.info("[viewer:placement-gallery] restoring placement scope", {
+      placementId: focusedPlacement.placement_id,
+      previousScope: photoScope.mode === "placement"
+        ? `placement:${photoScope.placementId}`
+        : photoScope.mode,
+    });
     void fetchPlacementFocus({
       placementId: focusedPlacement.placement_id,
       lat: focusedPlacement.lat,
       lng: focusedPlacement.lng,
       radiusKm: LOCAL_PLACEMENT_RADIUS_KM,
     });
-  }, [fetchPlacementFocus, focusedPlacement]);
+  }, [fetchPlacementFocus, focusedPlacement, photoScope]);
 
   useEffect(() => {
     return () => onNoticeChange?.(null);

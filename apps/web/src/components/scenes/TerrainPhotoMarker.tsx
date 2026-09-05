@@ -1727,32 +1727,58 @@ function usePhotoTexture(url: string) {
   useEffect(() => {
     let active = true;
     let loadedTexture: THREE.Texture | null = null;
+    let pendingTexture: THREE.Texture | null = null;
+    let retryTimer: number | null = null;
+    let attempt = 0;
+    const retryDelaysMs = [250, 750, 1500];
     setTexture(fallbackTexture);
 
-    new THREE.TextureLoader().load(
-      url,
-      (nextTexture) => {
-        loadedTexture = nextTexture;
-        nextTexture.colorSpace = THREE.SRGBColorSpace;
-        nextTexture.minFilter = THREE.LinearMipmapLinearFilter;
-        nextTexture.magFilter = THREE.LinearFilter;
-        nextTexture.generateMipmaps = true;
-        nextTexture.anisotropy = Math.min(4, gl.capabilities.getMaxAnisotropy());
-        nextTexture.needsUpdate = true;
-        if (active) setTexture(nextTexture);
-        else nextTexture.dispose();
-      },
-      undefined,
-      () => {
-        if (active) {
-          console.warn(`[viewer] thumbnail unavailable: ${url}`);
+    const loadTexture = () => {
+      attempt += 1;
+      pendingTexture = new THREE.TextureLoader().load(
+        url,
+        (nextTexture) => {
+          pendingTexture = null;
+          if (!active) {
+            nextTexture.dispose();
+            return;
+          }
+          loadedTexture = nextTexture;
+          nextTexture.colorSpace = THREE.SRGBColorSpace;
+          nextTexture.minFilter = THREE.LinearMipmapLinearFilter;
+          nextTexture.magFilter = THREE.LinearFilter;
+          nextTexture.generateMipmaps = true;
+          nextTexture.anisotropy = Math.min(4, gl.capabilities.getMaxAnisotropy());
+          nextTexture.needsUpdate = true;
+          setTexture(nextTexture);
+        },
+        undefined,
+        () => {
+          pendingTexture?.dispose();
+          pendingTexture = null;
+          if (!active) return;
+          const retryDelay = retryDelaysMs[attempt - 1];
+          if (retryDelay != null) {
+            console.warn(
+              `[viewer] thumbnail load failed; retrying in ${retryDelay}ms: ${url}`,
+            );
+            retryTimer = window.setTimeout(loadTexture, retryDelay);
+            return;
+          }
+          console.warn(`[viewer] thumbnail unavailable after ${attempt} attempts: ${url}`);
           setTexture(fallbackTexture);
-        }
-      },
-    );
+        },
+      );
+    };
+
+    loadTexture();
 
     return () => {
       active = false;
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
+      if (pendingTexture && pendingTexture !== loadedTexture) {
+        pendingTexture.dispose();
+      }
       loadedTexture?.dispose();
     };
   }, [fallbackTexture, gl, url]);

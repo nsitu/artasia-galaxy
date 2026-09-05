@@ -26,6 +26,35 @@ interface GalleryState {
 let galleryRequestId = 0;
 const placementPhotoCache = new Map<number, Photo[]>();
 const placementPhotoRequests = new Map<number, Promise<Photo[]>>();
+const PLACEMENT_REQUEST_RETRY_DELAYS_MS = [250, 750, 1500];
+
+function waitForRetry(delayMs: number) {
+  return new Promise<void>((resolve) => window.setTimeout(resolve, delayMs));
+}
+
+async function fetchPlacementPhotosWithRetry(params: {
+  placementId: number;
+  lat: number;
+  lng: number;
+  radiusKm: number;
+}) {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      const result = await fetchSlideshow({
+        placementFocus: params,
+        limit: 500,
+      });
+      return result.photos;
+    } catch (error) {
+      const retryDelay = PLACEMENT_REQUEST_RETRY_DELAYS_MS[attempt];
+      if (retryDelay == null) throw error;
+      console.warn(
+        `[viewer] placement ${params.placementId} gallery load failed; retrying in ${retryDelay}ms`,
+      );
+      await waitForRetry(retryDelay);
+    }
+  }
+}
 
 function requestPlacementPhotos(params: {
   placementId: number;
@@ -39,13 +68,10 @@ function requestPlacementPhotos(params: {
   const pending = placementPhotoRequests.get(params.placementId);
   if (pending) return pending;
 
-  const request = fetchSlideshow({
-    placementFocus: params,
-    limit: 500,
-  })
-    .then((result) => {
-      placementPhotoCache.set(params.placementId, result.photos);
-      return result.photos;
+  const request = fetchPlacementPhotosWithRetry(params)
+    .then((photos) => {
+      placementPhotoCache.set(params.placementId, photos);
+      return photos;
     })
     .finally(() => {
       placementPhotoRequests.delete(params.placementId);
