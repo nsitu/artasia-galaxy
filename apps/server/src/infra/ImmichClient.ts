@@ -22,6 +22,11 @@ const tagAssetIdsCache = new Map<string, {
   value: string[];
 }>();
 const tagAssetIdsRequests = new Map<string, Promise<string[]>>();
+const EMBEDDING_AVAILABILITY_CACHE_TTL_MS = 60_000;
+const embeddingAvailabilityCache = new Map<string, {
+  checkedAt: number;
+  available: boolean;
+}>();
 
 export interface ImmichAsset {
   id: string;
@@ -367,6 +372,27 @@ export async function searchSimilarAssets(params: {
   });
   const response = await res.json() as ImmichSearchResponse;
   return response.assets?.items ?? [];
+}
+
+export async function hasAssetEmbedding(assetId: string): Promise<boolean> {
+  const cached = embeddingAvailabilityCache.get(assetId);
+  if (cached && Date.now() - cached.checkedAt < EMBEDDING_AVAILABILITY_CACHE_TTL_MS) {
+    return cached.available;
+  }
+
+  try {
+    await searchSimilarAssets({ assetId, size: 1 });
+    embeddingAvailabilityCache.set(assetId, { checkedAt: Date.now(), available: true });
+    return true;
+  } catch (error) {
+    if (!isMissingEmbeddingError(error)) throw error;
+    embeddingAvailabilityCache.set(assetId, { checkedAt: Date.now(), available: false });
+    return false;
+  }
+}
+
+export function isMissingEmbeddingError(error: unknown): boolean {
+  return /has no embedding/i.test(error instanceof Error ? error.message : String(error));
 }
 
 export async function searchContextAssets(params: {

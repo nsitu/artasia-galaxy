@@ -2,6 +2,8 @@ import { Router } from "express";
 import {
   getAssetOriginal,
   getAssetThumbnail,
+  hasAssetEmbedding,
+  isMissingEmbeddingError,
   regenerateAssetThumbnail,
 } from "../infra/ImmichClient.js";
 import { getWordPressConfig } from "../infra/WordPressClient.js";
@@ -176,6 +178,18 @@ router.get("/:id/preview", async (req, res) => {
   }
 });
 
+router.get("/:id/similar-availability", async (req, res) => {
+  try {
+    const available = await hasAssetEmbedding(req.params.id);
+    res.set("Cache-Control", "no-store");
+    res.json({ available });
+  } catch (err) {
+    const msg = (err as Error).message;
+    console.error(`[similar-availability] ${req.params.id}: ${msg}`);
+    res.status(502).json({ error: msg });
+  }
+});
+
 router.get("/:id/similar", async (req, res) => {
   const rawPlacementId = typeof req.query.excludePlacementId === "string"
     ? Number(req.query.excludePlacementId)
@@ -200,7 +214,7 @@ router.get("/:id/similar", async (req, res) => {
   } catch (err) {
     const msg = (err as Error).message;
     console.error(`[similar] ${req.params.id}: ${msg}`);
-    res.status(502).json({ error: msg });
+    res.status(isMissingEmbeddingError(err) ? 400 : 502).json({ error: msg });
   }
 });
 

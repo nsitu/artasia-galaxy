@@ -2,7 +2,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { Canvas, useThree } from "@react-three/fiber";
 import { MapControls, Preload } from "@react-three/drei";
 import * as THREE from "three";
-import { fetchAuthUser, fetchContextSearch, fetchPlacementProcessGallery, fetchProjects, fetchSimilarAssets, fetchUploadOptions, fetchViewerAsset, type ActivityOption, type AuthUser, type ContextSearchPlacement, type ContextSearchResult, type MapPlacement, type Photo, type ProcessGalleryAsset, type ProjectOption } from "../../api/client";
+import { fetchAuthUser, fetchContextSearch, fetchPlacementProcessGallery, fetchProjects, fetchSimilarAssetAvailability, fetchSimilarAssets, fetchUploadOptions, fetchViewerAsset, type ActivityOption, type AuthUser, type ContextSearchPlacement, type ContextSearchResult, type MapPlacement, type Photo, type ProcessGalleryAsset, type ProjectOption } from "../../api/client";
 import { useGalleryStore } from "../../stores/galleryStore";
 import LoadingIndicator from "../ui/LoadingIndicator";
 import AudioLightboxPlayer from "../ui/AudioLightboxPlayer";
@@ -504,6 +504,7 @@ export default function ArtScene() {
   const [lightboxMetadataExpanded, setLightboxMetadataExpanded] = useState(true);
   const [similarLoading, setSimilarLoading] = useState(false);
   const [similarError, setSimilarError] = useState<string | null>(null);
+  const [similarEmbeddingAvailable, setSimilarEmbeddingAvailable] = useState<boolean | null>(null);
   const [similarMapOrigin, setSimilarMapOrigin] = useState<{
     asset: Photo;
     placementName: string;
@@ -953,7 +954,30 @@ export default function ArtScene() {
     similarRequestIdRef.current += 1;
     setSimilarLoading(false);
     setSimilarError(null);
+    setSimilarEmbeddingAvailable(null);
   }, [selectedPhoto?.id]);
+
+  useEffect(() => {
+    if (!selectedPhoto || selectedPhoto.mediaKind !== "image" || !ASSET_ID_PATTERN.test(selectedPhoto.id)) {
+      setSimilarEmbeddingAvailable(null);
+      return;
+    }
+
+    let cancelled = false;
+    void fetchSimilarAssetAvailability(selectedPhoto.id)
+      .then((available) => {
+        if (!cancelled) setSimilarEmbeddingAvailable(available);
+      })
+      .catch(() => {
+        // If the availability check itself is unavailable, preserve the existing
+        // action and let the actual request provide the fallback error.
+        if (!cancelled) setSimilarEmbeddingAvailable(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedPhoto?.id, selectedPhoto?.mediaKind]);
 
   const closeLightbox = useCallback(() => {
     setProcessLightboxPhotoId(null);
@@ -968,7 +992,11 @@ export default function ArtScene() {
   }, [selectPhoto]);
 
   const handleFindSimilar = useCallback(() => {
-    if (!selectedPhoto || selectedPhoto.mediaKind !== "image") return;
+    if (
+      !selectedPhoto ||
+      selectedPhoto.mediaKind !== "image" ||
+      similarEmbeddingAvailable !== true
+    ) return;
     const sourceAssetId = selectedPhoto.id;
     const sourcePlacement = contextSearchLightboxResult?.placement ?? focusedPlacementDetails;
     const requestId = similarRequestIdRef.current + 1;
@@ -1005,7 +1033,13 @@ export default function ArtScene() {
       })
       .catch((error) => {
         if (similarRequestIdRef.current !== requestId) return;
-        setSimilarError((error as Error).message);
+        const message = (error as Error).message;
+        if (/has no embedding/i.test(message)) {
+          setSimilarEmbeddingAvailable(false);
+          setSimilarError(null);
+          return;
+        }
+        setSimilarError(message);
       })
       .finally(() => {
         if (similarRequestIdRef.current === requestId) setSimilarLoading(false);
@@ -1018,6 +1052,7 @@ export default function ArtScene() {
     focusedPlacementDetails?.placement_name,
     focusedPlacementDetails?.section,
     selectedPhoto,
+    similarEmbeddingAvailable,
     selectedProjectSlug,
   ]);
   const selectedDescription = selectedPhoto?.exifInfo?.description?.trim();
@@ -2443,26 +2478,28 @@ export default function ArtScene() {
                         <span>Gallery</span>
                       </a>
                     )}
-                    <div className="atlas-lightbox-similar" style={photoLightboxSimilarStyle}>
-                      <button
-                        type="button"
-                        className="atlas-control-surface"
-                        onClick={handleFindSimilar}
-                        disabled={similarLoading}
-                        style={photoLightboxActionLinkStyle}
-                        aria-label="Find a similar artwork in another placement"
-                      >
-                        <span aria-hidden="true" style={photoLightboxMaterialIconStyle}>
-                          travel_explore
-                        </span>
-                        <span>{similarLoading ? "Loading map…" : "Find Similar"}</span>
-                      </button>
-                      {!similarLoading && similarError && (
-                        <span role="alert" style={photoLightboxSimilarStatusStyle}>
-                          {similarError}
-                        </span>
-                      )}
-                    </div>
+                    {similarEmbeddingAvailable === true && (
+                      <div className="atlas-lightbox-similar" style={photoLightboxSimilarStyle}>
+                        <button
+                          type="button"
+                          className="atlas-control-surface"
+                          onClick={handleFindSimilar}
+                          disabled={similarLoading}
+                          style={photoLightboxActionLinkStyle}
+                          aria-label="Find a similar artwork in another placement"
+                        >
+                          <span aria-hidden="true" style={photoLightboxMaterialIconStyle}>
+                            travel_explore
+                          </span>
+                          <span>{similarLoading ? "Loading map…" : "Find Similar"}</span>
+                        </button>
+                        {!similarLoading && similarError && (
+                          <span role="alert" style={photoLightboxSimilarStatusStyle}>
+                            {similarError}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </>
                 )}
                 <a

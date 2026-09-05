@@ -146,6 +146,18 @@ export async function fetchSimilarAsset(params: {
   return (await fetchSimilarAssetSearch(params)).recommendation;
 }
 
+export async function fetchSimilarAssetAvailability(assetId: string): Promise<boolean> {
+  const res = await fetch(`/api/v1/assets/${encodeURIComponent(assetId)}/similar-availability`, {
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  const body = await res.json() as { available?: boolean };
+  return body.available === true;
+}
+
 export async function fetchSimilarAssets(params: {
   assetId: string;
   excludePlacementId?: number;
