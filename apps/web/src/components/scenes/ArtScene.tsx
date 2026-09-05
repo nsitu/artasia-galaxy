@@ -3312,6 +3312,7 @@ const responsiveTopNavStyles = `
     .atlas-photo-lightbox-metadata-collapsed .atlas-lightbox-caption-header-content {
       flex-direction: row !important;
       align-items: center !important;
+      justify-content: flex-start !important;
       gap: 10px !important;
     }
 
@@ -4058,6 +4059,7 @@ const photoLightboxPlacementContentRowStyle: React.CSSProperties = {
   gap: 6,
   width: "100%",
   marginTop: 10,
+  marginBottom: 10,
 };
 
 const photoLightboxPlacementContentLinkStyle: React.CSSProperties = {
