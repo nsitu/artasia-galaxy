@@ -3044,7 +3044,7 @@ function TouchDoubleTapZoom({ enabled }: { enabled: boolean }) {
       const offset = camera.position.clone().sub(terrainControls.target);
       const currentDistance = offset.length();
       if (currentDistance > 1.5) {
-        const nextDistance = Math.max(1.5, currentDistance * 0.78);
+        const nextDistance = Math.max(1.5, currentDistance * 0.56);
         const startPosition = camera.position.clone();
         const endPosition = terrainControls.target
           .clone()
