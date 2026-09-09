@@ -12,6 +12,8 @@ const MAX_HISTORY_LENGTH = 120;
 const UPCOMING_BUFFER_LENGTH = 3;
 const REFRESH_INTERVAL_MS = 10 * 60 * 1_000;
 const ANECDOTE_SLIDE_PROBABILITY = 0.2;
+const MIN_IMAGE_LONG_EDGE = 1920;
+const MIN_IMAGE_SHORT_EDGE = 1080;
 const CUSTOM_ACTIVITY_COLOURS = ["#8e1d58", "#c45b2c", "#367b76", "#6b5aa8", "#9a7b1f"];
 const ROTATION_STORAGE_KEY = "atlas-slideshow-rotation";
 
@@ -111,6 +113,14 @@ function getContrastingTextColour(backgroundColour?: string): string {
   return 0.2126 * luminance[0] + 0.7152 * luminance[1] + 0.0722 * luminance[2] > 0.48
     ? "#16131a"
     : "#ffffff";
+}
+
+function hasSlideshowResolution(photo: Photo): boolean {
+  if (photo.mediaKind !== "image") return true;
+  return (
+    Math.max(photo.width, photo.height) >= MIN_IMAGE_LONG_EDGE &&
+    Math.min(photo.width, photo.height) >= MIN_IMAGE_SHORT_EDGE
+  );
 }
 
 function pickRandomPhoto(
@@ -224,7 +234,9 @@ export default function SlideshowViewer({ placementId }: SlideshowViewerProps) {
         placementFocus: placementId == null ? undefined : { placementId },
       });
       const incoming = result.photos.filter(
-        (photo) => photo.mediaKind === "image" || photo.mediaKind === "anecdote",
+        (photo) =>
+          (photo.mediaKind === "image" || photo.mediaKind === "anecdote") &&
+          hasSlideshowResolution(photo),
       );
       const metadataMissingPhotos = incoming
         .filter((photo) => photo.mediaKind === "image")

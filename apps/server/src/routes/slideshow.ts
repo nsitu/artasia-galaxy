@@ -15,6 +15,7 @@ router.post("/query", async (req, res) => {
       seed: req.body.seed ?? Date.now(),
       limit: req.body.limit ?? 100,
       assetType: req.body.assetType,
+      minimumImageResolution: { longEdge: 1920, shortEdge: 1080 },
       placementFocus: req.body.placementFocus,
     });
 

@@ -67,6 +67,10 @@ export interface SlideshowQuery {
   seed?: number;
   limit?: number;
   assetType?: AssetType;
+  minimumImageResolution?: {
+    longEdge: number;
+    shortEdge: number;
+  };
   placementFocus?: {
     placementId: number;
     lat?: number;
@@ -74,6 +78,32 @@ export interface SlideshowQuery {
     radiusKm?: number;
     activityId?: number;
   };
+}
+
+/**
+ * Check the source dimensions used by the slideshow before creating photo
+ * metadata. The long/short edge comparison keeps portrait images eligible for
+ * rotated displays while still requiring the equivalent of 1920x1080 pixels.
+ */
+export function hasMinimumImageResolution(
+  asset: ImmichAsset,
+  minimum: { longEdge: number; shortEdge: number },
+): boolean {
+  const width = asset.exifInfo?.exifImageWidth ?? asset.width ?? 0;
+  const height = asset.exifInfo?.exifImageHeight ?? asset.height ?? 0;
+  if (
+    !Number.isFinite(width) ||
+    !Number.isFinite(height) ||
+    width <= 0 ||
+    height <= 0
+  ) {
+    return false;
+  }
+
+  return (
+    Math.max(width, height) >= minimum.longEdge &&
+    Math.min(width, height) >= minimum.shortEdge
+  );
 }
 
 const PLACEMENT_TAG_PATTERN = /^(?:placement|display-placement):(\d+)$/i;
@@ -552,6 +582,22 @@ export async function querySlideshow(
       ...imageResult.assets.items.filter((asset) => asset.type === "IMAGE"),
       ...videoResult.assets.items.filter((asset) => asset.type === "VIDEO"),
     ];
+  }
+
+  const minimumImageResolution = query.minimumImageResolution;
+  if (minimumImageResolution) {
+    const originalAssetCount = assets.length;
+    assets = assets.filter(
+      (asset) =>
+        asset.type !== "IMAGE" ||
+        hasMinimumImageResolution(asset, minimumImageResolution),
+    );
+    const skippedAssetCount = originalAssetCount - assets.length;
+    if (skippedAssetCount > 0) {
+      console.info(
+        `[slideshow] skipped ${skippedAssetCount} image asset(s) below the minimum resolution`,
+      );
+    }
   }
 
   const assetIds = assets.map((asset) => asset.id);
